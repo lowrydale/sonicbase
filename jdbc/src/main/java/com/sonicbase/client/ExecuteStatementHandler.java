@@ -10,7 +10,6 @@ import com.sonicbase.query.impl.SelectStatementImpl;
 import net.sf.jsqlparser.statement.Statement;
 import net.sf.jsqlparser.statement.execute.Execute;
 
-import java.sql.SQLException;
 import java.util.concurrent.ThreadLocalRandom;
 
 @SuppressWarnings({"squid:S1168", "squid:S00107"})

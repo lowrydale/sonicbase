@@ -30,7 +30,7 @@ public class Util {
     return readRawLittleEndian32(buffer, 0);
   }
   public static int readRawLittleEndian32(byte[] buffer, int offset) {
-    return ((int)buffer[0 + offset] & 0xff)       |
+    return ((int)buffer[offset] & 0xff)       |
            ((int)buffer[1 + offset] & 0xff) <<  8 |
            ((int)buffer[2 + offset] & 0xff) << 16 |
            ((int)buffer[3 + offset] & 0xff) << 24;
@@ -38,7 +38,7 @@ public class Util {
 
   public static long readRawLittleEndian64(byte[] buffer) { return readRawLittleEndian64(buffer, 0); }
   public static long readRawLittleEndian64(byte[] buffer, int offset) {
-    return ((long)buffer[0 + offset] & 0xff)       |
+    return ((long)buffer[offset] & 0xff)       |
            ((long)buffer[1 + offset] & 0xff) <<  8 |
            ((long)buffer[2 + offset] & 0xff) << 16 |
            ((long)buffer[3 + offset] & 0xff) << 24 |

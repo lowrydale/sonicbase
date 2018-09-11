@@ -25,7 +25,7 @@ import java.util.concurrent.atomic.AtomicLong;
 public class InExpressionImpl extends ExpressionImpl implements InExpression {
   private ParameterHandler parms;
   private String tableName;
-  private List<ExpressionImpl> expressionList = new ArrayList<>();
+  private final List<ExpressionImpl> expressionList = new ArrayList<>();
   private ExpressionImpl leftExpression;
   private boolean isNot;
 
@@ -74,7 +74,7 @@ public class InExpressionImpl extends ExpressionImpl implements InExpression {
     }
   }
 
-  public ExpressionImpl getLeftExpression() {
+  private ExpressionImpl getLeftExpression() {
     return leftExpression;
   }
 
@@ -240,8 +240,9 @@ public class InExpressionImpl extends ExpressionImpl implements InExpression {
         getClient().getCommon().getSchemaVersion(), false, null, 0);
 
     Object[][][] ret = new Object[readResults.size()][][];
+    int retOffset = 0;
     for (Map.Entry<Integer, Object[][]> entry : readResults.entrySet()) {
-      ret[entry.getKey()] = entry.getValue();
+      ret[retOffset++] = entry.getValue();
     }
 
     setNextShard(-2);
@@ -264,11 +265,6 @@ public class InExpressionImpl extends ExpressionImpl implements InExpression {
   @Override
   public boolean canSortWithIndex() {
     return false;
-  }
-
-  @Override
-  public void queryRewrite() {
-
   }
 
   @Override

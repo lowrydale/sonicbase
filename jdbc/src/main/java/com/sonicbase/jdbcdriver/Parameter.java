@@ -1,8 +1,8 @@
 package com.sonicbase.jdbcdriver;
 
 import com.sonicbase.query.DatabaseException;
+import com.sonicbase.util.Varint;
 import org.apache.commons.io.IOUtils;
-import org.apache.giraph.utils.Varint;
 
 import java.io.*;
 import java.sql.SQLException;
@@ -13,7 +13,7 @@ import java.sql.Types;
 // I don't know a good way to reduce the parameter count
 public class Parameter {
 
-  public static final java.lang.String UTF_8_STR = "utf-8";
+  private static final java.lang.String UTF_8_STR = "utf-8";
 
   private Parameter() {
   }
@@ -25,7 +25,7 @@ public class Parameter {
       return value;
     }
 
-    public ParameterBase(Q value) {
+    ParameterBase(Q value) {
       this.value = value;
     }
 
@@ -52,13 +52,13 @@ public class Parameter {
       length = getValue().length;
     }
 
-    public NClobReader(Reader value, long length) throws IOException {
+    NClobReader(Reader value, long length) throws IOException {
       super(null);
       setValue(IOUtils.toByteArray(value, UTF_8_STR));
       this.length = length;
     }
 
-    public NClobReader(byte[] bytes) {
+    NClobReader(byte[] bytes) {
       super(bytes);
       length = bytes.length;
     }
@@ -94,13 +94,13 @@ public class Parameter {
       length = getValue().length;
     }
 
-    public ClobReader(Reader value, long length) throws IOException {
+    ClobReader(Reader value, long length) throws IOException {
       super(null);
       setValue(IOUtils.toByteArray(value, UTF_8_STR));
       this.length = length;
     }
 
-    public ClobReader(byte[] bytes) {
+    ClobReader(byte[] bytes) {
       super(bytes);
       length = bytes.length;
     }
@@ -133,11 +133,11 @@ public class Parameter {
       super(IOUtils.toString(value).getBytes(UTF_8_STR));
     }
 
-    public CharacterStream(Reader value, long length) throws IOException {
+    CharacterStream(Reader value, long length) throws IOException {
       super(IOUtils.toString(value).substring(0, (int)length).getBytes(UTF_8_STR));
     }
 
-    public CharacterStream(byte[] bytes) {
+    CharacterStream(byte[] bytes) {
       super(bytes);
     }
 
@@ -168,7 +168,7 @@ public class Parameter {
       setValue(IOUtils.toByteArray(value, UTF_8_STR));
     }
 
-    public NCharacterStream(Reader value, long length) {
+    NCharacterStream(Reader value, long length) {
       super(null);
       try {
         setValue(IOUtils.toString(value).substring(0, (int)length).getBytes(UTF_8_STR));
@@ -178,7 +178,7 @@ public class Parameter {
       }
     }
 
-    public NCharacterStream(byte[] bytes) {
+    NCharacterStream(byte[] bytes) {
       super(bytes);
     }
 
@@ -211,7 +211,7 @@ public class Parameter {
       super(value);
       this.length = value.length;
     }
-    public BinaryStream(byte[] value, long length) {
+    BinaryStream(byte[] value, long length) {
       super(value);
       this.length = length;
     }
@@ -243,12 +243,12 @@ public class Parameter {
       setValue(IOUtils.toByteArray(value));
     }
 
-    public AsciiStream(InputStream value, long length) throws IOException {
+    AsciiStream(InputStream value, long length) throws IOException {
       super(null);
       setValue(IOUtils.toString(value, UTF_8_STR).substring(0, (int)length).getBytes(UTF_8_STR));
     }
 
-    public AsciiStream(byte[] bytes) {
+    AsciiStream(byte[] bytes) {
       super(bytes);
     }
 
@@ -332,7 +332,7 @@ public class Parameter {
   }
 
   public static class Null extends ParameterBase<Integer> {
-    private int sqlType;
+    private final int sqlType;
 
     public Null(int sqlType) {
       super(null);

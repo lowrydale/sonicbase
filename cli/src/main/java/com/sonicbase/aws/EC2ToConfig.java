@@ -6,21 +6,20 @@ import com.amazonaws.regions.Regions;
 import com.amazonaws.services.ec2.AmazonEC2;
 import com.amazonaws.services.ec2.AmazonEC2ClientBuilder;
 import com.amazonaws.services.ec2.model.*;
-import com.fasterxml.jackson.databind.ObjectMapper;
-import com.fasterxml.jackson.databind.node.ArrayNode;
-import com.fasterxml.jackson.databind.node.JsonNodeFactory;
-import com.fasterxml.jackson.databind.node.ObjectNode;
+import com.sonicbase.cli.BuildConfig;
+import com.sonicbase.common.Config;
 import com.sonicbase.query.DatabaseException;
 import org.apache.commons.io.FileUtils;
 import org.apache.commons.io.IOUtils;
 
 import java.io.*;
 import java.util.ArrayList;
+import java.util.HashMap;
 import java.util.List;
 
 public class EC2ToConfig {
 
-  public static void main(String[] args) throws IOException {
+  public static void main(String[] args) {
     final String cluster = args[0];
     EC2ToConfig toConfig = new EC2ToConfig();
     toConfig.buildConfig(cluster);
@@ -28,41 +27,41 @@ public class EC2ToConfig {
 
   public void buildConfig(String cluster) {
     try {
-      File file = new File(System.getProperty("user.dir"), "../config/config-" + cluster + ".json");
+      File file = new File(System.getProperty("user.dir"), "../config/config-" + cluster + ".yaml");
       InputStream in = new FileInputStream(file);
 
       String json = IOUtils.toString(in, "utf-8");
-      ObjectMapper mapper = new ObjectMapper();
-      ObjectNode config = (ObjectNode) mapper.readTree(json);
-      ObjectNode databaseDict = config;
+      Config config = new Config(json);
 
       File keysFile = new File(System.getProperty("user.home"), ".awskeys");
       if (!keysFile.exists()) {
-        throw new Exception(".awskeys file not found");
+        throw new DatabaseException(".awskeys file not found");
       }
+      String accessKey;
+      String secretKey;
       try (BufferedReader reader = new BufferedReader(new InputStreamReader(new FileInputStream(keysFile)))) {
-        String accessKey = reader.readLine();
-        String secretKey = reader.readLine();
+        accessKey = reader.readLine();
+        secretKey = reader.readLine();
 
-        BasicAWSCredentials awsCredentials = new BasicAWSCredentials(accessKey, secretKey);
-        AmazonEC2 ec2 = AmazonEC2ClientBuilder.standard()
-            .withRegion(Regions.US_EAST_1)
-            .withCredentials(new AWSStaticCredentialsProvider(awsCredentials))
-            .build();
-
-        configureServers(ec2, databaseDict, cluster);
-        configureClients(ec2, databaseDict, cluster);
       }
+      BasicAWSCredentials awsCredentials = new BasicAWSCredentials(accessKey, secretKey);
+      AmazonEC2 ec2 = AmazonEC2ClientBuilder.standard()
+          .withRegion(Regions.US_EAST_1)
+          .withCredentials(new AWSStaticCredentialsProvider(awsCredentials))
+          .build();
 
-      file.delete();
+      List<Config.Shard> shards = configureServers(ec2, config, cluster);
+      List<Config.Client> clients = configureClients(ec2, config, cluster);
+
+      String newYaml = BuildConfig.dumpYaml(config, shards, clients);
+
+      FileUtils.forceDelete(file);
       try (BufferedWriter writer = new BufferedWriter(new OutputStreamWriter(new FileOutputStream(file)))) {
-        Object prettyJson = mapper.readValue(config.toString(), Object.class);
-        String ret = mapper.writerWithDefaultPrettyPrinter().writeValueAsString(prettyJson);
-        writer.write(ret);
+        writer.write(newYaml);
       }
       File secondaryConfigDir = new File(System.getProperty("user.home"), "/Dropbox/sonicbase-config");
       if (secondaryConfigDir.exists()) {
-        File destFile = new File(secondaryConfigDir, "config-" + cluster + ".json");
+        File destFile = new File(secondaryConfigDir, "config-" + cluster + ".yaml");
         FileUtils.copyFile(file, destFile);
       }
       System.out.println("Finished building config");
@@ -72,20 +71,17 @@ public class EC2ToConfig {
     }
   }
 
-  public static void configureServers(AmazonEC2 ec2Client, ObjectNode databaseDict, String cluster) throws Exception {
+  private static List<Config.Shard> configureServers(AmazonEC2 ec2Client, Config config, String cluster) throws Exception {
     DescribeInstancesRequest request = new DescribeInstancesRequest();
 
     List<String> valuesT1 = new ArrayList<>();
     valuesT1.add(cluster);
     Filter filter1 = new Filter("tag:sonicbase-server", valuesT1);
-//    List<String> valuesSomeprop = new ArrayList<>();
-//    valuesSomeprop.add("somevalue");
-//    Filter filter2 = new Filter("tag:someprop", valuesSomeprop);
 
     DescribeInstancesResult result = ec2Client.describeInstances(request.withFilters(filter1));
     List<Reservation> reservations = result.getReservations();
 
-    int replicationFactor = databaseDict.get("replicationFactor").asInt();
+    int replicationFactor = config.getInt("replicationFactor");
 
     boolean haveFirst = false;
     List<Node> servers = new ArrayList<>();
@@ -110,17 +106,19 @@ public class EC2ToConfig {
     }
 
     if (servers.size() % replicationFactor != 0) {
-      throw new Exception("Server count not divisible by replication factor: serverCount=" + servers.size() + ", replicationFactor=" + replicationFactor);
+      throw new DatabaseException("Server count not divisible by replication factor: serverCount=" + servers.size() + ", replicationFactor=" + replicationFactor);
     }
     int shardCount = servers.size() / replicationFactor;
-    ArrayNode shards = new ArrayNode(JsonNodeFactory.instance);
+    List<Config.Shard> shards = new ArrayList<>();
     int nodeOffset = 0;
     for (int i = 0; i < shardCount; i++) {
-      ObjectNode shard = shards.addObject();
-      ArrayNode replicas = new ArrayNode(JsonNodeFactory.instance);
-      shard.put("replicas", replicas);
+      Config.Shard shard = new Config.Shard();
+      shards.add(shard);
+      List<Config.Replica> replicas = shard.getReplicas();
       for (int j = 0; j < replicationFactor; j++) {
-        ObjectNode replica = replicas.addObject();
+        Config.Replica replica = new Config.Replica(new HashMap<>());
+        replicas.add(replica);
+
         replica.put("publicAddress", servers.get(nodeOffset).publicAddress);
         replica.put("privateAddress", servers.get(nodeOffset).privateAddress);
         replica.put("port", 9010);
@@ -129,10 +127,10 @@ public class EC2ToConfig {
       }
     }
 
-    databaseDict.put("shards", shards);
+    return shards;
   }
 
-  public static void configureClients(AmazonEC2 ec2Client, ObjectNode databaseDict, String cluster) {
+  private static List<Config.Client> configureClients(AmazonEC2 ec2Client, Config config, String cluster) {
     DescribeInstancesRequest request = new DescribeInstancesRequest();
 
     List<String> valuesT1 = new ArrayList<>();
@@ -157,24 +155,24 @@ public class EC2ToConfig {
       }
     }
 
-    ArrayNode clientArray = new ArrayNode(JsonNodeFactory.instance);
+    List<Config.Client> clientArray = new ArrayList<>();
     int nodeOffset = 0;
     for (int i = 0; i < clients.size(); i++) {
-      ObjectNode client = clientArray.addObject();
+      Config.Client client = new Config.Client(new HashMap<>());
+      clientArray.add(client);
       client.put("publicAddress", clients.get(nodeOffset).publicAddress);
       client.put("privateAddress", clients.get(nodeOffset).privateAddress);
       client.put("port", 8080);
       nodeOffset++;
     }
-    databaseDict.put("clients", clientArray);
-
+    return clientArray;
   }
 
   static class Node {
-    public String privateAddress;
-    public String publicAddress;
+    public final String privateAddress;
+    public final String publicAddress;
 
-    public Node(String publicIpAddress, String privateIpAddress) {
+    Node(String publicIpAddress, String privateIpAddress) {
       this.publicAddress = publicIpAddress;
       this.privateAddress = privateIpAddress;
     }

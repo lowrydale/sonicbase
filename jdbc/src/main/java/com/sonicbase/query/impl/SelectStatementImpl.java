@@ -13,12 +13,12 @@ import com.sonicbase.schema.DataType;
 import com.sonicbase.schema.FieldSchema;
 import com.sonicbase.schema.IndexSchema;
 import com.sonicbase.schema.TableSchema;
+import com.sonicbase.util.Varint;
 import net.sf.jsqlparser.expression.operators.relational.ExpressionList;
 import net.sf.jsqlparser.schema.Column;
 import net.sf.jsqlparser.statement.select.Limit;
 import net.sf.jsqlparser.statement.select.Offset;
 import org.apache.commons.lang.exception.ExceptionUtils;
-import org.apache.giraph.utils.Varint;
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
 
@@ -43,15 +43,15 @@ import static com.sonicbase.schema.DataType.Type.*;
 // I don't know a good way to reduce the parameter count
 public class SelectStatementImpl extends StatementImpl implements SelectStatement {
 
-  private static Logger logger = LoggerFactory.getLogger(SelectStatementImpl.class);
+  private static final Logger logger = LoggerFactory.getLogger(SelectStatementImpl.class);
   private ExpressionImpl.RecordCache recordCache;
 
-  private DatabaseClient client;
+  private final DatabaseClient client;
   private String fromTable;
   private ExpressionImpl expression;
   private List<OrderByExpressionImpl> orderByExpressions = new ArrayList<>();
-  private List<ColumnImpl> selectColumns = new ArrayList<>();
-  private List<Join> joins = new ArrayList<>();
+  private final List<ColumnImpl> selectColumns = new ArrayList<>();
+  private final List<Join> joins = new ArrayList<>();
   private boolean isCountFunction;
   private String countTable;
   private String countColumn;
@@ -78,8 +78,8 @@ public class SelectStatementImpl extends StatementImpl implements SelectStatemen
   private GroupByContext groupByContext;
   private Long pageSize = (long) SELECT_PAGE_SIZE;
   private boolean forceSelectOnServer;
-  private AtomicLong currOffset = new AtomicLong();
-  private AtomicLong countReturned = new AtomicLong();
+  private final AtomicLong currOffset = new AtomicLong();
+  private final AtomicLong countReturned = new AtomicLong();
   private short serializationVersion = DatabaseClient.SERIALIZATION_VERSION;
 
   public SelectStatementImpl(DatabaseClient client) {
@@ -120,7 +120,7 @@ public class SelectStatementImpl extends StatementImpl implements SelectStatemen
     }
   }
 
-  public void serialize(DataOutputStream out) {
+  private void serialize(DataOutputStream out) {
     try {
       Varint.writeSignedVarLong(serializationVersion, out);
       out.writeUTF(fromTable);
@@ -313,19 +313,19 @@ public class SelectStatementImpl extends StatementImpl implements SelectStatemen
     return tableNames;
   }
 
-  public boolean isServerSelect() {
+  boolean isServerSelect() {
     return serverSelect;
   }
 
-  public int getServerSelectShardNumber() {
+  int getServerSelectShardNumber() {
     return serverSelectShardNumber;
   }
 
-  public int getServerSelectReplicaNumber() {
+  int getServerSelectReplicaNumber() {
     return serverSelectReplicaNumber;
   }
 
-  public boolean isOnServer() {
+  boolean isOnServer() {
     return isOnServer;
   }
 
@@ -345,15 +345,15 @@ public class SelectStatementImpl extends StatementImpl implements SelectStatemen
     this.pageSize = pageSize;
   }
 
-  public void forceSelectOnServer() {
+  void forceSelectOnServer() {
     this.forceSelectOnServer = true;
   }
 
-  public boolean isForceSelectOnServer() {
+  boolean isForceSelectOnServer() {
     return forceSelectOnServer;
   }
 
-  public Long getPageSize() {
+  Long getPageSize() {
     return pageSize;
   }
 
@@ -361,11 +361,11 @@ public class SelectStatementImpl extends StatementImpl implements SelectStatemen
     return expression.getViewVersion();
   }
 
-  public int getCurrShard() {
+  int getCurrShard() {
     return expression.getNextShard();
   }
 
-  public int getLastShard() {
+  int getLastShard() {
     return expression.getLastShard();
   }
 
@@ -444,7 +444,7 @@ public class SelectStatementImpl extends StatementImpl implements SelectStatemen
     return limit;
   }
 
-  public void setAliases(Map<String, ColumnImpl> aliases) {
+  void setAliases(Map<String, ColumnImpl> aliases) {
     this.aliases = aliases;
   }
 
@@ -452,7 +452,7 @@ public class SelectStatementImpl extends StatementImpl implements SelectStatemen
     this.functionAliases = functionAliases;
   }
 
-  public void setServerSelect(boolean serverSelect) {
+  void setServerSelect(boolean serverSelect) {
     this.serverSelect = serverSelect;
   }
 
@@ -462,7 +462,7 @@ public class SelectStatementImpl extends StatementImpl implements SelectStatemen
     private final int[] distinctFields;
     private final boolean[] isArray;
 
-    public DistinctRecord(
+    DistinctRecord(
         Record record, Comparator[] comparators, boolean[] isArray, int[] distinctFields) {
       this.record = record;
       this.comparators = comparators;
@@ -521,14 +521,11 @@ public class SelectStatementImpl extends StatementImpl implements SelectStatemen
       this.indent = indent;
     }
 
-    public void appendSpaces() {
-    }
-
-    public void indent() {
+    void indent() {
       indent++;
     }
 
-    public void outdent() {
+    void outdent() {
       indent--;
     }
   }
@@ -536,59 +533,57 @@ public class SelectStatementImpl extends StatementImpl implements SelectStatemen
   @Override
   public Object execute(String dbName, String sqlToUse, Explain explain, Long sequence0, Long sequence1, Short sequence2,
                         boolean restrictToThisServer, StoredProcedureContextImpl procedureContext, int schemaRetryCount) {
-    while (true) {
-      try {
-        expression.setViewVersion(client.getCommon().getSchemaVersion());
-        expression.setDbName(dbName);
-        expression.setTableName(fromTable);
-        expression.setClient(client);
-        expression.setParms(getParms());
-        expression.setTopLevelExpression(getWhereClause());
-        expression.setOrderByExpressions(orderByExpressions);
-        expression.setRecordCache(recordCache);
+    try {
+      expression.setViewVersion(client.getCommon().getSchemaVersion());
+      expression.setDbName(dbName);
+      expression.setTableName(fromTable);
+      expression.setClient(client);
+      expression.setParms(getParms());
+      expression.setTopLevelExpression(getWhereClause());
+      expression.setOrderByExpressions(orderByExpressions);
+      expression.setRecordCache(recordCache);
 
-        boolean haveCounters = false;
-        boolean needToEvaluate = false;
-        List<Counter> countersList = new ArrayList<>();
-        GroupByContext groupContext = this.groupByContext;
-        if (groupContext == null && groupByColumns != null && !groupByColumns.isEmpty()) {
-          processGroupByContext(dbName, groupContext);
-        }
-        else {
-          CheckIfNeedToEvaluate checkIfNeedToEvaluate = new CheckIfNeedToEvaluate(dbName, restrictToThisServer,
-              procedureContext, schemaRetryCount, haveCounters, needToEvaluate, countersList).invoke();
-          haveCounters = checkIfNeedToEvaluate.isHaveCounters();
-          needToEvaluate = checkIfNeedToEvaluate.isNeedToEvaluate();
-        }
-        if (!haveCounters) {
-          needToEvaluate = true;
-        }
-
-        if (!countersList.isEmpty()) {
-          Counter[] localCounters = countersList.toArray(new Counter[countersList.size()]);
-          this.counters = localCounters;
-          expression.setCounters(localCounters);
-        }
-
-        getReplica();
-
-        boolean sortWithIndex = expression.canSortWithIndex();
-        tableNames = new String[]{fromTable};
-        getTableNamesForJoins();
-
-        boolean countDistinct = checkIfCountDistinct();
-
-        if (!countDistinct && this.isCountFunction && expression instanceof AllRecordsExpressionImpl) {
-          return countRecords(dbName, tableNames, restrictToThisServer, procedureContext, schemaRetryCount);
-        }
-        else {
-          return executeNonCountSelectStatement(dbName, sqlToUse, explain, restrictToThisServer, procedureContext,
-              schemaRetryCount, needToEvaluate, sortWithIndex, countDistinct);
-        }
+      boolean haveCounters = false;
+      boolean needToEvaluate = false;
+      List<Counter> countersList = new ArrayList<>();
+      GroupByContext groupContext = this.groupByContext;
+      if (groupContext == null && groupByColumns != null && !groupByColumns.isEmpty()) {
+        processGroupByContext(dbName, groupContext);
       }
-      catch (Exception e) {
-        throw new DatabaseException(e);
+      else {
+        CheckIfNeedToEvaluate checkIfNeedToEvaluate = new CheckIfNeedToEvaluate(dbName, restrictToThisServer,
+            procedureContext, schemaRetryCount, haveCounters, needToEvaluate, countersList).invoke();
+        haveCounters = checkIfNeedToEvaluate.isHaveCounters();
+        needToEvaluate = checkIfNeedToEvaluate.isNeedToEvaluate();
       }
+      if (!haveCounters) {
+        needToEvaluate = true;
+      }
+
+      if (!countersList.isEmpty()) {
+        Counter[] localCounters = countersList.toArray(new Counter[countersList.size()]);
+        this.counters = localCounters;
+        expression.setCounters(localCounters);
+      }
+
+      getReplica();
+
+      boolean sortWithIndex = expression.canSortWithIndex();
+      tableNames = new String[]{fromTable};
+      getTableNamesForJoins();
+
+      boolean countDistinct = checkIfCountDistinct();
+
+      if (!countDistinct && this.isCountFunction && expression instanceof AllRecordsExpressionImpl) {
+        return countRecords(dbName, tableNames, restrictToThisServer, procedureContext, schemaRetryCount);
+      }
+      else {
+        return executeNonCountSelectStatement(dbName, sqlToUse, explain, restrictToThisServer, procedureContext,
+            schemaRetryCount, needToEvaluate, sortWithIndex, countDistinct);
+      }
+    }
+    catch (Exception e) {
+      throw new DatabaseException(e);
     }
   }
 
@@ -606,8 +601,7 @@ public class SelectStatementImpl extends StatementImpl implements SelectStatemen
         localColumns.add(column);
       }
     }
-    List<ColumnImpl> list = new ArrayList<>();
-    list.addAll(localColumns);
+    List<ColumnImpl> list = new ArrayList<>(localColumns);
     expression.setColumns(list);
     this.columns = list;
 
@@ -700,12 +694,7 @@ public class SelectStatementImpl extends StatementImpl implements SelectStatemen
       String columnName = orderByExpressions.get(0).getColumnName();
       String tableName = orderByExpressions.get(0).getTableName();
       if (primaryColumn == null) {
-        if (isIndexed) {
-          serverSort = false;
-        }
-        else {
-          serverSort = true;
-        }
+        serverSort = !isIndexed;
       }
       else {
         if (isIndexed && primaryColumn.getColumnName().equals(columnName) &&
@@ -1112,7 +1101,7 @@ public class SelectStatementImpl extends StatementImpl implements SelectStatemen
 
           prepareComObjectForCountRecords(dbName, cobj);
 
-          byte[] lookupRet = client.send(null, shard, 0, cobj, DatabaseClient.Replica.MASTER);
+          byte[] lookupRet = client.send("ReadManager:countRecords", shard, 0, cobj, DatabaseClient.Replica.MASTER);
           ComObject retObj = new ComObject(lookupRet);
           return (long) retObj.getLong(ComObject.Tag.COUNT_LONG);
         }));
@@ -1160,7 +1149,6 @@ public class SelectStatementImpl extends StatementImpl implements SelectStatemen
 
     cobj.put(ComObject.Tag.DB_NAME, dbName);
     cobj.put(ComObject.Tag.SCHEMA_VERSION, client.getCommon().getSchemaVersion());
-    cobj.put(ComObject.Tag.METHOD, "ReadManager:countRecords");
     cobj.put(ComObject.Tag.TABLE_NAME, fromTable);
   }
 
@@ -1256,7 +1244,7 @@ public class SelectStatementImpl extends StatementImpl implements SelectStatemen
   }
 
   class DedupComparator implements Comparator<Object[][]> {
-    private Comparator[][] comparators;
+    private final Comparator[][] comparators;
 
     public DedupComparator(Comparator[][] comparators) {
       this.comparators = comparators;
@@ -1312,9 +1300,7 @@ public class SelectStatementImpl extends StatementImpl implements SelectStatemen
 
     Object[][][] actualIds = ids.getIds();
     ConcurrentSkipListSet<Object[][]> map = new ConcurrentSkipListSet<>(comparator);
-    for (int i = 0; i < actualIds.length; i++) {
-      map.add(actualIds[i]);
-    }
+    map.addAll(Arrays.asList(actualIds));
 
     Object[][][] retIds = new Object[map.size()][][];
     int localOffset = 0;
@@ -1636,8 +1622,7 @@ public class SelectStatementImpl extends StatementImpl implements SelectStatemen
                                                ExpressionImpl additionalJoinExpression, AtomicReference<JoinReturn> joinRet) {
     if (additionalJoinExpression != null) {
       if (explain != null) {
-        explain.appendSpaces();
-        explain.getBuilder().append("Evaluating join expression: expression=" + additionalJoinExpression.toString() + "\n");
+        explain.getBuilder().append("Evaluating join expression: expression=").append(additionalJoinExpression.toString()).append("\n");
       }
       if (joinRet.get() != null) {
         List<Object[][]> retKeys = new ArrayList<>();
@@ -1672,9 +1657,7 @@ public class SelectStatementImpl extends StatementImpl implements SelectStatemen
                                                      AtomicBoolean hadSelectRet) {
     if (multiTableIds.get() == null) {
       if (explain != null) {
-        explain.appendSpaces();
-        explain.getBuilder().append("inner join based on expression: table=" + fromTable + ", expression=" +
-            expression.toString() + "\n");
+        explain.getBuilder().append("inner join based on expression: table=").append(fromTable).append(", expression=").append(expression.toString()).append("\n");
       }
       long begin = System.nanoTime();
       ExpressionImpl.NextReturn ids = expression.next(this, pageSize / threadCount, explain,
@@ -1698,8 +1681,7 @@ public class SelectStatementImpl extends StatementImpl implements SelectStatemen
     ExpressionImpl.NextReturn ids = null;
     if (multiTableIds.get() == null) {
       if (explain != null) {
-        explain.appendSpaces();
-        explain.getBuilder().append("Right outer join. Retrieving all records from table: table=" + fromTable + "\n");
+        explain.getBuilder().append("Right outer join. Retrieving all records from table: table=").append(fromTable).append("\n");
       }
       AllRecordsExpressionImpl allExpression = new AllRecordsExpressionImpl();
       allExpression.setNextShard(expression.getNextShard());
@@ -1734,12 +1716,11 @@ public class SelectStatementImpl extends StatementImpl implements SelectStatemen
     ExpressionImpl.NextReturn ids = null;
     if (multiTableIds.get() == null) {
       if (explain != null) {
-        explain.appendSpaces();
         if (joinType == JoinType.LEFT_OUTER) {
-          explain.getBuilder().append("left outer join. Retrieving all records from table: table=" + fromTable + "\n");
+          explain.getBuilder().append("left outer join. Retrieving all records from table: table=").append(fromTable).append("\n");
         }
         else {
-          explain.getBuilder().append("Full outer join. Retrieving all records from table: table=" + fromTable + "\n");
+          explain.getBuilder().append("Full outer join. Retrieving all records from table: table=").append(fromTable).append("\n");
         }
       }
       AllRecordsExpressionImpl allExpression = new AllRecordsExpressionImpl();
@@ -1820,9 +1801,7 @@ public class SelectStatementImpl extends StatementImpl implements SelectStatemen
 
       final List<ExpressionImpl.IdEntry> keysToRead = getKeysToRead(multiTableIds, leftTable, leftTableIndex, leftColumnIndex);
       if (explain != null) {
-        explain.appendSpaces();
-        explain.getBuilder().append("Evaluate join expression. Read join records: joinTable=" + rightTable.getName() +
-            ", expression=" + expression.toString() + "\n");
+        explain.getBuilder().append("Evaluate join expression. Read join records: joinTable=").append(rightTable.getName()).append(", expression=").append(expression.toString()).append("\n");
       }
 
       keys = ExpressionImpl.readRecords(dbName, client, pageSize, forceSelectOnServer, tableSchema, keysToRead,
@@ -1988,14 +1967,14 @@ public class SelectStatementImpl extends StatementImpl implements SelectStatemen
   }
 
   private class ProcessFunction {
-    private String dbName;
-    private boolean restrictToThisServer;
-    private StoredProcedureContextImpl procedureContext;
-    private int schemaRetryCount;
+    private final String dbName;
+    private final boolean restrictToThisServer;
+    private final StoredProcedureContextImpl procedureContext;
+    private final int schemaRetryCount;
     private boolean haveCounters;
     private boolean needToEvaluate;
-    private List<Counter> countersList;
-    private Map<String, SelectFunctionImpl> localAliases;
+    private final List<Counter> countersList;
+    private final Map<String, SelectFunctionImpl> localAliases;
 
     public ProcessFunction(String dbName, boolean restrictToThisServer, StoredProcedureContextImpl procedureContext,
                            int schemaRetryCount, boolean haveCounters, boolean needToEvaluate, List<Counter> countersList,
@@ -2069,8 +2048,8 @@ public class SelectStatementImpl extends StatementImpl implements SelectStatemen
     }
 
     private class SelectIndexSchema {
-      private String columnName;
-      private String table;
+      private final String columnName;
+      private final String table;
       private boolean indexed;
       private IndexSchema selectedSchema;
 
@@ -2103,7 +2082,7 @@ public class SelectStatementImpl extends StatementImpl implements SelectStatemen
   }
 
   private class PrepareJoinExpression {
-    private BinaryExpressionImpl joinBinaryExpression;
+    private final BinaryExpressionImpl joinBinaryExpression;
     private ExpressionImpl leftExpression;
     private ExpressionImpl rightExpression;
     private ExpressionImpl additionalJoinExpression;
@@ -2169,13 +2148,13 @@ public class SelectStatementImpl extends StatementImpl implements SelectStatemen
   }
 
   private class CheckIfNeedToEvaluate {
-    private String dbName;
-    private boolean restrictToThisServer;
-    private StoredProcedureContextImpl procedureContext;
-    private int schemaRetryCount;
+    private final String dbName;
+    private final boolean restrictToThisServer;
+    private final StoredProcedureContextImpl procedureContext;
+    private final int schemaRetryCount;
     private boolean haveCounters;
     private boolean needToEvaluate;
-    private List<Counter> countersList;
+    private final List<Counter> countersList;
 
     public CheckIfNeedToEvaluate(String dbName, boolean restrictToThisServer, StoredProcedureContextImpl procedureContext,
                                  int schemaRetryCount, boolean haveCounters, boolean needToEvaluate, List<Counter> countersList) {

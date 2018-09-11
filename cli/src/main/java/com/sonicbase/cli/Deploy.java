@@ -3,6 +3,7 @@ package com.sonicbase.cli;
 import com.fasterxml.jackson.databind.ObjectMapper;
 import com.fasterxml.jackson.databind.node.ArrayNode;
 import com.fasterxml.jackson.databind.node.ObjectNode;
+import com.sonicbase.common.Config;
 import org.apache.commons.io.IOUtils;
 
 import java.io.File;
@@ -18,47 +19,58 @@ import java.util.concurrent.*;
  */
 public class Deploy {
 
-  private static int FAN_OUT = 4;
+  private static final int FAN_OUT = 4;
+  public static final String USER_DIR_STR = "user.dir";
 
   static class Node {
     private String id;
     private String address;
   }
 
-  public static void main(String[] args) throws IOException, InterruptedException {
+  public static void main(String[] args) {
     final String cluster = args[0];
     final String thisNode = args[1];
     Deploy deploy = new Deploy();
     deploy.deploy(cluster, thisNode);
   }
 
-  public void deploy(final String cluster, final String thisNodeId) throws IOException, InterruptedException {
+  private void printException(Exception e) {
+    e.printStackTrace();
+  }
+
+  void println(String msg) {
+    System.out.println(msg);
+  }
+
+  void write(int b) {
+    System.out.write(b);
+  }
+
+  void deploy(final String cluster, final String thisNodeId) {
     try {
       List<Node> nodes = new ArrayList<>();
-      InputStream in = Cli.class.getResourceAsStream("/config-" + cluster + ".json");
+      InputStream in = Cli.class.getResourceAsStream("/config-" + cluster + ".yaml");
       if (in == null) {
-        in = new FileInputStream(new File(System.getProperty("user.dir"), "../config/config-" + cluster + ".json"));
+        in = new FileInputStream(new File(System.getProperty(USER_DIR_STR), "../config/config-" + cluster + ".yaml"));
       }
       String json = IOUtils.toString(in, "utf-8");
-      ObjectMapper mapper = new ObjectMapper();
-      ObjectNode config = (ObjectNode) mapper.readTree(json);
-      ObjectNode databaseDict = config;
-      final String deployUser = databaseDict.get("user").asText();
-      final String installDir = resolvePath(databaseDict.get("installDirectory").asText());
+      Config config = new Config(json);
+      final String deployUser = config.getString("user");
+      final String installDir = resolvePath(config.getString("installDirectory"));
       int nodeCount = 0;
 
-      ArrayNode clients = databaseDict.withArray("clients");
-      ArrayNode shards = databaseDict.withArray("shards");
+      List<Config.Client> clients = config.getClients();
+      List<Config.Shard> shards = config.getShards();
       for (int i = 0; i < shards.size(); i++) {
-        ObjectNode dict = (ObjectNode) shards.get(i);
-        ArrayNode replicas = dict.withArray("replicas");
+        Config.Shard shard = shards.get(i);
+        List<Config.Replica> replicas = shard.getReplicas();
         for (int j = 0; j < replicas.size(); j++) {
           Node node = new Node();
           if (nodeCount == 0) {
-            node.address = replicas.get(j).get("publicAddress").asText();
+            node.address = replicas.get(j).getString("publicAddress");
           }
           else {
-            node.address = replicas.get(j).get("privateAddress").asText();
+            node.address = replicas.get(j).getString("privateAddress");
           }
           nodes.add(node);
           nodeCount++;
@@ -66,9 +78,9 @@ public class Deploy {
       }
 
       for (int i = 0; i < clients.size(); i++) {
-        ObjectNode dict = (ObjectNode) clients.get(i);
+        Config.Client client = clients.get(i);
         Node node = new Node();
-        node.address = dict.get("privateAddress").asText();
+        node.address = client.getString("privateAddress");
         nodes.add(node);
         nodeCount++;
       }
@@ -80,7 +92,7 @@ public class Deploy {
       }
 
       for (Node node : nodes) {
-        System.out.println("id=" + node.id + ", address=" + node.address);
+        println("id=" + node.id + ", address=" + node.address);
       }
       if (thisNodeId.equals("0")) {
         deployToAServer(deployUser, nodes.get(0), installDir, cluster);
@@ -91,15 +103,12 @@ public class Deploy {
         try {
           int offset = 1;
           for (final Node node : nodes) {
-            System.out.println("node.id=" + node.id + ", thisNodeId=" + thisNodeId);
+            println("node.id=" + node.id + ", thisNodeId=" + thisNodeId);
             if (node.id.equals(thisNodeId + "." + offset)) {
-              futures.add(executor.submit(new Callable() {
-                @Override
-                public Object call() throws Exception {
-                  deployToAServer(deployUser, node, installDir, cluster);
+              futures.add(executor.submit((Callable) () -> {
+                deployToAServer(deployUser, node, installDir, cluster);
 
-                  return null;
-                }
+                return null;
               }));
               offset++;
             }
@@ -109,7 +118,7 @@ public class Deploy {
           }
         }
         catch (Exception e) {
-          e.printStackTrace();
+          printException(e);
         }
         finally {
           executor.shutdownNow();
@@ -117,12 +126,12 @@ public class Deploy {
       }
     }
     catch (Exception e) {
-      e.printStackTrace();
+      printException(e);
     }
   }
 
   private void deployToAServer(String deployUser, Node node, String installDir, String cluster) throws IOException, InterruptedException {
-    System.out.println("Deploying to a server: id=" + node.id + ", address=" + node.address + ", userDir=" + System.getProperty("user.dir") + ", command=" + "bin/do-rsync " + deployUser + "@" + node.address + ":" + installDir);
+    println("Deploying to a server: id=" + node.id + ", address=" + node.address + ", userDir=" + System.getProperty(USER_DIR_STR) + ", command=" + "bin/do-rsync " + deployUser + "@" + node.address + ":" + installDir);
     ProcessBuilder builder = new ProcessBuilder().command("bash", "bin/do-rsync", deployUser + "@" + node.address, installDir);
     Process p = builder.start();
     InputStream in = p.getInputStream();
@@ -131,7 +140,7 @@ public class Deploy {
       if (b == -1) {
         break;
       }
-      System.out.write(b);
+      write(b);
     }
     p.waitFor();
 
@@ -143,7 +152,7 @@ public class Deploy {
       if (b == -1) {
         break;
       }
-      System.out.write(b);
+      write(b);
     }
     in = p.getErrorStream();
     while (true) {
@@ -151,7 +160,7 @@ public class Deploy {
       if (b == -1) {
         break;
       }
-      System.out.write(b);
+      write(b);
     }
     p.waitFor();
   }
@@ -164,7 +173,7 @@ public class Deploy {
       }
     }
     else if (installDir.startsWith("$WORKING_DIR")) {
-      installDir = installDir.replace("$WORKING_DIR", System.getProperty("user.dir"));
+      installDir = installDir.replace("$WORKING_DIR", System.getProperty(USER_DIR_STR));
       if (installDir.startsWith("/")) {
         installDir = installDir.substring(1);
       }

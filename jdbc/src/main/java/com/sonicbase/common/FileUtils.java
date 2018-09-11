@@ -1,5 +1,7 @@
 package com.sonicbase.common;
 
+import com.sonicbase.query.DatabaseException;
+
 import java.io.File;
 import java.io.IOException;
 import java.nio.file.Files;
@@ -9,6 +11,11 @@ import java.nio.file.Files;
 // I don't know a good way to reduce the parameter count
 public class FileUtils {
 
+  private FileUtils() {
+
+  }
+
+  //public for pro versions
   public static long sizeOfDirectory(File dir) {
     File[] files = dir.listFiles();
     if (files == null) {
@@ -25,6 +32,7 @@ public class FileUtils {
         }
       }
       catch (Exception e) {
+        throw new DatabaseException(e);
       }
     }
     return ret;

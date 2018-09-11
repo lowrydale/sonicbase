@@ -11,11 +11,10 @@ import com.sonicbase.common.ServersConfig;
 import com.sonicbase.jdbcdriver.ParameterHandler;
 import com.sonicbase.procedure.StoredProcedureContextImpl;
 import com.sonicbase.query.BinaryExpression;
-import com.sonicbase.query.DatabaseException;
 import com.sonicbase.query.Expression;
 import com.sonicbase.schema.IndexSchema;
 import com.sonicbase.schema.TableSchema;
-import com.sonicbase.util.TestUtils;
+import com.sonicbase.util.ClientTestUtils;
 import net.sf.jsqlparser.statement.select.Limit;
 import net.sf.jsqlparser.statement.select.Offset;
 import org.testng.annotations.BeforeMethod;
@@ -24,7 +23,9 @@ import org.testng.annotations.Test;
 import java.io.IOException;
 import java.io.UnsupportedEncodingException;
 import java.math.BigDecimal;
+import java.util.HashMap;
 import java.util.List;
+import java.util.Map;
 import java.util.concurrent.atomic.AtomicBoolean;
 import java.util.concurrent.atomic.AtomicLong;
 import java.util.concurrent.atomic.AtomicReference;
@@ -35,21 +36,21 @@ import static org.mockito.Mockito.when;
 import static org.testng.Assert.*;
 
 public class BInaryExpressionImplTest {
-  TableSchema tableSchema;
-  IndexSchema indexSchema;
-  DatabaseClient client;
-  List<Object[]> keys;
-  DatabaseCommon common;
-  byte[][] records;
+  private TableSchema tableSchema;
+  private IndexSchema indexSchema;
+  private DatabaseClient client;
+  private List<Object[]> keys;
+  private DatabaseCommon common;
+  private byte[][] records;
 
   @BeforeMethod
   public void beforeMethod() throws IOException {
-    tableSchema = TestUtils.createTable();
-    indexSchema = TestUtils.createIndexSchema(tableSchema);
+    tableSchema = ClientTestUtils.createTable();
+    indexSchema = ClientTestUtils.createIndexSchema(tableSchema);
 
     client = mock(DatabaseClient.class);
 
-    common = TestUtils.createCommon(tableSchema);
+    common = ClientTestUtils.createCommon(tableSchema);
     JsonNode node = new ObjectMapper().readTree(" { \"shards\" : [\n" +
         "    {\n" +
         "      \"replicas\": [\n" +
@@ -67,28 +68,17 @@ public class BInaryExpressionImplTest {
     common.setServersConfig(serversConfig);
     when(client.getCommon()).thenReturn(common);
 
-    records = TestUtils.createRecords(common, tableSchema, 10);
+    records = ClientTestUtils.createRecords(common, tableSchema, 10);
 
-    keys = TestUtils.createKeys(10);
+    keys = ClientTestUtils.createKeys(10);
 
   }
   @Test
-  public void testAndExpression() throws IOException {
+  public void testAndExpression() {
 
 
     BinaryExpressionImpl expression = new BinaryExpressionImpl() {
       protected IndexLookup createIndexLookup() {
-//        IndexLookup ret = mock(IndexLookup.class);
-//
-//        when(ret.lookup(any(ExpressionImpl.class), any(Expression.class))).thenAnswer(
-//            new Answer() {
-//              public Object answer(InvocationOnMock invocation) {
-//                Object[] args = invocation.getArguments();
-//                SelectContextImpl ret = new SelectContextImpl();
-//
-//                return ret;
-//              }
-//            });
         IndexLookup ret = new IndexLookup() {
           @Override
           public SelectContextImpl lookup(ExpressionImpl expression, Expression topLevelExpression) {
@@ -154,11 +144,11 @@ public class BInaryExpressionImplTest {
     column = new ColumnImpl();
     column.setTableName("table1");
     column.setColumnName("field1");
-    rightExp.setLeftExpression(column);
+    rightExp.setRightExpression(column);
     constant = new ConstantImpl();
     constant.setSqlType(BIGINT);
     constant.setValue(500L);
-    rightExp.setRightExpression(constant);
+    rightExp.setLeftExpression(constant);
     rightExp.setOperator(BinaryExpression.Operator.LESS_EQUAL);
     rightExp.setDbName("test");
     rightExp.setTableName("table1");
@@ -184,6 +174,12 @@ public class BInaryExpressionImplTest {
       assertEquals(ret.getKeys()[i][0][0], keys.get(i)[0]);
     }
     assertEquals(ret.getKeys().length, keys.size());
+
+    explain = new SelectStatementImpl.Explain();
+    ret = expression.evaluateAndExpression(null,100, usedIndex, explain, currOffset, countReturned,
+        limit, offset, false, false, 0);
+
+    assertEquals(explain.getBuilder().toString(), "Two-sided index lookup: index=_primarykey, field1 <= null and field1 >= null\n");
   }
 
   @Test
@@ -311,7 +307,181 @@ public class BInaryExpressionImplTest {
   }
 
   @Test
-  public void testEvaluateExpressionMath() throws UnsupportedEncodingException {
+  public void testBatchQuery() {
+    BinaryExpressionImpl leftExp = new BinaryExpressionImpl();
+    ColumnImpl column = new ColumnImpl();
+    column.setTableName("table1");
+    column.setColumnName("field1");
+    leftExp.setLeftExpression(column);
+    ConstantImpl constant = new ConstantImpl();
+    constant.setSqlType(BIGINT);
+    constant.setValue(200L);
+    leftExp.setRightExpression(constant);
+    leftExp.setOperator(BinaryExpression.Operator.EQUAL);
+    leftExp.setDbName("test");
+    leftExp.setTableName("table1");
+    leftExp.setClient(client);
+
+    BinaryExpressionImpl rightExp = new BinaryExpressionImpl();
+    column = new ColumnImpl();
+    column.setTableName("table1");
+    column.setColumnName("field1");
+    rightExp.setRightExpression(column);
+    constant = new ConstantImpl();
+    constant.setSqlType(BIGINT);
+    constant.setValue(500L);
+    rightExp.setLeftExpression(constant);
+    rightExp.setOperator(BinaryExpression.Operator.EQUAL);
+    rightExp.setDbName("test");
+    rightExp.setTableName("table1");
+    rightExp.setClient(client);
+
+    BinaryExpressionImpl expression = new BinaryExpressionImpl() {
+      public Map<Integer, Object[][]> readRecords(IndexSchema indexSchema, List<IdEntry> keysForLookup, TableSchema tableSchema) {
+        Map<Integer, Object[][]> ret = new HashMap<>();
+        ret.put(0, new Object[][]{new Object[]{1}});
+        ret.put(1, new Object[][]{new Object[]{2}});
+        return ret;
+      }
+    };
+    expression.setLeftExpression(leftExp);
+    expression.setOperator(BinaryExpression.Operator.OR);
+    expression.setRightExpression(rightExp);
+
+    expression.setDbName("test");
+    expression.setTableName("table1");
+
+    DatabaseClient client = mock(DatabaseClient.class);
+    when(client.getCommon()).thenReturn(common);
+    when(client.getShardCount()).thenReturn(2);
+    when(client.getReplicaCount()).thenReturn(2);
+
+    expression.setClient(client);
+
+    AtomicLong currOffset = new AtomicLong();
+    AtomicLong countReturned = new AtomicLong();
+    Limit limit = null;
+    Offset offset = null;
+    AtomicReference<String> usedIndex = new AtomicReference<>();
+    SelectStatementImpl.Explain explain = null;
+    ExpressionImpl.NextReturn ret = expression.evaluateOrExpression(null,100, explain, currOffset,
+        countReturned, limit, offset, false, 0);
+
+    assertEquals(ret.getKeys()[0][0][0], 1);
+    assertEquals(ret.getKeys()[1][0][0], 2);
+    assertEquals(ret.getKeys().length, 2);
+
+    explain = new SelectStatementImpl.Explain();
+    ret = expression.evaluateOrExpression(null,100, explain, currOffset,
+        countReturned, limit, offset, false, 0);
+
+    assertEquals(explain.getBuilder().toString(), "batch index lookup: keyCount=2");
+  }
+
+  @Test
+  public void testRelationalOpQuery() {
+    BinaryExpressionImpl expression = new BinaryExpressionImpl() {
+      protected IndexLookup createIndexLookup() {
+        IndexLookup ret = new IndexLookup() {
+          @Override
+          public SelectContextImpl lookup(ExpressionImpl expression, Expression topLevelExpression) {
+            assertEquals(getCount(), 100);
+            assertEquals(getIndexName(), "_primarykey");
+            assertEquals(getLeftOp(), Operator.EQUAL);
+            assertEquals(getLeftKey(), null);
+            assertEquals(getRightKey(), null);
+            assertEquals(getLeftOriginalKey()[0], 200L);
+            assertFalse(getEvaluateExpression());
+
+            Object[][][] retKeys = new Object[1][][];
+            retKeys[0] = new Object[][]{new Object[]{200}};
+
+            return new SelectContextImpl("table1", "_primary", Operator.LESS_EQUAL, 0, null,
+                retKeys, expression.getRecordCache(), 0, true);
+
+          }
+        };
+        return ret;
+      }
+    };
+
+    ColumnImpl column = new ColumnImpl();
+    column.setTableName("table1");
+    column.setColumnName("field1");
+    expression.setLeftExpression(column);
+    ConstantImpl constant = new ConstantImpl();
+    constant.setSqlType(BIGINT);
+    constant.setValue(200L);
+    expression.setRightExpression(constant);
+    expression.setOperator(BinaryExpression.Operator.EQUAL);
+    expression.setDbName("test");
+    expression.setTableName("table1");
+    expression.setClient(client);
+
+    expression.setDbName("test");
+    expression.setTableName("table1");
+
+    DatabaseClient client = mock(DatabaseClient.class);
+    when(client.getCommon()).thenReturn(common);
+    when(client.getShardCount()).thenReturn(2);
+    when(client.getReplicaCount()).thenReturn(2);
+
+    expression.setClient(client);
+
+    AtomicLong currOffset = new AtomicLong();
+    AtomicLong countReturned = new AtomicLong();
+    Limit limit = null;
+    Offset offset = null;
+    SelectStatementImpl.Explain explain = null;
+    ExpressionImpl.NextReturn ret = expression.next(null,100, explain, currOffset,
+        countReturned, limit, offset, false, false, 0);
+
+    assertEquals(ret.getKeys()[0][0][0], 200);
+    assertEquals(ret.getKeys().length, 1);
+
+    explain = new SelectStatementImpl.Explain();
+    ret = expression.next(null,100, explain, currOffset,
+        countReturned, limit, offset, false, false, 0);
+
+    assertEquals(explain.getBuilder().toString(), "Index lookup for relational op: _primarykey, table1.field1 = 200\n" +
+      "single key index lookup\n");
+
+
+    column = new ColumnImpl();
+    column.setTableName("table1");
+    column.setColumnName("field1");
+    expression.setRightExpression(column);
+    constant = new ConstantImpl();
+    constant.setSqlType(BIGINT);
+    constant.setValue(200L);
+    expression.setLeftExpression(constant);
+    expression.setOperator(BinaryExpression.Operator.EQUAL);
+    expression.setDbName("test");
+    expression.setTableName("table1");
+    expression.setClient(client);
+
+    expression.setDbName("test");
+    expression.setTableName("table1");
+
+    expression.setClient(client);
+
+    explain = null;
+    ret = expression.next(null,100, explain, currOffset,
+        countReturned, limit, offset, false, false, 0);
+
+    assertEquals(ret.getKeys()[0][0][0], 200);
+    assertEquals(ret.getKeys().length, 1);
+
+    explain = new SelectStatementImpl.Explain();
+    ret = expression.next(null,100, explain, currOffset,
+        countReturned, limit, offset, false, false, 0);
+
+    assertEquals(explain.getBuilder().toString(), "Index lookup for relational op: _primarykey, 200 = table1.field1\n" +
+        "single key index lookup\n");
+  }
+
+  @Test
+  public void testEvaluateExpressionMath() {
     ColumnImpl column1 = new ColumnImpl();
     column1.setTableName("table1");
     column1.setColumnName("field1");
@@ -375,7 +545,7 @@ public class BInaryExpressionImplTest {
   }
 
   @Test
-  public void testEvaluateExpressionMath2() throws UnsupportedEncodingException {
+  public void testEvaluateExpressionMath2() {
     ConstantImpl constant1 = new ConstantImpl();
     constant1.setSqlType(DOUBLE);
 

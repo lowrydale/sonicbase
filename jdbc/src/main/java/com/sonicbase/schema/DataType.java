@@ -4,6 +4,7 @@ import com.sonicbase.common.ExcludeRename;
 import com.sonicbase.query.DatabaseException;
 import com.sonicbase.util.DateUtils;
 import org.apache.commons.io.IOUtils;
+import org.apache.hadoop.io.WritableComparator;
 
 import java.io.ByteArrayOutputStream;
 import java.io.IOException;
@@ -25,7 +26,7 @@ import java.util.Map;
 // I don't know a good way to reduce the parameter count
 public class DataType {
 
-  public static final String UTF_8_STR = "utf-8";
+  private static final String UTF_8_STR = "utf-8";
 
   public interface Converter {
     Object convert(Object value);
@@ -94,13 +95,13 @@ public class DataType {
     }
   }
 
-  private static Converter longConverter = new LongConverter();
+  private static final Converter longConverter = new LongConverter();
 
   public static Converter getStringConverter() {
     return stringConverter;
   }
 
-  private static Converter stringConverter = value -> {
+  private static final Converter stringConverter = value -> {
     if (value == null) {
       return null;
     }
@@ -129,11 +130,11 @@ public class DataType {
     return String.valueOf(value);
   };
 
-  public static Converter getUtf8Converter() {
+  static Converter getUtf8Converter() {
     return utf8Converter;
   }
 
-  private static Converter utf8Converter = value -> {
+  private static final Converter utf8Converter = value -> {
     if (value == null) {
       return null;
     }
@@ -153,7 +154,7 @@ public class DataType {
     return byteArrayConverter;
   }
 
-  private static Converter byteArrayConverter = value -> {
+  private static final Converter byteArrayConverter = value -> {
     if (value == null) {
       return null;
     }
@@ -193,7 +194,7 @@ public class DataType {
     }
   }
 
-  private static Converter blobConverter = new BlobConverter();
+  private static final Converter blobConverter = new BlobConverter();
 
   public static Converter getDoubleConverter() {
     return doubleConverter;
@@ -245,14 +246,14 @@ public class DataType {
       }
   }
 
-  private static Converter doubleConverter = new DoubleConverter();
+  private static final Converter doubleConverter = new DoubleConverter();
 
 
   public static Converter getIntConverter() {
     return intConverter;
   }
 
-  private static Converter intConverter = value -> {
+  private static final Converter intConverter = value -> {
     if (value == null) {
       return null;
     }
@@ -267,7 +268,7 @@ public class DataType {
     return shortConverter;
   }
 
-  private static Converter shortConverter = value -> {
+  private static final Converter shortConverter = value -> {
     if (value == null) {
       return null;
     }
@@ -282,7 +283,7 @@ public class DataType {
     return booleanConverter;
   }
 
-  private static Converter booleanConverter = value -> {
+  private static final Converter booleanConverter = value -> {
     if (value == null) {
       return null;
     }
@@ -303,7 +304,7 @@ public class DataType {
     return byteConverter;
   }
 
-  private static Converter byteConverter = value -> {
+  private static final Converter byteConverter = value -> {
     if (value == null) {
       return null;
     }
@@ -318,7 +319,7 @@ public class DataType {
     return floatConverter;
   }
 
-  private static Converter floatConverter = value -> {
+  private static final Converter floatConverter = value -> {
     if (value == null) {
       return null;
     }
@@ -380,7 +381,7 @@ public class DataType {
     }
   }
 
-  private static Converter bigDecimalConverter = new BigDecimalConverter();
+  private static final Converter bigDecimalConverter = new BigDecimalConverter();
 
   public static Converter getDateConverter() {
     return dateConverter;
@@ -424,7 +425,7 @@ public class DataType {
     }
   }
 
-  private static Converter dateConverter = new DateConverter();
+  private static final Converter dateConverter = new DateConverter();
 
   public static Converter getTimeConverter() {
     return timeConverter;
@@ -474,7 +475,7 @@ public class DataType {
     }
   }
 
-  private static Converter timeConverter = new TimeConverter();
+  private static final Converter timeConverter = new TimeConverter();
 
   public static Converter getTimestampConverter() {
     return timestampConverter;
@@ -526,21 +527,15 @@ public class DataType {
     }
   }
 
-  private static Converter timestampConverter = new TimestampConverter();
+  private static final Converter timestampConverter = new TimestampConverter();
 
-  public static Comparator getBooleanComparator() {
+  static Comparator getBooleanComparator() {
     return booleanComparator;
   }
 
-  private static Comparator booleanComparator = (o1, o2) -> {
-    if (o1 == null && o2 == null) {
+  private static final Comparator booleanComparator = (o1, o2) -> {
+    if (o1 == null || o2 == null) {
       return 0;
-    }
-    if (o1 == null) {
-      return -1;
-    }
-    if (o2 == null) {
-      return 1;
     }
     if (!(o1 instanceof Boolean)) {
       o1 = booleanConverter.convert(o1);
@@ -583,14 +578,8 @@ public class DataType {
   }
 
   private static Integer compareNumerics(Object o1, Object o2) {
-    if (o1 == null && o2 == null) {
+    if (o1 == null || o2 == null) {
       return 0;
-    }
-    if (o1 == null) {
-      return -1;
-    }
-    if (o2 == null) {
-      return 1;
     }
     if (o1 instanceof Double) {
       Integer lhs = compareLhsDouble((Double) o1, o2);
@@ -632,57 +621,56 @@ public class DataType {
   }
 
   private static Integer compareLhsLong(Long o1, Object o2) {
-    Long lhs = o1;
     if (o2 instanceof Double) {
-      if (lhs > (Double) o2) {
+      if (o1 > (Double) o2) {
         return 1;
       }
-      else if (lhs < (Double) o2) {
+      else if (o1 < (Double) o2) {
         return -1;
       }
       return 0;
     }
     if (o2 instanceof Float) {
-      if (lhs > (Float) o2) {
+      if (o1 > (Float) o2) {
         return 1;
       }
-      else if (lhs < (Float) o2) {
+      else if (o1 < (Float) o2) {
         return -1;
       }
       return 0;
     }
     if (o2 instanceof Short) {
-      if (lhs > (Short) o2) {
+      if (o1 > (Short) o2) {
         return 1;
       }
-      else if (lhs < (Short) o2) {
+      else if (o1 < (Short) o2) {
         return -1;
       }
       return 0;
     }
     if (o2 instanceof Byte) {
-      if (lhs > (Byte) o2) {
+      if (o1 > (Byte) o2) {
         return 1;
       }
-      else if (lhs < (Byte) o2) {
+      else if (o1 < (Byte) o2) {
         return -1;
       }
       return 0;
     }
     if (o2 instanceof Long) {
-      if (lhs > (Long) o2) {
+      if (o1 > (Long) o2) {
         return 1;
       }
-      else if (lhs < (Long) o2) {
+      else if (o1 < (Long) o2) {
         return -1;
       }
       return 0;
     }
     if (o2 instanceof Integer) {
-      if (lhs > (Integer) o2) {
+      if (o1 > (Integer) o2) {
         return 1;
       }
-      else if (lhs < (Integer) o2) {
+      else if (o1 < (Integer) o2) {
         return -1;
       }
       return 0;
@@ -691,57 +679,56 @@ public class DataType {
   }
 
   private static Integer compareLhsDouble(Double o1, Object o2) {
-    Double lhs = o1;
     if (o2 instanceof Double) {
-      if (lhs > (Double) o2) {
+      if (o1 > (Double) o2) {
         return 1;
       }
-      else if (lhs < (Double) o2) {
+      else if (o1 < (Double) o2) {
         return -1;
       }
       return 0;
     }
     if (o2 instanceof Float) {
-      if (lhs > (Float) o2) {
+      if (o1 > (Float) o2) {
         return 1;
       }
-      else if (lhs < (Float) o2) {
+      else if (o1 < (Float) o2) {
         return -1;
       }
       return 0;
     }
     if (o2 instanceof Short) {
-      if (lhs > (Short) o2) {
+      if (o1 > (Short) o2) {
         return 1;
       }
-      else if (lhs < (Short) o2) {
+      else if (o1 < (Short) o2) {
         return -1;
       }
       return 0;
     }
     if (o2 instanceof Byte) {
-      if (lhs > (Byte) o2) {
+      if (o1 > (Byte) o2) {
         return 1;
       }
-      else if (lhs < (Byte) o2) {
+      else if (o1 < (Byte) o2) {
         return -1;
       }
       return 0;
     }
     if (o2 instanceof Long) {
-      if (lhs > (Long) o2) {
+      if (o1 > (Long) o2) {
         return 1;
       }
-      else if (lhs < (Long) o2) {
+      else if (o1 < (Long) o2) {
         return -1;
       }
       return 0;
     }
     if (o2 instanceof Integer) {
-      if (lhs > (Integer) o2) {
+      if (o1 > (Integer) o2) {
         return 1;
       }
-      else if (lhs < (Integer) o2) {
+      else if (o1 < (Integer) o2) {
         return -1;
       }
       return 0;
@@ -749,13 +736,13 @@ public class DataType {
     return null;
   }
 
-  private static Comparator longComparator = new LongComparator();
+  private static final Comparator longComparator = new LongComparator();
 
-  public static Comparator getIntComparator() {
+  static Comparator getIntComparator() {
     return intComparator;
   }
 
-  private static Comparator intComparator = (o1, o2) -> {
+  private static final Comparator intComparator = (o1, o2) -> {
     Integer ret = compareNumerics(o1, o2);
     if (ret == null) {
       Integer lhs = (Integer) intConverter.convert(o1);
@@ -769,17 +756,10 @@ public class DataType {
     return doubleComparator;
   }
 
-  private static Comparator doubleComparator = (o1, o2) -> {
-    if (o1 == null && o2 == null) {
+  private static final Comparator doubleComparator = (o1, o2) -> {
+    if (o1 == null || o2 == null) {
       return 0;
     }
-    if (o1 == null) {
-      return -1;
-    }
-    if (o2 == null) {
-      return 1;
-    }
-
     Integer ret = compareNumerics(o1, o2);
     if (ret == null) {
       Double lhs = (Double) doubleConverter.convert(o1);
@@ -789,11 +769,11 @@ public class DataType {
     return ret;
   };
 
-  public static Comparator getFloatComparator() {
+  static Comparator getFloatComparator() {
     return floatComparator;
   }
 
-  private static Comparator floatComparator = (o1, o2) -> {
+  private static final Comparator floatComparator = (o1, o2) -> {
     Integer ret = compareNumerics(o1, o2);
     if (ret == null) {
       Float lhs = (Float) floatConverter.convert(o1);
@@ -803,22 +783,15 @@ public class DataType {
     return ret;
   };
 
-  public static Comparator getStringComparator() {
+  static Comparator getStringComparator() {
     return stringComparator;
   }
 
-  private static Comparator stringComparator = (o1, o2) -> {
+  private static final Comparator stringComparator = (o1, o2) -> {
     try {
-      if (o1 == null && o2 == null) {
+      if (o1 == null || o2 == null) {
         return 0;
       }
-      if (o1 == null) {
-        return -1;
-      }
-      if (o2 == null) {
-        return 1;
-      }
-
       o1 = stringConverter.convert(o1);
       o2 = stringConverter.convert(o2);
       return ((String) o1).compareTo((String) o2);
@@ -837,19 +810,18 @@ public class DataType {
     @Override
     public int compare(Object o1, Object o2) {
       try {
-        if (o1 == null && o2 == null) {
+        if (o1 == null ||  o2 == null) {
           return 0;
         }
-        if (o1 == null) {
-          return -1;
+        if (!(o1 instanceof byte[])) {
+          o1 = utf8Converter.convert(o1);
         }
-        if (o2 == null) {
-          return 1;
+        if (!(o2 instanceof byte[])) {
+          o2 = utf8Converter.convert(o2);
         }
-
-        o1 = utf8Converter.convert(o1);
-        o2 = utf8Converter.convert(o2);
-        return (new String((byte[])o1, UTF_8_STR)).compareTo(new String((byte[])o2, UTF_8_STR));
+        byte[] o1Bytes = (byte[])o1;
+        byte[] o2Bytes = (byte[])o2;
+        return WritableComparator.compareBytes(o1Bytes, 0, o1Bytes.length, o2Bytes, 0, o2Bytes.length);
       }
       catch (Exception e) {
         throw new DatabaseException(e);
@@ -857,13 +829,13 @@ public class DataType {
     }
   }
 
-  private static Comparator utf8Comparator = new Utf8Comparator();
+  private static final Comparator utf8Comparator = new Utf8Comparator();
 
-  public static Comparator getByteComparator() {
+  static Comparator getByteComparator() {
     return byteComparator;
   }
 
-  private static Comparator byteComparator = (o1, o2) -> {
+  private static final Comparator byteComparator = (o1, o2) -> {
     Integer ret = compareNumerics(o1, o2);
     if (ret == null) {
       Byte lhs = (Byte) byteConverter.convert(o1);
@@ -873,11 +845,11 @@ public class DataType {
     return ret;
   };
 
-  public static Comparator getShortComparator() {
+  static Comparator getShortComparator() {
     return shortComparator;
   }
 
-  private static Comparator shortComparator = (o1, o2) -> {
+  private static final Comparator shortComparator = (o1, o2) -> {
     Integer ret = compareNumerics(o1, o2);
     if (ret == null) {
       Short lhs = (Short) shortConverter.convert(o1);
@@ -891,15 +863,9 @@ public class DataType {
     return bigDecimalComparator;
   }
 
-  private static Comparator bigDecimalComparator = (o1, o2) -> {
-    if (o1 == null && o2 == null) {
+  private static final Comparator bigDecimalComparator = (o1, o2) -> {
+    if (o1 == null || o2 == null) {
       return 0;
-    }
-    if (o1 == null) {
-      return -1;
-    }
-    if (o2 == null) {
-      return 1;
     }
     BigDecimal lhs = (BigDecimal) bigDecimalConverter.convert(o1);
     BigDecimal rhs = (BigDecimal) bigDecimalConverter.convert(o2);
@@ -910,15 +876,9 @@ public class DataType {
     return dateComparator;
   }
 
-  private static Comparator dateComparator = (o1, o2) -> {
-    if (o1 == null && o2 == null) {
+  private static final Comparator dateComparator = (o1, o2) -> {
+    if (o1 == null || o2 == null) {
       return 0;
-    }
-    if (o1 == null) {
-      return -1;
-    }
-    if (o2 == null) {
-      return 1;
     }
     Date lhs = (Date) dateConverter.convert(o1);
     Date rhs = (Date) dateConverter.convert(o2);
@@ -928,19 +888,13 @@ public class DataType {
     return l.compareTo(r);
   };
 
-  public static Comparator getTimeComparator() {
+  static Comparator getTimeComparator() {
     return timeComparator;
   }
 
-  private static Comparator timeComparator = (o1, o2) -> {
-    if (o1 == null && o2 == null) {
+  private static final Comparator timeComparator = (o1, o2) -> {
+    if (o1 == null || o2 == null) {
       return 0;
-    }
-    if (o1 == null) {
-      return -1;
-    }
-    if (o2 == null) {
-      return 1;
     }
     Time lhs = (Time) timeConverter.convert(o1);
     Time rhs = (Time) timeConverter.convert(o2);
@@ -949,26 +903,20 @@ public class DataType {
     return l.compareTo(r);
   };
 
-  public static Comparator getTimestampComparator() {
+  static Comparator getTimestampComparator() {
     return timestampComparator;
   }
 
-  private static Comparator timestampComparator = (o1, o2) -> {
-    if (o1 == null && o2 == null) {
+  private static final Comparator timestampComparator = (o1, o2) -> {
+    if (o1 == null || o2 == null) {
       return 0;
-    }
-    if (o1 == null) {
-      return -1;
-    }
-    if (o2 == null) {
-      return 1;
     }
     Timestamp lhs = (Timestamp) timestampConverter.convert(o1);
     Timestamp rhs = (Timestamp) timestampConverter.convert(o2);
     return lhs.compareTo(rhs);
   };
 
-  public static Comparator getByteArrayComparator() {
+  static Comparator getByteArrayComparator() {
     return byteArrayComparator;
   }
 
@@ -976,14 +924,8 @@ public class DataType {
 
     @Override
     public int compare(Object o1, Object o2) {
-      if (o1 == null && o2 == null) {
+      if (o1 == null || o2 == null) {
         return 0;
-      }
-      if (o1 == null) {
-        return -1;
-      }
-      if (o2 == null) {
-        return 1;
       }
       if (!(o1 instanceof byte[]) || !(o2 instanceof byte[])) {
         throw new DatabaseException("Datatype mismatch - expecting byte[]: found=" + o1.getClass().getName() +
@@ -1001,21 +943,15 @@ public class DataType {
     }
   }
 
-  private static Comparator byteArrayComparator = new ByteArrayComparator();
+  private static final Comparator byteArrayComparator = new ByteArrayComparator();
 
-  public static Comparator getBlobComparator() {
+  static Comparator getBlobComparator() {
     return blobComparator;
   }
 
-  private static Comparator blobComparator = (o1, o2) -> {
-    if (o1 == null && o2 == null) {
+  private static final Comparator blobComparator = (o1, o2) -> {
+    if (o1 == null || o2 == null) {
       return 0;
-    }
-    if (o1 == null) {
-      return -1;
-    }
-    if (o2 == null) {
-      return 1;
     }
     if (!(o1 instanceof byte[]) || !(o2 instanceof byte[])) {
       throw new DatabaseException("Datatype mismatch - expecting byte[]: found=" + o1.getClass().getName() +
@@ -1043,23 +979,23 @@ public class DataType {
     return intIncrementer;
   }
 
-  private static Incrementer intIncrementer = value -> ((Integer) value) + 1;
+  private static final Incrementer intIncrementer = value -> ((Integer) value) + 1;
 
   public static Incrementer getLongIncrementer() {
     return longIncrementer;
   }
 
-  private static Incrementer longIncrementer = value -> ((Long) value) + 1;
+  private static final Incrementer longIncrementer = value -> ((Long) value) + 1;
 
   public static Incrementer getBigDecimalIncrementer() {
     return bigDecimalIncrementer;
   }
 
-  private static Incrementer bigDecimalIncrementer = value -> ((BigDecimal) value).add(new BigDecimal(1));
+  private static final Incrementer bigDecimalIncrementer = value -> ((BigDecimal) value).add(new BigDecimal(1));
 
 
 
-  static Map<Integer, DataType.Type> types = new HashMap<>();
+  static final Map<Integer, DataType.Type> types = new HashMap<>();
 
   public enum Type {
     BIT(Types.BIT, booleanComparator, booleanConverter, null, null),
@@ -1107,7 +1043,7 @@ public class DataType {
     private final Comparator comparator;
     private final Incrementer incrementer;
     private final Converter converter;
-    private Object initialValue;
+    private final Object initialValue;
 
     public static DataType.Type valueOf(int value) {
       return types.get(value);
@@ -1177,9 +1113,6 @@ public class DataType {
       }
       if (lhsValue instanceof BigDecimal) {
         return bigDecimalComparator;
-      }
-      if (lhsValue instanceof byte[]) {
-        return byteArrayComparator;
       }
       return null;
     }

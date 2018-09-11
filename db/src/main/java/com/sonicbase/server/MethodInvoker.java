@@ -11,6 +11,7 @@ import java.lang.reflect.Method;
 import java.util.HashSet;
 import java.util.Set;
 import java.util.concurrent.ConcurrentHashMap;
+import java.util.concurrent.atomic.AtomicBoolean;
 import java.util.concurrent.atomic.AtomicInteger;
 import java.util.concurrent.atomic.AtomicLong;
 
@@ -19,19 +20,19 @@ import java.util.concurrent.atomic.AtomicLong;
 // I prefer to return null instead of an empty array
 // I don't know a good way to reduce the parameter count
 public class MethodInvoker {
-  private static Logger logger = LoggerFactory.getLogger(MethodInvoker.class);
+  private static final Logger logger = LoggerFactory.getLogger(MethodInvoker.class);
 
   private final com.sonicbase.server.LogManager logManager;
   private final com.sonicbase.server.DatabaseServer server;
   private final DatabaseCommon common;
   private boolean shutdown;
-  private AtomicInteger testWriteCallCount = new AtomicInteger();
-  private ConcurrentHashMap<String, Method> methodMap = new ConcurrentHashMap<>();
+  private final AtomicInteger testWriteCallCount = new AtomicInteger();
+  private final ConcurrentHashMap<String, Method> methodMap = new ConcurrentHashMap<>();
   public static final AtomicInteger blockCount = new AtomicInteger();
   public static final AtomicInteger echoCount = new AtomicInteger(0);
   public static final AtomicInteger echo2Count = new AtomicInteger(0);
 
-  public MethodInvoker(DatabaseServer server, com.sonicbase.server.LogManager logManager) {
+  public MethodInvoker(DatabaseServer server, LogManager logManager) {
     this.server = server;
     this.common = server.getCommon();
     this.logManager = logManager;
@@ -53,10 +54,18 @@ public class MethodInvoker {
     this.shutdown = true;
   }
 
-  private static Set<String> priorityCommands = new HashSet<>();
+  private static final Set<String> priorityCommands = new HashSet<>();
 
   static {
-    priorityCommands.add("DatabaseServer.logError");
+
+
+
+    priorityCommands.add("DatabaseServer:reloadServer");
+    priorityCommands.add("DatabaseServer:finishServerReloadForSource");
+    priorityCommands.add("DatabaseServer:isServerReloadFinished");
+    priorityCommands.add("DatabaseServer:enableServer");
+    priorityCommands.add("DatabaseServer:disableServer");
+    priorityCommands.add("DatabaseServer:logError");
     priorityCommands.add("DatabaseServer:setMaxRecordId");
     priorityCommands.add("LogManager:setMaxSequenceNum");
     priorityCommands.add("LogManager:sendQueueFile");
@@ -114,7 +123,8 @@ public class MethodInvoker {
           existingSequence0, existingSequence1, timeLogging);
       ComObject ret = null;
 
-      if (!replayedCommand && !server.isRecovered() && !priorityCommands.contains(methodStr)) {
+      if (!replayedCommand && (!server.isRecovered() || !server.isRunning())
+            && !priorityCommands.contains(methodStr)) {
         throw new DeadServerException("Server not running: method=" + methodStr);
       }
 
@@ -273,14 +283,14 @@ public class MethodInvoker {
 
 
   class MethodProvider {
-    private ConcurrentHashMap<String, Method> methodMap = new ConcurrentHashMap<>();
+    private final ConcurrentHashMap<String, Method> methodMap = new ConcurrentHashMap<>();
     private Object provider;
   }
 
   class NoOpMethodProvider extends MethodProvider {
   }
 
-  private ConcurrentHashMap<String, MethodProvider> providers = new ConcurrentHashMap<>();
+  private final ConcurrentHashMap<String, MethodProvider> providers = new ConcurrentHashMap<>();
 
   public void registerMethodProvider(String providerName, Object provider) {
     MethodProvider providerObj = new MethodProvider();

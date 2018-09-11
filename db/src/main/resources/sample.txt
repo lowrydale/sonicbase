@@ -1,623 +1,85 @@
-2018-08-04 14:23:05
-Full thread dump Java HotSpot(TM) 64-Bit Server VM (25.144-b01 mixed mode):
-
-"Thread-1056" #1072 prio=5 os_prio=31 tid=0x00007fbb44a38800 nid=0xa55b runnable [0x00007000046e7000]
-   java.lang.Thread.State: RUNNABLE
-	at sun.nio.ch.Net.connect0(Native Method)
-	at sun.nio.ch.Net.connect(Net.java:454)
-	at sun.nio.ch.Net.connect(Net.java:446)
-	at sun.nio.ch.SocketChannelImpl.connect(SocketChannelImpl.java:648)
-	- locked <0x0000000788b000a8> (a java.lang.Object)
-	- locked <0x0000000788b000c8> (a java.lang.Object)
-	- locked <0x0000000788b000b8> (a java.lang.Object)
-	at com.sonicbase.socket.DatabaseSocketClient$Connection.<init>(DatabaseSocketClient.java:161)
-	at com.sonicbase.socket.DatabaseSocketClient.lambda$doBorrowConnection$0(DatabaseSocketClient.java:80)
-	at com.sonicbase.socket.DatabaseSocketClient$$Lambda$85/764372388.run(Unknown Source)
-	at java.lang.Thread.run(Thread.java:748)
-
-"Thread-1055" #1071 prio=5 os_prio=31 tid=0x00007fbb4680b000 nid=0x739b runnable [0x0000700004bf6000]
-   java.lang.Thread.State: RUNNABLE
-	at sun.nio.ch.Net.connect0(Native Method)
-	at sun.nio.ch.Net.connect(Net.java:454)
-	at sun.nio.ch.Net.connect(Net.java:446)
-	at sun.nio.ch.SocketChannelImpl.connect(SocketChannelImpl.java:648)
-	- locked <0x0000000788cecde0> (a java.lang.Object)
-	- locked <0x0000000788cece00> (a java.lang.Object)
-	- locked <0x0000000788cecdf0> (a java.lang.Object)
-	at com.sonicbase.socket.DatabaseSocketClient$Connection.<init>(DatabaseSocketClient.java:161)
-	at com.sonicbase.socket.DatabaseSocketClient.lambda$doBorrowConnection$0(DatabaseSocketClient.java:80)
-	at com.sonicbase.socket.DatabaseSocketClient$$Lambda$85/764372388.run(Unknown Source)
-	at java.lang.Thread.run(Thread.java:748)
-
-"Thread-1054" #1070 prio=5 os_prio=31 tid=0x00007fbb44093800 nid=0x94ab waiting on condition [0x00007000036b6000]
-   java.lang.Thread.State: TIMED_WAITING (parking)
-	at sun.misc.Unsafe.park(Native Method)
-	- parking to wait for  <0x0000000788cb23b0> (a java.util.concurrent.CountDownLatch$Sync)
-	at java.util.concurrent.locks.LockSupport.parkNanos(LockSupport.java:215)
-	at java.util.concurrent.locks.AbstractQueuedSynchronizer.doAcquireSharedNanos(AbstractQueuedSynchronizer.java:1037)
-	at java.util.concurrent.locks.AbstractQueuedSynchronizer.tryAcquireSharedNanos(AbstractQueuedSynchronizer.java:1328)
-	at java.util.concurrent.CountDownLatch.await(CountDownLatch.java:277)
-	at com.sonicbase.socket.DatabaseSocketClient.doBorrowConnection(DatabaseSocketClient.java:89)
-	at com.sonicbase.socket.DatabaseSocketClient.borrowConnection(DatabaseSocketClient.java:53)
-	at com.sonicbase.socket.DatabaseSocketClient.sendBatch(DatabaseSocketClient.java:261)
-	at com.sonicbase.socket.DatabaseSocketClient.doSend(DatabaseSocketClient.java:523)
-	at com.sonicbase.client.DatabaseClient$Server.doSend(DatabaseClient.java:590)
-	at com.sonicbase.client.DatabaseClient.sendReplicaSpecified(DatabaseClient.java:999)
-	at com.sonicbase.client.DatabaseClient.doSend(DatabaseClient.java:1170)
-	at com.sonicbase.client.DatabaseClient.send(DatabaseClient.java:1142)
-	at com.sonicbase.client.DatabaseClient.send(DatabaseClient.java:749)
-	at com.sonicbase.jdbcdriver.ConnectionProxy.send(ConnectionProxy.java:215)
-	at com.sonicbase.cli.ClusterHandler$2.run(ClusterHandler.java:283)
-	at java.lang.Thread.run(Thread.java:748)
-
-"Thread-1053" #1069 prio=5 os_prio=31 tid=0x00007fbb44094000 nid=0xab53 runnable [0x00007000045e4000]
-   java.lang.Thread.State: RUNNABLE
-	at sun.nio.ch.Net.connect0(Native Method)
-	at sun.nio.ch.Net.connect(Net.java:454)
-	at sun.nio.ch.Net.connect(Net.java:446)
-	at sun.nio.ch.SocketChannelImpl.connect(SocketChannelImpl.java:648)
-	- locked <0x0000000788c76b40> (a java.lang.Object)
-	- locked <0x0000000788c76b60> (a java.lang.Object)
-	- locked <0x0000000788c76b50> (a java.lang.Object)
-	at com.sonicbase.socket.DatabaseSocketClient$Connection.<init>(DatabaseSocketClient.java:161)
-	at com.sonicbase.socket.DatabaseSocketClient.lambda$doBorrowConnection$0(DatabaseSocketClient.java:80)
-	at com.sonicbase.socket.DatabaseSocketClient$$Lambda$85/764372388.run(Unknown Source)
-	at java.lang.Thread.run(Thread.java:748)
-
-"Thread-1052" #1068 prio=5 os_prio=31 tid=0x00007fbb44041800 nid=0x955b runnable [0x00007000042db000]
-   java.lang.Thread.State: RUNNABLE
-	at sun.nio.ch.Net.connect0(Native Method)
-	at sun.nio.ch.Net.connect(Net.java:454)
-	at sun.nio.ch.Net.connect(Net.java:446)
-	at sun.nio.ch.SocketChannelImpl.connect(SocketChannelImpl.java:648)
-	- locked <0x0000000788c3b9f0> (a java.lang.Object)
-	- locked <0x0000000788c3ba10> (a java.lang.Object)
-	- locked <0x0000000788c3ba00> (a java.lang.Object)
-	at com.sonicbase.socket.DatabaseSocketClient$Connection.<init>(DatabaseSocketClient.java:161)
-	at com.sonicbase.socket.DatabaseSocketClient.lambda$doBorrowConnection$0(DatabaseSocketClient.java:80)
-	at com.sonicbase.socket.DatabaseSocketClient$$Lambda$85/764372388.run(Unknown Source)
-	at java.lang.Thread.run(Thread.java:748)
-
-"Thread-1051" #1067 prio=5 os_prio=31 tid=0x00007fbb43838000 nid=0x9f53 waiting on condition [0x0000700003cc8000]
-   java.lang.Thread.State: TIMED_WAITING (parking)
-	at sun.misc.Unsafe.park(Native Method)
-	- parking to wait for  <0x0000000788c02f90> (a java.util.concurrent.CountDownLatch$Sync)
-	at java.util.concurrent.locks.LockSupport.parkNanos(LockSupport.java:215)
-	at java.util.concurrent.locks.AbstractQueuedSynchronizer.doAcquireSharedNanos(AbstractQueuedSynchronizer.java:1037)
-	at java.util.concurrent.locks.AbstractQueuedSynchronizer.tryAcquireSharedNanos(AbstractQueuedSynchronizer.java:1328)
-	at java.util.concurrent.CountDownLatch.await(CountDownLatch.java:277)
-	at com.sonicbase.socket.DatabaseSocketClient.doBorrowConnection(DatabaseSocketClient.java:89)
-	at com.sonicbase.socket.DatabaseSocketClient.borrowConnection(DatabaseSocketClient.java:53)
-	at com.sonicbase.socket.DatabaseSocketClient.sendBatch(DatabaseSocketClient.java:261)
-	at com.sonicbase.socket.DatabaseSocketClient.doSend(DatabaseSocketClient.java:523)
-	at com.sonicbase.client.DatabaseClient$Server.doSend(DatabaseClient.java:590)
-	at com.sonicbase.client.DatabaseClient.sendReplicaSpecified(DatabaseClient.java:999)
-	at com.sonicbase.client.DatabaseClient.doSend(DatabaseClient.java:1170)
-	at com.sonicbase.client.DatabaseClient.send(DatabaseClient.java:1142)
-	at com.sonicbase.client.DatabaseClient.send(DatabaseClient.java:749)
-	at com.sonicbase.jdbcdriver.ConnectionProxy.send(ConnectionProxy.java:215)
-	at com.sonicbase.cli.ClusterHandler$2.run(ClusterHandler.java:301)
-	at java.lang.Thread.run(Thread.java:748)
-
-"Thread-1050" #1066 prio=5 os_prio=31 tid=0x00007fbb43837800 nid=0xa1cb runnable [0x00007000041d8000]
-   java.lang.Thread.State: RUNNABLE
-	at sun.nio.ch.Net.connect0(Native Method)
-	at sun.nio.ch.Net.connect(Net.java:454)
-	at sun.nio.ch.Net.connect(Net.java:446)
-	at sun.nio.ch.SocketChannelImpl.connect(SocketChannelImpl.java:648)
-	- locked <0x0000000788db1c98> (a java.lang.Object)
-	- locked <0x0000000788db1cb8> (a java.lang.Object)
-	- locked <0x0000000788db1ca8> (a java.lang.Object)
-	at com.sonicbase.socket.DatabaseSocketClient$Connection.<init>(DatabaseSocketClient.java:161)
-	at com.sonicbase.socket.DatabaseSocketClient.lambda$doBorrowConnection$0(DatabaseSocketClient.java:80)
-	at com.sonicbase.socket.DatabaseSocketClient$$Lambda$85/764372388.run(Unknown Source)
-	at java.lang.Thread.run(Thread.java:748)
-
-"Thread-1049" #1065 prio=5 os_prio=31 tid=0x00007fbb448e9000 nid=0xa753 runnable [0x0000700003ecf000]
-   java.lang.Thread.State: RUNNABLE
-	at sun.nio.ch.Net.connect0(Native Method)
-	at sun.nio.ch.Net.connect(Net.java:454)
-	at sun.nio.ch.Net.connect(Net.java:446)
-	at sun.nio.ch.SocketChannelImpl.connect(SocketChannelImpl.java:648)
-	- locked <0x0000000788d76b48> (a java.lang.Object)
-	- locked <0x0000000788d76b68> (a java.lang.Object)
-	- locked <0x0000000788d76b58> (a java.lang.Object)
-	at com.sonicbase.socket.DatabaseSocketClient$Connection.<init>(DatabaseSocketClient.java:161)
-	at com.sonicbase.socket.DatabaseSocketClient.lambda$doBorrowConnection$0(DatabaseSocketClient.java:80)
-	at com.sonicbase.socket.DatabaseSocketClient$$Lambda$85/764372388.run(Unknown Source)
-	at java.lang.Thread.run(Thread.java:748)
-
-"Thread-1048" #1064 prio=5 os_prio=31 tid=0x00007fbb43836800 nid=0x825b waiting on condition [0x0000700003bc5000]
-   java.lang.Thread.State: TIMED_WAITING (parking)
-	at sun.misc.Unsafe.park(Native Method)
-	- parking to wait for  <0x0000000788d3e8c8> (a java.util.concurrent.CountDownLatch$Sync)
-	at java.util.concurrent.locks.LockSupport.parkNanos(LockSupport.java:215)
-	at java.util.concurrent.locks.AbstractQueuedSynchronizer.doAcquireSharedNanos(AbstractQueuedSynchronizer.java:1037)
-	at java.util.concurrent.locks.AbstractQueuedSynchronizer.tryAcquireSharedNanos(AbstractQueuedSynchronizer.java:1328)
-	at java.util.concurrent.CountDownLatch.await(CountDownLatch.java:277)
-	at com.sonicbase.socket.DatabaseSocketClient.doBorrowConnection(DatabaseSocketClient.java:89)
-	at com.sonicbase.socket.DatabaseSocketClient.borrowConnection(DatabaseSocketClient.java:53)
-	at com.sonicbase.socket.DatabaseSocketClient.sendBatch(DatabaseSocketClient.java:261)
-	at com.sonicbase.socket.DatabaseSocketClient.doSend(DatabaseSocketClient.java:523)
-	at com.sonicbase.client.DatabaseClient$Server.doSend(DatabaseClient.java:590)
-	at com.sonicbase.client.DatabaseClient.sendReplicaSpecified(DatabaseClient.java:999)
-	at com.sonicbase.client.DatabaseClient.doSend(DatabaseClient.java:1170)
-	at com.sonicbase.client.DatabaseClient.send(DatabaseClient.java:1142)
-	at com.sonicbase.client.DatabaseClient.send(DatabaseClient.java:749)
-	at com.sonicbase.jdbcdriver.ConnectionProxy.send(ConnectionProxy.java:215)
-	at com.sonicbase.cli.ClusterHandler$2.run(ClusterHandler.java:301)
-	at java.lang.Thread.run(Thread.java:748)
-
-"Thread-1047" #1063 prio=5 os_prio=31 tid=0x00007fbb45207800 nid=0xa393 runnable [0x0000700003ac3000]
-   java.lang.Thread.State: RUNNABLE
-	at sun.nio.ch.Net.connect0(Native Method)
-	at sun.nio.ch.Net.connect(Net.java:454)
-	at sun.nio.ch.Net.connect(Net.java:446)
-	at sun.nio.ch.SocketChannelImpl.connect(SocketChannelImpl.java:648)
-	- locked <0x0000000788d008a8> (a java.lang.Object)
-	- locked <0x0000000788d008c8> (a java.lang.Object)
-	- locked <0x0000000788d008b8> (a java.lang.Object)
-	at com.sonicbase.socket.DatabaseSocketClient$Connection.<init>(DatabaseSocketClient.java:161)
-	at com.sonicbase.socket.DatabaseSocketClient.lambda$doBorrowConnection$0(DatabaseSocketClient.java:80)
-	at com.sonicbase.socket.DatabaseSocketClient$$Lambda$85/764372388.run(Unknown Source)
-	at java.lang.Thread.run(Thread.java:748)
-
-"Thread-1046" #1062 prio=5 os_prio=31 tid=0x00007fbb43836000 nid=0xb103 runnable [0x0000700004eff000]
-   java.lang.Thread.State: RUNNABLE
-	at sun.nio.ch.Net.connect0(Native Method)
-	at sun.nio.ch.Net.connect(Net.java:454)
-	at sun.nio.ch.Net.connect(Net.java:446)
-	at sun.nio.ch.SocketChannelImpl.connect(SocketChannelImpl.java:648)
-	- locked <0x0000000788d000a8> (a java.lang.Object)
-	- locked <0x0000000788d000c8> (a java.lang.Object)
-	- locked <0x0000000788d000b8> (a java.lang.Object)
-	at com.sonicbase.socket.DatabaseSocketClient$Connection.<init>(DatabaseSocketClient.java:161)
-	at com.sonicbase.socket.DatabaseSocketClient.lambda$doBorrowConnection$0(DatabaseSocketClient.java:80)
-	at com.sonicbase.socket.DatabaseSocketClient$$Lambda$85/764372388.run(Unknown Source)
-	at java.lang.Thread.run(Thread.java:748)
-
-"Thread-1045" #1061 prio=5 os_prio=31 tid=0x00007fbb44a3a000 nid=0x8ba7 waiting on condition [0x00007000032aa000]
-   java.lang.Thread.State: TIMED_WAITING (parking)
-	at sun.misc.Unsafe.park(Native Method)
-	- parking to wait for  <0x0000000788eefcb8> (a java.util.concurrent.CountDownLatch$Sync)
-	at java.util.concurrent.locks.LockSupport.parkNanos(LockSupport.java:215)
-	at java.util.concurrent.locks.AbstractQueuedSynchronizer.doAcquireSharedNanos(AbstractQueuedSynchronizer.java:1037)
-	at java.util.concurrent.locks.AbstractQueuedSynchronizer.tryAcquireSharedNanos(AbstractQueuedSynchronizer.java:1328)
-	at java.util.concurrent.CountDownLatch.await(CountDownLatch.java:277)
-	at com.sonicbase.socket.DatabaseSocketClient.doBorrowConnection(DatabaseSocketClient.java:89)
-	at com.sonicbase.socket.DatabaseSocketClient.borrowConnection(DatabaseSocketClient.java:53)
-	at com.sonicbase.socket.DatabaseSocketClient.sendBatch(DatabaseSocketClient.java:261)
-	at com.sonicbase.socket.DatabaseSocketClient.doSend(DatabaseSocketClient.java:523)
-	at com.sonicbase.client.DatabaseClient$Server.doSend(DatabaseClient.java:590)
-	at com.sonicbase.client.DatabaseClient.sendReplicaSpecified(DatabaseClient.java:999)
-	at com.sonicbase.client.DatabaseClient.doSend(DatabaseClient.java:1170)
-	at com.sonicbase.client.DatabaseClient.send(DatabaseClient.java:1142)
-	at com.sonicbase.client.DatabaseClient.send(DatabaseClient.java:749)
-	at com.sonicbase.jdbcdriver.ConnectionProxy.send(ConnectionProxy.java:215)
-	at com.sonicbase.cli.ClusterHandler$2.run(ClusterHandler.java:301)
-	at java.lang.Thread.run(Thread.java:748)
-
-"Thread-1043" #1059 prio=5 os_prio=31 tid=0x00007fbb451fb000 nid=0xaf03 runnable [0x0000700004dfc000]
-   java.lang.Thread.State: RUNNABLE
-	at sun.nio.ch.Net.connect0(Native Method)
-	at sun.nio.ch.Net.connect(Net.java:454)
-	at sun.nio.ch.Net.connect(Net.java:446)
-	at sun.nio.ch.SocketChannelImpl.connect(SocketChannelImpl.java:648)
-	- locked <0x0000000788e76b48> (a java.lang.Object)
-	- locked <0x0000000788e76b68> (a java.lang.Object)
-	- locked <0x0000000788e76b58> (a java.lang.Object)
-	at com.sonicbase.socket.DatabaseSocketClient$Connection.<init>(DatabaseSocketClient.java:161)
-	at com.sonicbase.socket.DatabaseSocketClient.lambda$doBorrowConnection$0(DatabaseSocketClient.java:80)
-	at com.sonicbase.socket.DatabaseSocketClient$$Lambda$85/764372388.run(Unknown Source)
-	at java.lang.Thread.run(Thread.java:748)
-
-"Thread-1042" #1058 prio=5 os_prio=31 tid=0x00007fbb43835000 nid=0x9957 waiting on condition [0x00007000035b3000]
-   java.lang.Thread.State: TIMED_WAITING (parking)
-	at sun.misc.Unsafe.park(Native Method)
-	- parking to wait for  <0x0000000788e3e8c8> (a java.util.concurrent.CountDownLatch$Sync)
-	at java.util.concurrent.locks.LockSupport.parkNanos(LockSupport.java:215)
-	at java.util.concurrent.locks.AbstractQueuedSynchronizer.doAcquireSharedNanos(AbstractQueuedSynchronizer.java:1037)
-	at java.util.concurrent.locks.AbstractQueuedSynchronizer.tryAcquireSharedNanos(AbstractQueuedSynchronizer.java:1328)
-	at java.util.concurrent.CountDownLatch.await(CountDownLatch.java:277)
-	at com.sonicbase.socket.DatabaseSocketClient.doBorrowConnection(DatabaseSocketClient.java:89)
-	at com.sonicbase.socket.DatabaseSocketClient.borrowConnection(DatabaseSocketClient.java:53)
-	at com.sonicbase.socket.DatabaseSocketClient.sendBatch(DatabaseSocketClient.java:261)
-	at com.sonicbase.socket.DatabaseSocketClient.doSend(DatabaseSocketClient.java:523)
-	at com.sonicbase.client.DatabaseClient$Server.doSend(DatabaseClient.java:590)
-	at com.sonicbase.client.DatabaseClient.sendReplicaSpecified(DatabaseClient.java:999)
-	at com.sonicbase.client.DatabaseClient.doSend(DatabaseClient.java:1170)
-	at com.sonicbase.client.DatabaseClient.send(DatabaseClient.java:1142)
-	at com.sonicbase.client.DatabaseClient.send(DatabaseClient.java:749)
-	at com.sonicbase.jdbcdriver.ConnectionProxy.send(ConnectionProxy.java:215)
-	at com.sonicbase.cli.ClusterHandler$2.run(ClusterHandler.java:301)
-	at java.lang.Thread.run(Thread.java:748)
-
-"Thread-1040" #1056 prio=5 os_prio=31 tid=0x00007fbb45207000 nid=0xad77 runnable [0x0000700004cf9000]
-   java.lang.Thread.State: RUNNABLE
-	at sun.nio.ch.Net.connect0(Native Method)
-	at sun.nio.ch.Net.connect(Net.java:454)
-	at sun.nio.ch.Net.connect(Net.java:446)
-	at sun.nio.ch.SocketChannelImpl.connect(SocketChannelImpl.java:648)
-	- locked <0x0000000788e00560> (a java.lang.Object)
-	- locked <0x0000000788e00580> (a java.lang.Object)
-	- locked <0x0000000788e00570> (a java.lang.Object)
-	at com.sonicbase.socket.DatabaseSocketClient$Connection.<init>(DatabaseSocketClient.java:161)
-	at com.sonicbase.socket.DatabaseSocketClient.lambda$doBorrowConnection$0(DatabaseSocketClient.java:80)
-	at com.sonicbase.socket.DatabaseSocketClient$$Lambda$85/764372388.run(Unknown Source)
-	at java.lang.Thread.run(Thread.java:748)
-
-"Thread-1039" #1055 prio=5 os_prio=31 tid=0x00007fbb438a9800 nid=0x8f5b waiting on condition [0x00007000048ed000]
-   java.lang.Thread.State: TIMED_WAITING (sleeping)
-	at java.lang.Thread.sleep(Native Method)
-	at com.sonicbase.cli.ClusterHandler$2.run(ClusterHandler.java:320)
-	at java.lang.Thread.run(Thread.java:748)
-
-"Thread-1037" #1053 prio=5 os_prio=31 tid=0x00007fbb44160000 nid=0x7d77 runnable [0x0000700003dcc000]
-   java.lang.Thread.State: RUNNABLE
-	at sun.nio.ch.Net.connect0(Native Method)
-	at sun.nio.ch.Net.connect(Net.java:454)
-	at sun.nio.ch.Net.connect(Net.java:446)
-	at sun.nio.ch.SocketChannelImpl.connect(SocketChannelImpl.java:648)
-	- locked <0x0000000788f77000> (a java.lang.Object)
-	- locked <0x0000000788f77020> (a java.lang.Object)
-	- locked <0x0000000788f77010> (a java.lang.Object)
-	at com.sonicbase.socket.DatabaseSocketClient$Connection.<init>(DatabaseSocketClient.java:161)
-	at com.sonicbase.socket.DatabaseSocketClient.lambda$doBorrowConnection$0(DatabaseSocketClient.java:80)
-	at com.sonicbase.socket.DatabaseSocketClient$$Lambda$85/764372388.run(Unknown Source)
-	at java.lang.Thread.run(Thread.java:748)
-
-"Thread-1034" #1050 prio=5 os_prio=31 tid=0x00007fbb44a39000 nid=0x854f runnable [0x00007000047ea000]
-   java.lang.Thread.State: RUNNABLE
-	at sun.nio.ch.Net.connect0(Native Method)
-	at sun.nio.ch.Net.connect(Net.java:454)
-	at sun.nio.ch.Net.connect(Net.java:446)
-	at sun.nio.ch.SocketChannelImpl.connect(SocketChannelImpl.java:648)
-	- locked <0x0000000788f00560> (a java.lang.Object)
-	- locked <0x0000000788f00580> (a java.lang.Object)
-	- locked <0x0000000788f00570> (a java.lang.Object)
-	at com.sonicbase.socket.DatabaseSocketClient$Connection.<init>(DatabaseSocketClient.java:161)
-	at com.sonicbase.socket.DatabaseSocketClient.lambda$doBorrowConnection$0(DatabaseSocketClient.java:80)
-	at com.sonicbase.socket.DatabaseSocketClient$$Lambda$85/764372388.run(Unknown Source)
-	at java.lang.Thread.run(Thread.java:748)
-
-"Thread-1031" #1047 prio=5 os_prio=31 tid=0x00007fbb44042000 nid=0x8013 runnable [0x0000700003fd2000]
-   java.lang.Thread.State: RUNNABLE
-	at sun.nio.ch.Net.connect0(Native Method)
-	at sun.nio.ch.Net.connect(Net.java:454)
-	at sun.nio.ch.Net.connect(Net.java:446)
-	at sun.nio.ch.SocketChannelImpl.connect(SocketChannelImpl.java:648)
-	- locked <0x0000000789077290> (a java.lang.Object)
-	- locked <0x00000007890772b0> (a java.lang.Object)
-	- locked <0x00000007890772a0> (a java.lang.Object)
-	at com.sonicbase.socket.DatabaseSocketClient$Connection.<init>(DatabaseSocketClient.java:161)
-	at com.sonicbase.socket.DatabaseSocketClient.lambda$doBorrowConnection$0(DatabaseSocketClient.java:80)
-	at com.sonicbase.socket.DatabaseSocketClient$$Lambda$85/764372388.run(Unknown Source)
-	at java.lang.Thread.run(Thread.java:748)
-
-"Thread-1028" #1044 prio=5 os_prio=31 tid=0x00007fbb441bb000 nid=0x93af runnable [0x00007000044e1000]
-   java.lang.Thread.State: RUNNABLE
-	at sun.nio.ch.Net.connect0(Native Method)
-	at sun.nio.ch.Net.connect(Net.java:454)
-	at sun.nio.ch.Net.connect(Net.java:446)
-	at sun.nio.ch.SocketChannelImpl.connect(SocketChannelImpl.java:648)
-	- locked <0x0000000789000560> (a java.lang.Object)
-	- locked <0x0000000789000580> (a java.lang.Object)
-	- locked <0x0000000789000570> (a java.lang.Object)
-	at com.sonicbase.socket.DatabaseSocketClient$Connection.<init>(DatabaseSocketClient.java:161)
-	at com.sonicbase.socket.DatabaseSocketClient.lambda$doBorrowConnection$0(DatabaseSocketClient.java:80)
-	at com.sonicbase.socket.DatabaseSocketClient$$Lambda$85/764372388.run(Unknown Source)
-	at java.lang.Thread.run(Thread.java:748)
-
-"Thread-1025" #1041 prio=5 os_prio=31 tid=0x00007fbb45208800 nid=0x9d4b runnable [0x0000700004af3000]
-   java.lang.Thread.State: RUNNABLE
-	at sun.nio.ch.Net.connect0(Native Method)
-	at sun.nio.ch.Net.connect(Net.java:454)
-	at sun.nio.ch.Net.connect(Net.java:446)
-	at sun.nio.ch.SocketChannelImpl.connect(SocketChannelImpl.java:648)
-	- locked <0x000000078913bea8> (a java.lang.Object)
-	- locked <0x000000078913bec8> (a java.lang.Object)
-	- locked <0x000000078913beb8> (a java.lang.Object)
-	at com.sonicbase.socket.DatabaseSocketClient$Connection.<init>(DatabaseSocketClient.java:161)
-	at com.sonicbase.socket.DatabaseSocketClient.lambda$doBorrowConnection$0(DatabaseSocketClient.java:80)
-	at com.sonicbase.socket.DatabaseSocketClient$$Lambda$85/764372388.run(Unknown Source)
-	at java.lang.Thread.run(Thread.java:748)
-
-"Thread-1022" #1038 prio=5 os_prio=31 tid=0x00007fbb4403e000 nid=0x8753 runnable [0x00007000049f0000]
-   java.lang.Thread.State: RUNNABLE
-	at sun.nio.ch.Net.connect0(Native Method)
-	at sun.nio.ch.Net.connect(Net.java:454)
-	at sun.nio.ch.Net.connect(Net.java:446)
-	at sun.nio.ch.SocketChannelImpl.connect(SocketChannelImpl.java:648)
-	- locked <0x00000007892b2588> (a java.lang.Object)
-	- locked <0x00000007892b25a8> (a java.lang.Object)
-	- locked <0x00000007892b2598> (a java.lang.Object)
-	at com.sonicbase.socket.DatabaseSocketClient$Connection.<init>(DatabaseSocketClient.java:161)
-	at com.sonicbase.socket.DatabaseSocketClient.lambda$doBorrowConnection$0(DatabaseSocketClient.java:80)
-	at com.sonicbase.socket.DatabaseSocketClient$$Lambda$85/764372388.run(Unknown Source)
-	at java.lang.Thread.run(Thread.java:748)
-
-"Thread-1019" #1035 prio=5 os_prio=31 tid=0x00007fbb44a3a800 nid=0x914f runnable [0x00007000037ba000]
-   java.lang.Thread.State: RUNNABLE
-	at sun.nio.ch.Net.connect0(Native Method)
-	at sun.nio.ch.Net.connect(Net.java:454)
-	at sun.nio.ch.Net.connect(Net.java:446)
-	at sun.nio.ch.SocketChannelImpl.connect(SocketChannelImpl.java:648)
-	- locked <0x0000000788deceb0> (a java.lang.Object)
-	- locked <0x0000000788deced0> (a java.lang.Object)
-	- locked <0x0000000788decec0> (a java.lang.Object)
-	at com.sonicbase.socket.DatabaseSocketClient$Connection.<init>(DatabaseSocketClient.java:161)
-	at com.sonicbase.socket.DatabaseSocketClient.lambda$doBorrowConnection$0(DatabaseSocketClient.java:80)
-	at com.sonicbase.socket.DatabaseSocketClient$$Lambda$85/764372388.run(Unknown Source)
-	at java.lang.Thread.run(Thread.java:748)
-
-"Thread-1016" #1032 prio=5 os_prio=31 tid=0x00007fbb4604c800 nid=0xa93f runnable [0x00007000043de000]
-   java.lang.Thread.State: RUNNABLE
-	at sun.nio.ch.Net.connect0(Native Method)
-	at sun.nio.ch.Net.connect(Net.java:454)
-	at sun.nio.ch.Net.connect(Net.java:446)
-	at sun.nio.ch.SocketChannelImpl.connect(SocketChannelImpl.java:648)
-	- locked <0x0000000789377438> (a java.lang.Object)
-	- locked <0x0000000789377458> (a java.lang.Object)
-	- locked <0x0000000789377448> (a java.lang.Object)
-	at com.sonicbase.socket.DatabaseSocketClient$Connection.<init>(DatabaseSocketClient.java:161)
-	at com.sonicbase.socket.DatabaseSocketClient.lambda$doBorrowConnection$0(DatabaseSocketClient.java:80)
-	at com.sonicbase.socket.DatabaseSocketClient$$Lambda$85/764372388.run(Unknown Source)
-	at java.lang.Thread.run(Thread.java:748)
-
-"Thread-1013" #1029 prio=5 os_prio=31 tid=0x00007fbb45132000 nid=0x974b runnable [0x00007000040d5000]
-   java.lang.Thread.State: RUNNABLE
-	at sun.nio.ch.Net.connect0(Native Method)
-	at sun.nio.ch.Net.connect(Net.java:454)
-	at sun.nio.ch.Net.connect(Net.java:446)
-	at sun.nio.ch.SocketChannelImpl.connect(SocketChannelImpl.java:648)
-	- locked <0x00000007894ed8f0> (a java.lang.Object)
-	- locked <0x00000007894ed910> (a java.lang.Object)
-	- locked <0x00000007894ed900> (a java.lang.Object)
-	at com.sonicbase.socket.DatabaseSocketClient$Connection.<init>(DatabaseSocketClient.java:161)
-	at com.sonicbase.socket.DatabaseSocketClient.lambda$doBorrowConnection$0(DatabaseSocketClient.java:80)
-	at com.sonicbase.socket.DatabaseSocketClient$$Lambda$85/764372388.run(Unknown Source)
-	at java.lang.Thread.run(Thread.java:748)
-
-"Thread-1010" #1026 prio=5 os_prio=31 tid=0x00007fbb45206000 nid=0x7543 runnable [0x00007000039c0000]
-   java.lang.Thread.State: RUNNABLE
-	at sun.nio.ch.Net.connect0(Native Method)
-	at sun.nio.ch.Net.connect(Net.java:454)
-	at sun.nio.ch.Net.connect(Net.java:446)
-	at sun.nio.ch.SocketChannelImpl.connect(SocketChannelImpl.java:648)
-	- locked <0x000000078943c270> (a java.lang.Object)
-	- locked <0x000000078943c290> (a java.lang.Object)
-	- locked <0x000000078943c280> (a java.lang.Object)
-	at com.sonicbase.socket.DatabaseSocketClient$Connection.<init>(DatabaseSocketClient.java:161)
-	at com.sonicbase.socket.DatabaseSocketClient.lambda$doBorrowConnection$0(DatabaseSocketClient.java:80)
-	at com.sonicbase.socket.DatabaseSocketClient$$Lambda$85/764372388.run(Unknown Source)
-	at java.lang.Thread.run(Thread.java:748)
-
-"Thread-1003" #1019 prio=5 os_prio=31 tid=0x00007fbb43846000 nid=0x8953 runnable [0x00007000038bc000]
-   java.lang.Thread.State: RUNNABLE
-	at sun.nio.ch.FileDispatcherImpl.read0(Native Method)
-	at sun.nio.ch.SocketDispatcher.read(SocketDispatcher.java:39)
-	at sun.nio.ch.IOUtil.readIntoNativeBuffer(IOUtil.java:223)
-	at sun.nio.ch.IOUtil.read(IOUtil.java:192)
-	at sun.nio.ch.SocketChannelImpl.read(SocketChannelImpl.java:380)
-	- locked <0x0000000789400528> (a java.lang.Object)
-	at com.sonicbase.socket.DatabaseSocketClient.readResponse(DatabaseSocketClient.java:424)
-	at com.sonicbase.socket.DatabaseSocketClient.sendBatch(DatabaseSocketClient.java:287)
-	at com.sonicbase.socket.DatabaseSocketClient.doSend(DatabaseSocketClient.java:523)
-	at com.sonicbase.client.DatabaseClient$Server.doSend(DatabaseClient.java:590)
-	at com.sonicbase.client.DatabaseClient.sendReplicaSpecified(DatabaseClient.java:999)
-	at com.sonicbase.client.DatabaseClient.doSend(DatabaseClient.java:1170)
-	at com.sonicbase.client.DatabaseClient.send(DatabaseClient.java:1142)
-	at com.sonicbase.client.DatabaseClient.send(DatabaseClient.java:749)
-	at com.sonicbase.jdbcdriver.ConnectionProxy.send(ConnectionProxy.java:215)
-	at com.sonicbase.cli.ClusterHandler$2.run(ClusterHandler.java:301)
-	at java.lang.Thread.run(Thread.java:748)
-
-"Thread-977" #993 prio=5 os_prio=31 tid=0x00007fbb451fb800 nid=0x9b47 runnable [0x00007000034b0000]
-   java.lang.Thread.State: RUNNABLE
-	at sun.nio.ch.FileDispatcherImpl.read0(Native Method)
-	at sun.nio.ch.SocketDispatcher.read(SocketDispatcher.java:39)
-	at sun.nio.ch.IOUtil.readIntoNativeBuffer(IOUtil.java:223)
-	at sun.nio.ch.IOUtil.read(IOUtil.java:192)
-	at sun.nio.ch.SocketChannelImpl.read(SocketChannelImpl.java:380)
-	- locked <0x0000000789ab2190> (a java.lang.Object)
-	at com.sonicbase.socket.DatabaseSocketClient.readResponse(DatabaseSocketClient.java:424)
-	at com.sonicbase.socket.DatabaseSocketClient.sendBatch(DatabaseSocketClient.java:287)
-	at com.sonicbase.socket.DatabaseSocketClient.doSend(DatabaseSocketClient.java:523)
-	at com.sonicbase.client.DatabaseClient$Server.doSend(DatabaseClient.java:590)
-	at com.sonicbase.client.DatabaseClient.sendReplicaSpecified(DatabaseClient.java:999)
-	at com.sonicbase.client.DatabaseClient.doSend(DatabaseClient.java:1170)
-	at com.sonicbase.client.DatabaseClient.send(DatabaseClient.java:1142)
-	at com.sonicbase.client.DatabaseClient.send(DatabaseClient.java:749)
-	at com.sonicbase.jdbcdriver.ConnectionProxy.send(ConnectionProxy.java:215)
-	at com.sonicbase.cli.ClusterHandler$2.run(ClusterHandler.java:301)
-	at java.lang.Thread.run(Thread.java:748)
-
-"Thread-966" #982 prio=5 os_prio=31 tid=0x00007fbb44040800 nid=0x8d4f runnable [0x00007000033ad000]
-   java.lang.Thread.State: RUNNABLE
-	at sun.nio.ch.FileDispatcherImpl.read0(Native Method)
-	at sun.nio.ch.SocketDispatcher.read(SocketDispatcher.java:39)
-	at sun.nio.ch.IOUtil.readIntoNativeBuffer(IOUtil.java:223)
-	at sun.nio.ch.IOUtil.read(IOUtil.java:192)
-	at sun.nio.ch.SocketChannelImpl.read(SocketChannelImpl.java:380)
-	- locked <0x0000000789cb2118> (a java.lang.Object)
-	at com.sonicbase.socket.DatabaseSocketClient.readResponse(DatabaseSocketClient.java:424)
-	at com.sonicbase.socket.DatabaseSocketClient.sendBatch(DatabaseSocketClient.java:287)
-	at com.sonicbase.socket.DatabaseSocketClient.doSend(DatabaseSocketClient.java:523)
-	at com.sonicbase.client.DatabaseClient$Server.doSend(DatabaseClient.java:590)
-	at com.sonicbase.client.DatabaseClient.sendReplicaSpecified(DatabaseClient.java:999)
-	at com.sonicbase.client.DatabaseClient.doSend(DatabaseClient.java:1170)
-	at com.sonicbase.client.DatabaseClient.send(DatabaseClient.java:1142)
-	at com.sonicbase.client.DatabaseClient.send(DatabaseClient.java:749)
-	at com.sonicbase.jdbcdriver.ConnectionProxy.send(ConnectionProxy.java:215)
-	at com.sonicbase.cli.ClusterHandler$2.run(ClusterHandler.java:301)
-	at java.lang.Thread.run(Thread.java:748)
-
-"SonicBase Stats Recorder - cluster=1-local" #21 prio=5 os_prio=31 tid=0x00007fbb448e4800 nid=0x7b03 waiting on condition [0x00007000031a8000]
-   java.lang.Thread.State: TIMED_WAITING (sleeping)
-	at java.lang.Thread.sleep(Native Method)
-	at com.sonicbase.client.ClientStatsHandler$QueryStatsRecorder.doRecordStats(ClientStatsHandler.java:83)
-	at com.sonicbase.client.ClientStatsHandler$QueryStatsRecorder.run(ClientStatsHandler.java:70)
-	at java.lang.Thread.run(Thread.java:748)
-
-"Timer-1" #20 prio=5 os_prio=31 tid=0x00007fbb448e2000 nid=0x7903 in Object.wait() [0x00007000030a5000]
-   java.lang.Thread.State: WAITING (on object monitor)
-	at java.lang.Object.wait(Native Method)
-	- waiting on <0x0000000786608278> (a java.util.TaskQueue)
-	at java.lang.Object.wait(Object.java:502)
-	at java.util.TimerThread.mainLoop(Timer.java:526)
-	- locked <0x0000000786608278> (a java.util.TaskQueue)
-	at java.util.TimerThread.run(Timer.java:505)
-
-"Timer-0" #19 prio=5 os_prio=31 tid=0x00007fbb44a0a000 nid=0x7707 in Object.wait() [0x0000700002fa2000]
-   java.lang.Thread.State: WAITING (on object monitor)
-	at java.lang.Object.wait(Native Method)
-	- waiting on <0x000000078663ae58> (a java.util.TaskQueue)
-	at java.lang.Object.wait(Object.java:502)
-	at java.util.TimerThread.mainLoop(Timer.java:526)
-	- locked <0x000000078663ae58> (a java.util.TaskQueue)
-	at java.util.TimerThread.run(Timer.java:505)
-
-"Abandoned connection cleanup thread" #16 daemon prio=5 os_prio=31 tid=0x00007fbb451af000 nid=0x1407 in Object.wait() [0x0000700002e9f000]
-   java.lang.Thread.State: TIMED_WAITING (on object monitor)
-	at java.lang.Object.wait(Native Method)
-	at java.lang.ref.ReferenceQueue.remove(ReferenceQueue.java:143)
-	- locked <0x00000007866423b0> (a java.lang.ref.ReferenceQueue$Lock)
-	at com.mysql.cj.jdbc.AbandonedConnectionCleanupThread.run(AbandonedConnectionCleanupThread.java:43)
-
-"pool-1-thread-1" #15 prio=5 os_prio=31 tid=0x00007fbb441cb000 nid=0x1007 waiting on condition [0x0000700002d9c000]
-   java.lang.Thread.State: WAITING (parking)
-	at sun.misc.Unsafe.park(Native Method)
-	- parking to wait for  <0x00000007800cd7e0> (a java.util.concurrent.locks.AbstractQueuedSynchronizer$ConditionObject)
-	at java.util.concurrent.locks.LockSupport.park(LockSupport.java:175)
-	at java.util.concurrent.locks.AbstractQueuedSynchronizer$ConditionObject.await(AbstractQueuedSynchronizer.java:2039)
-	at java.util.concurrent.ArrayBlockingQueue.take(ArrayBlockingQueue.java:403)
-	at java.util.concurrent.ThreadPoolExecutor.getTask(ThreadPoolExecutor.java:1074)
-	at java.util.concurrent.ThreadPoolExecutor.runWorker(ThreadPoolExecutor.java:1134)
-	at java.util.concurrent.ThreadPoolExecutor$Worker.run(ThreadPoolExecutor.java:624)
-	at java.lang.Thread.run(Thread.java:748)
-
-"Thread-0" #11 prio=5 os_prio=31 tid=0x00007fbb44140800 nid=0x7103 runnable [0x0000700002c42000]
-   java.lang.Thread.State: RUNNABLE
-	at java.net.PlainSocketImpl.socketConnect(Native Method)
-	at java.net.AbstractPlainSocketImpl.doConnect(AbstractPlainSocketImpl.java:350)
-	- locked <0x000000078bb9c3b8> (a java.net.SocksSocketImpl)
-	at java.net.AbstractPlainSocketImpl.connectToAddress(AbstractPlainSocketImpl.java:206)
-	at java.net.AbstractPlainSocketImpl.connect(AbstractPlainSocketImpl.java:188)
-	at java.net.SocksSocketImpl.connect(SocksSocketImpl.java:392)
-	at java.net.Socket.connect(Socket.java:589)
-	at sun.security.ssl.SSLSocketImpl.connect(SSLSocketImpl.java:673)
-	at sun.security.ssl.BaseSSLSocketImpl.connect(BaseSSLSocketImpl.java:173)
-	at sun.net.NetworkClient.doConnect(NetworkClient.java:180)
-	at sun.net.www.http.HttpClient.openServer(HttpClient.java:463)
-	at sun.net.www.http.HttpClient.openServer(HttpClient.java:558)
-	- locked <0x000000078bb9c270> (a sun.net.www.protocol.https.HttpsClient)
-	at sun.net.www.protocol.https.HttpsClient.<init>(HttpsClient.java:264)
-	at sun.net.www.protocol.https.HttpsClient.New(HttpsClient.java:367)
-	at sun.net.www.protocol.https.AbstractDelegateHttpsURLConnection.getNewHttpClient(AbstractDelegateHttpsURLConnection.java:191)
-	at sun.net.www.protocol.http.HttpURLConnection.plainConnect0(HttpURLConnection.java:1138)
-	at sun.net.www.protocol.http.HttpURLConnection.plainConnect(HttpURLConnection.java:1032)
-	at sun.net.www.protocol.https.AbstractDelegateHttpsURLConnection.connect(AbstractDelegateHttpsURLConnection.java:177)
-	at sun.net.www.protocol.http.HttpURLConnection.getInputStream0(HttpURLConnection.java:1546)
-	- locked <0x000000078bb9b7d8> (a sun.net.www.protocol.https.DelegateHttpsURLConnection)
-	at sun.net.www.protocol.http.HttpURLConnection.getInputStream(HttpURLConnection.java:1474)
-	- locked <0x000000078bb9b7d8> (a sun.net.www.protocol.https.DelegateHttpsURLConnection)
-	at sun.net.www.protocol.https.HttpsURLConnectionImpl.getInputStream(HttpsURLConnectionImpl.java:254)
-	- locked <0x000000078bb9b758> (a sun.net.www.protocol.https.HttpsURLConnectionImpl)
-	at com.sonicbase.client.DescribeStatementHandler.describeLicenses(DescribeStatementHandler.java:221)
-	at com.sonicbase.jdbcdriver.ConnectionProxy.describeLicenses(ConnectionProxy.java:184)
-	at com.sonicbase.cli.Cli.lambda$startCheckLicensesThread$66(Cli.java:580)
-	at com.sonicbase.cli.Cli$$Lambda$1/849460928.run(Unknown Source)
-	at java.lang.Thread.run(Thread.java:748)
-
-"Service Thread" #10 daemon prio=9 os_prio=31 tid=0x00007fbb448ec800 nid=0x6d03 runnable [0x0000000000000000]
-   java.lang.Thread.State: RUNNABLE
-
-"C1 CompilerThread3" #9 daemon prio=9 os_prio=31 tid=0x00007fbb4382d800 nid=0x6b03 waiting on condition [0x0000000000000000]
-   java.lang.Thread.State: RUNNABLE
-
-"C2 CompilerThread2" #8 daemon prio=9 os_prio=31 tid=0x00007fbb4382c800 nid=0x6903 waiting on condition [0x0000000000000000]
-   java.lang.Thread.State: RUNNABLE
-
-"C2 CompilerThread1" #7 daemon prio=9 os_prio=31 tid=0x00007fbb44023000 nid=0x6703 waiting on condition [0x0000000000000000]
-   java.lang.Thread.State: RUNNABLE
-
-"C2 CompilerThread0" #6 daemon prio=9 os_prio=31 tid=0x00007fbb448e1000 nid=0x6503 waiting on condition [0x0000000000000000]
-   java.lang.Thread.State: RUNNABLE
-
-"Signal Dispatcher" #5 daemon prio=9 os_prio=31 tid=0x00007fbb448c2000 nid=0x6303 waiting on condition [0x0000000000000000]
-   java.lang.Thread.State: RUNNABLE
-
-"Surrogate Locker Thread (Concurrent GC)" #4 daemon prio=9 os_prio=31 tid=0x00007fbb44809000 nid=0x6003 waiting on condition [0x0000000000000000]
-   java.lang.Thread.State: RUNNABLE
-
-"Finalizer" #3 daemon prio=8 os_prio=31 tid=0x00007fbb44007800 nid=0x5103 in Object.wait() [0x0000700002328000]
-   java.lang.Thread.State: WAITING (on object monitor)
-	at java.lang.Object.wait(Native Method)
-	at java.lang.ref.ReferenceQueue.remove(ReferenceQueue.java:143)
-	- locked <0x00000007800d04b8> (a java.lang.ref.ReferenceQueue$Lock)
-	at java.lang.ref.ReferenceQueue.remove(ReferenceQueue.java:164)
-	at java.lang.ref.Finalizer$FinalizerThread.run(Finalizer.java:209)
-
-"Reference Handler" #2 daemon prio=10 os_prio=31 tid=0x00007fbb43828800 nid=0x4f03 in Object.wait() [0x0000700002225000]
-   java.lang.Thread.State: WAITING (on object monitor)
-	at java.lang.Object.wait(Native Method)
-	at java.lang.Object.wait(Object.java:502)
-	at java.lang.ref.Reference.tryHandlePending(Reference.java:191)
-	- locked <0x00000007800d0670> (a java.lang.ref.Reference$Lock)
-	at java.lang.ref.Reference$ReferenceHandler.run(Reference.java:153)
-
-"main" #1 prio=5 os_prio=31 tid=0x00007fbb45001800 nid=0x1c03 in Object.wait() [0x0000700000be3000]
-   java.lang.Thread.State: TIMED_WAITING (on object monitor)
-	at java.lang.Object.wait(Native Method)
-	at java.lang.Thread.join(Thread.java:1260)
-	- locked <0x000000078feb1488> (a java.lang.Thread)
-	at com.sonicbase.cli.ClusterHandler.startCluster(ClusterHandler.java:330)
-	at com.sonicbase.cli.Cli.lambda$initCommands$2(Cli.java:340)
-	at com.sonicbase.cli.Cli$$Lambda$4/1364335809.invoke(Unknown Source)
-	at com.sonicbase.cli.Cli.runCommand(Cli.java:473)
-	at com.sonicbase.cli.Cli.start(Cli.java:184)
-	at com.sonicbase.cli.Cli.main(Cli.java:219)
-
-"VM Thread" os_prio=31 tid=0x00007fbb43828000 nid=0x4d03 runnable 
-
-"Gang worker#0 (Parallel GC Threads)" os_prio=31 tid=0x00007fbb44805000 nid=0x2503 runnable 
-
-"Gang worker#1 (Parallel GC Threads)" os_prio=31 tid=0x00007fbb44805800 nid=0x2703 runnable 
-
-"Gang worker#2 (Parallel GC Threads)" os_prio=31 tid=0x00007fbb44806000 nid=0x2903 runnable 
-
-"Gang worker#3 (Parallel GC Threads)" os_prio=31 tid=0x00007fbb4500a800 nid=0x2b03 runnable 
-
-"Gang worker#4 (Parallel GC Threads)" os_prio=31 tid=0x00007fbb43808800 nid=0x2d03 runnable 
-
-"Gang worker#5 (Parallel GC Threads)" os_prio=31 tid=0x00007fbb44810800 nid=0x2f03 runnable 
-
-"Gang worker#6 (Parallel GC Threads)" os_prio=31 tid=0x00007fbb43809000 nid=0x3103 runnable 
-
-"Gang worker#7 (Parallel GC Threads)" os_prio=31 tid=0x00007fbb44811000 nid=0x3303 runnable 
-
-"G1 Main Concurrent Mark GC Thread" os_prio=31 tid=0x00007fbb4501c000 nid=0x4703 runnable 
-
-"Gang worker#0 (G1 Parallel Marking Threads)" os_prio=31 tid=0x00007fbb4501c800 nid=0x4903 runnable 
-
-"Gang worker#1 (G1 Parallel Marking Threads)" os_prio=31 tid=0x00007fbb4501d000 nid=0x4b03 runnable 
-
-"G1 Concurrent Refinement Thread#0" os_prio=31 tid=0x00007fbb4500c800 nid=0x4503 runnable 
-
-"G1 Concurrent Refinement Thread#1" os_prio=31 tid=0x00007fbb44814800 nid=0x4303 runnable 
-
-"G1 Concurrent Refinement Thread#2" os_prio=31 tid=0x00007fbb4380a000 nid=0x4103 runnable 
-
-"G1 Concurrent Refinement Thread#3" os_prio=31 tid=0x00007fbb4500b800 nid=0x3f03 runnable 
-
-"G1 Concurrent Refinement Thread#4" os_prio=31 tid=0x00007fbb44814000 nid=0x3d03 runnable 
-
-"G1 Concurrent Refinement Thread#5" os_prio=31 tid=0x00007fbb44813000 nid=0x3b03 runnable 
-
-"G1 Concurrent Refinement Thread#6" os_prio=31 tid=0x00007fbb4500b000 nid=0x3903 runnable 
-
-"G1 Concurrent Refinement Thread#7" os_prio=31 tid=0x00007fbb44812800 nid=0x3703 runnable 
-
-"G1 Concurrent Refinement Thread#8" os_prio=31 tid=0x00007fbb44811800 nid=0x3503 runnable 
-
-"VM Periodic Task Thread" os_prio=31 tid=0x00007fbb44024800 nid=0x6f03 waiting on condition 
+NFO] ------------------------------------------------------------------------
+[INFO] 
+[INFO] --- maven-dependency-plugin:2.8:tree (default-cli) @ sonicbase-jdbc ---
+[INFO] com.sonicbase:sonicbase-jdbc:jar:1.2.15
+[INFO] +- org.yaml:snakeyaml:jar:1.21:compile
+[INFO] +- com.google.guava:guava:jar:24.0-jre:compile
+[INFO] |  +- com.google.code.findbugs:jsr305:jar:1.3.9:compile
+[INFO] |  +- org.checkerframework:checker-compat-qual:jar:2.0.0:compile
+[INFO] |  +- com.google.errorprone:error_prone_annotations:jar:2.1.3:compile
+[INFO] |  +- com.google.j2objc:j2objc-annotations:jar:1.1:compile
+[INFO] |  \- org.codehaus.mojo:animal-sniffer-annotations:jar:1.14:compile
+[INFO] +- io.dropwizard.metrics:metrics-core:jar:4.0.2:compile
+[INFO] |  \- org.slf4j:slf4j-api:jar:1.7.25:compile
+[INFO] +- com.fasterxml.jackson.core:jackson-databind:jar:2.9.6:compile
+[INFO] |  \- com.fasterxml.jackson.core:jackson-annotations:jar:2.9.0:compile
+[INFO] +- com.fasterxml.jackson.core:jackson-core:jar:2.9.6:compile
+[INFO] +- commons-io:commons-io:jar:2.5:compile
+[INFO] +- net.jpountz.lz4:lz4:jar:1.3.0:compile
+[INFO] +- org.apache.commons:commons-crypto:jar:1.0.0:compile
+[INFO] |  \- net.java.dev.jna:jna:jar:4.2.2:compile
+[INFO] +- org.apache.maven.plugin-tools:maven-plugin-annotations:jar:3.2:compile
+[INFO] |  \- org.apache.maven:maven-artifact:jar:3.0:compile
+[INFO] |     \- org.codehaus.plexus:plexus-utils:jar:2.0.4:compile
+[INFO] +- org.apache.commons:commons-lang3:jar:3.3.2:compile
+[INFO] +- log4j:log4j:jar:1.2.17:compile
+[INFO] +- com.google.code.gson:gson:jar:2.2.3:compile
+[INFO] +- com.github.jsqlparser:jsqlparser:jar:0.9.5:compile
+[INFO] +- commons-configuration:commons-configuration:jar:1.6:compile
+[INFO] |  +- commons-collections:commons-collections:jar:3.2.1:compile
+[INFO] |  +- commons-lang:commons-lang:jar:2.4:compile
+[INFO] |  +- commons-logging:commons-logging:jar:1.1.1:compile
+[INFO] |  +- commons-digester:commons-digester:jar:1.8:compile
+[INFO] |  |  \- commons-beanutils:commons-beanutils:jar:1.7.0:compile
+[INFO] |  \- commons-beanutils:commons-beanutils-core:jar:1.8.0:compile
+[INFO] +- org.anarres.lzo:lzo-hadoop:jar:1.0.5:compile
+[INFO] |  +- org.apache.hadoop:hadoop-core:jar:1.2.1:compile
+[INFO] |  |  +- xmlenc:xmlenc:jar:0.52:compile
+[INFO] |  |  +- com.sun.jersey:jersey-server:jar:1.8:compile
+[INFO] |  |  |  \- asm:asm:jar:3.1:compile
+[INFO] |  |  +- commons-httpclient:commons-httpclient:jar:3.0.1:compile
+[INFO] |  |  +- commons-codec:commons-codec:jar:1.4:compile
+[INFO] |  |  +- org.apache.commons:commons-math:jar:2.1:compile
+[INFO] |  |  +- commons-net:commons-net:jar:1.4.1:compile
+[INFO] |  |  +- org.mortbay.jetty:jetty:jar:6.1.26:compile
+[INFO] |  |  |  \- org.mortbay.jetty:servlet-api:jar:2.5-20081211:compile
+[INFO] |  |  +- org.mortbay.jetty:jetty-util:jar:6.1.26:compile
+[INFO] |  |  +- tomcat:jasper-runtime:jar:5.5.12:compile
+[INFO] |  |  +- tomcat:jasper-compiler:jar:5.5.12:compile
+[INFO] |  |  +- org.mortbay.jetty:jsp-api-2.1:jar:6.1.14:compile
+[INFO] |  |  |  \- org.mortbay.jetty:servlet-api-2.5:jar:6.1.14:compile
+[INFO] |  |  +- org.mortbay.jetty:jsp-2.1:jar:6.1.14:compile
+[INFO] |  |  |  \- ant:ant:jar:1.6.5:compile
+[INFO] |  |  +- commons-el:commons-el:jar:1.0:compile
+[INFO] |  |  +- net.java.dev.jets3t:jets3t:jar:0.6.1:compile
+[INFO] |  |  +- hsqldb:hsqldb:jar:1.8.0.10:compile
+[INFO] |  |  +- oro:oro:jar:2.0.8:compile
+[INFO] |  |  \- org.eclipse.jdt:core:jar:3.1.1:compile
+[INFO] |  \- com.google.code.findbugs:annotations:jar:2.0.3:compile
+[INFO] +- com.sun.jersey:jersey-json:jar:1.19.4:compile
+[INFO] |  +- org.codehaus.jettison:jettison:jar:1.1:compile
+[INFO] |  +- com.sun.xml.bind:jaxb-impl:jar:2.2.3-1:compile
+[INFO] |  |  \- javax.xml.bind:jaxb-api:jar:2.2.2:compile
+[INFO] |  |     +- javax.xml.stream:stax-api:jar:1.0-2:compile
+[INFO] |  |     \- javax.activation:activation:jar:1.1:compile
+[INFO] |  +- org.codehaus.jackson:jackson-core-asl:jar:1.9.2:compile
+[INFO] |  +- org.codehaus.jackson:jackson-mapper-asl:jar:1.9.2:compile
+[INFO] |  +- org.codehaus.jackson:jackson-jaxrs:jar:1.9.2:compile
+[INFO] |  +- org.codehaus.jackson:jackson-xc:jar:1.9.2:compile
+[INFO] |  \- com.sun.jersey:jersey-core:jar:1.19.4:compile
+[INFO] |     \- javax.ws.rs:jsr311-api:jar:1.1.1:compile
+[INFO] +- org.anarres.lzo:lzo-core:jar:1.0.5:compile
+[INFO] +- commons-cli:commons-cli:jar:1.3.1:compile
+[INFO] +- org.mockito:mockito-all:jar:1.10.19:test
+[INFO] \- org.testng:testng:jar:6.8:test
+[INFO]    +- junit:junit:jar:4.10:compile
+[INFO]    |  \- org.hamcrest:hamcrest-core:jar:1.1:compile
+[INFO]    +- org.beanshell:bsh:jar:2.0b4:test
+[INFO]    \- com.beust:jcommander:jar:1.27:test
+[INFO] ------------------------------------------------------------------------
+[INFO] BUILD SUCCESS
+[INFO] ------------------------------------------------------------------------
+[INFO] Total time: 2.253 s
+[INFO] Finished at: 2018-08-31T14:36:05-06:00
+[INFO] Final Memory: 23M/437M
+[INFO] ------------------------------

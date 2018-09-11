@@ -7,7 +7,7 @@ import com.sonicbase.query.DatabaseException;
 import com.sonicbase.schema.IndexSchema;
 import com.sonicbase.schema.TableSchema;
 import com.sonicbase.util.DateUtils;
-import org.apache.giraph.utils.Varint;
+import com.sonicbase.util.Varint;
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
 
@@ -25,36 +25,31 @@ import java.util.concurrent.atomic.AtomicLong;
 public class DeleteManager {
 
   private static final String ERROR_PERFORMING_DELETES_STR = "Error performing deletes";
-  private static Logger logger = LoggerFactory.getLogger(DeleteManager.class);
+  private static final Logger logger = LoggerFactory.getLogger(DeleteManager.class);
 
   private final com.sonicbase.server.DatabaseServer databaseServer;
-  private ThreadPoolExecutor executor;
+  private final ThreadPoolExecutor executor;
+  private final ThreadPoolExecutor fileExecutor;
   private Thread mainThread;
-  private ThreadPoolExecutor freeExecutor;
+  private final ThreadPoolExecutor freeExecutor;
   private boolean shutdown;
-  private LinkedBlockingQueue<Object> toFree = new LinkedBlockingQueue<>();
-  private Thread freeThread;
-  private AtomicLong countRead = new AtomicLong();
+  private final LinkedBlockingQueue<Object> toFree = new LinkedBlockingQueue<>();
+  private final Thread freeThread;
+  private final AtomicLong countRead = new AtomicLong();
 
   DeleteManager(final DatabaseServer databaseServer) {
     this.databaseServer = databaseServer;
-    this.executor = ThreadUtil.createExecutor(Runtime.getRuntime().availableProcessors() * 2,
+    this.executor = ThreadUtil.createExecutor(Runtime.getRuntime().availableProcessors() * 4,
         "SonicBase DeleteManager Thread");
-    this.freeExecutor = ThreadUtil.createExecutor(4, "SonicBase DeleteManager FreeExecutor Thread");
+    this.fileExecutor = ThreadUtil.createExecutor(Runtime.getRuntime().availableProcessors(),
+        "SonicBase DeleteManager File Thread");
+    this.freeExecutor = ThreadUtil.createExecutor(Runtime.getRuntime().availableProcessors() * 4,
+        "SonicBase DeleteManager FreeExecutor Thread");
     freeThread = ThreadUtil.createThread(() -> {
       while (!shutdown) {
         try {
           final Object obj = toFree.poll(10_000, TimeUnit.MILLISECONDS);
-          if (obj == null) {
-            continue;
-          }
-          final List<Object> batch = new ArrayList<>();
-          toFree.drainTo(batch, 1000);
-          freeExecutor.submit(() -> {
-            for (Object currObj : batch) {
-              databaseServer.getAddressMap().freeUnsafeIds(currObj);
-            }
-          });
+          freeBatch(databaseServer, obj);
         }
         catch (InterruptedException e) {
           Thread.currentThread().interrupt();
@@ -68,8 +63,20 @@ public class DeleteManager {
     freeThread.start();
   }
 
+  private void freeBatch(DatabaseServer databaseServer, Object obj) {
+    if (obj != null) {
+      final List<Object> batch = new ArrayList<>();
+      toFree.drainTo(batch, 1000);
+      freeExecutor.submit(() -> {
+        for (Object currObj : batch) {
+          databaseServer.getAddressMap().freeUnsafeIds(currObj);
+        }
+      });
+    }
+  }
+
   public static class DeleteRequest {
-    private Object[] key;
+    private final Object[] key;
 
     DeleteRequest(Object[] key) {
       this.key = key;
@@ -81,7 +88,7 @@ public class DeleteManager {
   }
 
   private void saveDeletes(String dbName, String tableName, String indexName,
-                           ConcurrentLinkedQueue<DeleteRequest> deleteRequests) {
+                           List<DeleteRequest> deleteRequests) {
     try {
       String dateStr = DateUtils.toString(new Date(System.currentTimeMillis()));
       Random rand = new Random(System.currentTimeMillis());
@@ -113,18 +120,8 @@ public class DeleteManager {
       if (dir.exists()) {
         logger.info("DeleteManager deleting file - begin: file={}", file.getAbsolutePath());
         List<Future> futures = new ArrayList<>();
-        InputStream countIn = new LogManager.ByteCounterStream(new FileInputStream(file), countRead);
-        try (DataInputStream in = new DataInputStream(new BufferedInputStream(countIn))) {
-          if (doDeletesProcessStream(ignoreVersion, futures, in)) {
-            return;
-          }
-        }
-        catch (Exception e) {
-          logger.error(ERROR_PERFORMING_DELETES_STR, e);
-        }
-
-        for (Future future : futures) {
-          future.get();
+        if (doDeletesForStream(ignoreVersion, file, futures)) {
+          return;
         }
         if (file.exists()) {
           Files.delete(file.toPath());
@@ -135,6 +132,23 @@ public class DeleteManager {
     catch (Exception e) {
       logger.error(ERROR_PERFORMING_DELETES_STR, e);
     }
+  }
+
+  private boolean doDeletesForStream(boolean ignoreVersion, File file, List<Future> futures) throws FileNotFoundException, InterruptedException, ExecutionException {
+    InputStream countIn = new LogManager.ByteCounterStream(new FileInputStream(file), countRead);
+    try (DataInputStream in = new DataInputStream(new BufferedInputStream(countIn))) {
+      if (doDeletesProcessStream(ignoreVersion, futures, in)) {
+        return true;
+      }
+    }
+    catch (Exception e) {
+      logger.error(ERROR_PERFORMING_DELETES_STR, e);
+    }
+
+    for (Future future : futures) {
+      future.get();
+    }
+    return false;
   }
 
   private boolean doDeletesProcessStream(boolean ignoreVersion, List<Future> futures, DataInputStream in) throws IOException {
@@ -176,9 +190,7 @@ public class DeleteManager {
     futures.add(executor.submit((Callable) () -> {
       final List<Object> toFreeBatch = new ArrayList<>();
       for (Object[] currKey : currBatch) {
-        synchronized (index.getMutex(currKey)) {
-          processValue(indexSchema, index, currKey);
-        }
+        processValue(indexSchema, index, currKey);
       }
       doFreeMemory(toFreeBatch);
       return null;
@@ -187,11 +199,13 @@ public class DeleteManager {
   }
 
   private void processValue(IndexSchema indexSchema, Index index, Object[] currKey) throws InterruptedException {
-    Object value = index.get(currKey);
-    if (value != null) {
-      byte[][] content = databaseServer.getAddressMap().fromUnsafeToRecords(value);
-      if (content != null) {
-        processRecords(indexSchema, index, currKey, content);
+    synchronized (index.getMutex(currKey)) {
+      Object value = index.get(currKey);
+      if (value != null) {
+        byte[][] content = databaseServer.getAddressMap().fromUnsafeToRecords(value);
+        if (content != null) {
+          processRecords(indexSchema, index, currKey, content);
+        }
       }
     }
   }
@@ -227,6 +241,15 @@ public class DeleteManager {
         File.separator + databaseServer.getReplica() + File.separator);
   }
 
+  public void getFiles(List<String> files) {
+    File dir = getReplicaRoot();
+    File[] currFiles = dir.listFiles();
+    if (currFiles != null) {
+      for (File file : currFiles) {
+        files.add(file.getAbsolutePath());
+      }
+    }
+  }
   public void start() {
 
     mainThread = new Thread(() -> {
@@ -256,7 +279,28 @@ public class DeleteManager {
       if (files != null && files.length != 0) {
         Arrays.sort(files, Comparator.comparing(File::getAbsolutePath));
 
-        doDeletes(false, files[0]);
+        if (false) {
+          doDeletes(false, files[0]);
+        }
+        else {
+          List<Future> futures = new ArrayList<>();
+          for (int i = 0; i < files.length; i++) {
+            final int offset = i;
+            futures.add(fileExecutor.submit((Callable) () -> {
+              doDeletes(false, files[offset]);
+              return null;
+            }));
+          }
+          for (int i = 0; i < futures.size(); i++) {
+            Future future = futures.get(i);
+            try {
+              future.get();
+            }
+            catch (Exception e) {
+              logger.error("Error deleting file: name={}", files[i].getAbsolutePath());
+            }
+          }
+        }
       }
     }
     return false;
@@ -295,28 +339,23 @@ public class DeleteManager {
   private long totalBytes = 0;
 
   double getPercentDeleteComplete() {
-
     if (totalBytes == 0) {
       return 0;
     }
-    if (countRead == null) {
-      return 0;
-    }
-
     return (double)countRead.get() / (double)totalBytes;
   }
 
   void saveDeletesForRecords(String dbName, String tableName, String indexName, long sequence0, long sequence1,
-                             ConcurrentLinkedQueue<DeleteRequest> keysToDeleteExpanded) {
+                             List<DeleteRequest> keysToDeleteExpanded) {
     saveDeletes(dbName, tableName, indexName, keysToDeleteExpanded);
   }
 
   void saveDeletesForKeyRecords(String dbName, String tableName, String indexName, long sequence0, long sequence1,
-                                ConcurrentLinkedQueue<DeleteRequest> keysToDeleteExpanded) {
+                                List<DeleteRequest> keysToDeleteExpanded) {
     saveDeletes(dbName, tableName, indexName, keysToDeleteExpanded);
   }
 
-  public static class DeleteRequestForKeyRecord extends DeleteRequest {
+  static class DeleteRequestForKeyRecord extends DeleteRequest {
 
     DeleteRequestForKeyRecord(Object[] key) {
       super(key);
@@ -327,13 +366,13 @@ public class DeleteManager {
     }
   }
 
-  public static class DeleteRequestForRecord extends DeleteRequest {
+  static class DeleteRequestForRecord extends DeleteRequest {
     DeleteRequestForRecord(Object[] key) {
       super(key);
     }
   }
 
-  private AtomicBoolean isForcingDeletes = new AtomicBoolean();
+  private final AtomicBoolean isForcingDeletes = new AtomicBoolean();
 
   boolean isForcingDeletes() {
     return isForcingDeletes.get();
@@ -382,16 +421,16 @@ public class DeleteManager {
 
   private class ProcessKey {
     private boolean myResult;
-    private List<Future> futures;
-    private DataInputStream in;
-    private TableSchema tableSchema;
-    private IndexSchema indexSchema;
-    private Index index;
+    private final List<Future> futures;
+    private final DataInputStream in;
+    private final TableSchema tableSchema;
+    private final IndexSchema indexSchema;
+    private final Index index;
     private List<Object[]> batch;
     private int errorsInARow;
 
-    public ProcessKey(List<Future> futures, DataInputStream in, TableSchema tableSchema, IndexSchema indexSchema,
-                      Index index, List<Object[]> batch, int errorsInARow) {
+    ProcessKey(List<Future> futures, DataInputStream in, TableSchema tableSchema, IndexSchema indexSchema,
+               Index index, List<Object[]> batch, int errorsInARow) {
       this.futures = futures;
       this.in = in;
       this.tableSchema = tableSchema;
@@ -409,7 +448,7 @@ public class DeleteManager {
       return batch;
     }
 
-    public int getErrorsInARow() {
+    int getErrorsInARow() {
       return errorsInARow;
     }
 

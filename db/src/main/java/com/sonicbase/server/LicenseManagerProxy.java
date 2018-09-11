@@ -10,9 +10,9 @@ import java.lang.reflect.Method;
 // all methods called from method invoker must have cobj and replayed command parms
 // I prefer to return null instead of an empty array
 // I don't know a good way to reduce the parameter count
-public class LicenseManagerProxy {
+class LicenseManagerProxy {
 
-  private static Logger logger = LoggerFactory.getLogger(LicenseManagerProxy.class);
+  private static final Logger logger = LoggerFactory.getLogger(LicenseManagerProxy.class);
 
   private Object licenseManager;
   private Method startMasterLicenseValidator;
@@ -28,7 +28,7 @@ public class LicenseManagerProxy {
       shutdownMasterLicenseValidator = streamClz.getMethod("shutdownMasterLicenseValidator");
     }
     catch (Exception e) {
-      logger.error("Error initializing LicenseManager", e);
+      logger.warn("Error initializing LicenseManager", e);
     }
   }
 

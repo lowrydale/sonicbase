@@ -8,10 +8,10 @@ import com.sonicbase.query.impl.*;
 import com.sonicbase.schema.IndexSchema;
 import com.sonicbase.schema.TableSchema;
 import com.sonicbase.server.support.MergeNFiles;
+import com.sonicbase.util.Varint;
 import net.sf.jsqlparser.statement.select.Limit;
 import net.sf.jsqlparser.statement.select.Offset;
 import org.apache.commons.io.FileUtils;
-import org.apache.giraph.utils.Varint;
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
 
@@ -30,15 +30,15 @@ import java.util.concurrent.atomic.AtomicLong;
 public class DiskBasedResultSet {
 
   private static final String RESULT_SETS_STR = "result-sets";
-  private static Logger logger = LoggerFactory.getLogger(DiskBasedResultSet.class);
+  private static final Logger logger = LoggerFactory.getLogger(DiskBasedResultSet.class);
 
-  private static AtomicLong nextResultSetId = new AtomicLong();
+  private static final AtomicLong nextResultSetId = new AtomicLong();
 
   private boolean setOperator;
   private List<OrderByExpressionImpl> orderByExpressions;
   private int count;
   private SelectStatementImpl select;
-  private DatabaseServer server;
+  private final DatabaseServer server;
   private String[] tableNames;
   private long resultSetId;
 
@@ -59,14 +59,12 @@ public class DiskBasedResultSet {
     File file = null;
     this.orderByExpressions = orderByExpressions;
     synchronized (this) {
-      while (true) {
+      do {
         resultSetId = nextResultSetId.getAndIncrement();
         file = new File(server.getDataDir(), RESULT_SETS_STR + File.separator + databaseServer.getShard() +
             File.separator + server.getReplica() + File.separator + resultSetId);
-        if (!file.exists()) {
-          break;
-        }
       }
+      while (file.exists());
       file.mkdirs();
     }
     final File finalFile = file;
@@ -265,9 +263,7 @@ public class DiskBasedResultSet {
       return true;
     }
     logger.info("got more results: duration={}, recordCount={}", (System.currentTimeMillis() - begin), records.length);
-    for (ExpressionImpl.CachedRecord[] row : records) {
-      batch.add(row);
-    }
+    batch.addAll(Arrays.asList(records));
     synchronized (rs.getRecordCache().getRecordsForTable()) {
       rs.getRecordCache().getRecordsForTable().clear();
     }
@@ -291,14 +287,14 @@ public class DiskBasedResultSet {
     return false;
   }
 
-  public String[] getTableNames() {
+  String[] getTableNames() {
     return tableNames;
   }
 
   class ResultSetContext {
-    DatabaseServer databaseServer;
-    String dbName;
-    Object rs;
+    final DatabaseServer databaseServer;
+    final String dbName;
+    final Object rs;
     int pageNum = 0;
     int pos = 0;
     ExpressionImpl.CachedRecord[][] records;
@@ -319,7 +315,7 @@ public class DiskBasedResultSet {
       return records[pos++];
     }
 
-    public boolean nextPage() {
+    boolean nextPage() {
       if (rs instanceof ResultSetImpl) {
         if (records != null) {
           return false;
@@ -369,9 +365,9 @@ public class DiskBasedResultSet {
     batch.clear();
   }
 
-  public DiskBasedResultSet(Short serializationVersion, String dbName, DatabaseServer databaseServer, String[] tableNames,
-                            Object[] resultSets, List<OrderByExpressionImpl> orderByExpressions,
-                            int count, boolean unique, boolean intersect, boolean except, List<ColumnImpl> selectColumns) {
+  DiskBasedResultSet(Short serializationVersion, String dbName, DatabaseServer databaseServer, String[] tableNames,
+                     Object[] resultSets, List<OrderByExpressionImpl> orderByExpressions,
+                     int count, boolean unique, boolean intersect, boolean except, List<ColumnImpl> selectColumns) {
     this.server = databaseServer;
     this.tableNames = tableNames;
     this.select = select;
@@ -380,14 +376,12 @@ public class DiskBasedResultSet {
     File file = null;
     this.orderByExpressions = orderByExpressions;
     synchronized (this) {
-      while (true) {
+      do {
         resultSetId = nextResultSetId.getAndIncrement();
         file = new File(server.getDataDir(), RESULT_SETS_STR + File.separator + databaseServer.getShard() +
             File.separator + server.getReplica() + File.separator + resultSetId);
-        if (!file.exists()) {
-          break;
-        }
       }
+      while (file.exists());
       file.mkdirs();
     }
     AtomicInteger fileOffset = new AtomicInteger();
@@ -566,7 +560,7 @@ public class DiskBasedResultSet {
     return null;
   }
 
-  public static void deleteOldResultSets(DatabaseServer server) {
+  static void deleteOldResultSets(DatabaseServer server) {
     File file = new File(server.getDataDir(), RESULT_SETS_STR + File.separator + server.getShard() + File.separator +
         server.getReplica() + File.separator);
     File[] resultSets = file.listFiles();
@@ -644,12 +638,12 @@ public class DiskBasedResultSet {
         setServer(server).setCount(count).invoke();
   }
 
-  public DiskBasedResultSet(DatabaseServer databaseServer, long resultSetId) {
+  DiskBasedResultSet(DatabaseServer databaseServer, long resultSetId) {
     this.server = databaseServer;
     this.resultSetId = resultSetId;
   }
 
-  public long getResultSetId() {
+  long getResultSetId() {
     return resultSetId;
   }
 
@@ -686,7 +680,7 @@ public class DiskBasedResultSet {
     }
   }
 
-  public DiskBasedResultSet(
+  DiskBasedResultSet(
       DatabaseServer databaseServer, SelectStatementImpl select, String[] tableNames, long resultSetId, boolean restrictToThisServer,
       StoredProcedureContextImpl procedureContext) {
     this.server = databaseServer;
@@ -706,7 +700,7 @@ public class DiskBasedResultSet {
     }
   }
 
-  public byte[][][] nextPage(int pageNumber) {
+  byte[][][] nextPage(int pageNumber) {
     try {
       File file = new File(server.getDataDir(), RESULT_SETS_STR + File.separator + server.getShard() +
           File.separator + server.getReplica() + File.separator + resultSetId);
@@ -764,24 +758,24 @@ public class DiskBasedResultSet {
   }
 
   private class ConsumeLhsRecord {
-    private Short serializationVersion;
-    private String dbName;
-    private boolean intersect;
-    private File file;
-    private AtomicInteger fileOffset;
-    private Comparator<ExpressionImpl.CachedRecord[]> comparator;
-    private ResultSetContext lhsRs;
-    private List<ExpressionImpl.CachedRecord[]> batch;
+    private final Short serializationVersion;
+    private final String dbName;
+    private final boolean intersect;
+    private final File file;
+    private final AtomicInteger fileOffset;
+    private final Comparator<ExpressionImpl.CachedRecord[]> comparator;
+    private final ResultSetContext lhsRs;
+    private final List<ExpressionImpl.CachedRecord[]> batch;
     private ExpressionImpl.CachedRecord[] lhsRecord;
     private ExpressionImpl.CachedRecord[] lastLhsRecord;
-    private int lhsCount;
-    private int rhsCount;
+    private final int lhsCount;
+    private final int rhsCount;
 
-    public ConsumeLhsRecord(Short serializationVersion, String dbName, boolean intersect, File file,
-                            AtomicInteger fileOffset, Comparator<ExpressionImpl.CachedRecord[]> comparator,
-                            ResultSetContext lhsRs, List<ExpressionImpl.CachedRecord[]> batch,
-                            ExpressionImpl.CachedRecord[] lhsRecord, ExpressionImpl.CachedRecord[] lastLhsRecord,
-                            int lhsCount, int rhsCount) {
+    ConsumeLhsRecord(Short serializationVersion, String dbName, boolean intersect, File file,
+                     AtomicInteger fileOffset, Comparator<ExpressionImpl.CachedRecord[]> comparator,
+                     ResultSetContext lhsRs, List<ExpressionImpl.CachedRecord[]> batch,
+                     ExpressionImpl.CachedRecord[] lhsRecord, ExpressionImpl.CachedRecord[] lastLhsRecord,
+                     int lhsCount, int rhsCount) {
       this.serializationVersion = serializationVersion;
       this.dbName = dbName;
       this.intersect = intersect;
@@ -796,11 +790,11 @@ public class DiskBasedResultSet {
       this.rhsCount = rhsCount;
     }
 
-    public ExpressionImpl.CachedRecord[] getLhsRecord() {
+    ExpressionImpl.CachedRecord[] getLhsRecord() {
       return lhsRecord;
     }
 
-    public ExpressionImpl.CachedRecord[] getLastLhsRecord() {
+    ExpressionImpl.CachedRecord[] getLastLhsRecord() {
       return lastLhsRecord;
     }
 
@@ -821,25 +815,25 @@ public class DiskBasedResultSet {
   }
 
   private class ProcessRecordsEqual {
-    private Short serializationVersion;
-    private String dbName;
-    private boolean unique;
-    private boolean except;
-    private File file;
-    private AtomicInteger fileOffset;
-    private ResultSetContext lhsRs;
-    private ResultSetContext rhsRs;
-    private List<ExpressionImpl.CachedRecord[]> batch;
+    private final Short serializationVersion;
+    private final String dbName;
+    private final boolean unique;
+    private final boolean except;
+    private final File file;
+    private final AtomicInteger fileOffset;
+    private final ResultSetContext lhsRs;
+    private final ResultSetContext rhsRs;
+    private final List<ExpressionImpl.CachedRecord[]> batch;
     private ExpressionImpl.CachedRecord[] lhsRecord;
     private ExpressionImpl.CachedRecord[] rhsRecord;
-    private int lhsCount;
-    private int rhsCount;
+    private final int lhsCount;
+    private final int rhsCount;
     private ExpressionImpl.CachedRecord[] lastLhsRecord;
 
-    public ProcessRecordsEqual(Short serializationVersion, String dbName, boolean unique, boolean except, File file,
-                               AtomicInteger fileOffset, ResultSetContext lhsRs, ResultSetContext rhsRs,
-                               List<ExpressionImpl.CachedRecord[]> batch, ExpressionImpl.CachedRecord[] lhsRecord,
-                               ExpressionImpl.CachedRecord[] rhsRecord, int lhsCount, int rhsCount) {
+    ProcessRecordsEqual(Short serializationVersion, String dbName, boolean unique, boolean except, File file,
+                        AtomicInteger fileOffset, ResultSetContext lhsRs, ResultSetContext rhsRs,
+                        List<ExpressionImpl.CachedRecord[]> batch, ExpressionImpl.CachedRecord[] lhsRecord,
+                        ExpressionImpl.CachedRecord[] rhsRecord, int lhsCount, int rhsCount) {
       this.serializationVersion = serializationVersion;
       this.dbName = dbName;
       this.unique = unique;
@@ -855,15 +849,15 @@ public class DiskBasedResultSet {
       this.rhsCount = rhsCount;
     }
 
-    public ExpressionImpl.CachedRecord[] getLhsRecord() {
+    ExpressionImpl.CachedRecord[] getLhsRecord() {
       return lhsRecord;
     }
 
-    public ExpressionImpl.CachedRecord[] getRhsRecord() {
+    ExpressionImpl.CachedRecord[] getRhsRecord() {
       return rhsRecord;
     }
 
-    public ExpressionImpl.CachedRecord[] getLastLhsRecord() {
+    ExpressionImpl.CachedRecord[] getLastLhsRecord() {
       return lastLhsRecord;
     }
 
@@ -882,21 +876,21 @@ public class DiskBasedResultSet {
   }
 
   private class ProcessRecordLess {
-    private Short serializationVersion;
-    private String dbName;
-    private boolean intersect;
-    private File file;
-    private AtomicInteger fileOffset;
-    private ResultSetContext lhsRs;
-    private List<ExpressionImpl.CachedRecord[]> batch;
+    private final Short serializationVersion;
+    private final String dbName;
+    private final boolean intersect;
+    private final File file;
+    private final AtomicInteger fileOffset;
+    private final ResultSetContext lhsRs;
+    private final List<ExpressionImpl.CachedRecord[]> batch;
     private ExpressionImpl.CachedRecord[] lhsRecord;
-    private int lhsCount;
-    private int rhsCount;
+    private final int lhsCount;
+    private final int rhsCount;
     private ExpressionImpl.CachedRecord[] lastLhsRecord;
 
-    public ProcessRecordLess(Short serializationVersion, String dbName, boolean intersect, File file,
-                             AtomicInteger fileOffset, ResultSetContext lhsRs, List<ExpressionImpl.CachedRecord[]> batch,
-                             ExpressionImpl.CachedRecord[] lhsRecord, int lhsCount, int rhsCount) {
+    ProcessRecordLess(Short serializationVersion, String dbName, boolean intersect, File file,
+                      AtomicInteger fileOffset, ResultSetContext lhsRs, List<ExpressionImpl.CachedRecord[]> batch,
+                      ExpressionImpl.CachedRecord[] lhsRecord, int lhsCount, int rhsCount) {
       this.serializationVersion = serializationVersion;
       this.dbName = dbName;
       this.intersect = intersect;
@@ -909,11 +903,11 @@ public class DiskBasedResultSet {
       this.rhsCount = rhsCount;
     }
 
-    public ExpressionImpl.CachedRecord[] getLhsRecord() {
+    ExpressionImpl.CachedRecord[] getLhsRecord() {
       return lhsRecord;
     }
 
-    public ExpressionImpl.CachedRecord[] getLastLhsRecord() {
+    ExpressionImpl.CachedRecord[] getLastLhsRecord() {
       return lastLhsRecord;
     }
 
@@ -929,28 +923,28 @@ public class DiskBasedResultSet {
   }
 
   private class ProcessRecords {
-    private Short serializationVersion;
-    private String dbName;
-    private boolean unique;
-    private boolean intersect;
-    private boolean except;
-    private File file;
-    private AtomicInteger fileOffset;
-    private Comparator<ExpressionImpl.CachedRecord[]> comparator;
-    private ResultSetContext lhsRs;
-    private ResultSetContext rhsRs;
-    private List<ExpressionImpl.CachedRecord[]> batch;
+    private final Short serializationVersion;
+    private final String dbName;
+    private final boolean unique;
+    private final boolean intersect;
+    private final boolean except;
+    private final File file;
+    private final AtomicInteger fileOffset;
+    private final Comparator<ExpressionImpl.CachedRecord[]> comparator;
+    private final ResultSetContext lhsRs;
+    private final ResultSetContext rhsRs;
+    private final List<ExpressionImpl.CachedRecord[]> batch;
     private ExpressionImpl.CachedRecord[] lhsRecord;
     private ExpressionImpl.CachedRecord[] rhsRecord;
     private ExpressionImpl.CachedRecord[] lastLhsRecord;
-    private int lhsCount;
-    private int rhsCount;
+    private final int lhsCount;
+    private final int rhsCount;
 
-    public ProcessRecords(Short serializationVersion, String dbName, boolean unique, boolean intersect, boolean except,
-                          File file, AtomicInteger fileOffset, Comparator<ExpressionImpl.CachedRecord[]> comparator,
-                          ResultSetContext lhsRs, ResultSetContext rhsRs, List<ExpressionImpl.CachedRecord[]> batch,
-                          ExpressionImpl.CachedRecord[] lhsRecord, ExpressionImpl.CachedRecord[] rhsRecord,
-                          ExpressionImpl.CachedRecord[] lastLhsRecord, int lhsCount, int rhsCount) {
+    ProcessRecords(Short serializationVersion, String dbName, boolean unique, boolean intersect, boolean except,
+                   File file, AtomicInteger fileOffset, Comparator<ExpressionImpl.CachedRecord[]> comparator,
+                   ResultSetContext lhsRs, ResultSetContext rhsRs, List<ExpressionImpl.CachedRecord[]> batch,
+                   ExpressionImpl.CachedRecord[] lhsRecord, ExpressionImpl.CachedRecord[] rhsRecord,
+                   ExpressionImpl.CachedRecord[] lastLhsRecord, int lhsCount, int rhsCount) {
       this.serializationVersion = serializationVersion;
       this.dbName = dbName;
       this.unique = unique;
@@ -969,15 +963,15 @@ public class DiskBasedResultSet {
       this.rhsCount = rhsCount;
     }
 
-    public ExpressionImpl.CachedRecord[] getLhsRecord() {
+    ExpressionImpl.CachedRecord[] getLhsRecord() {
       return lhsRecord;
     }
 
-    public ExpressionImpl.CachedRecord[] getRhsRecord() {
+    ExpressionImpl.CachedRecord[] getRhsRecord() {
       return rhsRecord;
     }
 
-    public ExpressionImpl.CachedRecord[] getLastLhsRecord() {
+    ExpressionImpl.CachedRecord[] getLastLhsRecord() {
       return lastLhsRecord;
     }
 

@@ -66,7 +66,7 @@ public class MyStoredProcedure2 implements StoredProcedure {
     return true;
   }
 
-  public void insertBatch(StoredProcedureContext context, List<Record> batch) {
+  private void insertBatch(StoredProcedureContext context, List<Record> batch) {
     try {
       PreparedStatement insertStmt = context.getConnection().prepareStatement("insert into " +
            "results_" + context.getStoredProdecureId() + " (id1, socialsecuritynumber, gender) VALUES (?, ?, ?)");

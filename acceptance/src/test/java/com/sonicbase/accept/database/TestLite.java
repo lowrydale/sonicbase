@@ -202,51 +202,45 @@ public class TestLite {
       map.put((long)i, (long)i);
     }
     final AtomicInteger offset = new AtomicInteger(999_999);
-    Thread readThread =new Thread(new Runnable(){
-      @Override
-      public void run() {
-        boolean first = true;
-        int currOffset = offset.get();
-        while (true) {
+    Thread readThread =new Thread(() -> {
+      boolean first = true;
+      int currOffset = offset.get();
+      while (true) {
 //          try {
 //            Thread.sleep(1);
 //          }
 //          catch (InterruptedException e) {
 //            break;
 //          }
-          if (map.get((long)offset.get()) != null) {
-            System.out.println("Not missing: " + offset.get());
-          }
-          if (map.get((long)offset.get()) == null && first) {
-            System.out.println("Missing: " + offset.get());
-            first = false;
-          }
-          else {
-          }
-          if (currOffset != offset.get()) {
-            currOffset = offset.get();
-            first = true;
-          }
+        if (map.get((long)offset.get()) != null) {
+          System.out.println("Not missing: " + offset.get());
+        }
+        if (map.get((long)offset.get()) == null && first) {
+          System.out.println("Missing: " + offset.get());
+          first = false;
+        }
+        else {
+        }
+        if (currOffset != offset.get()) {
+          currOffset = offset.get();
+          first = true;
         }
       }
     });
     readThread.start();
-    Thread thread = new Thread(new Runnable(){
-      @Override
-      public void run() {
-        while (true) {
-          map.remove((long)offset.decrementAndGet());
-          try {
-            Thread.sleep(5);
-          }
-          catch (InterruptedException e) {
-            break;
-          }
-          System.out.println("Changed offset: " + (offset.get() - 1));
-          //offset.decrementAndGet();
+    Thread thread = new Thread(() -> {
+      while (true) {
+        map.remove((long)offset.decrementAndGet());
+        try {
+          Thread.sleep(5);
         }
-
+        catch (InterruptedException e) {
+          break;
+        }
+        System.out.println("Changed offset: " + (offset.get() - 1));
+        //offset.decrementAndGet();
       }
+
     });
     thread.start();
 

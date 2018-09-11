@@ -11,7 +11,7 @@ import com.sonicbase.common.ServersConfig;
 import com.sonicbase.jdbcdriver.ParameterHandler;
 import com.sonicbase.schema.DataType;
 import com.sonicbase.schema.TableSchema;
-import com.sonicbase.util.TestUtils;
+import com.sonicbase.util.ClientTestUtils;
 import org.testng.annotations.BeforeClass;
 import org.testng.annotations.Test;
 
@@ -31,16 +31,16 @@ public class FunctionImplTest {
 
   private Record[] records;
   private TableSchema[] tableSchemas;
-  private ParameterHandler parms = new ParameterHandler();
+  private final ParameterHandler parms = new ParameterHandler();
 
   @BeforeClass
   public void beforeClass() throws IOException {
-    final TableSchema tableSchema = TestUtils.createTable();
+    final TableSchema tableSchema = ClientTestUtils.createTable();
     tableSchemas = new TableSchema[]{tableSchema};
 
     DatabaseClient client = mock(DatabaseClient.class);
 
-    DatabaseCommon common = TestUtils.createCommon(tableSchema);
+    DatabaseCommon common = ClientTestUtils.createCommon(tableSchema);
     JsonNode node = new ObjectMapper().readTree(" { \"shards\" : [\n" +
         "    {\n" +
         "      \"replicas\": [\n" +
@@ -57,7 +57,7 @@ public class FunctionImplTest {
     common.setServersConfig(serversConfig);
     when(client.getCommon()).thenReturn(common);
 
-    byte[][] recordBytes = TestUtils.createRecords(common, tableSchema, 10);
+    byte[][] recordBytes = ClientTestUtils.createRecords(common, tableSchema, 10);
 
     records = new Record[recordBytes.length];
     for (int i = 0; i < records.length; i++) {

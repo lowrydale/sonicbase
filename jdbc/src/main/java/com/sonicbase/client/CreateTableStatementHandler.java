@@ -14,7 +14,6 @@ import net.sf.jsqlparser.statement.create.table.CreateTable;
 import net.sf.jsqlparser.statement.create.table.Index;
 
 import java.io.IOException;
-import java.sql.SQLException;
 import java.util.ArrayList;
 import java.util.List;
 
@@ -104,7 +103,7 @@ public class CreateTableStatementHandler implements StatementHandler {
     }
   }
 
-  public int doCreateTable(String dbName, CreateTableStatementImpl createTableStatement) {
+  private int doCreateTable(String dbName, CreateTableStatementImpl createTableStatement) {
     try {
       ComObject cobj = new ComObject();
       cobj.put(ComObject.Tag.DB_NAME, dbName);

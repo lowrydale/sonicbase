@@ -1,6 +1,5 @@
 package com.sonicbase.server;
 
-import com.fasterxml.jackson.databind.node.ObjectNode;
 import com.sonicbase.client.DatabaseClient;
 import com.sonicbase.common.*;
 import com.sonicbase.index.Index;
@@ -10,8 +9,8 @@ import com.sonicbase.query.DatabaseException;
 import com.sonicbase.schema.IndexSchema;
 import com.sonicbase.schema.TableSchema;
 import com.sonicbase.util.PartitionUtils;
+import com.sonicbase.util.Varint;
 import org.apache.commons.io.FileUtils;
-import org.apache.giraph.utils.Varint;
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
 
@@ -30,19 +29,22 @@ import java.util.concurrent.atomic.AtomicLong;
 // I don't know a good way to reduce the parameter count
 public class SnapshotManager {
 
-  private static Logger logger = LoggerFactory.getLogger(SnapshotManager.class);
+  private static final Logger logger = LoggerFactory.getLogger(SnapshotManager.class);
   private static final int SNAPSHOT_PARTITION_COUNT = 128;
+  //public for pro version
   public static final String SNAPSHOT_STR = "snapshot" + File.separator;
   private static final String INDEX_STR = ", index=";
   private static final String RATE_STR = ", rate=";
   private static final String DURATION_STR = ", duration(s)=";
+  public static final String DIRECTORY_NOT_FOUND_DIR_STR = "directory not found: dir={}";
+  public static final String TABLE_STR = ", table=";
 
   private final com.sonicbase.server.DatabaseServer server;
   private long lastSnapshot = -1;
   private boolean enableSnapshot = true;
   private boolean isRecovering = true;
   private long totalBytes = 0;
-  private AtomicLong finishedBytes = new AtomicLong();
+  private final AtomicLong finishedBytes = new AtomicLong();
   private Exception errorRecovering = null;
 
   SnapshotManager(DatabaseServer databaseServer) {
@@ -57,21 +59,26 @@ public class SnapshotManager {
         for (String dir : dirs) {
           int pos = dir.indexOf('.');
           if (pos == -1) {
-            try {
-              int value = Integer.parseInt(dir);
-              if (value > highestSnapshot) {
-                highestSnapshot = value;
-              }
-            }
-            catch (Exception t) {
-              logger.error("Error parsing dir: " + dir, t);
-            }
+            highestSnapshot = parseDir(logger, highestSnapshot, dir);
           }
         }
       }
     }
     catch (Exception t) {
       logger.error("Error getting highest snapshot version");
+    }
+    return highestSnapshot;
+  }
+
+  private static int parseDir(Logger logger, int highestSnapshot, String dir) {
+    try {
+      int value = Integer.parseInt(dir);
+      if (value > highestSnapshot) {
+        highestSnapshot = value;
+      }
+    }
+    catch (Exception t) {
+      logger.error("Error parsing dir: " + dir, t);
     }
     return highestSnapshot;
   }
@@ -88,25 +95,10 @@ public class SnapshotManager {
         if (pos != -1) {
           dir = dir.substring(0, pos);
         }
-        try {
-          int value = Integer.parseInt(dir);
-          if (value > highestSnapshot) {
-            highestSnapshot = value;
-          }
-        }
-        catch (Exception t) {
-          logger.error("Error parsing dir: " + dir, t);
-        }
+        highestSnapshot = parseDir(logger, highestSnapshot, dir);
       }
     }
     return highestSnapshot;
-  }
-
-  public ComObject finishServerReloadForSource(ComObject cobj, boolean replayedCommand) {
-
-    enableSnapshot(true);
-
-    return null;
   }
 
   void getPercentRecoverComplete(ComObject retObj) {
@@ -130,7 +122,7 @@ public class SnapshotManager {
     errorRecovering = null;
     isRecovering = true;
     try {
-      server.purge(dbName);
+      server.getUpdateManager().truncateDbForSingleServerTruncate(dbName);
 
       String dataRoot = getSnapshotRootDir(dbName);
       File dataRootDir = new File(dataRoot);
@@ -168,6 +160,36 @@ public class SnapshotManager {
     }
   }
 
+  public void deleteSnapshots() {
+    File dir = getSnapshotReplicaDir();
+    try {
+      FileUtils.deleteDirectory(dir);
+      dir.mkdirs();
+    }
+    catch (IOException e) {
+      throw new DatabaseException(e);
+    }
+  }
+
+  public void getFilesForCurrentSnapshot(List<String> files) {
+    File replicaDir = getSnapshotReplicaDir();
+    getFilesFromDirectory(replicaDir, files);
+  }
+
+  private void getFilesFromDirectory(File dir, List<String> files) {
+    File[] currFiles = dir.listFiles();
+    if (currFiles != null) {
+      for (File file : currFiles) {
+        if (file.isDirectory()) {
+          getFilesFromDirectory(file, files);
+        }
+        else {
+          files.add(file.getAbsolutePath());
+        }
+      }
+    }
+  }
+
   private void doRecoverFromSnapshot(String dbName, File snapshotDir) {
     ThreadPoolExecutor executor = ThreadUtil.createExecutor(SNAPSHOT_PARTITION_COUNT,
         "SonicBase SnapshotManager recoverFromSnapshot Thread");
@@ -179,10 +201,9 @@ public class SnapshotManager {
       final long indexBegin = System.currentTimeMillis();
       recoveredCount.set(0);
       final  AtomicLong lastLogged = new AtomicLong(System.currentTimeMillis());
-      File file = snapshotDir;
 
-      if (file.exists()) {
-        for (File tableFile : file.listFiles()) {
+      if (snapshotDir.exists()) {
+        for (File tableFile : snapshotDir.listFiles()) {
           if (!tableFile.isDirectory()) {
             continue;
           }
@@ -193,8 +214,8 @@ public class SnapshotManager {
           }
         }
       }
-      if (file.exists()) {
-        recoverTables(dbName, executor, recoveredCount, indexBegin, lastLogged, file);
+      if (snapshotDir.exists()) {
+        recoverTables(dbName, executor, recoveredCount, indexBegin, lastLogged, snapshotDir);
       }
       logger.info("Recover progress - finished all indices. count={}, rate={}, duration={}", recoveredCount.get(),
           ((float) recoveredCount.get() / (float) (System.currentTimeMillis() - indexBegin) * 1000f),
@@ -270,10 +291,7 @@ public class SnapshotManager {
       try (DataInputStream inStream = new DataInputStream(new BufferedInputStream(
           new ByteCounterStream(finishedBytes, new FileInputStream(indexFile))))) {
         boolean isPrimaryKey = indexSchema.isPrimaryKey();
-        while (true) {
-          if (!inStream.readBoolean()) {
-            break;
-          }
+        while (inStream.readBoolean()) {
           Object[] key = DatabaseCommon.deserializeKey(tableSchema, inStream);
 
           long updateTime = Varint.readUnsignedVarLong(inStream);
@@ -389,7 +407,7 @@ public class SnapshotManager {
       FileUtils.deleteDirectory(file);
     }
     catch (IOException e) {
-      throw new DatabaseException("Error deleting table schema files: db=" + dbName + ", table=" + tableName, e);
+      logger.error(DIRECTORY_NOT_FOUND_DIR_STR, file.getAbsolutePath());
     }
   }
 
@@ -399,17 +417,17 @@ public class SnapshotManager {
       FileUtils.deleteDirectory(file);
     }
     catch (Exception e) {
-      throw new DatabaseException("Error deleting database schema files: db=" + dbName, e);
+      logger.error(DIRECTORY_NOT_FOUND_DIR_STR, file.getAbsolutePath());
     }
   }
 
   void deleteIndexSchema(String dbName, int schemaVersion, String table, String indexName) {
+    File file = new File(getSnapshotSchemaDir(dbName), table + "/indices/" + indexName);
     try {
-      File file = new File(getSnapshotSchemaDir(dbName), table + "/indices/" + indexName);
       FileUtils.deleteDirectory(file);
     }
     catch (Exception e) {
-      throw new DatabaseException(e);
+      logger.error(DIRECTORY_NOT_FOUND_DIR_STR, file.getAbsolutePath());
     }
   }
 
@@ -468,12 +486,8 @@ public class SnapshotManager {
 
   private void startSnapshotForDbs() throws IOException {
     Set<String> dbNames = new HashSet<>();
-    for (String dbName : server.getCommon().getDatabases().keySet()) {
-      dbNames.add(dbName);
-    }
-    for (String dbName : server.getDbNames(server.getDataDir())) {
-      dbNames.add(dbName);
-    }
+    dbNames.addAll(server.getCommon().getDatabases().keySet());
+    dbNames.addAll(server.getDbNames(server.getDataDir()));
     for (String dbName : dbNames) {
       runSnapshot(dbName);
     }
@@ -531,11 +545,11 @@ public class SnapshotManager {
       out.write(String.valueOf(DatabaseClient.SERIALIZATION_VERSION).getBytes());
     }
 
-    ObjectNode config = server.getConfig();
-    ObjectNode expire = (ObjectNode) config.get("expireRecords");
+    Config config = server.getConfig();
+    Map<String, Object> expire = (Map<String, Object>) config.getMap().get("expireRecords");
     final Long deleteIfOlder;
     if (expire != null) {
-      long duration = expire.get("durationMinutes").asLong();
+      long duration = (long) expire.get("durationMinutes");
       deleteIfOlder = System.currentTimeMillis() - duration * 60;
     }
     else {
@@ -674,7 +688,7 @@ public class SnapshotManager {
           logger.info("Snapshot progress - records: count=" + savedCount + RATE_STR +
               ((float) savedCount.get() / (float) (System.currentTimeMillis() - subBegin) * 1000f) +
               DURATION_STR + (System.currentTimeMillis() - subBegin) / 1000f +
-              ", table=" + tableEntry.getKey() + INDEX_STR + indexEntry.getKey());
+              TABLE_STR + tableEntry.getKey() + INDEX_STR + indexEntry.getKey());
         }
       }
     }
@@ -738,7 +752,7 @@ public class SnapshotManager {
     return isRecovering;
   }
 
-  public void deleteTableFiles(String dbName, String tableName) {
+  void deleteTableFiles(String dbName, String tableName) {
 
     String dataRoot = getSnapshotRootDir(dbName);
     File dataRootDir = new File(dataRoot);
@@ -755,11 +769,11 @@ public class SnapshotManager {
       FileUtils.deleteDirectory(tableDir);
     }
     catch (Exception e) {
-      throw new DatabaseException("Error deleting table dir: db=" + dbName + ", table=" + tableName, e);
+      throw new DatabaseException("Error deleting table dir: db=" + dbName + TABLE_STR + tableName, e);
     }
   }
 
-  public void deleteDbFiles(String dbName) {
+  void deleteDbFiles(String dbName) {
     String dataRoot = getSnapshotRootDir(dbName);
     File dbDir = new File(dataRoot);
     try {
@@ -770,7 +784,7 @@ public class SnapshotManager {
     }
   }
 
-  public void deleteIndexFiles(String dbName, String tableName, String indexName) {
+  void deleteIndexFiles(String dbName, String tableName, String indexName) {
     String dataRoot = getSnapshotRootDir(dbName);
     File dataRootDir = new File(dataRoot);
 
@@ -787,7 +801,7 @@ public class SnapshotManager {
       FileUtils.deleteDirectory(indexDir);
     }
     catch (Exception e) {
-      throw new DatabaseException("Error deleting index dir: db=" + dbName + ", table=" + tableName + ", index=" + indexName, e);
+      throw new DatabaseException("Error deleting index dir: db=" + dbName + TABLE_STR + tableName + INDEX_STR + indexName, e);
     }
   }
 

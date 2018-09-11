@@ -33,10 +33,8 @@ public class IndexLookupTwoKeys extends IndexLookup {
       if (greaterOp == BinaryExpression.Operator.LESS ||
           greaterOp == BinaryExpression.Operator.LESS_EQUAL) {
         greaterOp = rightOperator;
-        greaterKey = leftKey;
         greaterOriginalKey = originalRightKey;
         lessOp = leftOperator;
-        lessKey = leftKey;
         lessOriginalKey = originalLeftKey;
       }
 
@@ -75,13 +73,13 @@ public class IndexLookupTwoKeys extends IndexLookup {
         CheckIfRightIsDone checkIfRightIsDone = new CheckIfRightIsDone(entry, lessOp, lessOriginalKey).invoke();
         entry = checkIfRightIsDone.getEntry();
         if (checkIfRightIsDone.is()) {
-          break;
+          return entry;
         }
       }
       ProcessKey processKey = new ProcessKey(entry, countSkipped).invoke();
       entry = processKey.getEntry();
       if (processKey.shouldBreak()) {
-        break;
+        return entry;
       }
 
       PostTraversal post = new PostTraversal(entry, greaterOp, greaterOriginalKey, lessOp, lessOriginalKey).invoke();
@@ -107,9 +105,9 @@ public class IndexLookupTwoKeys extends IndexLookup {
   private class GetStartingKey {
     private Map.Entry<Object[], Object> entry;
     private Object[] greaterKey;
-    private Object[] greaterOriginalKey;
+    private final Object[] greaterOriginalKey;
     private Object[] lessKey;
-    private Object[] lessOriginalKey;
+    private final Object[] lessOriginalKey;
     private boolean useGreater;
 
     GetStartingKey(Map.Entry<Object[], Object> entry, Object[] greaterKey, Object[] greaterOriginalKey, Object[] lessKey,
@@ -188,13 +186,13 @@ public class IndexLookupTwoKeys extends IndexLookup {
 
   private class AdjustStartingKey {
     private Map.Entry<Object[], Object> entry;
-    private BinaryExpression.Operator greaterOp;
-    private Object[] greaterKey;
-    private Object[] greaterOriginalKey;
-    private BinaryExpression.Operator lessOp;
-    private Object[] lessKey;
-    private Object[] lessOriginalKey;
-    private boolean useGreater;
+    private final BinaryExpression.Operator greaterOp;
+    private final Object[] greaterKey;
+    private final Object[] greaterOriginalKey;
+    private final BinaryExpression.Operator lessOp;
+    private final Object[] lessKey;
+    private final Object[] lessOriginalKey;
+    private final boolean useGreater;
     private Object[] key;
 
     public AdjustStartingKey(Map.Entry<Object[], Object> entry, BinaryExpression.Operator greaterOp, Object[] greaterKey,
@@ -327,12 +325,16 @@ public class IndexLookupTwoKeys extends IndexLookup {
         }
       }
       if (shouldProcess) {
-        if (entry.getValue() != null && !entry.getValue().equals(0L)) {
-          if (keys) {
-            currKeyRecords = server.getAddressMap().fromUnsafeToKeys(entry.getValue());
-          }
-          else {
-            records = server.getAddressMap().fromUnsafeToRecords(entry.getValue());
+        Object[] key = entry.getKey();
+        synchronized (index.getMutex(key)) {
+          Object value = index.get(key);
+          if (value != null && !value.equals(0L)) {
+            if (keys) {
+              currKeyRecords = server.getAddressMap().fromUnsafeToKeys(value);
+            }
+            else {
+              records = server.getAddressMap().fromUnsafeToRecords(value);
+            }
           }
         }
         if (processEntry(currKeyRecords, records)) {
@@ -367,13 +369,13 @@ public class IndexLookupTwoKeys extends IndexLookup {
   private class CheckForEndTraversal {
     private boolean myResult;
     private Map.Entry<Object[], Object> entry;
-    private BinaryExpression.Operator greaterOp;
-    private Object[] greaterOriginalKey;
-    private BinaryExpression.Operator lessOp;
-    private Object[] lessOriginalKey;
+    private final BinaryExpression.Operator greaterOp;
+    private final Object[] greaterOriginalKey;
+    private final BinaryExpression.Operator lessOp;
+    private final Object[] lessOriginalKey;
 
-    public CheckForEndTraversal(Map.Entry<Object[], Object> entry, BinaryExpression.Operator greaterOp,
-                                Object[] greaterOriginalKey, BinaryExpression.Operator lessOp, Object... lessOriginalKey) {
+    CheckForEndTraversal(Map.Entry<Object[], Object> entry, BinaryExpression.Operator greaterOp,
+                         Object[] greaterOriginalKey, BinaryExpression.Operator lessOp, Object... lessOriginalKey) {
       this.entry = entry;
       this.greaterOp = greaterOp;
       this.greaterOriginalKey = greaterOriginalKey;
@@ -423,10 +425,10 @@ public class IndexLookupTwoKeys extends IndexLookup {
   private class CheckIfRightIsDone {
     private boolean myResult;
     private Map.Entry<Object[], Object> entry;
-    private BinaryExpression.Operator lessOp;
-    private Object[] lessOriginalKey;
+    private final BinaryExpression.Operator lessOp;
+    private final Object[] lessOriginalKey;
 
-    public CheckIfRightIsDone(Map.Entry<Object[], Object> entry, BinaryExpression.Operator lessOp, Object... lessOriginalKey) {
+    CheckIfRightIsDone(Map.Entry<Object[], Object> entry, BinaryExpression.Operator lessOp, Object... lessOriginalKey) {
       this.entry = entry;
       this.lessOp = lessOp;
       this.lessOriginalKey = lessOriginalKey;
@@ -464,14 +466,14 @@ public class IndexLookupTwoKeys extends IndexLookup {
 
   private class PostTraversal {
     private Map.Entry<Object[], Object> entry;
-    private BinaryExpression.Operator greaterOp;
-    private Object[] greaterOriginalKey;
-    private BinaryExpression.Operator lessOp;
-    private Object[] lessOriginalKey;
+    private final BinaryExpression.Operator greaterOp;
+    private final Object[] greaterOriginalKey;
+    private final BinaryExpression.Operator lessOp;
+    private final Object[] lessOriginalKey;
     private boolean shouldReturn;
 
-    public PostTraversal(Map.Entry<Object[], Object> entry, BinaryExpression.Operator greaterOp,
-                         Object[] greaterOriginalKey, BinaryExpression.Operator lessOp, Object... lessOriginalKey) {
+    PostTraversal(Map.Entry<Object[], Object> entry, BinaryExpression.Operator greaterOp,
+                  Object[] greaterOriginalKey, BinaryExpression.Operator lessOp, Object... lessOriginalKey) {
       this.entry = entry;
       this.greaterOp = greaterOp;
       this.greaterOriginalKey = greaterOriginalKey;

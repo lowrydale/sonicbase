@@ -1,10 +1,9 @@
 package com.sonicbase.accept.server;
 
 import com.fasterxml.jackson.databind.ObjectMapper;
-import com.fasterxml.jackson.databind.node.ArrayNode;
-import com.fasterxml.jackson.databind.node.JsonNodeFactory;
 import com.fasterxml.jackson.databind.node.ObjectNode;
 import com.sonicbase.client.DatabaseClient;
+import com.sonicbase.common.Config;
 import com.sonicbase.jdbcdriver.ConnectionProxy;
 import com.sonicbase.server.DatabaseServer;
 import com.sonicbase.server.NettyServer;
@@ -30,7 +29,7 @@ import static org.testng.Assert.assertTrue;
 public class TestStoredProcedures {
 
   private Connection conn;
-  List<Long> ids = new ArrayList<>();
+  final List<Long> ids = new ArrayList<>();
   com.sonicbase.server.DatabaseServer[] dbServers;
   private NettyServer serverA1;
   private NettyServer serverA2;
@@ -56,9 +55,8 @@ public class TestStoredProcedures {
   public void beforeClass() throws Exception {
     System.setProperty("log4j.configuration", "test-log4j.xml");
 
-    String configStr = IOUtils.toString(new BufferedInputStream(getClass().getResourceAsStream("/config/config-2-servers-a.json")), "utf-8");
-    ObjectMapper mapper = new ObjectMapper();
-    final ObjectNode config = (ObjectNode) mapper.readTree(configStr);
+    String configStr = IOUtils.toString(new BufferedInputStream(getClass().getResourceAsStream("/config/config-2-servers-a.yaml")), "utf-8");
+    Config config = new Config(configStr);
 
     FileUtils.deleteDirectory(new File(System.getProperty("user.home"), "db"));
 
@@ -72,13 +70,10 @@ public class TestStoredProcedures {
 
     final CountDownLatch latch = new CountDownLatch(4);
     serverA1 = new NettyServer(128);
-    Thread thread = new Thread(new Runnable(){
-      @Override
-      public void run() {
-        serverA1.startServer(new String[]{"-port", String.valueOf(9010), "-host", "localhost",
-            "-mport", String.valueOf(9010), "-mhost", "localhost", "-cluster", "2-servers-a", "-shard", String.valueOf(0)});
-        latch.countDown();
-      }
+    Thread thread = new Thread(() -> {
+      serverA1.startServer(new String[]{"-port", String.valueOf(9010), "-host", "localhost",
+          "-mport", String.valueOf(9010), "-mhost", "localhost", "-cluster", "2-servers-a", "-shard", String.valueOf(0)});
+      latch.countDown();
     });
     thread.start();
     while (true) {
@@ -89,13 +84,10 @@ public class TestStoredProcedures {
     }
 
     serverA2 = new NettyServer(128);
-    thread = new Thread(new Runnable(){
-      @Override
-      public void run() {
-        serverA2.startServer(new String[]{"-port", String.valueOf(9060), "-host", "localhost",
-            "-mport", String.valueOf(9060), "-mhost", "localhost", "-cluster", "2-servers-a", "-shard", String.valueOf(1)});
-        latch.countDown();
-      }
+    thread = new Thread(() -> {
+      serverA2.startServer(new String[]{"-port", String.valueOf(9060), "-host", "localhost",
+          "-mport", String.valueOf(9060), "-mhost", "localhost", "-cluster", "2-servers-a", "-shard", String.valueOf(1)});
+      latch.countDown();
     });
     thread.start();
 

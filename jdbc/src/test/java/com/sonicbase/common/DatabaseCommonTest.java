@@ -3,7 +3,7 @@ package com.sonicbase.common;
 import com.sonicbase.schema.DataType;
 import com.sonicbase.schema.IndexSchema;
 import com.sonicbase.schema.TableSchema;
-import com.sonicbase.util.TestUtils;
+import com.sonicbase.util.ClientTestUtils;
 import org.testng.annotations.Test;
 
 import java.io.*;
@@ -17,11 +17,11 @@ public class DatabaseCommonTest {
   public void testKeySerialization() throws UnsupportedEncodingException, EOFException {
 
     DatabaseCommon common = new DatabaseCommon();
-    TableSchema tableSchema = TestUtils.createTable();
-    IndexSchema indexSchema = TestUtils.createSecondaryIndexSchema(tableSchema);
-    byte[][] records = TestUtils.createRecords(common, tableSchema, 10);
+    TableSchema tableSchema = ClientTestUtils.createTable();
+    IndexSchema indexSchema = ClientTestUtils.createSecondaryIndexSchema(tableSchema);
+    byte[][] records = ClientTestUtils.createRecords(common, tableSchema, 10);
 
-    List<Object[]> keys = TestUtils.createKeysForSecondaryIndex(10);
+    List<Object[]> keys = ClientTestUtils.createKeysForSecondaryIndex(10);
 
     byte[] bytes = DatabaseCommon.serializeKey(tableSchema, indexSchema.getName(), keys.get(0));
 
@@ -33,11 +33,11 @@ public class DatabaseCommonTest {
   @Test
   void testKeySerialationPrep() throws IOException {
     DatabaseCommon common = new DatabaseCommon();
-    TableSchema tableSchema = TestUtils.createTable();
-    IndexSchema indexSchema = TestUtils.createSecondaryIndexSchema(tableSchema);
-    byte[][] records = TestUtils.createRecords(common, tableSchema, 10);
+    TableSchema tableSchema = ClientTestUtils.createTable();
+    IndexSchema indexSchema = ClientTestUtils.createSecondaryIndexSchema(tableSchema);
+    byte[][] records = ClientTestUtils.createRecords(common, tableSchema, 10);
 
-    List<Object[]> keys = TestUtils.createKeysForSecondaryIndex(10);
+    List<Object[]> keys = ClientTestUtils.createKeysForSecondaryIndex(10);
 
     byte[] bytes = DatabaseCommon.serializeKey(tableSchema, indexSchema.getName(), keys.get(0));
 
@@ -51,11 +51,11 @@ public class DatabaseCommonTest {
   @Test
   void testKeySerialationTyped() throws IOException {
     DatabaseCommon common = new DatabaseCommon();
-    TableSchema tableSchema = TestUtils.createTable();
-    IndexSchema indexSchema = TestUtils.createSecondaryIndexSchema(tableSchema);
-    byte[][] records = TestUtils.createRecords(common, tableSchema, 10);
+    TableSchema tableSchema = ClientTestUtils.createTable();
+    IndexSchema indexSchema = ClientTestUtils.createSecondaryIndexSchema(tableSchema);
+    byte[][] records = ClientTestUtils.createRecords(common, tableSchema, 10);
 
-    List<Object[]> keys = TestUtils.createKeysForSecondaryIndex(10);
+    List<Object[]> keys = ClientTestUtils.createKeysForSecondaryIndex(10);
 
     byte[] bytes = DatabaseCommon.serializeTypedKey(keys.get(0));
 

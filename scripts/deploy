@@ -1,13 +1,13 @@
-export SEARCH_HOME=$4
+export SONIC_BASE_HOME=$4
 
 if [ ${4:0:1} != "/" ]
 then
-  export SEARCH_HOME=$HOME/$SEARCH_HOME
+  export SONIC_BASE_HOME=$HOME/$SONIC_BASE_HOME
 fi
 
-cd $SEARCH_HOME
+cd $SONIC_BASE_HOME
 
-mkdir -p $SEARCH_HOME/logs
+mkdir -p $SONIC_BASE_HOME/logs
 
-nohup $SEARCH_HOME/bin/runclass com.sonicbase.cli.Deploy $1 $2 > $SEARCH_HOME/logs/deploy.log 2>&1 &
+nohup $SONIC_BASE_HOME/bin/runclass com.sonicbase.cli.Deploy $1 $2 > $SONIC_BASE_HOME/logs/deploy.log 2>&1 &
 

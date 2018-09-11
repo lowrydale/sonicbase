@@ -4,6 +4,7 @@ import com.fasterxml.jackson.databind.ObjectMapper;
 import com.fasterxml.jackson.databind.node.ObjectNode;
 import com.sonicbase.client.DatabaseClient;
 import com.sonicbase.common.ComObject;
+import com.sonicbase.common.Config;
 import com.sonicbase.common.FileUtils;
 import org.apache.commons.io.IOUtils;
 import org.testng.annotations.Test;
@@ -21,8 +22,8 @@ public class LongRunningCallsTest {
   public void test() throws IOException, InterruptedException {
     FileUtils.deleteDirectory(new File(System.getProperty("user.home"), "/db-data"));
 
-    String configStr = IOUtils.toString(DatabaseServerTest.class.getResourceAsStream("/config/config-1-local.json"), "utf-8");
-    ObjectNode config = (ObjectNode) new ObjectMapper().readTree(configStr);
+    String configStr = IOUtils.toString(DatabaseServerTest.class.getResourceAsStream("/config/config-1-local.yaml"), "utf-8");
+    Config config = new Config(configStr);
     DatabaseServer server = new DatabaseServer();
     server.setConfig(config, "test", "localhost", 9010, true, new AtomicBoolean(), new AtomicBoolean(), "gc.log");
     server.setRecovered(true);

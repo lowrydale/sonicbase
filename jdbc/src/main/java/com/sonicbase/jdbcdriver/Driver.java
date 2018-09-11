@@ -33,11 +33,11 @@ public class Driver implements java.sql.Driver {
     return new ConnectionProxy(url, info);
   }
 
-  public boolean acceptsURL(String url) throws SQLException {
+  public boolean acceptsURL(String url) {
     return url.startsWith(URL_PREFIX);
   }
 
-  public DriverPropertyInfo[] getPropertyInfo(String url, Properties info) throws SQLException {
+  public DriverPropertyInfo[] getPropertyInfo(String url, Properties info) {
     return new DriverPropertyInfo[0];  //To change body of implemented methods use File | Settings | File Templates.
   }
 
@@ -53,7 +53,7 @@ public class Driver implements java.sql.Driver {
     return true;
   }
 
-  public Logger getParentLogger() throws SQLFeatureNotSupportedException {
+  public Logger getParentLogger() {
     return null;
   }
 }

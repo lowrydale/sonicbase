@@ -1,12 +1,9 @@
 /* © 2018 by Intellectual Reserve, Inc. All rights reserved. */
 package com.sonicbase.cli;
 
-import com.fasterxml.jackson.databind.ObjectMapper;
-import com.fasterxml.jackson.databind.node.ArrayNode;
-import com.fasterxml.jackson.databind.node.ObjectNode;
 import com.sonicbase.common.ComObject;
+import com.sonicbase.common.Config;
 import com.sonicbase.jdbcdriver.ConnectionProxy;
-import com.sonicbase.query.DatabaseException;
 import com.sonicbase.schema.TableSchema;
 import org.apache.commons.io.FileUtils;
 import org.apache.commons.io.IOUtils;
@@ -18,89 +15,98 @@ import java.sql.PreparedStatement;
 import java.sql.ResultSet;
 import java.sql.SQLException;
 import java.util.*;
-import java.util.concurrent.Callable;
 import java.util.concurrent.ExecutionException;
 import java.util.concurrent.Future;
 import java.util.concurrent.atomic.AtomicBoolean;
 
-public class MiscHandler {
+class MiscHandler {
 
-  private static Logger logger = LoggerFactory.getLogger(MiscHandler.class);
+  private static final Logger logger = LoggerFactory.getLogger(MiscHandler.class);
+  private static final String ERROR_NOT_USING_A_CLUSTER_STR = "Error, not using a cluster";
+  private static final String CONFIG_LICENSE_SERVER_STR = "/config-license-server";
+  private static final String USERS_LOWRYDA_SONICBASE_CONFIG_CONFIG_LICENSE_SERVER_STR = "/Users/lowryda/sonicbase/config/config-license-server";
+  private static final String UTF_8_STR = "utf-8";
+  private static final String INSTALL_DIRECTORY_STR = "installDirectory";
+  private static final String SERVER_STR = "server";
+  private static final String PUBLIC_ADDRESS_STR = "publicAddress";
+  private static final String USER_DIR_STR = "user.dir";
+  private static final String CONFIG_STR = "/config-";
+  private static final String LOGS_STR = "/logs/";
+  private static final String PRIVATE_ADDRESS_STR = "privateAddress";
+  private static final String JSON_STR = ".json";
+  private static final String LOCALHOST_NUMS_STR = "127.0.0.1";
+  private static final String LOCALHOST_STR = "localhost";
+  private static final String USER_KNOWN_HOSTS_FILE_DEV_NULL_STR = "UserKnownHostsFile=/dev/null";
+  private static final String LICENSE_STR = "license-";
+  private static final String STRICT_HOST_KEY_CHECKING_NO_STR = "StrictHostKeyChecking=no";
+  private static final String PORT_STR = ", port=";
   private final Cli cli;
 
-  public MiscHandler(Cli cli) {
+  MiscHandler(Cli cli) {
     this.cli = cli;
   }
 
-  public void stopStreaming() {
+  void stopStreaming() {
     ComObject cobj = new ComObject();
     for (int shard = 0; shard < cli.getConn().getShardCount(); shard++) {
       cli.getConn().send("StreamManager:stopStreaming", shard, 0, cobj, ConnectionProxy.Replica.ALL);
     }
   }
 
-  public void startStreaming() {
+  void startStreaming() {
     ComObject cobj = new ComObject();
     for (int shard = 0; shard < cli.getConn().getShardCount(); shard++) {
       cli.getConn().send("StreamManager:startStreaming", shard, 0, cobj, ConnectionProxy.Replica.ALL);
     }
   }
 
-  public void explain(String command) throws SQLException, ClassNotFoundException, IOException, InterruptedException {
+  void explain(String command) throws SQLException, ClassNotFoundException, IOException, InterruptedException {
     String cluster = cli.getCurrCluster();
     if (cluster == null) {
-      System.out.println("Error, not using a cluster");
+      cli.println(ERROR_NOT_USING_A_CLUSTER_STR);
       return;
     }
 
     if (cli.getCurrDbName() == null) {
-      System.out.println("Error, not using a database");
+      cli.println("Error, not using a database");
       return;
     }
 
     cli.initConnection();
 
-    System.out.println("Executing explain request");
+    cli.println("Executing explain request");
 
     PreparedStatement stmt = cli.getConn().prepareStatement(command);
     cli.setRet(stmt.executeQuery());
 
     String str = cli.getTerminalSize();
     String[] parts = str.split(",");
-    String height = parts[1];
+    String height = parts[1].trim();
 
     int currLine = 0;
-    System.out.println();
-    for (int i = 0; currLine < Integer.valueOf(height) - 2; i++) {
+    cli.println("");
+    for (int i = 0; currLine < Integer.valueOf(height) - 2; i++, currLine++) {
       if (!cli.getRet().next()) {
         break;
       }
-      System.out.println(cli.getRet().getString(1));
-      currLine++;
+      cli.println(cli.getRet().getString(1));
     }
     cli.setLastCommand(command);
   }
 
 
-  public void deployLicenseServer() throws InterruptedException, IOException {
+  void deployLicenseServer() throws InterruptedException, IOException {
     if (cli.isWindows()) {
       cli.getCredentials("license-server");
     }
 
-    InputStream in = Cli.class.getResourceAsStream("/config-license-server.json");
-    if (in == null) {
-      in = new FileInputStream("/Users/lowryda/sonicbase/config/config-license-server.json");
-    }
-    String json = IOUtils.toString(in, "utf-8");
-    ObjectMapper mapper = new ObjectMapper();
-    ObjectNode config = (ObjectNode) mapper.readTree(json);
-    String dir = config.get("installDirectory").asText();
+    Config config = getLicenseServerConfig();
+    String dir = config.getString(INSTALL_DIRECTORY_STR);
     final String installDir = cli.resolvePath(dir);
-    ObjectNode server = (ObjectNode) config.get("server");
-    String address = server.get("publicAddress").asText();
-    String user = config.get("user").asText();
+    String address = config.getString(PUBLIC_ADDRESS_STR);
+    String user = config.getString("user");
 
-    System.out.println("Deploying to a server: address=" + address + ", userDir=" + System.getProperty("user.dir") +
+    cli.println("Deploying to a server: address=" + address + ", userDir=" + System.getProperty(USER_DIR_STR) +
         ", command=" + "bin/do-rsync " + user + "@" + address + ":" + installDir);
     ProcessBuilder builder = new ProcessBuilder().command("bash", "bin/do-rsync", user + "@" + address, installDir);
     Process p = builder.start();
@@ -110,44 +116,52 @@ public class MiscHandler {
       if (b == -1) {
         break;
       }
-      System.out.write(b);
+      cli.write(b);
     }
     p.waitFor();
   }
 
+  private Config getLicenseServerConfig() throws IOException {
 
-  public void gatherDiagnostics() throws IOException, InterruptedException, SQLException, ClassNotFoundException, ExecutionException {
+    InputStream in = Cli.class.getResourceAsStream(CONFIG_LICENSE_SERVER_STR + ".yaml");
+    if (in == null) {
+      in = new FileInputStream(USERS_LOWRYDA_SONICBASE_CONFIG_CONFIG_LICENSE_SERVER_STR + ".yaml");
+    }
+
+    String json = IOUtils.toString(in, UTF_8_STR);
+    return new Config(json);
+  }
+
+
+  void gatherDiagnostics() throws IOException, InterruptedException, SQLException, ClassNotFoundException, ExecutionException {
     String cluster = cli.getCurrCluster();
     if (cluster == null) {
-      System.out.println("Error, not using a cluster");
+      cli.println(ERROR_NOT_USING_A_CLUSTER_STR);
       return;
     }
 
     if (cli.getCurrDbName() == null) {
-      System.out.println("Error, not using a database");
+      cli.println("Error, not using a database");
       return;
     }
 
     cli.initConnection();
 
-    String json = IOUtils.toString(Cli.class.getResourceAsStream("/config-" + cluster + ".json"), "utf-8");
-    ObjectMapper mapper = new ObjectMapper();
-    final ObjectNode config = (ObjectNode) mapper.readTree(json);
-    ObjectNode databaseDict = config;
-    String dataDir = databaseDict.get("dataDirectory").asText();
+    Config config = cli.getConfig(cluster);
+    String dataDir = config.getString("dataDirectory");
     dataDir = cli.resolvePath(dataDir);
-    String installDir = databaseDict.get("installDirectory").asText();
+    String installDir = config.getString(INSTALL_DIRECTORY_STR);
 
     installDir = cli.resolvePath(installDir);
 
-    final File dir = new File(System.getProperty("user.dir"), "tmp/diag");
+    final File dir = new File(System.getProperty(USER_DIR_STR), "tmp/diag");
     FileUtils.deleteDirectory(dir);
     dir.mkdirs();
 
-    System.out.println("Output dir=" + dir.getAbsolutePath());
+    cli.println("Output dir=" + dir.getAbsolutePath());
 
-    File srcConfig = new File("config", "config-" + cluster + ".json");
-    File destConfig = new File(dir, "config-" + cluster + ".json");
+    File srcConfig = new File("config", "config-" + cluster + JSON_STR);
+    File destConfig = new File(dir, "config-" + cluster + JSON_STR);
 
     FileUtils.copyFile(srcConfig, destConfig);
 
@@ -172,20 +186,20 @@ public class MiscHandler {
       }
     }
     catch (Exception e) {
-      System.out.println("Error gathering OS stats");
-      e.printStackTrace();
+      cli.println("Error gathering OS stats");
+      cli.printException(e);
     }
 
     try {
       int masterReplica = cli.getConn().getMasterReplica(0);
-      cli.getFile(config, dir, 0, masterReplica, "/logs/" + "errors.log");
+      cli.getFile(config, dir, 0, masterReplica, LOGS_STR + "errors.log");
       for (int i = 1; i < 11; i++) {
-        cli.getFile(config, dir, 0, masterReplica, "/logs/" + "errors.log." + i);
+        cli.getFile(config, dir, 0, masterReplica, LOGS_STR + "errors.log." + i);
       }
 
-      cli.getFile(config, dir, 0, masterReplica, "/logs/" + "client-errors.log");
+      cli.getFile(config, dir, 0, masterReplica, LOGS_STR + "client-errors.log");
       for (int i = 1; i < 11; i++) {
-        cli.getFile(config, dir, 0, masterReplica, "/logs/" + "client-errors.log." + i);
+        cli.getFile(config, dir, 0, masterReplica, LOGS_STR + "client-errors.log." + i);
       }
     }
     catch (Exception e) {
@@ -194,25 +208,19 @@ public class MiscHandler {
 
     try {
 
-      InputStream in = null;//cli.class.getResourceAsStream("/config-license-server.json");
-      if (in == null) {
-        in = new FileInputStream(new File(System.getProperty("user.dir"), "config/config-license-server.json"));
-      }
-      String ljson = IOUtils.toString(in, "utf-8");
-      ObjectNode lconfig = (ObjectNode) mapper.readTree(ljson);
+      Config lconfig = getLicenseServerConfig();
 
-      ObjectNode server = (ObjectNode) lconfig.get("server");
-      String address = server.get("privateAddress").asText();
-      int port = server.get("port").asInt();
+      String address = lconfig.getString(PRIVATE_ADDRESS_STR);
+      int port = lconfig.getInt("port");
 
-      cli.getFile(lconfig, dir, address, "/logs/" + "license-" + port + ".log");
+      cli.getFile(lconfig, dir, address, LOGS_STR + LICENSE_STR + port + ".log");
       for (int i = 1; i < 11; i++) {
-        cli.getFile(lconfig, dir, address, "/logs/" + "license-" + port + ".log." + i);
+        cli.getFile(lconfig, dir, address, LOGS_STR + LICENSE_STR + port + ".log." + i);
       }
 
-      cli.getFile(lconfig, dir, address, "/logs/" + "license-" + port + ".sysout.log");
+      cli.getFile(lconfig, dir, address, LOGS_STR + LICENSE_STR + port + ".sysout.log");
       for (int i = 1; i < 11; i++) {
-        cli.getFile(lconfig, dir, address, "/logs/" + "license-" + port + ".sysout.log." + i);
+        cli.getFile(lconfig, dir, address, LOGS_STR + LICENSE_STR + port + ".sysout.log." + i);
       }
     }
     catch (Exception e) {
@@ -220,7 +228,7 @@ public class MiscHandler {
     }
 
     try {
-      cli.getFile(config, dir, "localhost", "/logs/" + "cli.out");
+      cli.getFile(config, dir, LOCALHOST_STR, LOGS_STR + "cli.out");
     }
     catch (Exception e) {
       logger.error("Error getting cli log file");
@@ -228,32 +236,23 @@ public class MiscHandler {
 
     Set<String> machinesVisited = new HashSet<>();
     if (!cli.isWindows()) {
-      ArrayNode shards = databaseDict.withArray("shards");
+      List<Config.Shard> shards = config.getShards();
       List<Future> futures = new ArrayList<>();
       for (int i = 0; i < shards.size(); i++) {
-        final ArrayNode replicas = (ArrayNode) shards.get(i).withArray("replicas");
+        final List<Config.Replica> replicas = shards.get(i).getReplicas();
         for (int j = 0; j < replicas.size(); j++) {
-          final int replicaOffset = j;
           final boolean first;
-          if (machinesVisited.add(replicas.get(replicaOffset).get("publicAddress").asText())) {
-            first = true;
-          }
-          else {
-            first = false;
-          }
+          first = machinesVisited.add(replicas.get(j).getString(PUBLIC_ADDRESS_STR));
           try {
-            gatherDiagnostics(config, dir, i, j, (ObjectNode) replicas.get(replicaOffset), first);
+            gatherDiagnostics(config, dir, i, j, replicas.get(j), first);
           }
           catch (Exception e) {
-            logger.error("Error gathering diagnostics from server: shard=" + i + ", replica=" + j);
+            logger.error("Error gathering diagnostics from server: shard={}, replica={}", i, j);
           }
         }
       }
       for (Future future : futures) {
         future.get();
-      }
-      ArrayNode clients = databaseDict.withArray("clients");
-      for (int i = 0; i < clients.size(); i++) {
       }
     }
 
@@ -274,13 +273,12 @@ public class MiscHandler {
 
       writer.write("host,shard,replica,version\n");
       while (cli.getRet().next()) {
-        StringBuilder builder = new StringBuilder();
-        builder.append(cli.getRet().getString("host"));
-        builder.append(",").append(cli.getRet().getString("shard"));
-        builder.append(",").append(cli.getRet().getString("replica"));
-        builder.append(",").append(cli.getRet().getString("version"));
 
-        writer.write(builder.toString() + "\n");
+        String builder = cli.getRet().getString("host") +
+            "," + cli.getRet().getString("shard") +
+            "," + cli.getRet().getString("replica") +
+            "," + cli.getRet().getString("version");
+        writer.write(builder + "\n");
       }
     }
 
@@ -324,46 +322,48 @@ public class MiscHandler {
       }
     }
 
-    PreparedStatement stmt = cli.getConn().prepareStatement("describe server health");
-    ResultSet rs = stmt.executeQuery();
+    try (PreparedStatement stmt = cli.getConn().prepareStatement("describe server health")) {
+      try (ResultSet rs = stmt.executeQuery()) {
 
-    StringBuilder builder = new StringBuilder();
-    builder.append("host,shard,replica,dead,master\n");
-    while (rs.next()) {
-      builder.append(rs.getString("host")).append(",");
-      builder.append(rs.getString("shard")).append(",");
-      builder.append(rs.getString("replica")).append(",");
-      builder.append(rs.getString("dead")).append(",");
-      builder.append(rs.getString("master")).append(",");
-      builder.append("\n");
-    }
-    File healthFile = new File(dir, "health.csv");
-    try (BufferedWriter writer = new BufferedWriter(new OutputStreamWriter(new FileOutputStream(healthFile)))) {
-      writer.write(builder.toString());
+        StringBuilder builder = new StringBuilder();
+        builder.append("host,shard,replica,dead,master\n");
+        while (rs.next()) {
+          builder.append(rs.getString("host")).append(",");
+          builder.append(rs.getString("shard")).append(",");
+          builder.append(rs.getString("replica")).append(",");
+          builder.append(rs.getString("dead")).append(",");
+          builder.append(rs.getString("master")).append(",");
+          builder.append("\n");
+        }
+        File healthFile = new File(dir, "health.csv");
+        try (BufferedWriter writer = new BufferedWriter(new OutputStreamWriter(new FileOutputStream(healthFile)))) {
+          writer.write(builder.toString());
+        }
+      }
     }
 
     if (cli.isWindows()) {
-      System.out.println("Diagnostics file can be found at: " + installDir + "/tmp/*. Zip the contents and send the zip file");
+      cli.println("Diagnostics file can be found at: " + installDir + "/tmp/*. Zip the contents and send the zip file");
     }
     else {
       ProcessBuilder pbuilder = new ProcessBuilder().command("tar", "-czf", "tmp/diag.tgz", "tmp/diag");
       Process p = pbuilder.start();
       p.waitFor();
-      System.out.println("Diagnostics file can be found at: " + System.getProperty("user.dir") + "/tmp/diag.tgz");
+      cli.println("Diagnostics file can be found at: " + System.getProperty(USER_DIR_STR) + "/tmp/diag.tgz");
     }
   }
 
-  private void gatherDiagnostics(ObjectNode config, File dir, int shard, int replica, ObjectNode replicaDict, boolean first) throws IOException, InterruptedException {
-    final String user = config.get("user").asText();
-    final String publicAddress = replicaDict.get("publicAddress").asText();
+  private void gatherDiagnostics(Config config, File dir, int shard, int replica, Config.Replica replicaDict, boolean first) throws IOException, InterruptedException {
+    final String user = config.getString("user");
+    final String publicAddress = replicaDict.getString(PUBLIC_ADDRESS_STR);
     File machineDir = new File(dir, publicAddress);
-    final String installDir = cli.resolvePath(config.get("installDirectory").asText());
+    final String installDir = cli.resolvePath(config.getString(INSTALL_DIRECTORY_STR));
 
     machineDir.mkdirs();
 
     final AtomicBoolean finished = new AtomicBoolean();
     if (!cli.isWindows()) {
-      if (publicAddress.equals("localhost") || publicAddress.equals("127.0.0.1")) {
+      if (publicAddress.equals(LOCALHOST_STR) || publicAddress.equals(LOCALHOST_NUMS_STR)) {
         if (first) {
           ProcessBuilder builder = new ProcessBuilder().command("killall", "-QUIT", "java");
           Process p = builder.start();
@@ -394,52 +394,49 @@ public class MiscHandler {
       }
       else {
         if (first) {
-          Thread thread = new Thread(new Runnable() {
-            @Override
-            public void run() {
-              try {
-                ProcessBuilder builder = new ProcessBuilder().command("ssh", "-n", "-f", "-o",
-                    "UserKnownHostsFile=/dev/null", "-o", "StrictHostKeyChecking=no", user + "@" +
-                        publicAddress, "killall -QUIT java");
-                Process p = builder.start();
-                p.waitFor();
+          Thread thread = new Thread(() -> {
+            try {
+              ProcessBuilder builder = new ProcessBuilder().command("ssh", "-n", "-f", "-o",
+                  USER_KNOWN_HOSTS_FILE_DEV_NULL_STR, "-o", STRICT_HOST_KEY_CHECKING_NO_STR, user + "@" +
+                      publicAddress, "killall -QUIT java");
+              Process p = builder.start();
+              p.waitFor();
 
-                builder = new ProcessBuilder().command("ssh", "-n", "-f", "-o",
-                    "UserKnownHostsFile=/dev/null", "-o", "StrictHostKeyChecking=no", user + "@" +
-                        publicAddress, installDir + "/bin/get-distribution", installDir);
-                p = builder.start();
-                p.waitFor();
+              builder = new ProcessBuilder().command("ssh", "-n", "-f", "-o",
+                  USER_KNOWN_HOSTS_FILE_DEV_NULL_STR, "-o", STRICT_HOST_KEY_CHECKING_NO_STR, user + "@" +
+                      publicAddress, installDir + "/bin/get-distribution", installDir);
+              p = builder.start();
+              p.waitFor();
 
-                builder = new ProcessBuilder().command("ssh", "-n", "-f", "-o",
-                    "UserKnownHostsFile=/dev/null", "-o", "StrictHostKeyChecking=no", user + "@" +
-                        publicAddress, installDir + "/bin/get-df", installDir);
-                p = builder.start();
-                p.waitFor();
+              builder = new ProcessBuilder().command("ssh", "-n", "-f", "-o",
+                  USER_KNOWN_HOSTS_FILE_DEV_NULL_STR, "-o", STRICT_HOST_KEY_CHECKING_NO_STR, user + "@" +
+                      publicAddress, installDir + "/bin/get-df", installDir);
+              p = builder.start();
+              p.waitFor();
 
-                builder = new ProcessBuilder().command("ssh", "-n", "-f", "-o",
-                    "UserKnownHostsFile=/dev/null", "-o", "StrictHostKeyChecking=no", user + "@" +
-                        publicAddress, installDir + "/bin/get-dir", installDir);
-                p = builder.start();
-                p.waitFor();
+              builder = new ProcessBuilder().command("ssh", "-n", "-f", "-o",
+                  USER_KNOWN_HOSTS_FILE_DEV_NULL_STR, "-o", STRICT_HOST_KEY_CHECKING_NO_STR, user + "@" +
+                      publicAddress, installDir + "/bin/get-dir", installDir);
+              p = builder.start();
+              p.waitFor();
 
-                builder = new ProcessBuilder().command("ssh", "-n", "-f", "-o",
-                    "UserKnownHostsFile=/dev/null", "-o", "StrictHostKeyChecking=no", user + "@" +
-                        publicAddress, installDir + "/bin/get-top", installDir);
-                p = builder.start();
-                p.waitFor();
+              builder = new ProcessBuilder().command("ssh", "-n", "-f", "-o",
+                  USER_KNOWN_HOSTS_FILE_DEV_NULL_STR, "-o", STRICT_HOST_KEY_CHECKING_NO_STR, user + "@" +
+                      publicAddress, installDir + "/bin/get-top", installDir);
+              p = builder.start();
+              p.waitFor();
 
-                builder = new ProcessBuilder().command("ssh", "-n", "-f", "-o",
-                    "UserKnownHostsFile=/dev/null", "-o", "StrictHostKeyChecking=no", user + "@" +
-                        publicAddress, installDir + "/bin/get-jarlist", installDir);
-                p = builder.start();
-                p.waitFor();
-              }
-              catch (Exception e) {
-                logger.error("Error gathering diagnostics: server=" + publicAddress);
-              }
-              finally {
-                finished.set(true);
-              }
+              builder = new ProcessBuilder().command("ssh", "-n", "-f", "-o",
+                  USER_KNOWN_HOSTS_FILE_DEV_NULL_STR, "-o", STRICT_HOST_KEY_CHECKING_NO_STR, user + "@" +
+                      publicAddress, installDir + "/bin/get-jarlist", installDir);
+              p = builder.start();
+              p.waitFor();
+            }
+            catch (Exception e) {
+              logger.error("Error gathering diagnostics: server={}", publicAddress);
+            }
+            finally {
+              finished.set(true);
             }
           });
           thread.start();
@@ -458,9 +455,9 @@ public class MiscHandler {
         cli.getFile(config, machineDir, shard, replica, "/tmp/top");
         cli.getFile(config, machineDir, shard, replica, "/tmp/jars");
       }
-      cli.getFile(config, machineDir, shard, replica, "/logs/" + replicaDict.get("port").asInt() + ".log");
-      cli.getFile(config, machineDir, shard, replica, "/logs/" + replicaDict.get("port").asInt() + ".sysout.log");
-      cli.getFile(config, machineDir, shard, replica, "/logs/gc-" + replicaDict.get("port").asInt() + ".log.0.current");
+      cli.getFile(config, machineDir, shard, replica, LOGS_STR + replicaDict.getInt("port") + ".log");
+      cli.getFile(config, machineDir, shard, replica, LOGS_STR + replicaDict.getInt("port") + ".sysout.log");
+      cli.getFile(config, machineDir, shard, replica, "/logs/gc-" + replicaDict.getInt("port") + ".log.0.current");
     }
 /*
     1.	Current log from each server
@@ -473,80 +470,97 @@ public class MiscHandler {
 
   }
 
-  public void purgeInstall() throws IOException {
+  void purgeInstall() throws IOException {
     String cluster = cli.getCurrCluster();
     if (cluster == null) {
-      System.out.println("Error, not using a cluster");
+      cli.println(ERROR_NOT_USING_A_CLUSTER_STR);
       return;
     }
 
-    System.out.println("Starting purge install: cluster=" + cluster);
-    String json = IOUtils.toString(Cli.class.getResourceAsStream("/config-" + cluster + ".json"), "utf-8");
-    ObjectMapper mapper = new ObjectMapper();
-    ObjectNode config = (ObjectNode) mapper.readTree(json);
-    ObjectNode databaseDict = config;
-    String dataDir = databaseDict.get("dataDirectory").asText();
+    cli.println("Starting purge install: cluster=" + cluster);
+    Config config = cli.getConfig(cluster);
+    String dataDir = config.getString("dataDirectory");
     dataDir = cli.resolvePath(dataDir);
-    String installDir = databaseDict.get("installDirectory").asText();
+    String installDir = config.getString(INSTALL_DIRECTORY_STR);
     installDir = cli.resolvePath(installDir);
-    ArrayNode shards = databaseDict.withArray("shards");
+    List<Config.Shard> shards = config.getShards();
     for (int i = 0; i < shards.size(); i++) {
-      ArrayNode replicas = (ArrayNode) shards.get(i).withArray("replicas");
+      List<Config.Replica> replicas = shards.get(i).getReplicas();
       for (int j = 0; j < replicas.size(); j++) {
-        purgeInstallServer(databaseDict, dataDir, installDir, replicas, j);
+        purgeInstallServer(cli, config, dataDir, installDir, replicas, j);
       }
     }
-    ArrayNode clients = databaseDict.withArray("clients");
+    List<Config.Client> clients = config.getClients();
     for (int i = 0; i < clients.size(); i++) {
-      purgeInstallServer(databaseDict, dataDir, installDir, clients, i);
+      purgeClientInstallServer(cli, config, dataDir, installDir, clients, i);
     }
-    System.out.println("Finished purging install: cluster=" + cluster);
+    cli.println("Finished purging install: cluster=" + cluster);
   }
 
-  private static void purgeInstallServer(ObjectNode databaseDict, String dataDir, String installDir, ArrayNode replicas, int j) throws IOException {
-    ObjectNode replica = (ObjectNode) replicas.get(j);
-    String deployUser = databaseDict.get("user").asText();
-    String publicAddress = replica.get("publicAddress").asText();
-    if (publicAddress.equals("127.0.0.1") || publicAddress.equals("localhost")) {
+  private static void purgeInstallServer(Cli cli, Config config, String dataDir, String installDir, List<Config.Replica> replicas, int j) throws IOException {
+    Config.Replica replica = replicas.get(j);
+    String deployUser = config.getString("user");
+    String publicAddress = replica.getString(PUBLIC_ADDRESS_STR);
+    if (publicAddress.equals(LOCALHOST_NUMS_STR) || publicAddress.equals(LOCALHOST_STR)) {
       File file = new File(installDir);
       if (!dataDir.startsWith("/")) {
         file = new File(System.getProperty("user.home"), installDir);
       }
-      System.out.println("Deleting directory: dir=" + file.getAbsolutePath());
+      cli.println("Deleting directory: dir=" + file.getAbsolutePath());
       FileUtils.deleteDirectory(file);
     }
     else {
       ProcessBuilder builder = new ProcessBuilder().command("ssh", "-n", "-f", "-o",
-          "UserKnownHostsFile=/dev/null", "-o", "StrictHostKeyChecking=no", deployUser + "@" +
-              replica.get("publicAddress").asText(), "rm", "-rf", installDir);
-      System.out.println("purging: address=" + replica.get("publicAddress").asText() + ", dir=" + dataDir);
-      //builder.directory(workingDir);
+          USER_KNOWN_HOSTS_FILE_DEV_NULL_STR, "-o", STRICT_HOST_KEY_CHECKING_NO_STR, deployUser + "@" +
+              replica.getString(PUBLIC_ADDRESS_STR), "rm", "-rf", installDir);
+      cli.println("purging: address=" + replica.getString(PUBLIC_ADDRESS_STR) + ", dir=" + dataDir);
       builder.start();
     }
   }
 
-  private void startLicenseServer(ObjectNode config, String externalAddress, String privateAddress, String port,
+  private static void purgeClientInstallServer(Cli cli, Config config, String dataDir, String installDir, List<Config.Client> replicas, int j) throws IOException {
+    Config.Client replica = replicas.get(j);
+    String deployUser = config.getString("user");
+    String publicAddress = replica.getString(PUBLIC_ADDRESS_STR);
+    if (publicAddress.equals(LOCALHOST_NUMS_STR) || publicAddress.equals(LOCALHOST_STR)) {
+      File file = new File(installDir);
+      if (!dataDir.startsWith("/")) {
+        file = new File(System.getProperty("user.home"), installDir);
+      }
+      cli.println("Deleting directory: dir=" + file.getAbsolutePath());
+      FileUtils.deleteDirectory(file);
+    }
+    else {
+      ProcessBuilder builder = new ProcessBuilder().command("ssh", "-n", "-f", "-o",
+          USER_KNOWN_HOSTS_FILE_DEV_NULL_STR, "-o", STRICT_HOST_KEY_CHECKING_NO_STR, deployUser + "@" +
+              replica.getString(PUBLIC_ADDRESS_STR), "rm", "-rf", installDir);
+      cli.println("purging: address=" + replica.getString(PUBLIC_ADDRESS_STR) + ", dir=" + dataDir);
+      builder.start();
+    }
+  }
+
+  private void startLicenseServer(Config config, String externalAddress, String privateAddress, String port,
                                          String installDir) throws IOException, InterruptedException {
     if (cli.isWindows()) {
       cli.getCredentials("license-server");
     }
 
-    String deployUser = config.get("user").asText();
+    String deployUser = config.getString("user");
     if (port == null) {
       port = "8443";
     }
     String searchHome = installDir;
-    if (externalAddress.equals("127.0.0.1") || externalAddress.equals("localhost")) {
+    if (externalAddress.equals(LOCALHOST_NUMS_STR) || externalAddress.equals(LOCALHOST_STR)) {
 
       if (!searchHome.startsWith("/")) {
         File file = new File(System.getProperty("user.home"), searchHome);
         searchHome = file.getAbsolutePath();
       }
-      searchHome = new File(System.getProperty("user.dir")).getAbsolutePath();
-      System.out.println("Starting license server: installDir=" + searchHome);
+      searchHome = new File(System.getProperty(USER_DIR_STR)).getAbsolutePath();
+      cli.println("Starting license server: installDir=" + searchHome);
       ProcessBuilder builder = null;
       if (cli.isCygwin() || cli.isWindows()) {
-        System.out.println("starting license server: userDir=" + System.getProperty("user.dir"));
+        cli.println("starting license server: userDir=" + System.getProperty(USER_DIR_STR));
 
         builder = new ProcessBuilder().command("bin/start-license-server-task.bat", port, searchHome);
         Process p = builder.start();
@@ -554,38 +568,33 @@ public class MiscHandler {
       }
       else {
         builder = new ProcessBuilder().command("bash", "bin/start-license-server", privateAddress, port, searchHome);
-        Process p = builder.start();
+        builder.start();
       }
-      System.out.println("Started server: address=" + externalAddress + ", port=" + port);
+      cli.println("Started server: address=" + externalAddress + PORT_STR + port);
       return;
     }
 
-    System.out.println("Home=" + searchHome);
+    cli.println("Home=" + searchHome);
 
     if (cli.isWindows()) {
-      System.out.println("starting license server: userDir=" + System.getProperty("user.dir"));
+      cli.println("starting license server: userDir=" + System.getProperty(USER_DIR_STR));
 
       File file = new File("bin/remote-start-license-server-server.ps1");
-      String str = IOUtils.toString(new FileInputStream(file), "utf-8");
-      str = str.replaceAll("\\$1", new File(System.getProperty("user.dir"), "credentials/license-server-" + cli.getUsername()).getAbsolutePath().replaceAll("\\\\", "/"));
+      String str = IOUtils.toString(new FileInputStream(file), UTF_8_STR);
+      str = str.replaceAll("\\$1", new File(System.getProperty(USER_DIR_STR), "credentials/license-server-" + cli.getUsername()).getAbsolutePath().replaceAll("\\\\", "/"));
       str = str.replaceAll("\\$2", cli.getUsername());
       str = str.replaceAll("\\$3", externalAddress);
       str = str.replaceAll("\\$4", installDir);
       str = str.replaceAll("\\$5", port);
       File outFile = new File("tmp/" + externalAddress + "-" + port + "-remote-start-license-server.ps1");
       outFile.getParentFile().mkdirs();
-      outFile.delete();
-      try {
-        try (BufferedWriter writer = new BufferedWriter(new OutputStreamWriter(new FileOutputStream(outFile)))) {
-          writer.write(str);
-        }
+      FileUtils.forceDelete(outFile);
+      try (BufferedWriter writer = new BufferedWriter(new OutputStreamWriter(new FileOutputStream(outFile)))) {
+        writer.write(str);
+      }
 
-        ProcessBuilder builder = new ProcessBuilder().command("powershell", "-F", outFile.getAbsolutePath());
-        Process p = builder.start();
-      }
-      finally {
-        //outFile.delete();
-      }
+      ProcessBuilder builder = new ProcessBuilder().command("powershell", "-F", outFile.getAbsolutePath());
+      builder.start();
     }
     else {
       ProcessBuilder builder = new ProcessBuilder().command("bash", "bin/do-start-license-server", deployUser + "@" + externalAddress,
@@ -599,45 +608,37 @@ public class MiscHandler {
           break;
         }
         sbuilder.append(String.valueOf((char) b));
-        //System.out.write(b);
       }
-      System.out.println(sbuilder.toString());
+      cli.println(sbuilder.toString());
       int ret = p.waitFor();
       if (0 == ret) {
-        System.out.println("Started license server: address=" + privateAddress + ", port=" + port);
+        cli.println("Started license server: address=" + privateAddress + PORT_STR + port);
       }
       else {
-        System.out.println("Failed to start license server: address=" + privateAddress + ", port=" + port);
+        cli.println("Failed to start license server: address=" + privateAddress + PORT_STR + port);
       }
     }
   }
 
 
-  public void startLicenseServer() throws IOException, InterruptedException, ExecutionException {
+  void startLicenseServer() throws IOException, InterruptedException {
 
-    InputStream in = Cli.class.getResourceAsStream("/config-license-server.json");
-    if (in == null) {
-      in = new FileInputStream("/Users/lowryda/sonicbase/config/config-license-server.json");
-    }
-    String json = IOUtils.toString(in, "utf-8");
-    ObjectMapper mapper = new ObjectMapper();
-    ObjectNode config = (ObjectNode) mapper.readTree(json);
-    String dir = config.get("installDirectory").asText();
+    Config config = getLicenseServerConfig();
+    String dir = config.getString(INSTALL_DIRECTORY_STR);
     final String installDir = cli.resolvePath(dir);
 
     stopLicenseServer();
 
-    ObjectNode server = (ObjectNode) config.get("server");
-    startLicenseServer(config, server.get("publicAddress").asText(), server.get("privateAddress").asText(),
-        server.get("port").asText(), installDir);
-    System.out.println("Finished starting license server");
+    startLicenseServer(config, config.getString(PUBLIC_ADDRESS_STR), config.getString(PRIVATE_ADDRESS_STR),
+        String.valueOf(config.getInt("port")), installDir);
+    cli.println("Finished starting license server");
   }
 
 
 
-  private void stopLicenseServer(ObjectNode databaseDict, String externalAddress, String privateAddress, String port, String installDir) throws IOException, InterruptedException {
-    String deployUser = databaseDict.get("user").asText();
-    if (externalAddress.equals("127.0.0.1") || externalAddress.equals("localhost")) {
+  private void stopLicenseServer(Config config, String externalAddress, String privateAddress, String port, String installDir) throws IOException, InterruptedException {
+    String deployUser = config.getString("user");
+    if (externalAddress.equals(LOCALHOST_NUMS_STR) || externalAddress.equals(LOCALHOST_STR)) {
       ProcessBuilder builder = null;
       if (cli.isCygwin() || cli.isWindows()) {
         builder = new ProcessBuilder().command("bin/kill-server.bat", port);
@@ -653,29 +654,24 @@ public class MiscHandler {
       Process p = null;
       if (cli.isWindows()) {
         File file = new File("bin/remote-kill-server.ps1");
-        String str = IOUtils.toString(new FileInputStream(file), "utf-8");
-        str = str.replaceAll("\\$1", new File(System.getProperty("user.dir"), "credentials/" + cli.getCurrCluster() + "-" + cli.getUsername()).getAbsolutePath().replaceAll("\\\\", "/"));
+        String str = IOUtils.toString(new FileInputStream(file), UTF_8_STR);
+        str = str.replaceAll("\\$1", new File(System.getProperty(USER_DIR_STR), "credentials/" + cli.getCurrCluster() + "-" + cli.getUsername()).getAbsolutePath().replaceAll("\\\\", "/"));
         str = str.replaceAll("\\$2", cli.getUsername());
         str = str.replaceAll("\\$3", externalAddress);
         str = str.replaceAll("\\$4", installDir);
         str = str.replaceAll("\\$5", port);
         File outFile = new File("tmp/" + externalAddress + "-" + port + "-remote-kill-server.ps1");
         outFile.getParentFile().mkdirs();
-        outFile.delete();
-        try {
-          try (BufferedWriter writer = new BufferedWriter(new OutputStreamWriter(new FileOutputStream(outFile)))) {
-            writer.write(str);
-          }
-          builder = new ProcessBuilder().command("powershell", "-F", outFile.getAbsolutePath());
-          p = builder.start();
+        FileUtils.forceDelete(outFile);
+        try (BufferedWriter writer = new BufferedWriter(new OutputStreamWriter(new FileOutputStream(outFile)))) {
+          writer.write(str);
         }
-        finally {
-          //outFile.delete();
-        }
+        builder = new ProcessBuilder().command("powershell", "-F", outFile.getAbsolutePath());
+        p = builder.start();
       }
       else {
         builder = new ProcessBuilder().command("ssh", "-n", "-f", "-o",
-            "UserKnownHostsFile=/dev/null", "-o", "StrictHostKeyChecking=no", deployUser + "@" +
+            USER_KNOWN_HOSTS_FILE_DEV_NULL_STR, "-o", STRICT_HOST_KEY_CHECKING_NO_STR, deployUser + "@" +
                 externalAddress, installDir + "/bin/kill-server", "LicenseServer", port, port, port, port);
         p = builder.start();
       }
@@ -683,22 +679,15 @@ public class MiscHandler {
     }
   }
 
-  public void stopLicenseServer() throws IOException, InterruptedException, ExecutionException {
+  void stopLicenseServer() throws IOException, InterruptedException {
 
-    InputStream in = Cli.class.getResourceAsStream("/config-license-server.json");
-    if (in == null) {
-      in = new FileInputStream("/Users/lowryda/sonicbase/config/config-license-server.json");
-    }
-    String json = IOUtils.toString(in, "utf-8");
-    ObjectMapper mapper = new ObjectMapper();
-    ObjectNode config = (ObjectNode) mapper.readTree(json);
-    final String installDir = cli.resolvePath(config.get("installDirectory").asText());
+    Config config = getLicenseServerConfig();
+    final String installDir = cli.resolvePath(config.getString(INSTALL_DIRECTORY_STR));
 
-    ObjectNode server = (ObjectNode) config.get("server");
-    stopLicenseServer(config, server.get("publicAddress").asText(), server.get("privateAddress").asText(),
-        server.get("port").asText(), installDir);
+    stopLicenseServer(config, config.getString(PUBLIC_ADDRESS_STR), config.getString(PRIVATE_ADDRESS_STR),
+        String.valueOf(config.getInt("port")), installDir);
 
-    System.out.println("Stopped license server");
+    cli.println("Stopped license server");
   }
 
 }

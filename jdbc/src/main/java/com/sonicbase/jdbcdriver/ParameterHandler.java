@@ -3,8 +3,8 @@ package com.sonicbase.jdbcdriver;
 
 import com.sonicbase.client.DatabaseClient;
 import com.sonicbase.query.DatabaseException;
+import com.sonicbase.util.Varint;
 import org.apache.commons.io.IOUtils;
-import org.apache.giraph.utils.Varint;
 
 import java.io.*;
 import java.math.BigDecimal;
@@ -18,8 +18,8 @@ import java.util.Map;
 // I don't know a good way to reduce the parameter count
 public class ParameterHandler {
 
-  private HashMap<String, Parameter.ParameterBase> currParmsByName = new HashMap<>();
-  private Map<Integer, Parameter.ParameterBase> currParmsByIndex = new HashMap<>();
+  private final HashMap<String, Parameter.ParameterBase> currParmsByName = new HashMap<>();
+  private final Map<Integer, Parameter.ParameterBase> currParmsByIndex = new HashMap<>();
 
   public ParameterHandler() {
   }
@@ -28,7 +28,7 @@ public class ParameterHandler {
     return currParmsByIndex;
   }
 
-  public void clearBatch() throws SQLException {
+  public void clearBatch() {
     currParmsByName.clear();
     currParmsByIndex.clear();
   }
@@ -108,7 +108,7 @@ public class ParameterHandler {
     getCurrParmsByIndex().put(parameterIndex, new Parameter.BinaryStream(bytes, length));
   }
 
-  public void clearParameters() throws SQLException {
+  public void clearParameters() {
     currParmsByIndex.clear();
     currParmsByName.clear();
   }

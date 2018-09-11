@@ -11,9 +11,9 @@ import java.lang.reflect.Method;
 // all methods called from method invoker must have cobj and replayed command parms
 // I prefer to return null instead of an empty array
 // I don't know a good way to reduce the parameter count
-public class StreamManagerProxy {
+class StreamManagerProxy {
 
-  private static Logger logger = LoggerFactory.getLogger(StreamManagerProxy.class);
+  private static final Logger logger = LoggerFactory.getLogger(StreamManagerProxy.class);
 
   private Object streamManager;
   private Method initPublisher;
@@ -25,7 +25,7 @@ public class StreamManagerProxy {
   private Method startStreamsConsumerMasterMonitor;
   private Method stopStreamsConsumerMasterMonitor;
 
-  public StreamManagerProxy(Object proServer) {
+  StreamManagerProxy(Object proServer) {
     try {
       Class proClz = Class.forName("com.sonicbase.server.ProServer");
       Method method = proClz.getMethod("getStreamManager");
@@ -43,13 +43,13 @@ public class StreamManagerProxy {
       stopStreamsConsumerMasterMonitor = streamClz.getMethod("stopStreamsConsumerMasterMonitor");
     }
     catch (Exception e) {
-      logger.error("Error initializing streamManager", e);
+      logger.warn("Error initializing streamManager", e);
     }
   }
 
-  public void startStreamsConsumerMasterMonitor() {
+  void startStreamsConsumerMasterMonitor() {
     try {
-      if (startStreamsConsumerMasterMonitor != null) {
+      if (streamManager != null && startStreamsConsumerMasterMonitor != null) {
         startStreamsConsumerMasterMonitor.invoke(streamManager);
       }
     }
@@ -59,9 +59,9 @@ public class StreamManagerProxy {
     }
   }
 
-  public void stopStreamsConsumerMasterMonitor() {
+  void stopStreamsConsumerMasterMonitor() {
     try {
-      if (stopStreamsConsumerMasterMonitor != null) {
+      if (streamManager != null && stopStreamsConsumerMasterMonitor != null) {
         stopStreamsConsumerMasterMonitor.invoke(streamManager);
       }
     }
@@ -70,9 +70,9 @@ public class StreamManagerProxy {
     }
   }
 
-  public void initPublisher() {
+  void initPublisher() {
     try {
-      if (initPublisher != null) {
+      if (streamManager != null && initPublisher != null) {
         initPublisher.invoke(streamManager);
       }
     }
@@ -82,8 +82,8 @@ public class StreamManagerProxy {
     }
   }
 
-  public void initBatchInsert() {
-    if (streamManager != null) {
+  void initBatchInsert() {
+    if (streamManager != null && initBatchInsert != null) {
       try {
         initBatchInsert.invoke(streamManager);
       }
@@ -93,8 +93,8 @@ public class StreamManagerProxy {
     }
   }
 
-  public void publishBatch(ComObject cobj) {
-    if (streamManager != null) {
+  void publishBatch(ComObject cobj) {
+    if (streamManager != null && publishBatch != null) {
       try {
         publishBatch.invoke(streamManager, cobj);
       }
@@ -105,8 +105,8 @@ public class StreamManagerProxy {
 
   }
 
-  public void batchInsertFinish() {
-    if (streamManager != null) {
+  void batchInsertFinish() {
+    if (streamManager != null && batchInsertFinish != null) {
       try {
         batchInsertFinish.invoke(streamManager);
       }
@@ -116,9 +116,9 @@ public class StreamManagerProxy {
     }
   }
 
-  public void publishInsertOrUpdate(ComObject cobj, String dbName, String tableName, byte[] bytes, byte[] existingBytes,
-                                    UpdateManager.UpdateType update) {
-    if (streamManager != null) {
+  void publishInsertOrUpdate(ComObject cobj, String dbName, String tableName, byte[] bytes, byte[] existingBytes,
+                             UpdateManager.UpdateType update) {
+    if (streamManager != null && publishInsertOrUpdate != null) {
       try {
         publishInsertOrUpdate.invoke(streamManager, cobj, dbName, tableName, bytes, existingBytes, update);
       }
@@ -128,8 +128,9 @@ public class StreamManagerProxy {
     }
   }
 
-  public void addToBatch(String dbName, String tableName, byte[] recordBytes, UpdateManager.UpdateType insert) {
-    if (streamManager != null) {
+  void addToBatch(String dbName, String tableName, byte[] recordBytes, UpdateManager.UpdateType insert) {
+    if (streamManager != null && addToBatch != null
+        ) {
       try {
         addToBatch.invoke(streamManager, dbName, tableName, recordBytes, insert);
       }

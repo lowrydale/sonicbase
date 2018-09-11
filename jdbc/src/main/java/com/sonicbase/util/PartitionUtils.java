@@ -25,7 +25,7 @@ public class PartitionUtils {
   }
 
   public static class IndexCounts {
-    private Map<Integer, Long> counts = new ConcurrentHashMap<>();
+    private final Map<Integer, Long> counts = new ConcurrentHashMap<>();
 
     public Map<Integer, Long> getCounts() {
       return counts;
@@ -33,7 +33,7 @@ public class PartitionUtils {
   }
 
   public static class TableIndexCounts {
-    private Map<String, IndexCounts> indices = new ConcurrentHashMap<>();
+    private final Map<String, IndexCounts> indices = new ConcurrentHashMap<>();
 
     public Map<String, IndexCounts> getIndices() {
       return indices;
@@ -41,7 +41,7 @@ public class PartitionUtils {
   }
 
   public static class GlobalIndexCounts {
-    private Map<String, TableIndexCounts> tables = new ConcurrentHashMap<>();
+    private final Map<String, TableIndexCounts> tables = new ConcurrentHashMap<>();
 
     public Map<String, TableIndexCounts> getTables() {
       return tables;
@@ -235,9 +235,7 @@ public class PartitionUtils {
                                          Object[] lessKey, int i, Object[] lowerKey) {
     String[] indexFields = tableSchema.getIndices().get(indexName).getFields();
     Object[] tempLowerKey = new Object[indexFields.length];
-    for (int j = 0; j < indexFields.length; j++) {
-      tempLowerKey[j] = lowerKey[j];
-    }
+    System.arraycopy(lowerKey, 0, tempLowerKey, 0, indexFields.length);
 
     int greaterCompareValue = getCompareValue(comparators, greaterKey, tempLowerKey);
 
@@ -338,9 +336,9 @@ public class PartitionUtils {
     private boolean shouldContinue;
     private boolean shouldBreak;
 
-    public HandleLowerKeyIsNull(boolean ascending, TableSchema tableSchema, String indexName,
-                                List<Integer> selectedPartitions, TableSchema.Partition[] partitions, int i,
-                                Object[] lowerKey, Object[] key, BinaryExpression.Operator operator, Comparator[] comparators) {
+    HandleLowerKeyIsNull(boolean ascending, TableSchema tableSchema, String indexName,
+                         List<Integer> selectedPartitions, TableSchema.Partition[] partitions, int i,
+                         Object[] lowerKey, Object[] key, BinaryExpression.Operator operator, Comparator[] comparators) {
       this.ascending = ascending;
       this.tableSchema = tableSchema;
       this.indexName = indexName;
@@ -411,9 +409,9 @@ public class PartitionUtils {
     private boolean shouldReturn;
     private boolean shouldContinue;
 
-    public CompareLowerKeyWithKey(List<Integer> selectedPartitions, TableSchema.Partition[] partitions, int i,
-                                  String[] indexFields, Object[] lowerKey, Object[] key,
-                                  BinaryExpression.Operator operator, Comparator[] comparators) {
+    CompareLowerKeyWithKey(List<Integer> selectedPartitions, TableSchema.Partition[] partitions, int i,
+                           String[] indexFields, Object[] lowerKey, Object[] key,
+                           BinaryExpression.Operator operator, Comparator[] comparators) {
       this.indexFields = indexFields;
       this.lowerKey = lowerKey;
       this.comparators = comparators;
@@ -426,9 +424,7 @@ public class PartitionUtils {
 
     private CompareLowerKeyWithKey invoke() {
       Object[] tempLowerKey = new Object[indexFields.length];
-      for (int j = 0; j < indexFields.length; j++) {
-        tempLowerKey[j] = lowerKey[j];
-      }
+      System.arraycopy(lowerKey, 0, tempLowerKey, 0, indexFields.length);
 
       int compareValue = 0;
 
@@ -468,9 +464,7 @@ public class PartitionUtils {
                                               Object[] key, Object[] lowerLowerKey) {
     String[] indexFields = tableSchema.getIndices().get(indexName).getFields();
     Object[] tempLowerKey = new Object[indexFields.length];
-    for (int j = 0; j < indexFields.length; j++) {
-      tempLowerKey[j] = lowerLowerKey[j];
-    }
+    System.arraycopy(lowerLowerKey, 0, tempLowerKey, 0, indexFields.length);
     int compareValue = 0;
 
     for (int k = 0; k < key.length; k++) {
@@ -560,23 +554,23 @@ public class PartitionUtils {
 
 
   private static class GetKeys {
-    private Object[] leftKey;
-    private Object[] rightKey;
-    private BinaryExpression.Operator greaterOp;
+    private final Object[] leftKey;
+    private final Object[] rightKey;
+    private final BinaryExpression.Operator greaterOp;
     private Object[] greaterKey;
     private Object[] lessKey;
 
-    public GetKeys(Object[] leftKey, Object[] rightKey, BinaryExpression.Operator greaterOp) {
+    GetKeys(Object[] leftKey, Object[] rightKey, BinaryExpression.Operator greaterOp) {
       this.leftKey = leftKey;
       this.rightKey = rightKey;
       this.greaterOp = greaterOp;
     }
 
-    public Object[] getGreaterKey() {
+    Object[] getGreaterKey() {
       return greaterKey;
     }
 
-    public Object[] getLessKey() {
+    Object[] getLessKey() {
       return lessKey;
     }
 

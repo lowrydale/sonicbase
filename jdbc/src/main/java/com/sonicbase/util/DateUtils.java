@@ -81,7 +81,7 @@ public final class DateUtils {
     return format1.format(timestamp.getTime());
   }
 
-  static String[] formatStrings = new String[]{
+  private static final String[] formatStrings = new String[]{
       TIME_STR_3,
       TIME_STR_2,
       "yyyy-MM-dd HH:mm:ss.SSS",
@@ -114,7 +114,7 @@ public final class DateUtils {
     throw new DatabaseException("Error parsing date", lastException);
   }
 
-  static String[] formatTimeStrings = new String[]{
+  private static final String[] formatTimeStrings = new String[]{
       "HH:mm:ss.SSSZ",
       "HH:mm:ss.SSS",
       "HH:mm:ssZ",

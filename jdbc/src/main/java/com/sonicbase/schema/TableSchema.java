@@ -2,7 +2,7 @@ package com.sonicbase.schema;
 
 import com.sonicbase.common.DatabaseCommon;
 import com.sonicbase.common.ExcludeRename;
-import org.apache.giraph.utils.Varint;
+import com.sonicbase.util.Varint;
 
 import java.io.DataInputStream;
 import java.io.DataOutputStream;
@@ -16,12 +16,13 @@ import java.util.*;
 public class TableSchema {
   private int version;
   private List<FieldSchema> fields = new ArrayList<>();
-  private Map<String, Integer> fieldOffsets = new HashMap<>();
+  private final Map<String, Integer> fieldOffsets = new HashMap<>();
   private String name;
   private Map<String, IndexSchema> indexes = new HashMap<>();
   private String[] primaryKey;
   private int tableId;
-  private Map<Integer, IndexSchema> indexesById = new HashMap<>();
+  private List<PreviousFields> previousFields = new ArrayList<>();
+  private final Map<Integer, IndexSchema> indexesById = new HashMap<>();
 
   public void addField(FieldSchema schema) {
     fields.add(schema);
@@ -139,14 +140,10 @@ public class TableSchema {
     List<FieldSchema> fields = new ArrayList<>();
   }
 
-  List<PreviousFields> previousFields = new ArrayList<>();
-
   public void saveFields(int schemaVersion) {
     PreviousFields prev = new PreviousFields();
     prev.schemaVersion = schemaVersion;
-    for (FieldSchema fieldSchema : fields) {
-      prev.fields.add(fieldSchema);
-    }
+    prev.fields.addAll(fields);
     previousFields.add(prev);
   }
 

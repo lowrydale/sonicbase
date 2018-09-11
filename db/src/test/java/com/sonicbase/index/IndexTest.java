@@ -5,7 +5,6 @@ import com.sonicbase.schema.TableSchema;
 import com.sonicbase.util.TestUtils;
 import org.testng.annotations.Test;
 
-import java.io.IOException;
 import java.io.UnsupportedEncodingException;
 import java.util.List;
 import java.util.concurrent.atomic.AtomicInteger;
@@ -43,7 +42,7 @@ public class IndexTest {
     final AtomicInteger count = new AtomicInteger(4);
     index.visitTailMap(keys.get(4), new Index.Visitor(){
       @Override
-      public boolean visit(Object[] key, Object value) throws IOException {
+      public boolean visit(Object[] key, Object value) {
         assertEquals(value, count.get());
         count.incrementAndGet();
         return true;
@@ -53,7 +52,7 @@ public class IndexTest {
     count.set(3);
     index.visitHeadMap(keys.get(4), new Index.Visitor(){
       @Override
-      public boolean visit(Object[] key, Object value) throws IOException {
+      public boolean visit(Object[] key, Object value) {
         assertEquals(value, count.get());
         count.decrementAndGet();
         return true;
@@ -93,7 +92,7 @@ public class IndexTest {
     final AtomicInteger count = new AtomicInteger(4);
     index.visitTailMap(keys.get(4), new Index.Visitor(){
       @Override
-      public boolean visit(Object[] key, Object value) throws IOException {
+      public boolean visit(Object[] key, Object value) {
         assertEquals(value, count.get());
         count.incrementAndGet();
         return true;
@@ -103,7 +102,7 @@ public class IndexTest {
     count.set(3);
     index.visitHeadMap(keys.get(4), new Index.Visitor(){
       @Override
-      public boolean visit(Object[] key, Object value) throws IOException {
+      public boolean visit(Object[] key, Object value) {
         assertEquals(value, count.get());
         count.decrementAndGet();
         return true;

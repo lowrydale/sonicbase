@@ -12,7 +12,7 @@ public abstract class StatementImpl implements Statement {
 
   private ParameterHandler parms = null;
 
-  public StatementImpl() {
+  StatementImpl() {
     try {
       parms = new ParameterHandler();
     }

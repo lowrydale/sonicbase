@@ -1,9 +1,8 @@
 
 package com.sonicbase.accept.database;
 
-import com.fasterxml.jackson.databind.ObjectMapper;
-import com.fasterxml.jackson.databind.node.ObjectNode;
 import com.sonicbase.client.DatabaseClient;
+import com.sonicbase.common.Config;
 import com.sonicbase.common.DatabaseCommon;
 import com.sonicbase.common.Record;
 import com.sonicbase.index.Index;
@@ -43,11 +42,12 @@ public class TestPartitionManagerConsistencySecondaryIndex {
   final DatabaseServer[] dbServers = new DatabaseServer[4];
 
   @BeforeClass
-  public void beforeClass() throws Exception {
+  public void beforeClass() {
     try {
-      String configStr = IOUtils.toString(new BufferedInputStream(getClass().getResourceAsStream("/config/config-4-servers.json")), "utf-8");
-      ObjectMapper mapper = new ObjectMapper();
-      final ObjectNode config = (ObjectNode) mapper.readTree(configStr);
+      System.setProperty("log4j.configuration", "test-log4j.xml");
+
+      String configStr = IOUtils.toString(new BufferedInputStream(getClass().getResourceAsStream("/config/config-4-servers.yaml")), "utf-8");
+      Config config = new Config(configStr);
 
       FileUtils.deleteDirectory(new File(System.getProperty("user.home"), "db"));
 
@@ -57,10 +57,9 @@ public class TestPartitionManagerConsistencySecondaryIndex {
       String role = "primaryMaster";
 
       for (int i = 0; i < dbServers.length; i++) {
-        final int shard = i;
-        dbServers[shard] = new DatabaseServer();
-        dbServers[shard].setConfig(config, "4-servers", "localhost", 9010 + (50 * shard), true, new AtomicBoolean(true), new AtomicBoolean(true),null);
-        dbServers[shard].setRole(role);
+        dbServers[i] = new DatabaseServer();
+        dbServers[i].setConfig(config, "4-servers", "localhost", 9010 + (50 * i), true, new AtomicBoolean(true), new AtomicBoolean(true),null);
+        dbServers[i].setRole(role);
       }
 
       dbServers[0].getMasterManager().promoteToMaster(null, false);
@@ -110,20 +109,12 @@ public class TestPartitionManagerConsistencySecondaryIndex {
     try {
 
       final AtomicLong highestId = new AtomicLong();
-      Thread thread = new Thread(new Runnable(){
-        @Override
-        public void run() {
-          insertThread(highestId);
-        }
-      });
+      Thread thread = new Thread(() -> insertThread(highestId));
       thread.start();
 
-      thread = new Thread(new Runnable(){
-        @Override
-        public void run() {
-          queryThread(highestId);
-          return;
-        }
+      thread = new Thread(() -> {
+        queryThread(highestId);
+        return;
       });
       thread.start();
 
@@ -139,34 +130,38 @@ public class TestPartitionManagerConsistencySecondaryIndex {
   private void insertThread(AtomicLong highestId) {
     try {
       int offset = 0;
-//            while (true) {
-//              PreparedStatement stmt = conn.prepareStatement("upsert into persons (id, id2) VALUES (?, ?)");
-//              for (int i = 0; i < 100; i++) {
-//                stmt.setLong(1, offset);
-//                stmt.setLong(2, (offset + 100) % 2);
-//                stmt.addBatch();
-//                highestId.set(offset);
-//                offset++;
-//                Thread.sleep(1);
-//
-//                if (highestId.get() % 10000 == 0) {
-//                  System.out.println("upsert progress: count=" + highestId.get());
-//                }
-//              }
-//              stmt.executeBatch();
-//            }
-      for (int i = 0; ; i++) {
-        PreparedStatement stmt = conn.prepareStatement("insert into persons (id, id2) VALUES (?, ?)");
-        stmt.setLong(1, i );
-        stmt.setLong(2, (i + 100) % 2);
-        int count = stmt.executeUpdate();
-        assertEquals(count, 1);
-        highestId.set(i);
+      if (true) {
+        while (true) {
+          PreparedStatement stmt = conn.prepareStatement("insert into persons (id, id2) VALUES (?, ?)");
+          for (int i = 0; i < 100; i++) {
+            stmt.setLong(1, offset);
+            stmt.setLong(2, (offset + 100) % 2);
+            stmt.addBatch();
+            highestId.set(offset);
+            offset++;
+            Thread.sleep(1);
 
-        Thread.sleep(1);
+            if (highestId.get() % 10000 == 0) {
+              System.out.println("insert progress: count=" + highestId.get());
+            }
+          }
+          stmt.executeBatch();
+        }
+      }
+      else {
+        for (int i = 0; ; i++) {
+          PreparedStatement stmt = conn.prepareStatement("insert into persons (id, id2) VALUES (?, ?)");
+          stmt.setLong(1, i);
+          stmt.setLong(2, (i + 100) % 2);
+          int count = stmt.executeUpdate();
+          assertEquals(count, 1);
+          highestId.set(i);
 
-        if (highestId.get() % 10000 == 0) {
-          System.out.println("upsert progress: count=" + highestId.get());
+          Thread.sleep(1);
+
+          if (highestId.get() % 10000 == 0) {
+            System.out.println("upsert progress: count=" + highestId.get());
+          }
         }
       }
     }
@@ -198,19 +193,25 @@ public class TestPartitionManagerConsistencySecondaryIndex {
             id = rs.getLong("id");
           }
           if (id != i) {
+            rs.next();
+            long id2 = rs.getLong("id");
             Map<Integer, Index> indices = new HashMap<>();
             Map<Integer, DatabaseServer> dbServersByShard = new HashMap<>();
             for (int j = 0; j < dbServers.length; j++) {
               if (dbServers[j].getReplica() == 0) {
-                indices.put(dbServers[j].getShard(), dbServers[j].getIndices().get("test").getIndices().get("persons").get("_1__primarykey"));
+                indices.put(dbServers[j].getShard(), dbServers[j].getIndices().get("test").getIndices().get("persons").get("_primarykey"));
                 dbServersByShard.put(dbServers[j].getShard(), dbServers[j]);
               }
             }
-            IndexSchema schema = dbServers[0].getCommon().getTables("test").get("persons").getIndices().get("_1__primarykey");
-            Index index0 = dbServers[0].getIndices().get("test").getIndices().get("persons").get("_1__primarykey");
-            Index index1 = dbServers[2].getIndices().get("test").getIndices().get("persons").get("_1__primarykey");
-            Index index0_1 = dbServers[1].getIndices().get("test").getIndices().get("persons").get("_1__primarykey");
-            Index index1_1 = dbServers[3].getIndices().get("test").getIndices().get("persons").get("_1__primarykey");
+            IndexSchema schema = dbServers[0].getCommon().getTables("test").get("persons").getIndices().get("_primarykey");
+//            if (schema == null) {
+//              dbServers[0].getClient().syncSchema();
+//            }
+//            schema = dbServers[0].getCommon().getTables("test").get("persons").getIndices().get("_primarykey");
+            Index index0 = dbServers[0].getIndices().get("test").getIndices().get("persons").get("_primarykey");
+            Index index1 = dbServers[2].getIndices().get("test").getIndices().get("persons").get("_primarykey");
+            Index index0_1 = dbServers[1].getIndices().get("test").getIndices().get("persons").get("_primarykey");
+            Index index1_1 = dbServers[3].getIndices().get("test").getIndices().get("persons").get("_primarykey");
 
             TableSchema.Partition[] partitions = schema.getCurrPartitions();
             TableSchema.Partition[] lastPartitions = schema.getLastPartitions();
@@ -220,10 +221,10 @@ public class TestPartitionManagerConsistencySecondaryIndex {
               appendUpperKey(j, partitions, curr);
             }
             synchronized (PartitionManager.getPreviousPartitions()) {
-              List<PartitionManager.PartitionEntry> list = PartitionManager.getPreviousPartitions().get("persons:_1__primarykey");
+              List<PartitionManager.PartitionEntry> list = PartitionManager.getPreviousPartitions().get("persons:_primarykey");
               if (list != null) {
                 for (int j = Math.min(4, list.size() - 1); j >= 0; j--) {
-                  last.append("last(" + j + ")");
+                  last.append("last(").append(j).append(")");
                   PartitionManager.PartitionEntry entry = list.get(j);
                   if (entry == null || entry.getPartitions() == null) {
                     last.append("null");
@@ -238,7 +239,7 @@ public class TestPartitionManagerConsistencySecondaryIndex {
             }
 
             TableSchema tableSchema = dbServers[0].getCommon().getTables("test").get("persons");
-            IndexSchema indexSchema = tableSchema.getIndices().get("_1__primarykey");
+            IndexSchema indexSchema = tableSchema.getIndices().get("_primarykey");
             String[] indexFields = indexSchema.getFields();
             int[] fieldOffsets = new int[indexFields.length];
             for (int k = 0; k < indexFields.length; k++) {
@@ -250,7 +251,7 @@ public class TestPartitionManagerConsistencySecondaryIndex {
 
             boolean currPartitions = false;
             List<Integer> selectedShards = PartitionUtils.findOrderedPartitionForRecord(false, true, tableSchema,
-                "_1__primarykey", null, BinaryExpression.Operator.EQUAL, null, new Object[]{i},
+                "_primarykey", null, BinaryExpression.Operator.EQUAL, null, new Object[]{i},
                 null);
             if (selectedShards.size() == 0) {
               selectedShards = PartitionUtils.findOrderedPartitionForRecord(true, false, tableSchema,

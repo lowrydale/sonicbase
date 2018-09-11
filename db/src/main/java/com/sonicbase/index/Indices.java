@@ -10,7 +10,7 @@ import java.util.concurrent.ConcurrentHashMap;
 // I prefer to return null instead of an empty array
 // I don't know a good way to reduce the parameter count
 public class Indices {
-  private ConcurrentHashMap<String, ConcurrentHashMap<String, Index>> indexes = new ConcurrentHashMap<>();
+  private final ConcurrentHashMap<String, ConcurrentHashMap<String, Index>> indexes = new ConcurrentHashMap<>();
 
   public Map<String, ConcurrentHashMap<String, Index>> getIndices() {
     return indexes;

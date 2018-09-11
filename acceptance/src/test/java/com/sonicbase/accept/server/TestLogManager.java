@@ -1,12 +1,8 @@
 package com.sonicbase.accept.server;
 
-import com.fasterxml.jackson.databind.ObjectMapper;
-import com.fasterxml.jackson.databind.node.ArrayNode;
-import com.fasterxml.jackson.databind.node.JsonNodeFactory;
-import com.fasterxml.jackson.databind.node.ObjectNode;
 import com.sonicbase.client.DatabaseClient;
+import com.sonicbase.common.Config;
 import com.sonicbase.jdbcdriver.ConnectionProxy;
-import com.sonicbase.server.DatabaseServer;
 import org.apache.commons.io.IOUtils;
 import org.apache.commons.io.FileUtils;
 import org.testng.annotations.AfterClass;
@@ -52,9 +48,8 @@ public class TestLogManager {
     System.setProperty("log4j.configuration", "test-log4j.xml");
 
 
-    String configStr = IOUtils.toString(new BufferedInputStream(getClass().getResourceAsStream("/config/config-4-servers.json")), "utf-8");
-    ObjectMapper mapper = new ObjectMapper();
-    final ObjectNode config = (ObjectNode) mapper.readTree(configStr);
+    String configStr = IOUtils.toString(new BufferedInputStream(getClass().getResourceAsStream("/config/config-4-servers.yaml")), "utf-8");
+    Config config = new Config(configStr);
 
     FileUtils.deleteDirectory(new File(System.getProperty("user.home"), "db"));
 
@@ -67,15 +62,14 @@ public class TestLogManager {
 
     List<Future> futures = new ArrayList<>();
     for (int i = 0; i < dbServers.length; i++) {
-      final int shard = i;
       //      futures.add(executor.submit(new Callable() {
       //        @Override
       //        public Object call() throws Exception {
       //          String role = "primaryMaster";
 
-      dbServers[shard] = new com.sonicbase.server.DatabaseServer();
-      dbServers[shard].setConfig(config, "4-servers", "localhost", 9010 + (50 * shard), true, new AtomicBoolean(true), new AtomicBoolean(true),null);
-      dbServers[shard].setRole(role);
+      dbServers[i] = new com.sonicbase.server.DatabaseServer();
+      dbServers[i].setConfig(config, "4-servers", "localhost", 9010 + (50 * i), true, new AtomicBoolean(true), new AtomicBoolean(true),null);
+      dbServers[i].setRole(role);
 
       //          return null;
       //        }
@@ -125,18 +119,15 @@ public class TestLogManager {
     futures = new ArrayList<>();
     for (int i = 0; i < 100_000; i++) {
       final int offset = i;
-      futures.add(executor.submit(new Callable() {
-        @Override
-        public Object call() throws Exception {
-          PreparedStatement stmt2 = conn.prepareStatement("insert into persons (id, socialSecurityNumber, relatives, restricted, gender) VALUES (?, ?, ?, ?, ?)");
-          stmt2.setLong(1, offset);
-          stmt2.setString(2, "933-28-" + offset);
-          stmt2.setString(3, "12345678901,12345678901|12345678901,12345678901,12345678901,12345678901|12345678901");
-          stmt2.setBoolean(4, false);
-          stmt2.setString(5, "m");
-          assertEquals(stmt2.executeUpdate(), 1);
-          return null;
-        }
+      futures.add(executor.submit((Callable) () -> {
+        PreparedStatement stmt2 = conn.prepareStatement("insert into persons (id, socialSecurityNumber, relatives, restricted, gender) VALUES (?, ?, ?, ?, ?)");
+        stmt2.setLong(1, offset);
+        stmt2.setString(2, "933-28-" + offset);
+        stmt2.setString(3, "12345678901,12345678901|12345678901,12345678901,12345678901,12345678901|12345678901");
+        stmt2.setBoolean(4, false);
+        stmt2.setString(5, "m");
+        assertEquals(stmt2.executeUpdate(), 1);
+        return null;
       }));
     }
     for (Future future : futures) {
@@ -207,7 +198,7 @@ public class TestLogManager {
     assertFalse(ret.next());
 
     for (com.sonicbase.server.DatabaseServer server : dbServers) {
-      server.purgeMemory();
+      server.unsafePurgeMemoryForTests();
     }
 
     try {

@@ -9,28 +9,30 @@ import java.sql.SQLException;
 
 public class SQLHandler {
 
+  public static final String ERROR_NOT_USING_A_CLUSTER_STR = "Error, not using a cluster";
+  public static final String ERROR_NOT_USING_A_DATABASE_STR = "Error, not using a database";
   private final Cli cli;
 
-  public SQLHandler(Cli cli) {
+  SQLHandler(Cli cli) {
     this.cli = cli;
   }
 
-  public void select(String command) throws SQLException, JSQLParserException, ClassNotFoundException, IOException,
+  void select(String command) throws SQLException, JSQLParserException, ClassNotFoundException, IOException,
       InterruptedException {
     String cluster = cli.getCurrCluster();
     if (cluster == null) {
-      System.out.println("Error, not using a cluster");
+      cli.println(ERROR_NOT_USING_A_CLUSTER_STR);
       return;
     }
 
     if (cli.getCurrDbName() == null) {
-      System.out.println("Error, not using a database");
+      cli.println(ERROR_NOT_USING_A_DATABASE_STR);
       return;
     }
 
     cli.initConnection();
 
-    System.out.println("Executing select request");
+    cli.println("Executing select request");
 
     PreparedStatement stmt = cli.getConn().prepareStatement(command);
     cli.setRet(stmt.executeQuery());
@@ -43,91 +45,91 @@ public class SQLHandler {
   public void insert(String command) throws SQLException, ClassNotFoundException {
     String cluster = cli.getCurrCluster();
     if (cluster == null) {
-      System.out.println("Error, not using a cluster");
+      cli.println(ERROR_NOT_USING_A_CLUSTER_STR);
       return;
     }
 
     if (cli.getCurrDbName() == null) {
-      System.out.println("Error, not using a database");
+      cli.println(ERROR_NOT_USING_A_DATABASE_STR);
       return;
     }
 
     cli.initConnection();
 
-    System.out.println("Executing insert request");
+    cli.println("Executing insert request");
 
     PreparedStatement stmt = cli.getConn().prepareStatement(command);
     int count = stmt.executeUpdate();
-    System.out.println("Finished insert: count=" + count);
+    cli.println("Finished insert: count=" + count);
   }
 
   public void delete(String command) throws SQLException, ClassNotFoundException {
     String cluster = cli.getCurrCluster();
     if (cluster == null) {
-      System.out.println("Error, not using a cluster");
+      cli.println(ERROR_NOT_USING_A_CLUSTER_STR);
       return;
     }
 
     if (cli.getCurrDbName() == null) {
-      System.out.println("Error, not using a database");
+      cli.println(ERROR_NOT_USING_A_DATABASE_STR);
       return;
     }
 
     cli.initConnection();
 
-    System.out.println("Executing delete request");
+    cli.println("Executing delete request");
 
     PreparedStatement stmt = cli.getConn().prepareStatement(command);
     int count = stmt.executeUpdate();
-    System.out.println("Finished delete: count=" + count);
+    cli.println("Finished delete: count=" + count);
   }
 
-  public void truncate(String command) throws SQLException, ClassNotFoundException {
+  void truncate(String command) throws SQLException, ClassNotFoundException {
     String cluster = cli.getCurrCluster();
     if (cluster == null) {
-      System.out.println("Error, not using a cluster");
+      cli.println(ERROR_NOT_USING_A_CLUSTER_STR);
       return;
     }
 
     if (cli.getCurrDbName() == null) {
-      System.out.println("Error, not using a database");
+      cli.println(ERROR_NOT_USING_A_DATABASE_STR);
       return;
     }
 
     cli.initConnection();
 
-    System.out.println("Executing truncate request");
+    cli.println("Executing truncate request");
 
     PreparedStatement stmt = cli.getConn().prepareStatement(command);
     int count = stmt.executeUpdate();
-    System.out.println("Finished truncate: count=" + count);
+    cli.println("Finished truncate: count=" + count);
   }
 
-  public void drop(String command) throws SQLException, ClassNotFoundException {
+  void drop(String command) throws SQLException, ClassNotFoundException {
     String cluster = cli.getCurrCluster();
     if (cluster == null) {
-      System.out.println("Error, not using a cluster");
+      cli.println(ERROR_NOT_USING_A_CLUSTER_STR);
       return;
     }
 
     if (cli.getCurrDbName() == null) {
-      System.out.println("Error, not using a database");
+      cli.println(ERROR_NOT_USING_A_DATABASE_STR);
       return;
     }
 
     cli.initConnection();
 
-    System.out.println("Executing drop request");
+    cli.println("Executing drop request");
 
     PreparedStatement stmt = cli.getConn().prepareStatement(command);
     int count = stmt.executeUpdate();
-    System.out.println("Finished drop: count=" + count);
+    cli.println("Finished drop: count=" + count);
   }
 
-  public void create(String command) throws SQLException, ClassNotFoundException {
+  void create(String command) throws SQLException, ClassNotFoundException {
     String cluster = cli.getCurrCluster();
     if (cluster == null) {
-      System.out.println("Error, not using a cluster");
+      cli.println(ERROR_NOT_USING_A_CLUSTER_STR);
       return;
     }
 
@@ -141,36 +143,36 @@ public class SQLHandler {
     }
 
     if (cli.getCurrDbName() == null) {
-      System.out.println("Error, not using a database");
+      cli.println(ERROR_NOT_USING_A_DATABASE_STR);
       return;
     }
 
-    System.out.println("Executing create request");
+    cli.println("Executing create request");
 
     PreparedStatement stmt = cli.getConn().prepareStatement(command);
     int count = stmt.executeUpdate();
-    System.out.println("Finished create: count=" + count);
+    cli.println("Finished create: count=" + count);
   }
 
-  public void alter(String command) throws SQLException, ClassNotFoundException {
+  void alter(String command) throws SQLException, ClassNotFoundException {
     String cluster = cli.getCurrCluster();
     if (cluster == null) {
-      System.out.println("Error, not using a cluster");
+      cli.println(ERROR_NOT_USING_A_CLUSTER_STR);
       return;
     }
 
     if (cli.getCurrDbName() == null) {
-      System.out.println("Error, not using a database");
+      cli.println(ERROR_NOT_USING_A_DATABASE_STR);
       return;
     }
 
     cli.initConnection();
 
-    System.out.println("Executing alter request");
+    cli.println("Executing alter request");
 
     PreparedStatement stmt = cli.getConn().prepareStatement(command);
     int count = stmt.executeUpdate();
-    System.out.println("Finished alter: count=" + count);
+    cli.println("Finished alter: count=" + count);
   }
 
 }

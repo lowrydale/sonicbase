@@ -1,9 +1,9 @@
 @echo off
 reg Query "HKLM\Hardware\Description\System\CentralProcessor\0" | find /i "x86" > NUL && set OS=32BIT || set OS=64BIT
 
-echo SEARCH_HOME=%SEARCH_HOME%
+echo SONIC_BASE_HOME=%SONIC_BASE_HOME%
 
-pushd %SEARCH_HOME%
+pushd %SONIC_BASE_HOME%
 
 if "%_XMX_%" == "" (
   SET _XMX_=2000m
@@ -11,7 +11,7 @@ if "%_XMX_%" == "" (
 SET _GC_=%_GC_LOG_FILENAME_%
 
 if "%_GC_LOG_FILENAME_%" == "" (
-  SET _GC_=%SEARCH_HOME%/logs/gc.log
+  SET _GC_=%SONIC_BASE_HOME%/logs/gc.log
 )
 
 SET java_opts=-server  -XX:NewRatio=2 -XX:SurvivorRatio=10 -XX:+UseG1GC -XX:MaxGCPauseMillis=150 -XX:-ResizePLAB -XX:ParallelGCThreads=4 -XX:ConcGCThreads=2 -XX:-OmitStackTraceInFastThrow
@@ -39,10 +39,10 @@ SET java_opts=%java_opts% -XX:-OmitStackTraceInFastThrow -XX:-UseLoopPredicate
 SET java_opts=%java_opts% -Xmx%_XMX_% -XX:MaxDirectMemorySize=2g
 SET java_opts=%java_opts% -Dfamilysearch.search.disable.foreign.node.registration -Dfamilysearch.search.disable.central.log
 if "%OS%"=="64BIT" (
-    SET java_opts=%java_opts% -Djava.library.path=%SEARCH_HOME%/lib/win/x64
+    SET java_opts=%java_opts% -Djava.library.path=%SONIC_BASE_HOME%/lib/win/x64
 )
 if "%OS%"=="32BIT" (
-    SET java_opts=%java_opts% -Djava.library.path=%SEARCH_HOME%/lib/win/x86
+    SET java_opts=%java_opts% -Djava.library.path=%SONIC_BASE_HOME%/lib/win/x86
 )
 
 if "%LOG4J_FILE%" == "cli-log4j.xml" (
@@ -55,7 +55,7 @@ SET _JAVA_OPTS_=%java_opts%
 
 setlocal EnableDelayedExpansion
 
-SET _SEARCH_CLASSPATH_=%SEARCH_HOME%/target/;%SEARCH_HOME%/config/;%SEARCH_HOME%/lib
+SET _SEARCH_CLASSPATH_=%SONIC_BASE_HOME%/target/;%SONIC_BASE_HOME%/config/;%SONIC_BASE_HOME%/lib
 for /r ../lib %%i in (*.*) do (
     if NOT "%%i" == "win-util.dll" (
         SET _SEARCH_CLASSPATH_=!_SEARCH_CLASSPATH_!;%%~fi

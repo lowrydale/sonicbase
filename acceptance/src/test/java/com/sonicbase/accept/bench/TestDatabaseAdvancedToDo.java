@@ -1,8 +1,7 @@
 package com.sonicbase.accept.bench;
 
-import com.fasterxml.jackson.databind.ObjectMapper;
-import com.fasterxml.jackson.databind.node.ObjectNode;
 import com.sonicbase.client.DatabaseClient;
+import com.sonicbase.common.Config;
 import com.sonicbase.server.DatabaseServer;
 import org.apache.commons.io.FileUtils;
 import org.apache.commons.io.IOUtils;
@@ -14,7 +13,6 @@ import java.io.File;
 import java.sql.Connection;
 import java.sql.DriverManager;
 import java.sql.PreparedStatement;
-import java.sql.SQLException;
 import java.util.ArrayList;
 import java.util.List;
 import java.util.concurrent.*;
@@ -26,14 +24,13 @@ import static org.testng.Assert.fail;
 public class TestDatabaseAdvancedToDo {
 
   private Connection conn;
-  private int recordCount = 10;
-  List<Long> ids = new ArrayList<>();
+  private final int recordCount = 10;
+  final List<Long> ids = new ArrayList<>();
 
   @BeforeClass
   public void beforeClass() throws Exception {
-    String configStr = IOUtils.toString(new BufferedInputStream(getClass().getResourceAsStream("/config/config-4-servers.json")), "utf-8");
-    ObjectMapper mapper = new ObjectMapper();
-    final ObjectNode config = (ObjectNode) mapper.readTree(configStr);
+    String configStr = IOUtils.toString(new BufferedInputStream(getClass().getResourceAsStream("/config/config-4-servers.yaml")), "utf-8");
+    Config config = new Config(configStr);
 
     FileUtils.deleteDirectory(new File(System.getProperty("user.home"), "db"));
 
@@ -47,16 +44,13 @@ public class TestDatabaseAdvancedToDo {
     List<Future> futures = new ArrayList<>();
     for (int i = 0; i < dbServers.length; i++) {
       final int shard = i;
-      futures.add(executor.submit(new Callable() {
-        @Override
-        public Object call() throws Exception {
-          String role = "primaryMaster";
+      futures.add(executor.submit((Callable) () -> {
+        String role1 = "primaryMaster";
 
-          dbServers[shard] = new DatabaseServer();
-          dbServers[shard].setConfig(config, "test", "localhost", 9010 + (50 * shard), true, new AtomicBoolean(true), new AtomicBoolean(true), null);
-          dbServers[shard].setRole(role);
-          return null;
-        }
+        dbServers[shard] = new DatabaseServer();
+        dbServers[shard].setConfig(config, "test", "localhost", 9010 + (50 * shard), true, new AtomicBoolean(true), new AtomicBoolean(true), null);
+        dbServers[shard].setRole(role1);
+        return null;
       }));
     }
     for (Future future : futures) {
@@ -161,7 +155,7 @@ public class TestDatabaseAdvancedToDo {
   }
 
   @Test(enabled=false)
-  public void testAlias3() throws SQLException {
+  public void testAlias3() {
 //    PreparedStatement stmt = conn.prepareStatement("select p.id as i from persons as p where i < 2 order by i asc");
 //    ResultSet ret = stmt.executeQuery();
 //
@@ -173,7 +167,7 @@ public class TestDatabaseAdvancedToDo {
   }
 
   @Test(enabled=false)
-  public void testAlterTable() throws SQLException {
+  public void testAlterTable() {
 //      PreparedStatement stmt = conn.prepareStatement("alter table x drop column y");
 //      ResultSet ret = stmt.executeQuery();
 //
@@ -183,7 +177,7 @@ public class TestDatabaseAdvancedToDo {
   }
 
   @Test(enabled=false)
-  public void testInsertFromSelect() throws SQLException {
+  public void testInsertFromSelect() {
 //      PreparedStatement stmt = conn.prepareStatement("INSERT INTO db_name.dest_table (First,Last,Age) SELECT First,Last,Age from db_name.source_table");
 //      ResultSet ret = stmt.executeQuery();
 //
@@ -193,7 +187,7 @@ public class TestDatabaseAdvancedToDo {
   }
 
   @Test(enabled=false)
-  public void testCreateTableLike() throws SQLException {
+  public void testCreateTableLike() {
 //      PreparedStatement stmt = conn.prepareStatement("CREATE TABLE database_name.copy_name LIKE database_name.original_name");
 //      ResultSet ret = stmt.executeQuery();
 //
@@ -203,7 +197,7 @@ public class TestDatabaseAdvancedToDo {
   }
 
   @Test(enabled=false)
-  public void testCopyTable() throws SQLException {
+  public void testCopyTable() {
 //      PreparedStatement stmt = conn.prepareStatement("INSERT database_name.copy_name SELECT * FROM database_name.original_name");
 //      ResultSet ret = stmt.executeQuery();
 //
@@ -213,7 +207,7 @@ public class TestDatabaseAdvancedToDo {
   }
 
   @Test(enabled=false)
-  public void testChangeFieldDataType() throws SQLException {
+  public void testChangeFieldDataType() {
 //      PreparedStatement stmt = conn.prepareStatement("ALTER TABLE db_name.ziptable CHANGE latitude latitude double");
 //      ResultSet ret = stmt.executeQuery();
 //
@@ -223,7 +217,7 @@ public class TestDatabaseAdvancedToDo {
   }
 
   @Test(enabled=false)
-  public void testInsertColumn() throws SQLException {
+  public void testInsertColumn() {
 //      PreparedStatement stmt = conn.prepareStatement("ALTER TABLE mybase.mytable ADD COLUMN Extra text AFTER Ordinary");
 //      ResultSet ret = stmt.executeQuery();
 //
@@ -243,7 +237,7 @@ public class TestDatabaseAdvancedToDo {
 //  }
 
   @Test(enabled=false)
-  public void testDropIndex() throws SQLException {
+  public void testDropIndex() {
 //     PreparedStatement stmt = conn.prepareStatement("drop index developers.UniqueName");
 //     ResultSet ret = stmt.executeQuery();
 //
@@ -253,7 +247,7 @@ public class TestDatabaseAdvancedToDo {
   }
 
   @Test(enabled=false)
-  public void testToDate() throws SQLException {
+  public void testToDate() {
 //      PreparedStatement stmt = conn.prepareStatement("select e1.\"Event_Name\", e1.\"Event_Date\", (sysdate) as \"CurDate\"\n" +
 //          "  from \"events\" e1\n" +
 //          "  where (e1.\"Event_Date\" < todate (\"11/19/2003 10:15:30 am\", \"MM/DD/YYYY hh:nn:ss ampm\"))\n");
@@ -265,7 +259,7 @@ public class TestDatabaseAdvancedToDo {
   }
 
   @Test(enabled=false)
-  public void testHaving() throws SQLException {
+  public void testHaving() {
 //      PreparedStatement stmt = conn.prepareStatement("select e1.\"VenueNo\", avg(e1.\"Ticket_price\") as \"avgTicket_price\"\n" +
 //          "  from \"events\" e1\n" +
 //          "  group by e1.\"VenueNo\"\n" +
@@ -278,7 +272,7 @@ public class TestDatabaseAdvancedToDo {
   }
 
   @Test(enabled=false)
-  public void testCase() throws SQLException {
+  public void testCase() {
 //      PreparedStatement stmt = conn.prepareStatement("select e1.\"Event_Name\", \n" +
 //          "  case e1.\"VenueNo\" \n" +
 //          "  when 2 then \"Memorial Stadium\" \n" +
@@ -294,7 +288,7 @@ public class TestDatabaseAdvancedToDo {
   }
 
   @Test(enabled=false)
-  public void testDropTable() throws SQLException {
+  public void testDropTable() {
 //       PreparedStatement stmt = conn.prepareStatement("drop table x");
 //       ResultSet ret = stmt.executeQuery();
 //
@@ -304,7 +298,7 @@ public class TestDatabaseAdvancedToDo {
   }
 
   @Test(enabled=false)
-  public void testUnion() throws SQLException {
+  public void testUnion() {
 //      PreparedStatement stmt = conn.prepareStatement("SELECT BusinessEntityID, JobTitle, HireDate, VacationHours, SickLeaveHours\n" +
 //          "  FROM HumanResources.Employee AS e1\n" +
 //          "  UNION\n" +

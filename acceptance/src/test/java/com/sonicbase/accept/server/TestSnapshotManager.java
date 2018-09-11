@@ -1,10 +1,7 @@
 package com.sonicbase.accept.server;
 
-import com.fasterxml.jackson.databind.ObjectMapper;
-import com.fasterxml.jackson.databind.node.ArrayNode;
-import com.fasterxml.jackson.databind.node.JsonNodeFactory;
-import com.fasterxml.jackson.databind.node.ObjectNode;
 import com.sonicbase.client.DatabaseClient;
+import com.sonicbase.common.Config;
 import com.sonicbase.jdbcdriver.ConnectionProxy;
 import com.sonicbase.server.DatabaseServer;
 import org.apache.commons.io.IOUtils;
@@ -15,7 +12,6 @@ import java.io.BufferedInputStream;
 import java.io.File;
 import java.io.IOException;
 import java.sql.*;
-import java.text.ParseException;
 import java.util.ArrayList;
 import java.util.List;
 import java.util.concurrent.*;
@@ -26,16 +22,15 @@ import static org.testng.Assert.*;
 public class TestSnapshotManager {
 
   @Test
-  public void test() throws InterruptedException, ExecutionException, ClassNotFoundException, SQLException, IOException {
+  public void test() throws SQLException {
     System.setProperty("log4j.configuration", "test-log4j.xml");
 
     final com.sonicbase.server.DatabaseServer[] dbServers = new com.sonicbase.server.DatabaseServer[4];
     Connection conn = null;
     try {
 
-      String configStr = IOUtils.toString(new BufferedInputStream(getClass().getResourceAsStream("/config/config-4-servers.json")), "utf-8");
-      ObjectMapper mapper = new ObjectMapper();
-      final ObjectNode config = (ObjectNode) mapper.readTree(configStr);
+      String configStr = IOUtils.toString(new BufferedInputStream(getClass().getResourceAsStream("/config/config-4-servers.yaml")), "utf-8");
+      Config config = new Config(configStr);
 
       FileUtils.deleteDirectory(new File(System.getProperty("user.home"), "db"));
 
@@ -47,15 +42,14 @@ public class TestSnapshotManager {
 
       List<Future> futures = new ArrayList<>();
       for (int i = 0; i < dbServers.length; i++) {
-        final int shard = i;
         //      futures.add(executor.submit(new Callable() {
         //        @Override
         //        public Object call() throws Exception {
         //          String role = "primaryMaster";
 
-        dbServers[shard] = new com.sonicbase.server.DatabaseServer();
-        dbServers[shard].setConfig(config, "4-servers", "localhost", 9010 + (50 * shard), true, new AtomicBoolean(true), new AtomicBoolean(true), null);
-        dbServers[shard].setRole(role);
+        dbServers[i] = new com.sonicbase.server.DatabaseServer();
+        dbServers[i].setConfig(config, "4-servers", "localhost", 9010 + (50 * i), true, new AtomicBoolean(true), new AtomicBoolean(true), null);
+        dbServers[i].setRole(role);
 
         //          return null;
         //        }
@@ -159,7 +153,7 @@ public class TestSnapshotManager {
       stmt = conn.prepareStatement("select count(*) from persons");
       ret = stmt.executeQuery();
       ret.next();
-      assertEquals(ret.getInt(1), count - 2); //8 and 9 aren't recorded
+      assertEquals(ret.getInt(1), count); // 6 was deleted, 8 & 9 came back with recover logs
 
       validateRecord(conn, 0);
       validateRecord(conn, 1);
@@ -169,8 +163,8 @@ public class TestSnapshotManager {
       validateRecord(conn, 5);
       validateDeleted(conn, 6);
       validateRecord(conn, 7);
-//      validateRecord(conn, 8);
-//      validateRecord(conn, 9);
+      validateRecord(conn, 8);
+      validateRecord(conn, 9);
 
       for (int i = 100; i < 10_000; i++) {
         insertRecord(conn, i);
@@ -269,13 +263,12 @@ public class TestSnapshotManager {
   }
 
   @Test
-  public void testRolling() throws InterruptedException, ExecutionException, ClassNotFoundException, SQLException, IOException {
+  public void testRolling() throws SQLException {
     final com.sonicbase.server.DatabaseServer[] dbServers = new com.sonicbase.server.DatabaseServer[4];
     Connection conn = null;
     try {
-      String configStr = IOUtils.toString(new BufferedInputStream(getClass().getResourceAsStream("/config/config-4-servers.json")), "utf-8");
-      ObjectMapper mapper = new ObjectMapper();
-      final ObjectNode config = (ObjectNode) mapper.readTree(configStr);
+      String configStr = IOUtils.toString(new BufferedInputStream(getClass().getResourceAsStream("/config/config-4-servers.yaml")), "utf-8");
+      Config config = new Config(configStr);
 
       FileUtils.deleteDirectory(new File(System.getProperty("user.home"), "db"));
 
@@ -287,15 +280,14 @@ public class TestSnapshotManager {
 
       List<Future> futures = new ArrayList<>();
       for (int i = 0; i < dbServers.length; i++) {
-        final int shard = i;
         //      futures.add(executor.submit(new Callable() {
         //        @Override
         //        public Object call() throws Exception {
         //          String role = "primaryMaster";
 
-        dbServers[shard] = new com.sonicbase.server.DatabaseServer();
-        dbServers[shard].setConfig(config, "4-servers", "localhost", 9010 + (50 * shard), true, new AtomicBoolean(true), new AtomicBoolean(true),null);
-        dbServers[shard].setRole(role);
+        dbServers[i] = new com.sonicbase.server.DatabaseServer();
+        dbServers[i].setConfig(config, "4-servers", "localhost", 9010 + (50 * i), true, new AtomicBoolean(true), new AtomicBoolean(true),null);
+        dbServers[i].setRole(role);
         //        }
         //      }));
       }
@@ -375,13 +367,12 @@ public class TestSnapshotManager {
   }
 
   @Test
-  public void testKeys() throws InterruptedException, ExecutionException, ClassNotFoundException, SQLException, IOException {
+  public void testKeys() throws SQLException {
     final com.sonicbase.server.DatabaseServer[] dbServers = new com.sonicbase.server.DatabaseServer[4];
     Connection conn = null;
     try {
-      String configStr = IOUtils.toString(new BufferedInputStream(getClass().getResourceAsStream("/config/config-4-servers.json")), "utf-8");
-      ObjectMapper mapper = new ObjectMapper();
-      final ObjectNode config = (ObjectNode) mapper.readTree(configStr);
+      String configStr = IOUtils.toString(new BufferedInputStream(getClass().getResourceAsStream("/config/config-4-servers.yaml")), "utf-8");
+      Config config = new Config(configStr);
 
       FileUtils.deleteDirectory(new File(System.getProperty("user.home"), "db"));
 
@@ -393,15 +384,14 @@ public class TestSnapshotManager {
 
       List<Future> futures = new ArrayList<>();
       for (int i = 0; i < dbServers.length; i++) {
-        final int shard = i;
         //      futures.add(executor.submit(new Callable() {
         //        @Override
         //        public Object call() throws Exception {
         //          String role = "primaryMaster";
 
-        dbServers[shard] = new com.sonicbase.server.DatabaseServer();
-        dbServers[shard].setConfig(config, "4-servers", "localhost", 9010 + (50 * shard), true, new AtomicBoolean(true), new AtomicBoolean(true),null);
-        dbServers[shard].setRole(role);
+        dbServers[i] = new com.sonicbase.server.DatabaseServer();
+        dbServers[i].setConfig(config, "4-servers", "localhost", 9010 + (50 * i), true, new AtomicBoolean(true), new AtomicBoolean(true),null);
+        dbServers[i].setRole(role);
         //          return null;
         //        }
         //      }));
@@ -591,13 +581,12 @@ public class TestSnapshotManager {
   }
 
   @Test
-  public void testDuplicateKeys() throws InterruptedException, ExecutionException, ClassNotFoundException, SQLException, IOException {
+  public void testDuplicateKeys() throws SQLException {
     final com.sonicbase.server.DatabaseServer[] dbServers = new com.sonicbase.server.DatabaseServer[4];
     Connection conn = null;
     try {
-      String configStr = IOUtils.toString(new BufferedInputStream(getClass().getResourceAsStream("/config/config-4-servers.json")), "utf-8");
-      ObjectMapper mapper = new ObjectMapper();
-      final ObjectNode config = (ObjectNode) mapper.readTree(configStr);
+      String configStr = IOUtils.toString(new BufferedInputStream(getClass().getResourceAsStream("/config/config-4-servers.yaml")), "utf-8");
+      Config config = new Config(configStr);
 
       FileUtils.deleteDirectory(new File(System.getProperty("user.home"), "db"));
 
@@ -609,15 +598,14 @@ public class TestSnapshotManager {
 
       List<Future> futures = new ArrayList<>();
       for (int i = 0; i < dbServers.length; i++) {
-        final int shard = i;
         //      futures.add(executor.submit(new Callable() {
         //        @Override
         //        public Object call() throws Exception {
         //          String role = "primaryMaster";
 
-        dbServers[shard] = new com.sonicbase.server.DatabaseServer();
-        dbServers[shard].setConfig(config, "4-servers", "localhost", 9010 + (50 * shard), true, new AtomicBoolean(true),new AtomicBoolean(true), null);
-        dbServers[shard].setRole(role);
+        dbServers[i] = new com.sonicbase.server.DatabaseServer();
+        dbServers[i].setConfig(config, "4-servers", "localhost", 9010 + (50 * i), true, new AtomicBoolean(true),new AtomicBoolean(true), null);
+        dbServers[i].setRole(role);
         //          return null;
         //        }
         //      }));
@@ -857,9 +845,9 @@ public class TestSnapshotManager {
     assertEquals(ret.getLong("id2"), value2, String.valueOf(value2));
   }
 
-  private void restartServers(com.sonicbase.server.DatabaseServer[] dbServers) throws Exception {
+  private void restartServers(com.sonicbase.server.DatabaseServer[] dbServers) {
     for (com.sonicbase.server.DatabaseServer server : dbServers) {
-      server.purgeMemory();
+      server.unsafePurgeMemoryForTests();
     }
 
     for (com.sonicbase.server.DatabaseServer server : dbServers) {
@@ -869,7 +857,7 @@ public class TestSnapshotManager {
     }
   }
 
-  private void runSnapshot(DatabaseServer[] dbServers) throws InterruptedException, ParseException, IOException {
+  private void runSnapshot(DatabaseServer[] dbServers) throws IOException {
     dbServers[0].runSnapshot();
     dbServers[1].runSnapshot();
     dbServers[2].runSnapshot();

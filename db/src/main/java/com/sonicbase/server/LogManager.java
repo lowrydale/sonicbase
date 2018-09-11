@@ -4,9 +4,9 @@ import com.sonicbase.client.DatabaseClient;
 import com.sonicbase.common.*;
 import com.sonicbase.query.DatabaseException;
 import com.sonicbase.util.DateUtils;
+import com.sonicbase.util.Varint;
 import org.apache.commons.io.FileUtils;
 import org.apache.commons.io.IOUtils;
-import org.apache.giraph.utils.Varint;
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
 
@@ -33,7 +33,7 @@ public class LogManager {
   private static final String NONE_STR = "__none__";
   private final List<LogWriter> logWriters = new ArrayList<>();
   private final List<LogWriter> peerLogWriters = new ArrayList<>();
-  private static Logger logger = LoggerFactory.getLogger(LogManager.class);
+  private static final Logger logger = LoggerFactory.getLogger(LogManager.class);
 
   private final com.sonicbase.server.DatabaseServer databaseServer;
   private final ThreadPoolExecutor executor;
@@ -41,21 +41,21 @@ public class LogManager {
   private final List<Thread> logwWriterThreads = new ArrayList<>();
 
   private long cycleLogsMillis = 60_000;
-  private AtomicLong countLogged = new AtomicLong();
+  private final AtomicLong countLogged = new AtomicLong();
   private final com.sonicbase.server.DatabaseServer server;
-  private ArrayBlockingQueue<LogRequest> logRequests = new ArrayBlockingQueue<>(2_000);
-  private Map<Integer, ArrayBlockingQueue<LogRequest>> peerLogRequests = new ConcurrentHashMap<>();
-  private AtomicBoolean unbindQueues = new AtomicBoolean();
+  private final ArrayBlockingQueue<LogRequest> logRequests = new ArrayBlockingQueue<>(2_000);
+  private final Map<Integer, ArrayBlockingQueue<LogRequest>> peerLogRequests = new ConcurrentHashMap<>();
+  private final AtomicBoolean unbindQueues = new AtomicBoolean();
   private final Object logLock = new Object();
-  private AtomicLong logSequenceNumber = new AtomicLong();
-  private AtomicLong maxAllocatedLogSequenceNumber = new AtomicLong();
+  private final AtomicLong logSequenceNumber = new AtomicLong();
+  private final AtomicLong maxAllocatedLogSequenceNumber = new AtomicLong();
   private static final int SEQUENCE_NUM_ALLOC_COUNT = 100000;
   private boolean shouldSlice = false;
   private boolean shutdown;
-  final AtomicInteger countReplayed = new AtomicInteger();
-  private AtomicLong countRead = new AtomicLong();
+  private final AtomicInteger countReplayed = new AtomicInteger();
+  private final AtomicLong countRead = new AtomicLong();
 
-  public LogManager(com.sonicbase.server.DatabaseServer databaseServer, File rootDir) {
+  LogManager(com.sonicbase.server.DatabaseServer databaseServer, File rootDir) {
     this.databaseServer = databaseServer;
     this.server = databaseServer;
     this.rootDir = rootDir;
@@ -82,10 +82,10 @@ public class LogManager {
 
   public static class LogRequest {
     private byte[] buffer;
-    private CountDownLatch latch = new CountDownLatch(1);
+    private final CountDownLatch latch = new CountDownLatch(1);
     private List<byte[]> buffers;
-    private long[] sequenceNumbers;
-    private long[] times;
+    private final long[] sequenceNumbers;
+    private final long[] times;
     private long begin;
     private AtomicLong timeLogging;
 
@@ -158,7 +158,7 @@ public class LogManager {
   }
 
 
-  public void startLoggingForPeer(int replicaNum) {
+  private void startLoggingForPeer(int replicaNum) {
     synchronized (peerLogRequests) {
       if (!peerLogRequests.containsKey(replicaNum)) {
         peerLogRequests.put(replicaNum, new ArrayBlockingQueue<LogRequest>(1000));
@@ -275,7 +275,7 @@ public class LogManager {
     }
   }
 
-  private void sliceLogsForPeers(boolean includePeers, StringBuilder sliceFiles) {
+  public void sliceLogsForPeers(boolean includePeers, StringBuilder sliceFiles) {
     File[] files;
     if (includePeers) {
       for (int replica = 0; replica < server.getReplicationFactor(); replica++) {
@@ -344,7 +344,7 @@ public class LogManager {
     }
   }
 
-  private void deletePeerLogs(int replicaNum) {
+  public void deletePeerLogs(int replicaNum) {
     File dir = new File(getLogRoot() + File.separator + PEER_STR + replicaNum);
     logger.info("Deleting peer logs: dir={}", dir.getAbsolutePath());
     File[] files = dir.listFiles();
@@ -384,7 +384,11 @@ public class LogManager {
       peerLogRequests.get(deadReplica).put(logRequest);
       logRequest.getLatch().await();
     }
-    catch (InterruptedException | IOException e) {
+    catch (InterruptedException e) {
+      Thread.currentThread().interrupt();
+      throw new DatabaseException(e);
+    }
+    catch (IOException e) {
       throw new DatabaseException(e);
     }
   }
@@ -439,10 +443,10 @@ public class LogManager {
     private long currQueueTime = 0;
     private DataOutputStream writer = null;
     private boolean shutdown;
-    private AtomicReference<String> currFilename = new AtomicReference<>();
+    private final AtomicReference<String> currFilename = new AtomicReference<>();
 
 
-    public LogWriter(int offset, int peerReplicaNum, ArrayBlockingQueue<LogRequest> logRequests) {
+    LogWriter(int offset, int peerReplicaNum, ArrayBlockingQueue<LogRequest> logRequests) {
       this.offset = offset;
       this.peerReplicaNum = peerReplicaNum;
       this.currLogRequests = logRequests;
@@ -556,12 +560,7 @@ public class LogManager {
       long begin = System.currentTimeMillis();
       for (int replica = 0; replica < server.getReplicationFactor(); replica++) {
         if (replica != server.getReplica()) {
-          try {
-            getLogsFromPeer(replica);
-          }
-          catch (Exception e) {
-            logger.error("Error getting logs from peer: replica=" + replica, e);
-          }
+          getLogsFromPeer(replica);
         }
       }
 
@@ -580,48 +579,60 @@ public class LogManager {
   }
 
   void getLogsFromPeer(int replica) {
-    ComObject cobj = new ComObject();
-    cobj.put(ComObject.Tag.DB_NAME, NONE_STR);
-    cobj.put(ComObject.Tag.SCHEMA_VERSION, server.getCommon().getSchemaVersion());
-    cobj.put(ComObject.Tag.METHOD, "LogManager:sendLogsToPeer");
-    cobj.put(ComObject.Tag.REPLICA, server.getReplica());
-    AtomicBoolean isHealthy = new AtomicBoolean();
+    try {
+      ComObject cobj = new ComObject();
+      cobj.put(ComObject.Tag.DB_NAME, NONE_STR);
+      cobj.put(ComObject.Tag.SCHEMA_VERSION, server.getCommon().getSchemaVersion());
+      cobj.put(ComObject.Tag.METHOD, "LogManager:sendLogsToPeer");
+      cobj.put(ComObject.Tag.REPLICA, server.getReplica());
+      AtomicBoolean isHealthy = new AtomicBoolean();
+      if (checkHealthOfServer(replica, isHealthy)) {
+        return;
+      }
+      if (isHealthy.get()) {
+        byte[] ret = server.getClient().send(null, server.getShard(), replica, cobj, DatabaseClient.Replica.SPECIFIED);
+        ComObject retObj = new ComObject(ret);
+        ComArray filenames = retObj.getArray(ComObject.Tag.FILENAMES);
+        if (filenames != null) {
+          for (int i = 0; i < filenames.getArray().size(); i++) {
+            String filename = (String) filenames.getArray().get(i);
+            cobj = new ComObject();
+            cobj.put(ComObject.Tag.DB_NAME, NONE_STR);
+            cobj.put(ComObject.Tag.SCHEMA_VERSION, server.getCommon().getSchemaVersion());
+            cobj.put(ComObject.Tag.METHOD, "LogManager:getLogFile");
+            cobj.put(ComObject.Tag.REPLICA, server.getReplica());
+            cobj.put(ComObject.Tag.FILENAME, filename);
+
+            ret = server.getClient().send(null, server.getShard(), replica, cobj, DatabaseClient.Replica.SPECIFIED);
+            retObj = new ComObject(ret);
+            byte[] bytes = retObj.getByteArray(ComObject.Tag.BINARY_FILE_CONTENT);
+
+            sendQueueFile(replica, filename, bytes);
+            logger.info("Received log file: filename={}, replica={}", filename, replica);
+          }
+          cobj = new ComObject();
+          cobj.put(ComObject.Tag.DB_NAME, NONE_STR);
+          cobj.put(ComObject.Tag.SCHEMA_VERSION, server.getCommon().getSchemaVersion());
+          cobj.put(ComObject.Tag.METHOD, "LogManager:deletePeerLogs");
+          cobj.put(ComObject.Tag.REPLICA, server.getReplica());
+          server.getClient().send(null, server.getShard(), replica, cobj, DatabaseClient.Replica.SPECIFIED);
+        }
+      }
+    }
+    catch (Exception e) {
+      logger.error("Error getting logs from peer: replica=" + replica, e);
+    }
+  }
+
+  private boolean checkHealthOfServer(int replica, AtomicBoolean isHealthy) {
     try {
       server.checkHealthOfServer(server.getShard(), replica, isHealthy);
     }
     catch (InterruptedException e) {
       Thread.currentThread().interrupt();
-      return;
+      return true;
     }
-    if (isHealthy.get()) {
-      byte[] ret = server.getClient().send(null, server.getShard(), replica, cobj, DatabaseClient.Replica.SPECIFIED);
-      ComObject retObj = new ComObject(ret);
-      ComArray filenames = retObj.getArray(ComObject.Tag.FILENAMES);
-      if (filenames != null) {
-        for (int i = 0; i < filenames.getArray().size(); i++) {
-          String filename = (String) filenames.getArray().get(i);
-          cobj = new ComObject();
-          cobj.put(ComObject.Tag.DB_NAME, NONE_STR);
-          cobj.put(ComObject.Tag.SCHEMA_VERSION, server.getCommon().getSchemaVersion());
-          cobj.put(ComObject.Tag.METHOD, "LogManager:getLogFile");
-          cobj.put(ComObject.Tag.REPLICA, server.getReplica());
-          cobj.put(ComObject.Tag.FILENAME, filename);
-
-          ret = server.getClient().send(null, server.getShard(), replica, cobj, DatabaseClient.Replica.SPECIFIED);
-          retObj = new ComObject(ret);
-          byte[] bytes = retObj.getByteArray(ComObject.Tag.BINARY_FILE_CONTENT);
-
-          sendQueueFile(replica, filename, bytes);
-          logger.info("Received log file: filename={}, replica={}", filename, replica);
-        }
-        cobj = new ComObject();
-        cobj.put(ComObject.Tag.DB_NAME, NONE_STR);
-        cobj.put(ComObject.Tag.SCHEMA_VERSION, server.getCommon().getSchemaVersion());
-        cobj.put(ComObject.Tag.METHOD, "LogManager:deletePeerLogs");
-        cobj.put(ComObject.Tag.REPLICA, server.getReplica());
-        server.getClient().send(null, server.getShard(), replica, cobj, DatabaseClient.Replica.SPECIFIED);
-      }
-    }
+    return false;
   }
 
   //public for pro version
@@ -788,7 +799,7 @@ public class LogManager {
     }
   }
 
-  private List<LogSource> allCurrentSources = new ArrayList<>();
+  private final List<LogSource> allCurrentSources = new ArrayList<>();
 
   public interface LogVisitor {
     boolean visit(byte[] buffer);
@@ -862,25 +873,24 @@ public class LogManager {
   private void addSources(String slicePoint, boolean beforeSlice, boolean peerFiles, File[] files,
                           List<LogSource> sources, Set<String> sliceFiles) throws IOException {
     for (File file : files) {
-      if (peerFiles && !file.getName().startsWith("peer")) {
-        continue;
-      }
-      if (slicePoint == null) {
-        LogSource src = new LogSource(file, server, logger, countRead);
-        sources.add(src);
-        allCurrentSources.add(src);
-        continue;
-      }
-      if (beforeSlice && sliceFiles.contains(file.getAbsolutePath())) {
-        LogSource src = new LogSource(file, server, logger, countRead);
-        sources.add(src);
-        allCurrentSources.add(src);
-      }
+      if (!(peerFiles && !file.getName().startsWith("peer"))) {
+        if (slicePoint == null) {
+          LogSource src = new LogSource(file, server, logger, countRead);
+          sources.add(src);
+          allCurrentSources.add(src);
+          continue;
+        }
+        if (beforeSlice && sliceFiles.contains(file.getAbsolutePath())) {
+          LogSource src = new LogSource(file, server, logger, countRead);
+          sources.add(src);
+          allCurrentSources.add(src);
+        }
 
-      if (!beforeSlice && !sliceFiles.contains(file.getAbsolutePath())) {
-        LogSource src = new LogSource(file, server, logger, countRead);
-        sources.add(src);
-        allCurrentSources.add(src);
+        if (!beforeSlice && !sliceFiles.contains(file.getAbsolutePath())) {
+          LogSource src = new LogSource(file, server, logger, countRead);
+          sources.add(src);
+          allCurrentSources.add(src);
+        }
       }
     }
   }
@@ -967,7 +977,6 @@ public class LogManager {
       if (lastSnapshot != -1) {
         File[] files = new File(getLogRoot(), "self").listFiles();
         if (files != null) {
-          outer:
           for (File file : files) {
             deleteOldLogsProcessFile(lastSnapshot, exactDate, file);
           }
@@ -1003,12 +1012,12 @@ public class LogManager {
 
   private class ProcessSource {
     private boolean myResult;
-    private List<LogSource> sources;
-    private long begin;
-    private AtomicLong lastLogged;
+    private final List<LogSource> sources;
+    private final long begin;
+    private final AtomicLong lastLogged;
     private List<NettyServer.Request> batch;
 
-    public ProcessSource(List<LogSource> sources, long begin, AtomicLong lastLogged, List<NettyServer.Request> batch) {
+    ProcessSource(List<LogSource> sources, long begin, AtomicLong lastLogged, List<NettyServer.Request> batch) {
       this.sources = sources;
       this.begin = begin;
       this.lastLogged = lastLogged;

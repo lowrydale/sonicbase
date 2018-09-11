@@ -1,10 +1,7 @@
 package com.sonicbase.accept.database;
 
-import com.fasterxml.jackson.databind.ObjectMapper;
-import com.fasterxml.jackson.databind.node.ArrayNode;
-import com.fasterxml.jackson.databind.node.JsonNodeFactory;
-import com.fasterxml.jackson.databind.node.ObjectNode;
 import com.sonicbase.client.DatabaseClient;
+import com.sonicbase.common.Config;
 import com.sonicbase.jdbcdriver.ConnectionProxy;
 import com.sonicbase.server.DatabaseServer;
 import org.apache.commons.io.FileUtils;
@@ -16,7 +13,6 @@ import java.io.BufferedInputStream;
 import java.io.File;
 import java.io.IOException;
 import java.sql.*;
-import java.text.ParseException;
 import java.util.ArrayList;
 import java.util.List;
 import java.util.concurrent.*;
@@ -39,13 +35,12 @@ public class TestDeltaManager {
   }
 
   @Test
-  public void test() throws InterruptedException, ExecutionException, ClassNotFoundException, SQLException, IOException {
+  public void test() {
     try {
 
 
-      String configStr = IOUtils.toString(new BufferedInputStream(getClass().getResourceAsStream("/config/config-4-servers.json")), "utf-8");
-      ObjectMapper mapper = new ObjectMapper();
-      final ObjectNode config = (ObjectNode) mapper.readTree(configStr);
+      String configStr = IOUtils.toString(new BufferedInputStream(getClass().getResourceAsStream("/config/config-4-servers.yaml")), "utf-8");
+      Config config = new Config(configStr);
 
       FileUtils.deleteDirectory(new File(System.getProperty("user.home"), "db"));
 
@@ -58,15 +53,14 @@ public class TestDeltaManager {
 
       List<Future> futures = new ArrayList<>();
       for (int i = 0; i < dbServers.length; i++) {
-        final int shard = i;
         //      futures.add(executor.submit(new Callable() {
         //        @Override
         //        public Object call() throws Exception {
         //          String role = "primaryMaster";
 
-        dbServers[shard] = new DatabaseServer();
-        dbServers[shard].setConfig(config, "4-servers", "localhost", 9010 + (50 * shard), true, new AtomicBoolean(true), new AtomicBoolean(true),null);
-        dbServers[shard].setRole(role);
+        dbServers[i] = new DatabaseServer();
+        dbServers[i].setConfig(config, "4-servers", "localhost", 9010 + (50 * i), true, new AtomicBoolean(true), new AtomicBoolean(true),null);
+        dbServers[i].setRole(role);
         //          return null;
         //        }
         //      }));
@@ -239,11 +233,10 @@ public class TestDeltaManager {
   }
 
   @Test
-  public void testRolling() throws InterruptedException, ExecutionException, ClassNotFoundException, SQLException, IOException {
+  public void testRolling() {
     try {
-      String configStr = IOUtils.toString(new BufferedInputStream(getClass().getResourceAsStream("/config/config-4-servers.json")), "utf-8");
-      ObjectMapper mapper = new ObjectMapper();
-      final ObjectNode config = (ObjectNode) mapper.readTree(configStr);
+      String configStr = IOUtils.toString(new BufferedInputStream(getClass().getResourceAsStream("/config/config-4-servers.yaml")), "utf-8");
+      Config config = new Config(configStr);
 
       FileUtils.deleteDirectory(new File(System.getProperty("user.home"), "db"));
 
@@ -256,15 +249,14 @@ public class TestDeltaManager {
 
       List<Future> futures = new ArrayList<>();
       for (int i = 0; i < dbServers.length; i++) {
-        final int shard = i;
         //      futures.add(executor.submit(new Callable() {
         //        @Override
         //        public Object call() throws Exception {
         //          String role = "primaryMaster";
 
-        dbServers[shard] = new DatabaseServer();
-        dbServers[shard].setConfig(config, "4-servers", "localhost", 9010 + (50 * shard), true, new AtomicBoolean(true), new AtomicBoolean(true),null);
-        dbServers[shard].setRole(role);
+        dbServers[i] = new DatabaseServer();
+        dbServers[i].setConfig(config, "4-servers", "localhost", 9010 + (50 * i), true, new AtomicBoolean(true), new AtomicBoolean(true),null);
+        dbServers[i].setRole(role);
         //          return null;
         //        }
         //      }));
@@ -332,11 +324,10 @@ public class TestDeltaManager {
   }
 
   @Test
-  public void testKeys() throws InterruptedException, ExecutionException, ClassNotFoundException, SQLException, IOException {
+  public void testKeys() {
     try {
-      String configStr = IOUtils.toString(new BufferedInputStream(getClass().getResourceAsStream("/config/config-4-servers.json")), "utf-8");
-      ObjectMapper mapper = new ObjectMapper();
-      final ObjectNode config = (ObjectNode) mapper.readTree(configStr);
+      String configStr = IOUtils.toString(new BufferedInputStream(getClass().getResourceAsStream("/config/config-4-servers.yaml")), "utf-8");
+      Config config = new Config(configStr);
 
       FileUtils.deleteDirectory(new File(System.getProperty("user.home"), "db"));
 
@@ -349,15 +340,14 @@ public class TestDeltaManager {
 
       List<Future> futures = new ArrayList<>();
       for (int i = 0; i < dbServers.length; i++) {
-        final int shard = i;
         //      futures.add(executor.submit(new Callable() {
         //        @Override
         //        public Object call() throws Exception {
         //          String role = "primaryMaster";
 
-        dbServers[shard] = new DatabaseServer();
-        dbServers[shard].setConfig(config, "4-servers", "localhost", 9010 + (50 * shard), true, new AtomicBoolean(true), new AtomicBoolean(true),null);
-        dbServers[shard].setRole(role);
+        dbServers[i] = new DatabaseServer();
+        dbServers[i].setConfig(config, "4-servers", "localhost", 9010 + (50 * i), true, new AtomicBoolean(true), new AtomicBoolean(true),null);
+        dbServers[i].setRole(role);
         //          return null;
         //        }
         //      }));
@@ -534,11 +524,10 @@ public class TestDeltaManager {
   }
 
   @Test
-  public void testDuplicateKeys() throws InterruptedException, ExecutionException, ClassNotFoundException, SQLException, IOException {
+  public void testDuplicateKeys() {
     try {
-      String configStr = IOUtils.toString(new BufferedInputStream(getClass().getResourceAsStream("/config/config-4-servers.json")), "utf-8");
-      ObjectMapper mapper = new ObjectMapper();
-      final ObjectNode config = (ObjectNode) mapper.readTree(configStr);
+      String configStr = IOUtils.toString(new BufferedInputStream(getClass().getResourceAsStream("/config/config-4-servers.yaml")), "utf-8");
+      Config config = new Config(configStr);
 
       FileUtils.deleteDirectory(new File(System.getProperty("user.home"), "db"));
 
@@ -551,15 +540,14 @@ public class TestDeltaManager {
 
       List<Future> futures = new ArrayList<>();
       for (int i = 0; i < dbServers.length; i++) {
-        final int shard = i;
         //      futures.add(executor.submit(new Callable() {
         //        @Override
         //        public Object call() throws Exception {
         //          String role = "primaryMaster";
 
-        dbServers[shard] = new DatabaseServer();
-        dbServers[shard].setConfig(config, "4-servers", "localhost", 9010 + (50 * shard), true, new AtomicBoolean(true), new AtomicBoolean(true),null);
-        dbServers[shard].setRole(role);
+        dbServers[i] = new DatabaseServer();
+        dbServers[i].setConfig(config, "4-servers", "localhost", 9010 + (50 * i), true, new AtomicBoolean(true), new AtomicBoolean(true),null);
+        dbServers[i].setRole(role);
         //          return null;
         //        }
         //      }));
@@ -786,9 +774,9 @@ public class TestDeltaManager {
     assertEquals(ret.getLong("id2"), value2, String.valueOf(value2));
   }
 
-  private void restartServers(DatabaseServer[] dbServers) throws Exception {
+  private void restartServers(DatabaseServer[] dbServers) {
     for (DatabaseServer server : dbServers) {
-      server.purgeMemory();
+      server.unsafePurgeMemoryForTests();
     }
 
     for (DatabaseServer server : dbServers) {
@@ -798,7 +786,7 @@ public class TestDeltaManager {
     }
   }
 
-  private void runSnapshot(DatabaseServer[] dbServers) throws InterruptedException, ParseException, IOException {
+  private void runSnapshot(DatabaseServer[] dbServers) throws IOException {
     dbServers[0].runSnapshot();
     dbServers[1].runSnapshot();
     dbServers[2].runSnapshot();

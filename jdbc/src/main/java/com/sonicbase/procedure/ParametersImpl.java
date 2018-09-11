@@ -11,7 +11,7 @@ import java.sql.Timestamp;
 // I prefer to return null instead of an empty array
 // I don't know a good way to reduce the parameter count
 public class ParametersImpl implements Parameters {
-  private Object[] parms;
+  private final Object[] parms;
 
   public ParametersImpl(Object[] parmsArray) {
     this.parms = parmsArray;

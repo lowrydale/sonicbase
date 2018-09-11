@@ -81,9 +81,8 @@ public class BulkImportManagerTest {
     when(server.getShardCount()).thenReturn(2);
     when(server.getReplicationFactor()).thenReturn(1);
 
-    String configStr = IOUtils.toString(new BufferedInputStream(getClass().getResourceAsStream("/config/config-4-servers.json")), "utf-8");
-    ObjectMapper mapper = new ObjectMapper();
-    final ObjectNode config = (ObjectNode) mapper.readTree(configStr);
+    String configStr = IOUtils.toString(new BufferedInputStream(getClass().getResourceAsStream("/config/config-4-servers.yaml")), "utf-8");
+    final Config config = new Config(configStr);
 
     when(server.getConfig()).thenReturn(config);
     transManager = new TransactionManager(server);
@@ -139,11 +138,6 @@ public class BulkImportManagerTest {
         });
 
     when(server.getClient()).thenReturn(client);
-  }
-
-  @AfterMethod
-  public void afterMethod() {
-
   }
 
   @Test
@@ -245,10 +239,10 @@ public class BulkImportManagerTest {
     assertEquals(called.size(), 28);
   }
 
-  private void attachSetters(PreparedStatement ps, final Set<Integer> called) throws SQLException, UnsupportedEncodingException {
+  private void attachSetters(PreparedStatement ps, final Set<Integer> called) throws SQLException {
     doAnswer(new Answer(){
       @Override
-      public Object answer(InvocationOnMock invocation) throws Throwable {
+      public Object answer(InvocationOnMock invocation) {
         Object[] args = invocation.getArguments();
         assertEquals(args[1], 0L);
         called.add(1);
@@ -258,7 +252,7 @@ public class BulkImportManagerTest {
 
     doAnswer(new Answer(){
       @Override
-      public Object answer(InvocationOnMock invocation) throws Throwable {
+      public Object answer(InvocationOnMock invocation) {
         Object[] args = invocation.getArguments();
         assertEquals(args[1], 200L);
         called.add(2);
@@ -268,7 +262,7 @@ public class BulkImportManagerTest {
 
     doAnswer(new Answer(){
       @Override
-      public Object answer(InvocationOnMock invocation) throws Throwable {
+      public Object answer(InvocationOnMock invocation) {
         Object[] args = invocation.getArguments();
         assertEquals(args[1], "0-value");
         called.add(3);
@@ -278,7 +272,7 @@ public class BulkImportManagerTest {
 
     doAnswer(new Answer(){
       @Override
-      public Object answer(InvocationOnMock invocation) throws Throwable {
+      public Object answer(InvocationOnMock invocation) {
         Object[] args = invocation.getArguments();
         assertEquals(args[1], new Timestamp(200));
         called.add(4);
@@ -288,7 +282,7 @@ public class BulkImportManagerTest {
 
     doAnswer(new Answer(){
       @Override
-      public Object answer(InvocationOnMock invocation) throws Throwable {
+      public Object answer(InvocationOnMock invocation) {
         Object[] args = invocation.getArguments();
         assertEquals(args[1], 1200);
         called.add(5);
@@ -298,7 +292,7 @@ public class BulkImportManagerTest {
 
     doAnswer(new Answer(){
       @Override
-      public Object answer(InvocationOnMock invocation) throws Throwable {
+      public Object answer(InvocationOnMock invocation) {
         Object[] args = invocation.getArguments();
         assertEquals(args[1], (short)0);
         called.add(6);
@@ -308,7 +302,7 @@ public class BulkImportManagerTest {
 
     doAnswer(new Answer(){
       @Override
-      public Object answer(InvocationOnMock invocation) throws Throwable {
+      public Object answer(InvocationOnMock invocation) {
         Object[] args = invocation.getArguments();
         assertEquals(args[1], (byte)0);
         called.add(7);
@@ -318,7 +312,7 @@ public class BulkImportManagerTest {
 
     doAnswer(new Answer(){
       @Override
-      public Object answer(InvocationOnMock invocation) throws Throwable {
+      public Object answer(InvocationOnMock invocation) {
         Object[] args = invocation.getArguments();
         assertEquals(args[1],  "0-value");
         called.add(8);
@@ -328,7 +322,7 @@ public class BulkImportManagerTest {
 
     doAnswer(new Answer(){
       @Override
-      public Object answer(InvocationOnMock invocation) throws Throwable {
+      public Object answer(InvocationOnMock invocation) {
         Object[] args = invocation.getArguments();
         assertEquals(args[1],  "0-value");
         called.add(9);
@@ -338,7 +332,7 @@ public class BulkImportManagerTest {
 
     doAnswer(new Answer(){
       @Override
-      public Object answer(InvocationOnMock invocation) throws Throwable {
+      public Object answer(InvocationOnMock invocation) {
         Object[] args = invocation.getArguments();
         assertEquals(args[1], 0d);
         called.add(10);
@@ -348,7 +342,7 @@ public class BulkImportManagerTest {
 
     doAnswer(new Answer(){
       @Override
-      public Object answer(InvocationOnMock invocation) throws Throwable {
+      public Object answer(InvocationOnMock invocation) {
         Object[] args = invocation.getArguments();
         assertEquals(args[1], 0f);
         called.add(11);
@@ -358,7 +352,7 @@ public class BulkImportManagerTest {
 
     doAnswer(new Answer(){
       @Override
-      public Object answer(InvocationOnMock invocation) throws Throwable {
+      public Object answer(InvocationOnMock invocation) {
         Object[] args = invocation.getArguments();
         assertEquals(args[1], 0d);
         called.add(12);
@@ -368,7 +362,7 @@ public class BulkImportManagerTest {
 
     doAnswer(new Answer(){
       @Override
-      public Object answer(InvocationOnMock invocation) throws Throwable {
+      public Object answer(InvocationOnMock invocation) {
         Object[] args = invocation.getArguments();
         assertEquals(args[1], true);
         called.add(13);
@@ -378,7 +372,7 @@ public class BulkImportManagerTest {
 
     doAnswer(new Answer(){
       @Override
-      public Object answer(InvocationOnMock invocation) throws Throwable {
+      public Object answer(InvocationOnMock invocation) {
         Object[] args = invocation.getArguments();
         assertEquals(args[1], true);
         called.add(14);
@@ -388,7 +382,7 @@ public class BulkImportManagerTest {
 
     doAnswer(new Answer(){
       @Override
-      public Object answer(InvocationOnMock invocation) throws Throwable {
+      public Object answer(InvocationOnMock invocation) {
         Object[] args = invocation.getArguments();
         assertEquals(args[1],  "0-value");
         called.add(15);
@@ -398,7 +392,7 @@ public class BulkImportManagerTest {
 
     doAnswer(new Answer(){
       @Override
-      public Object answer(InvocationOnMock invocation) throws Throwable {
+      public Object answer(InvocationOnMock invocation) {
         Object[] args = invocation.getArguments();
         assertEquals(args[1],  "0-value");
         called.add(16);
@@ -408,7 +402,7 @@ public class BulkImportManagerTest {
 
     doAnswer(new Answer(){
       @Override
-      public Object answer(InvocationOnMock invocation) throws Throwable {
+      public Object answer(InvocationOnMock invocation) {
         Object[] args = invocation.getArguments();
         assertEquals(args[1],  "0-value");
         called.add(17);
@@ -418,7 +412,7 @@ public class BulkImportManagerTest {
 
     doAnswer(new Answer(){
       @Override
-      public Object answer(InvocationOnMock invocation) throws Throwable {
+      public Object answer(InvocationOnMock invocation) {
         Object[] args = invocation.getArguments();
         assertEquals(args[1],  "0-value");
         called.add(18);
@@ -428,7 +422,7 @@ public class BulkImportManagerTest {
 
     doAnswer(new Answer(){
       @Override
-      public Object answer(InvocationOnMock invocation) throws Throwable {
+      public Object answer(InvocationOnMock invocation) {
         Object[] args = invocation.getArguments();
         assertEquals(args[1],  "0-value");
         called.add(19);
@@ -438,7 +432,7 @@ public class BulkImportManagerTest {
 
     doAnswer(new Answer(){
       @Override
-      public Object answer(InvocationOnMock invocation) throws Throwable {
+      public Object answer(InvocationOnMock invocation) {
         Object[] args = invocation.getArguments();
         assertEquals(args[1],  "0-value");
         called.add(20);
@@ -478,7 +472,7 @@ public class BulkImportManagerTest {
 
     doAnswer(new Answer(){
       @Override
-      public Object answer(InvocationOnMock invocation) throws Throwable {
+      public Object answer(InvocationOnMock invocation) {
         Object[] args = invocation.getArguments();
         assertEquals(args[1],  new BigDecimal(0));
         called.add(24);
@@ -488,7 +482,7 @@ public class BulkImportManagerTest {
 
     doAnswer(new Answer(){
       @Override
-      public Object answer(InvocationOnMock invocation) throws Throwable {
+      public Object answer(InvocationOnMock invocation) {
         Object[] args = invocation.getArguments();
         assertEquals(args[1],  new BigDecimal(0));
         called.add(25);
@@ -498,7 +492,7 @@ public class BulkImportManagerTest {
 
     doAnswer(new Answer(){
       @Override
-      public Object answer(InvocationOnMock invocation) throws Throwable {
+      public Object answer(InvocationOnMock invocation) {
         Object[] args = invocation.getArguments();
         assertEquals(args[1],  new Date(1900, 10, 1));
         called.add(26);
@@ -508,7 +502,7 @@ public class BulkImportManagerTest {
 
     doAnswer(new Answer(){
       @Override
-      public Object answer(InvocationOnMock invocation) throws Throwable {
+      public Object answer(InvocationOnMock invocation) {
         Object[] args = invocation.getArguments();
         assertEquals(args[1],  new Time(1, 0, 0));
         called.add(27);
@@ -518,7 +512,7 @@ public class BulkImportManagerTest {
 
     doAnswer(new Answer(){
       @Override
-      public Object answer(InvocationOnMock invocation) throws Throwable {
+      public Object answer(InvocationOnMock invocation) {
         Object[] args = invocation.getArguments();
         assertEquals(args[1],  new Timestamp(0));
         called.add(28);
@@ -529,13 +523,13 @@ public class BulkImportManagerTest {
 
 
   @Test
-  public void testSetFieldsInInsertStatementNulls() throws UnsupportedEncodingException, SQLException {
+  public void testSetFieldsInInsertStatementNulls() throws SQLException {
     PreparedStatement ps = mock(PreparedStatement.class);
 
     final Set<Integer> called = new HashSet<>();
     doAnswer(new Answer(){
       @Override
-      public Object answer(InvocationOnMock invocation) throws Throwable {
+      public Object answer(InvocationOnMock invocation) {
         Object[] args = invocation.getArguments();
         called.add((Integer) args[0]);
         return null;
@@ -584,7 +578,7 @@ public class BulkImportManagerTest {
   }
 
   @Test
-  public void testBulkImportOnServer() throws UnsupportedEncodingException, SQLException, InterruptedException {
+  public void testBulkImportOnServer() throws IOException, SQLException, InterruptedException {
     ResultSet rs = createResultSetMock();
     PreparedStatement ps = mock(PreparedStatement.class);
 
@@ -594,34 +588,28 @@ public class BulkImportManagerTest {
     when(ps.executeQuery()).thenReturn(rs);
     when(rs.next()).thenAnswer(new Answer(){
       @Override
-      public Object answer(InvocationOnMock invocationOnMock) throws Throwable {
+      public Object answer(InvocationOnMock invocationOnMock) {
         return countReturned.getAndIncrement() == 0;
       }
     });
     final Connection connection = mock(Connection.class);
     when(connection.prepareStatement(anyString())).thenReturn(ps);
     BulkImportManager bim = new BulkImportManager(server) {
-      protected Connection getConnection(String dbName, String address, int port) throws SQLException {
+      protected Connection getConnection(String dbName, String address, int port) {
         return connection;
       }
-      protected Connection getConnection(String connectString) throws SQLException {
+      protected Connection getConnection(String connectString) {
         return connection;
       }
 
-      protected Connection getConnection(String connectString, String username, String password) throws SQLException {
+      protected Connection getConnection(String connectString, String username, String password) {
         return connection;
       }
     };
 
     when(server.getDbNames(anyString())).thenReturn(Collections.singletonList("test"));
-    ObjectNode config = new ObjectMapper().createObjectNode();
-    config.put("clientIsPrivate", true);
-    ArrayNode shards = config.putArray("shards");
-    ObjectNode replicasNode = shards.addObject();
-    ArrayNode replicas = replicasNode.putArray("replicas");
-    ObjectNode replicaNode = replicas.addObject();
-    replicaNode.put("privateAddress", "127.0.0.1");
-    replicaNode.put("port", 9010);
+    String configStr = IOUtils.toString(BulkImportManager.class.getResourceAsStream("/config/config-1-local.yaml"));
+    Config config = new Config(configStr);
     when(server.getConfig()).thenReturn(config);
 
     ComObject cobj = new ComObject();
@@ -655,7 +643,7 @@ public class BulkImportManagerTest {
   }
 
   @Test
-  public void testBulkImportOnServerCoordinate() throws UnsupportedEncodingException, SQLException, InterruptedException {
+  public void testBulkImportOnServerCoordinate() throws IOException, SQLException, InterruptedException {
     ResultSet rs = createResultSetMock();
     PreparedStatement ps = mock(PreparedStatement.class);
 
@@ -665,35 +653,29 @@ public class BulkImportManagerTest {
     when(ps.executeQuery()).thenReturn(rs);
     when(rs.next()).thenAnswer(new Answer() {
       @Override
-      public Object answer(InvocationOnMock invocationOnMock) throws Throwable {
+      public Object answer(InvocationOnMock invocationOnMock) {
         return countReturned.getAndIncrement() == 0;
       }
     });
     final Connection connection = mock(Connection.class);
     when(connection.prepareStatement(anyString())).thenReturn(ps);
     BulkImportManager bim = new BulkImportManager(server) {
-      protected Connection getConnection(String dbName, String address, int port) throws SQLException {
+      protected Connection getConnection(String dbName, String address, int port) {
         return connection;
       }
 
-      protected Connection getConnection(String connectString) throws SQLException {
+      protected Connection getConnection(String connectString) {
         return connection;
       }
 
-      protected Connection getConnection(String connectString, String username, String password) throws SQLException {
+      protected Connection getConnection(String connectString, String username, String password) {
         return connection;
       }
     };
 
     when(server.getDbNames(anyString())).thenReturn(Collections.singletonList("test"));
-    ObjectNode config = new ObjectMapper().createObjectNode();
-    config.put("clientIsPrivate", true);
-    ArrayNode shards = config.putArray("shards");
-    ObjectNode replicasNode = shards.addObject();
-    ArrayNode replicas = replicasNode.putArray("replicas");
-    ObjectNode replicaNode = replicas.addObject();
-    replicaNode.put("privateAddress", "127.0.0.1");
-    replicaNode.put("port", 9010);
+    String configStr = IOUtils.toString(BulkImportManager.class.getResourceAsStream("/config/config-1-local.yaml"));
+    Config config = new Config(configStr);
     when(server.getConfig()).thenReturn(config);
 
     ComObject cobj = new ComObject();
@@ -719,7 +701,7 @@ public class BulkImportManagerTest {
   }
 
   @Test
-  public void testBulkImportOnServerCoordinateNoIndex() throws UnsupportedEncodingException, SQLException, InterruptedException {
+  public void testBulkImportOnServerCoordinateNoIndex() throws IOException, SQLException, InterruptedException {
     tableSchema2 = TestUtils.createTable2();
     common.getTables("test").put(tableSchema2.getName(), tableSchema2);
 
@@ -732,35 +714,29 @@ public class BulkImportManagerTest {
     when(ps.executeQuery()).thenReturn(rs);
     when(rs.next()).thenAnswer(new Answer() {
       @Override
-      public Object answer(InvocationOnMock invocationOnMock) throws Throwable {
+      public Object answer(InvocationOnMock invocationOnMock) {
         return countReturned.getAndIncrement() == 0;
       }
     });
     final Connection connection = mock(Connection.class);
     when(connection.prepareStatement(anyString())).thenReturn(ps);
     BulkImportManager bim = new BulkImportManager(server) {
-      protected Connection getConnection(String dbName, String address, int port) throws SQLException {
+      protected Connection getConnection(String dbName, String address, int port) {
         return connection;
       }
 
-      protected Connection getConnection(String connectString) throws SQLException {
+      protected Connection getConnection(String connectString) {
         return connection;
       }
 
-      protected Connection getConnection(String connectString, String username, String password) throws SQLException {
+      protected Connection getConnection(String connectString, String username, String password) {
         return connection;
       }
     };
 
     when(server.getDbNames(anyString())).thenReturn(Collections.singletonList("test"));
-    ObjectNode config = new ObjectMapper().createObjectNode();
-    config.put("clientIsPrivate", true);
-    ArrayNode shards = config.putArray("shards");
-    ObjectNode replicasNode = shards.addObject();
-    ArrayNode replicas = replicasNode.putArray("replicas");
-    ObjectNode replicaNode = replicas.addObject();
-    replicaNode.put("privateAddress", "127.0.0.1");
-    replicaNode.put("port", 9010);
+    String configStr = IOUtils.toString(BulkImportManager.class.getResourceAsStream("/config/config-1-local.yaml"));
+    Config config = new Config(configStr);
     when(server.getConfig()).thenReturn(config);
 
     ComObject cobj = new ComObject();
@@ -784,5 +760,125 @@ public class BulkImportManagerTest {
     while (bim.getCountCoordinating() > 0) {
       Thread.sleep(5L);
     }
+  }
+
+
+  @Test
+  public void testBulkImportStatus() throws IOException, SQLException, InterruptedException {
+    ResultSet rs = createResultSetMock();
+    PreparedStatement ps = mock(PreparedStatement.class);
+
+    final Set<Integer> called = new HashSet<>();
+    attachSetters(ps, called);
+    final AtomicInteger countReturned = new AtomicInteger();
+    when(ps.executeQuery()).thenReturn(rs);
+    when(rs.next()).thenAnswer((Answer) invocationOnMock -> countReturned.getAndIncrement() == 0);
+    final Connection connection = mock(Connection.class);
+    when(connection.prepareStatement(anyString())).thenReturn(ps);
+    BulkImportManager bim = new BulkImportManager(server) {
+      protected Connection getConnection(String dbName, String address, int port) {
+        return connection;
+      }
+
+      protected Connection getConnection(String connectString) {
+        return connection;
+      }
+
+      protected Connection getConnection(String connectString, String username, String password) {
+        return connection;
+      }
+    };
+
+    when(server.getDbNames(anyString())).thenReturn(Collections.singletonList("test"));
+    String configStr = IOUtils.toString(BulkImportManager.class.getResourceAsStream("/config/config-1-local.yaml"), "utf-8");
+    Config config = new Config(configStr);
+    when(server.getConfig()).thenReturn(config);
+
+    ComObject cobj = new ComObject();
+    ComArray keyArray = cobj.putArray(ComObject.Tag.KEYS, ComObject.Type.BYTE_ARRAY_TYPE);
+    cobj.put(ComObject.Tag.LOWER_KEY, DatabaseCommon.serializeKey(tableSchema, indexSchema.getName(), keys.get(0)));
+    keyArray.add(DatabaseCommon.serializeKey(tableSchema, indexSchema.getName(), keys.get(0)));
+
+    cobj.put(ComObject.Tag.DB_NAME, "test");
+    cobj.put(ComObject.Tag.TABLE_NAME, "table1");
+    cobj.put(ComObject.Tag.SHOULD_PROCESS, true);
+    cobj.put(ComObject.Tag.DRIVER_NAME, "com.sonicbase.jdbcdriver.Driver");
+    cobj.put(ComObject.Tag.USER, "user");
+    cobj.put(ComObject.Tag.PASSWORD, "password");
+    cobj.put(ComObject.Tag.CONNECT_STRING, "jdbc:sonicbase:localhost:9010");
+
+    ComObject ret = bim.coordinateBulkImportForTable(cobj, false);
+    ret = bim.getBulkImportProgress(cobj, false);
+
+    ComArray array = ret.getArray(ComObject.Tag.PROGRESS_ARRAY);
+    ComObject serverObj = (ComObject) array.getArray().get(0);
+    assertEquals(serverObj.getString(ComObject.Tag.TABLE_NAME), "test:table1");
+    assertEquals((long)serverObj.getLong(ComObject.Tag.EXPECTED_COUNT), 0);
+    assertEquals((boolean)serverObj.getBoolean(ComObject.Tag.FINISHED), true);
+    assertEquals((long)serverObj.getLong(ComObject.Tag.PRE_PROCESS_EXPECTED_COUNT), 0);
+    assertEquals((long)serverObj.getLong(ComObject.Tag.PRE_PROCESS_COUNT_PROCESSED), 0);
+    assertEquals((boolean)serverObj.getBoolean(ComObject.Tag.PRE_PROCESS_FINISHED), true);
+
+  }
+
+  @Test
+  public void testBulkImportStart() throws IOException, SQLException, InterruptedException {
+    ResultSet rs = createResultSetMock();
+    PreparedStatement ps = mock(PreparedStatement.class);
+
+    final Set<Integer> called = new HashSet<>();
+    attachSetters(ps, called);
+    final AtomicInteger countReturned = new AtomicInteger();
+    when(ps.executeQuery()).thenReturn(rs);
+    when(rs.next()).thenAnswer((Answer) invocationOnMock -> countReturned.getAndIncrement() == 0);
+    final Connection connection = mock(Connection.class);
+    when(connection.prepareStatement(anyString())).thenReturn(ps);
+    BulkImportManager bim = new BulkImportManager(server) {
+      protected Connection getConnection(String dbName, String address, int port) {
+        return connection;
+      }
+
+      protected Connection getConnection(String connectString) {
+        return connection;
+      }
+
+      protected Connection getConnection(String connectString, String username, String password) {
+        return connection;
+      }
+    };
+
+    when(server.getDbNames(anyString())).thenReturn(Collections.singletonList("test"));
+    String configStr = IOUtils.toString(BulkImportManager.class.getResourceAsStream("/config/config-1-local.yaml"), "utf-8");
+    Config config = new Config(configStr);
+    when(server.getConfig()).thenReturn(config);
+
+    ComObject cobj = new ComObject();
+    ComArray keyArray = cobj.putArray(ComObject.Tag.KEYS, ComObject.Type.BYTE_ARRAY_TYPE);
+    cobj.put(ComObject.Tag.LOWER_KEY, DatabaseCommon.serializeKey(tableSchema, indexSchema.getName(), keys.get(0)));
+    keyArray.add(DatabaseCommon.serializeKey(tableSchema, indexSchema.getName(), keys.get(0)));
+
+    cobj.put(ComObject.Tag.DB_NAME, "test");
+    cobj.put(ComObject.Tag.TABLE_NAME, "table1");
+    cobj.put(ComObject.Tag.SHOULD_PROCESS, true);
+    cobj.put(ComObject.Tag.DRIVER_NAME, "com.sonicbase.jdbcdriver.Driver");
+    cobj.put(ComObject.Tag.USER, "user");
+    cobj.put(ComObject.Tag.PASSWORD, "password");
+    cobj.put(ComObject.Tag.CONNECT_STRING, "jdbc:sonicbase:localhost:9010");
+
+    bim.startBulkImport(cobj, false);
+
+    Thread.sleep(1_000);
+
+    ComObject ret = bim.getBulkImportProgress(cobj, false);
+
+    ComArray array = ret.getArray(ComObject.Tag.PROGRESS_ARRAY);
+    ComObject serverObj = (ComObject) array.getArray().get(0);
+    assertEquals(serverObj.getString(ComObject.Tag.TABLE_NAME), "test:table1");
+    assertEquals((long)serverObj.getLong(ComObject.Tag.EXPECTED_COUNT), 0);
+    assertEquals((boolean)serverObj.getBoolean(ComObject.Tag.FINISHED), true);
+    assertEquals((long)serverObj.getLong(ComObject.Tag.PRE_PROCESS_EXPECTED_COUNT), 0);
+    assertEquals((long)serverObj.getLong(ComObject.Tag.PRE_PROCESS_COUNT_PROCESSED), 0);
+    assertEquals((boolean)serverObj.getBoolean(ComObject.Tag.PRE_PROCESS_FINISHED), true);
+
   }
 }

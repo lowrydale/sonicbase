@@ -43,8 +43,8 @@ public class SelectContextImpl {
                            boolean restrictToThisServer, StoredProcedureContextImpl procedureContext) {
     if (tableIds != null) {
       this.currKeys = tableIds.getKeys();
-      this.recordCache = recordCache;
     }
+    this.recordCache = recordCache;
     this.restrictToThisServer = restrictToThisServer;
     this.procedureContext = procedureContext;
     this.sortWithIndex = canUseIndex;

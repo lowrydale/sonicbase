@@ -92,9 +92,8 @@ public class UpdateManagerTest {
     when(server.getShardCount()).thenReturn(2);
     when(server.getReplicationFactor()).thenReturn(1);
 
-    String configStr = IOUtils.toString(new BufferedInputStream(getClass().getResourceAsStream("/config/config-4-servers.json")), "utf-8");
-    ObjectMapper mapper = new ObjectMapper();
-    final ObjectNode config = (ObjectNode) mapper.readTree(configStr);
+    String configStr = IOUtils.toString(new BufferedInputStream(getClass().getResourceAsStream("/config/config-4-servers.yaml")), "utf-8");
+    Config config = new Config(configStr);
 
     when(server.getConfig()).thenReturn(config);
     transManager = new TransactionManager(server);
@@ -149,12 +148,8 @@ public class UpdateManagerTest {
     when(server.getClient()).thenReturn(client);
   }
 
-  @AfterMethod
-  public void afterMethod() {
-  }
-
   @Test
-  public void test() throws IOException {
+  public void test() {
 
     for (int j = 0; j < keys.size(); j++) {
       int tableId = common.getTables("test").get("table1").getTableId();
@@ -193,7 +188,7 @@ public class UpdateManagerTest {
   }
 
   @Test
-  public void testInsertWithRecord() throws IOException {
+  public void testInsertWithRecord() {
 
     for (int j = 0; j < keys.size(); j++) {
       int tableId = common.getTables("test").get("table1").getTableId();
@@ -337,7 +332,7 @@ public class UpdateManagerTest {
   }
 
   @Test
-  public void testBatchInsert() throws SQLException, UnsupportedEncodingException {
+  public void testBatchInsert() throws SQLException {
 
     InsertStatementHandler handler = new InsertStatementHandler(client);
     InsertStatementHandler.getBatch().set(new ArrayList<InsertStatementHandler.InsertRequest>());
@@ -545,7 +540,7 @@ public class UpdateManagerTest {
   }
 
   @Test
-  public void testDeleteIndexEntry() throws SQLException, UnsupportedEncodingException, EOFException {
+  public void testDeleteIndexEntry() throws SQLException {
 
     InsertStatementHandler handler = new InsertStatementHandler(client);
     InsertStatementImpl insertStatement = new InsertStatementImpl(client);
@@ -640,7 +635,7 @@ public class UpdateManagerTest {
 
 
   @Test
-  public void testUpdateRecord() throws SQLException, UnsupportedEncodingException, EOFException {
+  public void testUpdateRecord() throws SQLException, UnsupportedEncodingException {
 
     InsertStatementHandler handler = new InsertStatementHandler(client);
     InsertStatementImpl insertStatement = new InsertStatementImpl(client);
@@ -775,7 +770,7 @@ public class UpdateManagerTest {
   }
 
   @Test
-  public void testTransactionsCommit() throws IOException, SQLException {
+  public void testTransactionsCommit() throws SQLException {
 
     int tableId = common.getTables("test").get("table1").getTableId();
     int indexId = common.getTables("test").get("table1").getIndices().get(indexSchema.getName()).getIndexId();
@@ -887,7 +882,7 @@ public class UpdateManagerTest {
   }
 
   @Test
-  public void testTransactionsRollback() throws IOException {
+  public void testTransactionsRollback() {
 
     for (int j = 0; j < keys.size(); j++) {
       int tableId = common.getTables("test").get("table1").getTableId();
@@ -941,7 +936,7 @@ public class UpdateManagerTest {
     assertNull(trans);
   }
 
-  private ResultSet createResultSetMock() throws SQLException, UnsupportedEncodingException {
+  private ResultSet createResultSetMock() throws SQLException {
     ResultSet rs = mock(ResultSet.class);
     when(rs.getLong(eq("field1"))).thenReturn(200L);
     when(rs.getString(eq("field2"))).thenReturn("0-value");
@@ -961,7 +956,7 @@ public class UpdateManagerTest {
 
     when(client.send(anyString(), anyInt(), anyInt(), anyObject(), anyObject())).thenAnswer(new Answer() {
       @Override
-      public Object answer(InvocationOnMock invocationOnMock) throws Throwable {
+      public Object answer(InvocationOnMock invocationOnMock) {
         ComObject retObj = new ComObject();
         ComArray array = retObj.putArray(ComObject.Tag.KEYS, ComObject.Type.BYTE_ARRAY_TYPE);
         array = retObj.putArray(ComObject.Tag.KEY_RECORDS, ComObject.Type.BYTE_ARRAY_TYPE);
@@ -1007,9 +1002,7 @@ public class UpdateManagerTest {
     String columnsStr = "field1 field2 field3 field4 field4 field5 field6 field7 field8 field9 field10 field11 field12 field13 field14 field15 field16 field17 field18 field19 field20 field21 field22 field23 field24 field25 field26 field27";
     String[] columns = columnsStr.split(" ");
     List<String> columnsList = new ArrayList<>();
-    for (String column : columns) {
-      columnsList.add(column);
-    }
+    columnsList.addAll(Arrays.asList(columns));
     insertStatement.setColumns(columnsList);
     insertStatement.serialize(cobj);
 
@@ -1019,7 +1012,7 @@ public class UpdateManagerTest {
     final AtomicBoolean calledSetLong = new AtomicBoolean();
     doAnswer(new Answer() {
       @Override
-      public Object answer(InvocationOnMock invocationOnMock) throws Throwable {
+      public Object answer(InvocationOnMock invocationOnMock) {
         calledSetLong.set(true);
         return null;
       }
@@ -1029,7 +1022,7 @@ public class UpdateManagerTest {
     when(ps.executeQuery()).thenReturn(rs);
     when(rs.next()).thenAnswer(new Answer(){
       @Override
-      public Object answer(InvocationOnMock invocationOnMock) throws Throwable {
+      public Object answer(InvocationOnMock invocationOnMock) {
         return countReturned.getAndIncrement() == 0;
       }
     });
@@ -1037,7 +1030,7 @@ public class UpdateManagerTest {
     when(connection.prepareStatement(anyString())).thenReturn(ps);
 
     UpdateManager updateManager = new UpdateManager(server) {
-      protected Connection getSonicBaseConnection(String dbName, String address, int port) throws SQLException {
+      protected Connection getSonicBaseConnection(String dbName, String address, int port) {
         return connection;
       }
     };

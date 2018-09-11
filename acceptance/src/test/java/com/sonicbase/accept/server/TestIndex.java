@@ -1,10 +1,7 @@
 package com.sonicbase.accept.server;
 
-import com.fasterxml.jackson.databind.ObjectMapper;
-import com.fasterxml.jackson.databind.node.ArrayNode;
-import com.fasterxml.jackson.databind.node.JsonNodeFactory;
-import com.fasterxml.jackson.databind.node.ObjectNode;
 import com.sonicbase.client.DatabaseClient;
+import com.sonicbase.common.Config;
 import com.sonicbase.common.DatabaseCommon;
 import com.sonicbase.index.Index;
 import com.sonicbase.jdbcdriver.ConnectionProxy;
@@ -62,9 +59,8 @@ public class TestIndex {
   public void before() throws ClassNotFoundException, SQLException, IOException, ExecutionException, InterruptedException {
     System.setProperty("log4j.configuration", "test-log4j.xml");
 
-    String configStr = IOUtils.toString(new BufferedInputStream(getClass().getResourceAsStream("/config/config-4-servers.json")), "utf-8");
-    ObjectMapper mapper = new ObjectMapper();
-    final ObjectNode config = (ObjectNode) mapper.readTree(configStr);
+    String configStr = IOUtils.toString(new BufferedInputStream(getClass().getResourceAsStream("/config/config-4-servers.yaml")), "utf-8");
+    Config config = new Config(configStr);
 
     FileUtils.deleteDirectory(new File(System.getProperty("user.home"), "db"));
 
@@ -75,15 +71,14 @@ public class TestIndex {
 
         List<Future> futures = new ArrayList<>();
         for (int i = 0; i < dbServers.length; i++) {
-          final int shard = i;
-    //      futures.add(executor.submit(new Callable() {
+          //      futures.add(executor.submit(new Callable() {
     //        @Override
     //        public Object call() throws Exception {
     //          String role = "primaryMaster";
 
-          dbServers[shard] = new DatabaseServer();
-          dbServers[shard].setConfig(config, "4-servers", "localhost", 9010 + (50 * shard), true, new AtomicBoolean(true), new AtomicBoolean(true),null);
-          dbServers[shard].setRole(role);
+          dbServers[i] = new DatabaseServer();
+          dbServers[i].setConfig(config, "4-servers", "localhost", 9010 + (50 * i), true, new AtomicBoolean(true), new AtomicBoolean(true),null);
+          dbServers[i].setRole(role);
           //          return null;
     //        }
     //      }));
@@ -250,7 +245,7 @@ public class TestIndex {
     final AtomicInteger offset = new AtomicInteger(201);
     index.visitTailMap(index.floorEntry(new Object[]{(long)201}).getKey(), new Index.Visitor(){
       @Override
-      public boolean visit(Object[] key, Object value) throws IOException {
+      public boolean visit(Object[] key, Object value) {
         assertEquals((long)key[0], offset.getAndIncrement());
         return true;
       }
@@ -273,7 +268,7 @@ public class TestIndex {
     final AtomicInteger offset = new AtomicInteger(10000 - 2);
     index.visitHeadMap(index.lastEntry().getKey(), new Index.Visitor(){
       @Override
-      public boolean visit(Object[] key, Object value) throws IOException {
+      public boolean visit(Object[] key, Object value) {
         assertEquals((long)key[0], offset.getAndDecrement());
         return true;
       }
@@ -305,7 +300,7 @@ public class TestIndex {
     final AtomicInteger countVisited = new AtomicInteger();
     index.visitTailMap(new Object[]{500L}, new Index.Visitor(){
       @Override
-      public boolean visit(Object[] key, Object value) throws IOException {
+      public boolean visit(Object[] key, Object value) {
         countVisited.incrementAndGet();
         return true;
       }
@@ -315,7 +310,7 @@ public class TestIndex {
     countVisited.set(0);
     index.visitHeadMap(new Object[]{100L}, new Index.Visitor(){
       @Override
-      public boolean visit(Object[] key, Object value) throws IOException {
+      public boolean visit(Object[] key, Object value) {
         countVisited.incrementAndGet();
         return true;
       }
@@ -368,7 +363,7 @@ public class TestIndex {
     final AtomicInteger countVisited = new AtomicInteger();
     index.visitTailMap(new Object[]{500L}, new Index.Visitor(){
       @Override
-      public boolean visit(Object[] key, Object value) throws IOException {
+      public boolean visit(Object[] key, Object value) {
         countVisited.incrementAndGet();
         return true;
       }
@@ -378,7 +373,7 @@ public class TestIndex {
     countVisited.set(0);
     index.visitHeadMap(new Object[]{100L}, new Index.Visitor(){
       @Override
-      public boolean visit(Object[] key, Object value) throws IOException {
+      public boolean visit(Object[] key, Object value) {
         countVisited.incrementAndGet();
         return true;
       }
@@ -397,7 +392,7 @@ public class TestIndex {
   final Comparator[] comparators = new Comparator[]{DataType.getLongComparator()};
 
 
-  Comparator<Object[]> comparator = new Comparator<Object[]>() {
+  final Comparator<Object[]> comparator = new Comparator<Object[]>() {
     @Override
     public int compare(Object[] o1, Object[] o2) {
       for (int i = 0; i < Math.min(o1.length, o2.length); i++) {
@@ -424,13 +419,10 @@ public class TestIndex {
       map.put(new Object[]{(long)i}, new Object());
     }
 
-    Thread thread = new Thread(new Runnable(){
-      @Override
-      public void run() {
-        int offset = 15000000;
-        while (true) {
-          map.put(new Object[]{(long)offset++}, new Object());
-        }
+    Thread thread = new Thread(() -> {
+      int offset = 15000000;
+      while (true) {
+        map.put(new Object[]{(long)offset++}, new Object());
       }
     });
     thread.start();
@@ -446,7 +438,7 @@ public class TestIndex {
   final Comparator[] memComparators = new Comparator[]{DataType.getLongComparator(), DataType.getLongComparator()};
 
 
-  Comparator<Object[]> memComparator = new Comparator<Object[]>() {
+  final Comparator<Object[]> memComparator = new Comparator<Object[]>() {
     @Override
     public int compare(Object[] o1, Object[] o2) {
       for (int i = 0; i < Math.min(o1.length, o2.length); i++) {

@@ -216,11 +216,6 @@ public class ColumnImpl extends ExpressionImpl {
   }
 
   @Override
-  public void queryRewrite() {
-
-  }
-
-  @Override
   public ColumnImpl getPrimaryColumn() {
     return this;
   }

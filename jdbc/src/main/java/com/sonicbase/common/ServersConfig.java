@@ -2,9 +2,10 @@ package com.sonicbase.common;
 
 import com.fasterxml.jackson.databind.node.ArrayNode;
 import com.sonicbase.client.DatabaseClient;
-import org.apache.giraph.utils.Varint;
+import com.sonicbase.util.Varint;
 
 import java.io.*;
+import java.util.List;
 
 @SuppressWarnings({"squid:S1168", "squid:S00107"})
 // I prefer to return null instead of an empty array
@@ -15,8 +16,19 @@ public class ServersConfig {
   private Shard[] shards;
   private boolean clientIsInternal;
 
+  public ServersConfig() {
+  }
+
   public boolean shouldOptimizeForThroughput() {
     return optimizeForThroughput;
+  }
+
+  public void setShards(Shard[] shards) {
+    this.shards = shards;
+  }
+
+  public void setCluster(String cluster) {
+    this.cluster = cluster;
   }
 
 
@@ -26,7 +38,7 @@ public class ServersConfig {
     private int port;
     private boolean dead;
 
-    public Host(String publicAddress, String privateAddress, int port) {
+    private Host(String publicAddress, String privateAddress, int port) {
       this.publicAddress = publicAddress;
       this.privateAddress = privateAddress;
       this.port = port;
@@ -42,6 +54,13 @@ public class ServersConfig {
 
     public int getPort() {
       return port;
+    }
+
+    public Host(String publicAddress, String privateAddress, int port, boolean dead) {
+      this.publicAddress = publicAddress;
+      this.privateAddress = privateAddress;
+      this.port = port;
+      this.dead = dead;
     }
 
     public Host(DataInputStream in, short serializationVersionNumber) throws IOException {
@@ -182,6 +201,25 @@ public class ServersConfig {
       for (int j = 0; j < hosts.length; j++) {
         hosts[j] = new Host(replicas.get(j).get("publicAddress").asText(), replicas.get(j).get("privateAddress").asText(),
             (int) replicas.get(j).get("port").asLong());
+      }
+      shards[i] = new Shard(hosts);
+
+    }
+    this.clientIsInternal = clientIsInternal;
+    this.optimizeForThroughput = optimizedForThroughput;
+  }
+
+
+  public ServersConfig(String cluster, List<Config.Shard> inShards, boolean clientIsInternal, boolean optimizedForThroughput) {
+    this.cluster = cluster;
+    int shardCount = inShards.size();
+    shards = new Shard[shardCount];
+    for (int i = 0; i < shardCount; i++) {
+      List<Config.Replica> replicas = inShards.get(i).getReplicas();
+      Host[] hosts = new Host[replicas.size()];
+      for (int j = 0; j < hosts.length; j++) {
+        hosts[j] = new Host(replicas.get(j).getString("publicAddress"), replicas.get(j).getString("privateAddress"),
+            replicas.get(j).getInt("port"));
       }
       shards[i] = new Shard(hosts);
 

@@ -25,7 +25,7 @@ public class RecordImpl implements Record {
   private DatabaseCommon common;
   private TableSchema tableSchema;
   private com.sonicbase.common.Record record;
-  private Map<String, Object> fieldMap = new HashMap<>();
+  private final Map<String, Object> fieldMap = new HashMap<>();
   private int viewVersion;
   private boolean isDeleting;
   private boolean isAdding;

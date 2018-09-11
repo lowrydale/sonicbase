@@ -15,7 +15,6 @@ import java.io.IOException;
 import java.io.UnsupportedEncodingException;
 import java.math.BigDecimal;
 import java.sql.Types;
-import java.util.Set;
 import java.util.concurrent.atomic.AtomicLong;
 
 
@@ -119,11 +118,6 @@ public class ConstantImpl extends ExpressionImpl {
     return value;
   }
 
-  @Override
-  public void getColumns(Set<ColumnImpl> columns) {
-    //nothing to implement
-  }
-
   public void negate() {
     if (value instanceof Long) {
       value = -1 * (Long)value;
@@ -218,11 +212,6 @@ public class ConstantImpl extends ExpressionImpl {
   @Override
   public boolean canSortWithIndex() {
     return false;
-  }
-
-  @Override
-  public void queryRewrite() {
-    //nothing to implement
   }
 
   @Override

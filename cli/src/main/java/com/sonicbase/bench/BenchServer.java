@@ -1,58 +1,83 @@
 package com.sonicbase.bench;
 
+import com.fasterxml.jackson.databind.ObjectMapper;
+import com.fasterxml.jackson.databind.node.ArrayNode;
+import com.fasterxml.jackson.databind.node.ObjectNode;
+import com.sonicbase.common.Config;
 import org.apache.commons.cli.*;
+import org.apache.commons.io.IOUtils;
 import org.eclipse.jetty.server.Request;
 import org.eclipse.jetty.server.Server;
 import org.eclipse.jetty.server.handler.AbstractHandler;
+import org.slf4j.Logger;
+import org.slf4j.LoggerFactory;
 
-import javax.servlet.ServletException;
 import javax.servlet.http.HttpServletRequest;
 import javax.servlet.http.HttpServletResponse;
-import java.io.IOException;
+import java.io.*;
+import java.util.List;
 import java.util.concurrent.atomic.AtomicLong;
 
-/**
- * Created by lowryda on 3/11/17.
- */
 public class BenchServer {
+  public static final Logger logger = LoggerFactory.getLogger(BenchServer.class);
 
-  static BenchmarkCheck benchCheck = new BenchmarkCheck();
-  static BenchmarkInsert benchInsert = new BenchmarkInsert();
-  static BenchmarkDelete benchDelete = new BenchmarkDelete();
-  static BenchmarkAWSInsertPublish benchAWSInsert = new BenchmarkAWSInsertPublish();
-  static BenchmarkAWSDeletePublish benchAWSDelete = new BenchmarkAWSDeletePublish();
-  static BenchmarkIdentityQuery benchIdentity = new BenchmarkIdentityQuery();
-  static BenchmarkRangeQuery benchRange = new BenchmarkRangeQuery();
-  static BenchmarkJoins benchJoins = new BenchmarkJoins();
-  static AtomicLong insertBegin = new AtomicLong();
-  static AtomicLong insertHighest = new AtomicLong();
+  static final BenchmarkCheck benchCheck = new BenchmarkCheck();
+  static final BenchmarkInsert benchInsert = new BenchmarkInsert();
+  static final BenchmarkDelete benchDelete = new BenchmarkDelete();
+  static final BenchmarkIdentityQuery benchIdentity = new BenchmarkIdentityQuery();
+  static final BenchmarkRangeQuery benchRange = new BenchmarkRangeQuery();
+  static final BenchmarkJoins benchJoins = new BenchmarkJoins();
+  static final AtomicLong insertBegin = new AtomicLong();
+  static final AtomicLong insertHighest = new AtomicLong();
+  public static final String CLUSTER_STR = "cluster";
+  public static final String SHARD_STR = "shard";
+  public static final String COUNT_STR = "count";
+  public static final String SHARD_COUNT_STR = "shardCount";
+  public static final String USER_DIR_STR = "user.dir";
 
-  public static class HelloHandler extends AbstractHandler
-  {
+  private static String getAddress(HttpServletRequest request) throws IOException {
+    String cluster = request.getParameter(CLUSTER_STR);
+    if (cluster == null) {
+      return null;
+    }
+    logger.info("userDir={}", System.getProperty(USER_DIR_STR));
+    File file = new File(System.getProperty(USER_DIR_STR), "config/config-" + cluster + ".yaml");
+    if (!file.exists()) {
+      file = new File(System.getProperty(USER_DIR_STR), "db/src/main/resources/config/config-" + cluster + ".yaml");
+    }
+    String configStr = IOUtils.toString(new BufferedInputStream(new FileInputStream(file)), "utf-8");
+    Config config = new Config(configStr);
+    List<Config.Shard> array = config.getShards();
+    Config.Shard shard = array.get(0);
+    List<Config.Replica> replicasArray = shard.getReplicas();
+    String address = replicasArray.get(0).getString("publicAddress");
+    if (config.getBoolean("clientIsPrivate")) {
+      address = replicasArray.get(0).getString("privateAddress");
+    }
+    return address;
+  }
+  public static class HelloHandler extends AbstractHandler {
     public void handle(String target, Request baseRequest, HttpServletRequest request, HttpServletResponse response)
-        throws IOException, ServletException
-    {
-      System.out.println("target=" + target);
-      System.out.println("baseRequest, contextPath=" + baseRequest.getContextPath() +
-          ", queryString=" + baseRequest.getQueryString());
-      System.out.println("request, queryString=" + request.getQueryString() +
-          ", servletPath=" + request.getServletPath() +
-          ", requestURL=" + request.getRequestURL() +
-          ", contextPath=" + request.getContextPath() +
-          ", requestUri=" + request.getRequestURI());
+        throws IOException {
+      logger.info("target={}", target);
+      logger.info("baseRequest, contextPath={}, queryString={}", baseRequest.getContextPath(),
+          baseRequest.getQueryString());
+      logger.info("request, queryString={}, servletPath={}, requestURL={}, contextPath={}, requestUri={}",
+          request.getQueryString(), request.getServletPath(), request.getRequestURL(),
+          request.getContextPath(), request.getRequestURI());
       String uri = request.getRequestURI();
       String ret = "";
       if (uri.startsWith("/bench/start/insert")) {
-        benchInsert.start(insertBegin, insertHighest, request.getParameter("cluster"),
-            Integer.valueOf(request.getParameter("shard")),
+        benchInsert.start(getAddress(request), insertBegin, insertHighest, request.getParameter(CLUSTER_STR),
+            Integer.valueOf(request.getParameter(SHARD_STR)),
             Long.valueOf(request.getParameter("offset")),
-            Long.valueOf(request.getParameter("count")), false);
+            Long.valueOf(request.getParameter(COUNT_STR)), false);
       }
       else if (uri.startsWith("/bench/start/delete")) {
-        benchDelete.start(insertBegin, insertHighest, request.getParameter("cluster"), Integer.valueOf(request.getParameter("shardCount")),
-            Integer.valueOf(request.getParameter("shard")),
+        benchDelete.start(getAddress(request), insertBegin, insertHighest, request.getParameter(CLUSTER_STR), Integer.valueOf(request.getParameter(SHARD_COUNT_STR)),
+            Integer.valueOf(request.getParameter(SHARD_STR)),
             Long.valueOf(request.getParameter("offset")),
-            Long.valueOf(request.getParameter("count")), false);
+            Long.valueOf(request.getParameter(COUNT_STR)), false);
       }
       else if (uri.startsWith("/bench/stop/insert")) {
         benchInsert.stop();
@@ -60,70 +85,34 @@ public class BenchServer {
       else if (uri.startsWith("/bench/stop/Delete")) {
         benchDelete.stop();
       }
-      else if (uri.startsWith("/bench/start/aws-insert")) {
-        benchAWSInsert.start(insertBegin, insertHighest, request.getParameter("cluster"), Integer.valueOf(request.getParameter("shardCount")),
-            Integer.valueOf(request.getParameter("shard")),
-            Long.valueOf(request.getParameter("offset")),
-            Long.valueOf(request.getParameter("count")), false);
-      }
-      else if (uri.startsWith("/bench/start/aws-delete")) {
-        benchAWSDelete.start(insertBegin, insertHighest, request.getParameter("cluster"), Integer.valueOf(request.getParameter("shardCount")),
-            Integer.valueOf(request.getParameter("shard")),
-            Long.valueOf(request.getParameter("offset")),
-            Long.valueOf(request.getParameter("count")), false);
-      }
-      else if (uri.startsWith("/bench/stop/aws-insert")) {
-        benchAWSInsert.stop();
-      }
-      else if (uri.startsWith("/bench/stop/aws-delete")) {
-        benchAWSDelete.stop();
-      }
-//      else if (uri.startsWith("/bench/start/kafka-insert")) {
-//        benchKafkaInsert.start(insertBegin, insertHighest, request.getParameter("cluster"), Integer.valueOf(request.getParameter("shardCount")),
-//            Integer.valueOf(request.getParameter("shard")),
-//            Long.valueOf(request.getParameter("offset")),
-//            Long.valueOf(request.getParameter("count")), false);
-//      }
-//      else if (uri.startsWith("/bench/start/kafka-delete")) {
-//        benchKafkaDelete.start(insertBegin, insertHighest, request.getParameter("cluster"), Integer.valueOf(request.getParameter("shardCount")),
-//            Integer.valueOf(request.getParameter("shard")),
-//            Long.valueOf(request.getParameter("offset")),
-//            Long.valueOf(request.getParameter("count")), false);
-//      }
-//      else if (uri.startsWith("/bench/stop/kafka-insert")) {
-//        benchKafkaInsert.stop();
-//      }
-//      else if (uri.startsWith("/bench/stop/aws-delete")) {
-//        benchKafkaDelete.stop();
-//      }
       else if (uri.startsWith("/bench/start/check")) {
-        benchCheck.start(insertBegin, insertHighest, request.getParameter("cluster"), Integer.valueOf(request.getParameter("shardCount")),
-            Integer.valueOf(request.getParameter("shard")),
-            Long.valueOf(request.getParameter("count")));
+        benchCheck.start(getAddress(request), insertBegin, insertHighest, request.getParameter(CLUSTER_STR), Integer.valueOf(request.getParameter(SHARD_COUNT_STR)),
+            Integer.valueOf(request.getParameter(SHARD_STR)),
+            Long.valueOf(request.getParameter(COUNT_STR)));
       }
       else if (uri.startsWith("/bench/stop/check")) {
         benchCheck.stop();
       }
       else if (uri.startsWith("/bench/start/identity")) {
-        benchIdentity.start(request.getParameter("cluster"), Integer.valueOf(request.getParameter("shardCount")),
-            Integer.valueOf(request.getParameter("shard")),
-            Long.valueOf(request.getParameter("count")), request.getParameter("queryType"));
+        benchIdentity.start(getAddress(request), request.getParameter(CLUSTER_STR), Integer.valueOf(request.getParameter(SHARD_COUNT_STR)),
+            Integer.valueOf(request.getParameter(SHARD_STR)),
+            Long.valueOf(request.getParameter(COUNT_STR)), request.getParameter("queryType"));
       }
       else if (uri.startsWith("/bench/stop/identity")) {
         benchIdentity.stop();
       }
       else if (uri.startsWith("/bench/start/range")) {
-        benchRange.start(request.getParameter("cluster"), Integer.valueOf(request.getParameter("shardCount")),
-            Integer.valueOf(request.getParameter("shard")),
-            Long.valueOf(request.getParameter("count")));
+        benchRange.start(getAddress(request), request.getParameter(CLUSTER_STR), Integer.valueOf(request.getParameter(SHARD_COUNT_STR)),
+            Integer.valueOf(request.getParameter(SHARD_STR)),
+            Long.valueOf(request.getParameter(COUNT_STR)));
       }
       else if (uri.startsWith("/bench/stop/range")) {
         benchRange.stop();
       }
       else if (uri.startsWith("/bench/start/joins")) {
-        benchJoins.start(request.getParameter("cluster"), Integer.valueOf(request.getParameter("shardCount")),
-            Integer.valueOf(request.getParameter("shard")),
-            Long.valueOf(request.getParameter("count")), request.getParameter("queryType"));
+        benchJoins.start(getAddress(request), request.getParameter(CLUSTER_STR), Integer.valueOf(request.getParameter(SHARD_COUNT_STR)),
+            Integer.valueOf(request.getParameter(SHARD_STR)),
+            Long.valueOf(request.getParameter(COUNT_STR)), request.getParameter("queryType"));
       }
       else if (uri.startsWith("/bench/stop/joins")) {
         benchJoins.stop();
@@ -137,18 +126,6 @@ public class BenchServer {
       else if (uri.startsWith("/bench/stats/delete")) {
         ret = benchDelete.stats();
       }
-      else if (uri.startsWith("/bench/stats/aws-insert")) {
-        ret = benchAWSInsert.stats();
-      }
-      else if (uri.startsWith("/bench/stats/aws-delete")) {
-        ret = benchAWSDelete.stats();
-      }
-//      else if (uri.startsWith("/bench/stats/kafka-insert")) {
-//        ret = benchKafkaInsert.stats();
-//      }
-//      else if (uri.startsWith("/bench/stats/kafka-delete")) {
-//        ret = benchKafkaDelete.stats();
-//      }
       else if (uri.startsWith("/bench/stats/identity")) {
         ret = benchIdentity.stats();
       }
@@ -164,18 +141,6 @@ public class BenchServer {
       else if (uri.startsWith("/bench/resetStats/delete")) {
         benchDelete.resetStats();
       }
-      else if (uri.startsWith("/bench/resetStats/aws-insert")) {
-        benchAWSInsert.resetStats();
-      }
-      else if (uri.startsWith("/bench/resetStats/aws-delete")) {
-        benchAWSDelete.resetStats();
-      }
-//      else if (uri.startsWith("/bench/resetStats/kafka-insert")) {
-//        benchKafkaInsert.resetStats();
-//      }
-//      else if (uri.startsWith("/bench/resetStats/kafka-delete")) {
-//        benchKafkaDelete.resetStats();
-//      }
       else if (uri.startsWith("/bench/resetStats/identity")) {
         benchIdentity.resetStats();
       }

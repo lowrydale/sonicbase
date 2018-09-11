@@ -1,9 +1,8 @@
 package com.sonicbase.accept.server;
 
-import com.fasterxml.jackson.databind.ObjectMapper;
-import com.fasterxml.jackson.databind.node.ObjectNode;
 import com.sonicbase.client.DatabaseClient;
 import com.sonicbase.common.ComObject;
+import com.sonicbase.common.Config;
 import com.sonicbase.common.DatabaseCommon;
 import com.sonicbase.index.Index;
 import com.sonicbase.jdbcdriver.ConnectionProxy;
@@ -32,8 +31,8 @@ import static org.testng.Assert.*;
 public class TestJoins {
 
   private Connection conn;
-  private int recordCount = 10;
-  List<Long> ids = new ArrayList<>();
+  private final int recordCount = 10;
+  final List<Long> ids = new ArrayList<>();
   DatabaseClient client;
 
   com.sonicbase.server.DatabaseServer[] dbServers;
@@ -57,9 +56,8 @@ public class TestJoins {
     System.setProperty("log4j.configuration", "test-log4j.xml");
 
 
-    String configStr = IOUtils.toString(new BufferedInputStream(getClass().getResourceAsStream("/config/config-4-servers.json")), "utf-8");
-    ObjectMapper mapper = new ObjectMapper();
-    final ObjectNode config = (ObjectNode) mapper.readTree(configStr);
+    String configStr = IOUtils.toString(new BufferedInputStream(getClass().getResourceAsStream("/config/config-4-servers.yaml")), "utf-8");
+    Config config = new Config(configStr);
 
     FileUtils.deleteDirectory(new File(System.getProperty("user.home"), "db"));
 
@@ -72,10 +70,9 @@ public class TestJoins {
 
     List<Future> futures = new ArrayList<>();
     for (int i = 0; i < dbServers.length; i++) {
-      final int shard = i;
-      dbServers[shard] = new com.sonicbase.server.DatabaseServer();
-      dbServers[shard].setConfig(config, "4-servers", "localhost", 9010 + (50 * shard), true, new AtomicBoolean(true), new AtomicBoolean(true),null);
-      dbServers[shard].setRole(role);
+      dbServers[i] = new com.sonicbase.server.DatabaseServer();
+      dbServers[i].setConfig(config, "4-servers", "localhost", 9010 + (50 * i), true, new AtomicBoolean(true), new AtomicBoolean(true),null);
+      dbServers[i].setRole(role);
     }
     for (Future future : futures) {
       future.get();

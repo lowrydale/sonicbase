@@ -3,10 +3,8 @@ package com.sonicbase.server;
 import com.amazonaws.transform.MapEntry;
 import com.sonicbase.client.DatabaseClient;
 import com.sonicbase.common.DatabaseCommon;
-import com.sonicbase.index.Index;
 import com.sonicbase.query.BinaryExpression;
 
-import java.io.IOException;
 import java.util.ArrayList;
 import java.util.List;
 import java.util.Map;
@@ -392,13 +390,16 @@ public class IndexLookupOneKey extends IndexLookup {
                                                       byte[][] currKeyRecords, boolean shouldProcess) {
     Object value;
     if (shouldProcess) {
-      value = entry.getValue();
-      if (value != null && !value.equals(0L)) {
-        if (keys) {
-          currKeyRecords = server.getAddressMap().fromUnsafeToKeys(value);
-        }
-        else {
-          records = server.getAddressMap().fromUnsafeToRecords(value);
+      Object[] key = entry.getKey();
+      synchronized (index.getMutex(key)) {
+        value = index.get(key);
+        if (value != null && !value.equals(0L)) {
+          if (keys) {
+            currKeyRecords = server.getAddressMap().fromUnsafeToKeys(value);
+          }
+          else {
+            records = server.getAddressMap().fromUnsafeToRecords(value);
+          }
         }
       }
       Object[] keyToUse = leftKey;
@@ -408,9 +409,7 @@ public class IndexLookupOneKey extends IndexLookup {
       if (value != null) {
         AtomicBoolean done = new AtomicBoolean();
         handleRecord(viewVersion, keyToUse, evaluateExpression, records, currKeyRecords, done);
-        if (done.get()) {
-          return true;
-        }
+        return done.get();
       }
     }
     return false;
@@ -424,13 +423,15 @@ public class IndexLookupOneKey extends IndexLookup {
     boolean shouldProcess = true;
     shouldProcess = handleProbe(countSkipped, shouldProcess);
     if (shouldProcess) {
-      value = index.get(originalLeftKey);
-      if (value != null && !value.equals(0L)) {
-        if (keys) {
-          currKeyRecords = server.getAddressMap().fromUnsafeToKeys(value);
-        }
-        else {
-          records = server.getAddressMap().fromUnsafeToRecords(value);
+      synchronized (index.getMutex(originalLeftKey)) {
+        value = index.get(originalLeftKey);
+        if (value != null && !value.equals(0L)) {
+          if (keys) {
+            currKeyRecords = server.getAddressMap().fromUnsafeToKeys(value);
+          }
+          else {
+            records = server.getAddressMap().fromUnsafeToRecords(value);
+          }
         }
       }
       if (value != null) {
@@ -448,7 +449,7 @@ public class IndexLookupOneKey extends IndexLookup {
   private class CheckForEndOfTraversal {
     private boolean myResult;
     private Map.Entry<Object[], Object> entry;
-    private Map.Entry<Object[], Object> currEntry;
+    private final Map.Entry<Object[], Object> currEntry;
 
     public CheckForEndOfTraversal(Map.Entry<Object[], Object> entry, Map.Entry<Object[], Object> currEntry) {
       this.entry = entry;
@@ -523,9 +524,9 @@ public class IndexLookupOneKey extends IndexLookup {
     private final AtomicInteger countSkipped;
     private boolean myResult;
     private Map.Entry<Object[], Object> entry;
-    private Map.Entry<Object[], Object> currEntry;
+    private final Map.Entry<Object[], Object> currEntry;
 
-    public ProcessKey(AtomicInteger countSkipped, Map.Entry<Object[], Object> entry, Map.Entry<Object[], Object> currEntry) {
+    ProcessKey(AtomicInteger countSkipped, Map.Entry<Object[], Object> entry, Map.Entry<Object[], Object> currEntry) {
       this.countSkipped = countSkipped;
       this.entry = entry;
       this.currEntry = currEntry;
@@ -577,12 +578,12 @@ public class IndexLookupOneKey extends IndexLookup {
       private byte[][] currKeyRecords;
       private byte[][] records;
 
-      public GetRecords(byte[][] currKeyRecords, byte[]... records) {
+      GetRecords(byte[][] currKeyRecords, byte[]... records) {
         this.currKeyRecords = currKeyRecords;
         this.records = records;
       }
 
-      public byte[][] getCurrKeyRecords() {
+      byte[][] getCurrKeyRecords() {
         return currKeyRecords;
       }
 
@@ -591,16 +592,18 @@ public class IndexLookupOneKey extends IndexLookup {
       }
 
       public GetRecords invoke() {
-        if (keys) {
-          Object unsafeAddress = currEntry.getValue();
-          if (unsafeAddress != null && !unsafeAddress.equals(0L)) {
-            currKeyRecords = server.getAddressMap().fromUnsafeToKeys(unsafeAddress);
+        Object[] key = currEntry.getKey();
+        synchronized (index.getMutex(key)) {
+          Object unsafeAddress = index.get(key);
+          if (keys) {
+            if (unsafeAddress != null && !unsafeAddress.equals(0L)) {
+              currKeyRecords = server.getAddressMap().fromUnsafeToKeys(unsafeAddress);
+            }
           }
-        }
-        else {
-          Object unsafeAddress = currEntry.getValue();
-          if (unsafeAddress != null && !unsafeAddress.equals(0L)) {
-            records = server.getAddressMap().fromUnsafeToRecords(unsafeAddress);
+          else {
+            if (unsafeAddress != null && !unsafeAddress.equals(0L)) {
+              records = server.getAddressMap().fromUnsafeToRecords(unsafeAddress);
+            }
           }
         }
         return this;
@@ -609,12 +612,12 @@ public class IndexLookupOneKey extends IndexLookup {
   }
 
   private class GetNextEntries {
-    private Map.Entry<Object[], Object> entry;
+    private final Map.Entry<Object[], Object> entry;
     private boolean shouldRet;
     private Map.Entry<Object[], Object> retEntry;
     private Map.Entry[] entries;
 
-    public GetNextEntries(Map.Entry<Object[], Object> entry) {
+    GetNextEntries(Map.Entry<Object[], Object> entry) {
       this.entry = entry;
     }
 
@@ -677,7 +680,7 @@ public class IndexLookupOneKey extends IndexLookup {
       return localEntries;
     }
 
-    public Map.Entry<Object[], Object> getRetEntry() {
+    Map.Entry<Object[], Object> getRetEntry() {
       return retEntry;
     }
   }

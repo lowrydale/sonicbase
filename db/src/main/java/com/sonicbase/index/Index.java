@@ -17,15 +17,15 @@ import java.util.concurrent.atomic.AtomicLong;
 // I prefer to return null instead of an empty array
 // I don't know a good way to reduce the parameter count
 public class Index {
-  private static Logger logger = LoggerFactory.getLogger(Index.class);
+  private static final Logger logger = LoggerFactory.getLogger(Index.class);
 
   private final Comparator[] comparators;
-  private Object[] mutexes = new Object[100_000];
+  private final Object[] mutexes = new Object[100_000];
 
-  private AtomicLong count = new AtomicLong();
-  private IndexImpl impl;
+  private final AtomicLong count = new AtomicLong();
+  private final IndexImpl impl;
 
-  private AtomicLong size = new AtomicLong();
+  private final AtomicLong size = new AtomicLong();
   private Comparator<Object[]> comparator = null;
 
   public Index(TableSchema tableSchema, String indexName, final Comparator[] comparators) {
@@ -59,17 +59,12 @@ public class Index {
     return comparators;
   }
 
-  protected int getObjectArrayComparator(Comparator[] comparators, Object[] o1, Object[] o2) {
-    for (int i = 0; i < Math.min(o1.length, o2.length); i++) {
-      if (o1[i] == null || o2[i] == null) {
-        continue;
-      }
+  int getObjectArrayComparator(Comparator[] comparators, Object[] o1, Object[] o2) {
+    int keyLen = (o1.length <= o2.length) ? o1.length : o2.length;
+    for (int i = 0; i < keyLen; i++) {
       int value = comparators[i].compare(o1[i], o2[i]);
-      if (value < 0) {
-        return -1;
-      }
-      if (value > 0) {
-        return 1;
+      if (value != 0) {
+        return value;
       }
     }
     return 0;
@@ -125,7 +120,7 @@ public class Index {
     this.count.set(count);
   }
 
-  public AtomicLong getSizeObj() {
+  AtomicLong getSizeObj() {
     return size;
   }
 
@@ -134,10 +129,10 @@ public class Index {
   }
 
   public static class MyEntry<T, V> implements Map.Entry<T, V> {
-    private T key;
+    private final T key;
     private V value;
 
-    public MyEntry(T key, V value) {
+    MyEntry(T key, V value) {
       this.key = key;
       this.value = value;
     }
@@ -248,9 +243,7 @@ public class Index {
       if (currOffset.get() >= offsets.get(curr.get())) {
         ret.add(key);
         curr.incrementAndGet();
-        if (curr.get() == offsets.size()) {
-          return false;
-        }
+        return curr.get() != offsets.size();
       }
       return true;
     });

@@ -9,7 +9,7 @@ import java.sql.SQLException;
 // I prefer to return null instead of an empty array
 // I don't know a good way to reduce the parameter count
 public class Clob implements java.sql.Clob {
-  public static final String NULL_DATA_STR = "null data";
+  private static final String NULL_DATA_STR = "null data";
   private String data;
 
   public Clob() {
@@ -21,7 +21,7 @@ public class Clob implements java.sql.Clob {
   }
 
   @Override
-  public long length() throws SQLException {
+  public long length() {
     if (data == null) {
       return 0;
     }
@@ -58,7 +58,7 @@ public class Clob implements java.sql.Clob {
   }
 
   @Override
-  public long position(String searchstr, long start) throws SQLException {
+  public long position(String searchstr, long start) {
     if (data == null) {
       return -1;
     }
@@ -113,7 +113,7 @@ public class Clob implements java.sql.Clob {
   }
 
   @Override
-  public void truncate(long len) throws SQLException {
+  public void truncate(long len) {
     if (data == null) {
       return;
     }
@@ -121,7 +121,7 @@ public class Clob implements java.sql.Clob {
   }
 
   @Override
-  public void free() throws SQLException {
+  public void free() {
     data = null;
   }
 

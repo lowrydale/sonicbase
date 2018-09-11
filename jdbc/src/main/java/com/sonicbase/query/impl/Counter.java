@@ -82,6 +82,10 @@ public class Counter {
     }
   }
 
+  public void setLongCount(Long longCount) {
+    this.longCount = longCount;
+  }
+
   public void addLong(Long toAdd) {
     if (longCount == null) {
       longCount = 0L;
@@ -93,11 +97,11 @@ public class Counter {
     maxLong = Math.max(maxLong, toAdd);
   }
 
-  public Object getDoubleCount() {
+  Object getDoubleCount() {
     return doubleCount;
   }
 
-  public void addDouble(Double toAdd) {
+  private void addDouble(Double toAdd) {
     if (doubleCount == null) {
       doubleCount = 0d;
     }
@@ -116,7 +120,7 @@ public class Counter {
     return minLong;
   }
 
-  public Double getMinDouble() {
+  Double getMinDouble() {
     return minDouble;
   }
 
@@ -124,18 +128,18 @@ public class Counter {
     return maxLong;
   }
 
-  public Double getMaxDouble() {
+  Double getMaxDouble() {
     return maxDouble;
   }
 
-  public Double getAvgLong() {
+  Double getAvgLong() {
     if (count == 0 || longCount == null) {
       return 0d;
     }
     return longCount / (double) count;
   }
 
-  public Double getAvgDouble() {
+  Double getAvgDouble() {
     if (count == 0 || doubleCount == null) {
       return 0d;
     }
@@ -146,11 +150,11 @@ public class Counter {
     this.dataType = dataType;
   }
 
-  public void setDestTypeToLong() {
+  void setDestTypeToLong() {
     this.longCount = 0L;
   }
 
-  public void setDestTypeToDouble() {
+  void setDestTypeToDouble() {
     this.doubleCount = 0d;
   }
 
@@ -216,7 +220,7 @@ public class Counter {
     dataType = DataType.Type.valueOf(in.readInt());
   }
 
-  public DataType.Type getDataType() {
+  DataType.Type getDataType() {
     return dataType;
   }
 

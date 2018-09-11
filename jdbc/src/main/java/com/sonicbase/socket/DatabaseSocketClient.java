@@ -34,10 +34,10 @@ public class DatabaseSocketClient {
 
   private static final int CONNECTION_COUNT = 10000;
   private static final String PORT_STR = ", port=";
-  private static Logger logger = LoggerFactory.getLogger(DatabaseSocketClient.class);
-  private static ConcurrentHashMap<String, ArrayBlockingQueue<Connection>> pools = new ConcurrentHashMap<>();
-  private static AtomicInteger connectionCount = new AtomicInteger();
-  private static ConcurrentLinkedQueue<Connection> openConnections = new ConcurrentLinkedQueue<>();
+  private static final Logger logger = LoggerFactory.getLogger(DatabaseSocketClient.class);
+  private static final ConcurrentHashMap<String, ArrayBlockingQueue<Connection>> pools = new ConcurrentHashMap<>();
+  private static final AtomicInteger connectionCount = new AtomicInteger();
+  private static final ConcurrentLinkedQueue<Connection> openConnections = new ConcurrentLinkedQueue<>();
 
   private static Connection borrowConnection(final String host, final int port) {
     try {
@@ -102,7 +102,7 @@ public class DatabaseSocketClient {
     return sock;
   }
 
-  public static void returnConnection(
+  private static void returnConnection(
       Connection sock, String host, int port) {
     if (sock != null) {
       try {
@@ -229,13 +229,13 @@ public class DatabaseSocketClient {
     }
   }
 
-  private static AtomicLong totalCallCount = new AtomicLong();
-  private static AtomicLong callCount = new AtomicLong();
-  private static AtomicLong callDuration = new AtomicLong();
-  private static AtomicLong requestDuration = new AtomicLong();
-  private static AtomicLong processingDuration = new AtomicLong();
-  private static AtomicLong responseDuration = new AtomicLong();
-  private static AtomicLong lastLogReset = new AtomicLong(System.currentTimeMillis());
+  private static final AtomicLong totalCallCount = new AtomicLong();
+  private static final AtomicLong callCount = new AtomicLong();
+  private static final AtomicLong callDuration = new AtomicLong();
+  private static final AtomicLong requestDuration = new AtomicLong();
+  private static final AtomicLong processingDuration = new AtomicLong();
+  private static final AtomicLong responseDuration = new AtomicLong();
+  private static final AtomicLong lastLogReset = new AtomicLong(System.currentTimeMillis());
 
   public static void sendBatch(String host, int port, List<Request> requests) {
     try {
@@ -485,16 +485,14 @@ public class DatabaseSocketClient {
       if (responseLen > 0) {
         request.response = new byte[responseLen];
         totalRead = 0;
-        while (true) {
+        do {
           int lenRead = in.read(request.response, totalRead, request.response.length - totalRead);
           if (lenRead == -1) {
             throw new DatabaseException("EOF");
           }
           totalRead += lenRead;
-          if (totalRead == request.response.length) {
-            break;
-          }
         }
+        while(totalRead != request.response.length);
       }
       request.latch.countDown();
     }

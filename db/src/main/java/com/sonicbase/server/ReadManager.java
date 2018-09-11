@@ -34,13 +34,13 @@ import java.util.concurrent.atomic.AtomicLong;
 public class ReadManager {
 
   private static final String CURR_VER_STR = "currVer:";
-  private static Logger logger = LoggerFactory.getLogger(ReadManager.class);
+  private static final Logger logger = LoggerFactory.getLogger(ReadManager.class);
 
 
   private final com.sonicbase.server.DatabaseServer server;
   private Thread diskReaper;
   private boolean shutdown;
-  private AtomicInteger lookupCount = new AtomicInteger();
+  private final AtomicInteger lookupCount = new AtomicInteger();
 
 
   ReadManager(DatabaseServer databaseServer) {
@@ -148,13 +148,14 @@ public class ReadManager {
   private long doCount(String dbName, Expression expression, ParameterHandler parms, String countColumn, long count,
                        TableSchema tableSchema, Index index, int countColumnOffset) {
     Map.Entry<Object[], Object> entry = index.firstEntry();
-    while (true) {
-      if (entry == null) {
-        break;
-      }
+    while (entry != null) {
       byte[][] records = null;
-      if (entry.getValue() != null && !entry.getValue().equals(0L)) {
-        records = server.getAddressMap().fromUnsafeToRecords(entry.getValue());
+      Object[] key = entry.getKey();
+      synchronized (index.getMutex(key)) {
+        Object value = index.get(key);
+        if (value != null && !value.equals(0L)) {
+          records = server.getAddressMap().fromUnsafeToRecords(value);
+        }
       }
       for (byte[] bytes : records) {
         count = doCountForRecord(dbName, expression, parms, countColumn, count, tableSchema, countColumnOffset, bytes);
@@ -194,13 +195,7 @@ public class ReadManager {
   public ComObject batchIndexLookup(ComObject cobj, boolean replayedCommand) {
     try {
       if (server.getBatchRepartCount().get() != 0 && lookupCount.incrementAndGet() % 1000 == 0) {
-        try {
-          Thread.sleep(10);
-        }
-        catch (InterruptedException e) {
-          Thread.currentThread().interrupt();
-          throw new DatabaseException(e);
-        }
+        ThreadUtil.sleep(10);
       }
 
       IndexLookup indexLookup = new IndexLookupOneKey(server);
@@ -211,7 +206,6 @@ public class ReadManager {
         throw new SchemaOutOfSyncException(CURR_VER_STR + server.getCommon().getSchemaVersion() + ":");
       }
       indexLookup.setCount(cobj.getInt(ComObject.Tag.COUNT));
-      indexLookup.setSerializationVersion(cobj.getShort(ComObject.Tag.SERIALIZATION_VERSION));
 
       String tableName = cobj.getString(ComObject.Tag.TABLE_NAME);
       String indexName = cobj.getString(ComObject.Tag.INDEX_NAME);
@@ -257,14 +251,13 @@ public class ReadManager {
   private void batchIndexLookupForKey(IndexLookup indexLookup, String indexName, TableSchema tableSchema,
                                       IndexSchema indexSchema, boolean singleValue, ComArray retKeysArray,
                                       ComObject keyObj) throws EOFException {
-    ComObject key = keyObj;
-    int offset = key.getInt(ComObject.Tag.OFFSET);
+    int offset = keyObj.getInt(ComObject.Tag.OFFSET);
     Object[] leftKey = null;
     if (singleValue) {
-      leftKey = new Object[]{key.getLong(ComObject.Tag.LONG_KEY)};
+      leftKey = new Object[]{keyObj.getLong(ComObject.Tag.LONG_KEY)};
     }
     else {
-      byte[] keyBytes = key.getByteArray(ComObject.Tag.KEY_BYTES);
+      byte[] keyBytes = keyObj.getByteArray(ComObject.Tag.KEY_BYTES);
       leftKey = DatabaseCommon.deserializeKey(tableSchema, keyBytes);
     }
     indexLookup.setLeftKey(leftKey);
@@ -299,6 +292,9 @@ public class ReadManager {
       keysArray.add(DatabaseCommon.serializeKey(tableSchema, indexName, currKey));
     }
     ComArray retRecordsArray = retEntry.putArray(ComObject.Tag.RECORDS, ComObject.Type.BYTE_ARRAY_TYPE);
+    if (retRecords.isEmpty()) {
+      logger.error("Record not found: key=" + DatabaseCommon.keyToString(leftKey));
+    }
     for (int j = 0; j < retRecords.size(); j++) {
       byte[] bytes = retRecords.get(j);
       retRecordsArray.add(bytes);
@@ -314,6 +310,7 @@ public class ReadManager {
       }
     }
     catch (InterruptedException e) {
+      Thread.currentThread().interrupt();
       throw new DatabaseException(e);
     }
   }
@@ -350,7 +347,6 @@ public class ReadManager {
       }
 
       indexLookup.setProcedureContext(procedureContext);
-      indexLookup.setSerializationVersion(serializationVersion);
       indexLookup.setCount(cobj.getInt(ComObject.Tag.COUNT));
       indexLookup.setIsExplicitTrans(cobj.getBoolean(ComObject.Tag.IS_EXCPLICITE_TRANS));
       indexLookup.setIsCommiting(cobj.getBoolean(ComObject.Tag.IS_COMMITTING));
@@ -661,12 +657,7 @@ public class ReadManager {
     try {
       int schemaRetryCount = 0;
       if (server.getBatchRepartCount().get() != 0 && lookupCount.incrementAndGet() % 1000 == 0) {
-        try {
-          Thread.sleep(10);
-        }
-        catch (InterruptedException e) {
-          throw new DatabaseException(e);
-        }
+        ThreadUtil.sleep(10);
       }
 
       String dbName = cobj.getString(ComObject.Tag.DB_NAME);
@@ -793,13 +784,7 @@ public class ReadManager {
     try {
       final int schemaRetryCount = 0;
       if (server.getBatchRepartCount().get() != 0 && lookupCount.incrementAndGet() % 1000 == 0) {
-        try {
-          Thread.sleep(10);
-        }
-        catch (InterruptedException e) {
-          Thread.currentThread().interrupt();
-          throw new DatabaseException(e);
-        }
+        ThreadUtil.sleep(10);
       }
 
       final String dbName = cobj.getString(ComObject.Tag.DB_NAME);
@@ -986,14 +971,10 @@ public class ReadManager {
     List<String> tables = new ArrayList<>();
     String[] localTableNames = ret instanceof ResultSetImpl ?
         ((ResultSetImpl)ret).getTableNames() : ((DiskBasedResultSet)ret).getTableNames();
-    for (String tableName : localTableNames) {
-      tables.add(tableName);
-    }
+    tables.addAll(Arrays.asList(localTableNames));
     localTableNames = diskResultSets[i] instanceof ResultSetImpl ?
         ((ResultSetImpl)diskResultSets[i]).getTableNames() : ((DiskBasedResultSet)diskResultSets[i]).getTableNames();
-    for (String tableName : localTableNames) {
-      tables.add(tableName);
-    }
+    tables.addAll(Arrays.asList(localTableNames));
     ret = new DiskBasedResultSet(serializationVersion, dbName, server,
         tables.toArray(new String[tables.size()]), new Object[]{ret, diskResultSets[i]},
         orderByExpressions, count, unique, intersect, except, selectStatement.getSelectColumns());
@@ -1261,7 +1242,7 @@ public class ReadManager {
       Index index = server.getIndex(dbName, tableName, indexName);
       Map.Entry<Object[], Object> entry = index.lastEntry();
 
-      maxKey = evaluateCounterProcessEntry(isPrimaryKey, indexName, tableSchema, maxKey, entry);
+      maxKey = evaluateCounterProcessEntry(index, isPrimaryKey, indexName, tableSchema, maxKey, entry);
       minKey = evaluateCounterProcessFirstEntry(isPrimaryKey, indexName, tableSchema, minKey, index);
 
       if (minKey == null || maxKey == null) {
@@ -1274,13 +1255,16 @@ public class ReadManager {
     }
   }
 
-  private byte[] evaluateCounterProcessEntry(boolean isPrimaryKey, String indexName, TableSchema tableSchema,
+  private byte[] evaluateCounterProcessEntry(Index index, boolean isPrimaryKey, String indexName, TableSchema tableSchema,
                                              byte[] maxKey, Map.Entry<Object[], Object> entry) {
     if (entry != null) {
       byte[][] records = null;
-      Object unsafeAddress = entry.getValue();
-      if (unsafeAddress != null && !unsafeAddress.equals(0L)) {
-        records = server.getAddressMap().fromUnsafeToRecords(unsafeAddress);
+      Object[] key = entry.getKey();
+      synchronized (index.getMutex(key)) {
+        Object unsafeAddress = index.get(key);
+        if (unsafeAddress != null && !unsafeAddress.equals(0L)) {
+          records = server.getAddressMap().fromUnsafeToRecords(unsafeAddress);
+        }
       }
       if (records != null) {
         if (isPrimaryKey) {
@@ -1298,7 +1282,7 @@ public class ReadManager {
   private byte[] evaluateCounterProcessFirstEntry(boolean isPrimaryKey, String indexName, TableSchema tableSchema,
                                                   byte[] minKey, Index index) {
     Map.Entry<Object[], Object> entry = index.firstEntry();
-    minKey = evaluateCounterProcessEntry(isPrimaryKey, indexName, tableSchema, minKey, entry);
+    minKey = evaluateCounterProcessEntry(index, isPrimaryKey, indexName, tableSchema, minKey, entry);
     return minKey;
   }
 
@@ -1342,16 +1326,18 @@ public class ReadManager {
       Object[] key = DatabaseCommon.deserializeKey(tableSchema, keyBytes);
 
       Index index = server.getIndex(dbName, tableName, indexName);
-      Object unsafeAddress = index.get(key);
-      if (unsafeAddress != null) {
-        byte[][] records = null;
-        if (!unsafeAddress.equals(0L)) {
-          records = server.getAddressMap().fromUnsafeToRecords(unsafeAddress);
+      byte[][] records = null;
+      synchronized (index.getMutex(key)) {
+        Object unsafeAddress = index.get(key);
+        if (unsafeAddress != null) {
+          if (!unsafeAddress.equals(0L)) {
+            records = server.getAddressMap().fromUnsafeToRecords(unsafeAddress);
+          }
         }
-        if (records != null) {
-          doEvaluateCounter(new Record(dbName, server.getCommon(), records[0]), counter, minKeyBytes,
-              tableSchema.getFieldOffset(columnName));
-        }
+      }
+      if (records != null) {
+        doEvaluateCounter(new Record(dbName, server.getCommon(), records[0]), counter, minKeyBytes,
+            tableSchema.getFieldOffset(columnName));
       }
       ComObject retObj = new ComObject();
       retObj.put(ComObject.Tag.LEGACY_COUNTER, counter.serialize());
@@ -1363,8 +1349,7 @@ public class ReadManager {
   }
 
   private void doEvaluateCounter(Record record1, Counter counter, byte[] minKeyBytes, Integer fieldOffset) {
-    Record record = record1;
-    Object value = record.getFields()[fieldOffset];
+    Object value = record1.getFields()[fieldOffset];
     if (minKeyBytes != null) {
       if (counter.isDestTypeLong()) {
         counter.setMinLong((Long) DataType.getLongConverter().convert(value));
@@ -1385,12 +1370,12 @@ public class ReadManager {
 
 
   private class SetOffsetLimit {
-    private ComObject cobj;
-    private IndexLookup indexLookup;
+    private final ComObject cobj;
+    private final IndexLookup indexLookup;
     private AtomicLong currOffset;
     private AtomicLong countReturned;
 
-    public SetOffsetLimit(ComObject cobj, IndexLookup indexLookup) {
+    SetOffsetLimit(ComObject cobj, IndexLookup indexLookup) {
       this.cobj = cobj;
       this.indexLookup = indexLookup;
     }
@@ -1399,7 +1384,7 @@ public class ReadManager {
       return currOffset;
     }
 
-    public AtomicLong getCountReturned() {
+    AtomicLong getCountReturned() {
       return countReturned;
     }
 
@@ -1420,15 +1405,15 @@ public class ReadManager {
   }
 
   private class ServerSelectProcessRecordsForResponse {
-    private Offset offset;
-    private Limit limit;
-    private byte[][][] records;
+    private final Offset offset;
+    private final Limit limit;
+    private final byte[][][] records;
     private long currOffset;
     private long countReturned;
-    private ComArray tableArray;
+    private final ComArray tableArray;
 
-    public ServerSelectProcessRecordsForResponse(Offset offset, Limit limit, byte[][][] records, long currOffset,
-                                                 long countReturned, ComArray tableArray) {
+    ServerSelectProcessRecordsForResponse(Offset offset, Limit limit, byte[][][] records, long currOffset,
+                                          long countReturned, ComArray tableArray) {
       this.offset = offset;
       this.limit = limit;
       this.records = records;
@@ -1441,7 +1426,7 @@ public class ReadManager {
       return currOffset;
     }
 
-    public long getCountReturned() {
+    long getCountReturned() {
       return countReturned;
     }
 
@@ -1471,15 +1456,15 @@ public class ReadManager {
   }
 
   private class DoProcessServerSelectResults {
-    private Offset offset;
-    private Limit limit;
-    private ExpressionImpl.CachedRecord[][] results;
+    private final Offset offset;
+    private final Limit limit;
+    private final ExpressionImpl.CachedRecord[][] results;
     private long currOffset;
     private long countReturned;
-    private ComArray tableArray;
+    private final ComArray tableArray;
 
-    public DoProcessServerSelectResults(Offset offset, Limit limit, ExpressionImpl.CachedRecord[][] results,
-                                        long currOffset, long countReturned, ComArray tableArray) {
+    DoProcessServerSelectResults(Offset offset, Limit limit, ExpressionImpl.CachedRecord[][] results,
+                                 long currOffset, long countReturned, ComArray tableArray) {
       this.offset = offset;
       this.limit = limit;
       this.results = results;
@@ -1492,7 +1477,7 @@ public class ReadManager {
       return currOffset;
     }
 
-    public long getCountReturned() {
+    long getCountReturned() {
       return countReturned;
     }
 

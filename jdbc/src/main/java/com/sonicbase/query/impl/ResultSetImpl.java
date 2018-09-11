@@ -13,7 +13,6 @@ import com.sonicbase.schema.DataType;
 import com.sonicbase.schema.FieldSchema;
 import com.sonicbase.schema.IndexSchema;
 import com.sonicbase.schema.TableSchema;
-import it.unimi.dsi.fastutil.objects.Object2ObjectOpenHashMap;
 import net.sf.jsqlparser.expression.Expression;
 import net.sf.jsqlparser.expression.LongValue;
 import net.sf.jsqlparser.expression.operators.relational.ExpressionList;
@@ -76,16 +75,17 @@ public class ResultSetImpl implements ResultSet {
 
   public ResultSetImpl(String[] describeStrs) {
     this.describeStrs = describeStrs;
+    this.recordCache = new ExpressionImpl.RecordCache();
   }
 
   public ResultSetImpl(List<Map<String, String>> mapResults) {
     this.mapResults = mapResults;
+    this.recordCache = new ExpressionImpl.RecordCache();
   }
 
   public ResultSetImpl(String dbName, DatabaseClient client, String[] tableNames, SelectStatementHandler.SetOperation setOperation,
                        Map<String, ColumnImpl> aliases, Map<String, SelectFunctionImpl> functionAliases,
                        boolean restrictToThisServer, StoredProcedureContextImpl procedureContext) {
-
     this.dbName = dbName;
     this.databaseClient = client;
     this.setOperation = setOperation;
@@ -100,6 +100,7 @@ public class ResultSetImpl implements ResultSet {
   public ResultSetImpl(DatabaseClient databaseClient, ComArray records) {
     this.databaseClient = databaseClient;
     this.recordsResults = records;
+    this.recordCache = new ExpressionImpl.RecordCache();
   }
 
   public ExpressionImpl.CachedRecord[][] getReadRecordsAndSerializedRecords() {
@@ -114,7 +115,7 @@ public class ResultSetImpl implements ResultSet {
     this.count = count;
   }
 
-  public Object getGroupByFunctionResults(String columnLabel, DataType.Type type) {
+  private Object getGroupByFunctionResults(String columnLabel, DataType.Type type) {
     if (groupByContext == null) {
       return null;
     }
@@ -223,6 +224,10 @@ public class ResultSetImpl implements ResultSet {
     return tableNames;
   }
 
+  public void setCurrPos(int currPos) {
+    this.currPos = currPos;
+  }
+
   public static class MultiTableRecordList {
     private String[] tableNames;
     private long[][] ids;
@@ -258,6 +263,8 @@ public class ResultSetImpl implements ResultSet {
     this.tableNames = selectStatement.getTableNames();
     this.restrictToThisServer = restrictToThisServer;
     this.procedureContext = procedureContext;
+    this.recordCache = new ExpressionImpl.RecordCache();
+
   }
 
   public ResultSetImpl(
@@ -363,7 +370,7 @@ public class ResultSetImpl implements ResultSet {
         return -1 * (ascendingFlags[i] ? 1 : -1);
       }
       if (value > 0) {
-        return 1 * (ascendingFlags[i] ? 1 : -1);
+        return (ascendingFlags[i] ? 1 : -1);
       }
     }
     return 0;
@@ -385,10 +392,10 @@ public class ResultSetImpl implements ResultSet {
       return -1 * (ascendingFlags[i] ? 1 : -1);
     }
     if (cachedRecord1 == null) {
-      return 1 * (ascendingFlags[i] ? 1 : -1);
+      return (ascendingFlags[i] ? 1 : -1);
     }
     if (cachedRecord.getRecord().getFields()[fieldOffset] == null) {
-      return 1 * (ascendingFlags[i] ? 1 : -1);
+      return (ascendingFlags[i] ? 1 : -1);
     }
     if (cachedRecord1.getRecord().getFields()[fieldOffset] == null) {
       return -1 * (ascendingFlags[i] ? 1 : -1);
@@ -1106,7 +1113,7 @@ public class ResultSetImpl implements ResultSet {
     private SelectFunctionImpl function;
   }
 
-  private Object2ObjectOpenHashMap<String, FieldInfo> fieldInfos = new Object2ObjectOpenHashMap<>();
+  private final Map<String, FieldInfo> fieldInfos = new HashMap<>();
 
   private boolean canShortCircuitFieldLookup(FieldInfo fieldInfo) {
     return fieldInfo != null && currPos >= 0 && !isCount && groupByContext == null && !functionAliases.containsKey(fieldInfo.labelName);
@@ -1802,10 +1809,9 @@ public class ResultSetImpl implements ResultSet {
         retString = retString.toLowerCase();
       }
       else if (function.equals("substring")) {
-        ExpressionList list = localParms;
-        int pos1 = (int) ((LongValue) list.getExpressions().get(1)).getValue();
-        if (list.getExpressions().size() > 2) {
-          int pos2 = (int) ((LongValue) list.getExpressions().get(2)).getValue();
+        int pos1 = (int) ((LongValue) localParms.getExpressions().get(1)).getValue();
+        if (localParms.getExpressions().size() > 2) {
+          int pos2 = (int) ((LongValue) localParms.getExpressions().get(2)).getValue();
           retString = retString.substring(pos1, pos2);
         }
         else {
@@ -2056,8 +2062,10 @@ public class ResultSetImpl implements ResultSet {
         retRecords[i][j] = cachedRecord;
         if (retRecords[i][j] == null) {
           Record record = doReadRecord(actualIds[i][j], nextReturn.getTableNames()[j], schemaRetryCount);
-          retRecords[i][j] = new ExpressionImpl.CachedRecord(record, record.serialize(databaseClient.getCommon(),
-              DatabaseClient.SERIALIZATION_VERSION));
+          if (record != null) {
+            retRecords[i][j] = new ExpressionImpl.CachedRecord(record, record.serialize(databaseClient.getCommon(),
+                DatabaseClient.SERIALIZATION_VERSION));
+          }
         }
       }
     }
@@ -2065,8 +2073,8 @@ public class ResultSetImpl implements ResultSet {
 
   private class GetGroupByFunctionResutsForSimpleMathFunction {
     private boolean myResult;
-    private String columnLabel;
-    private Map.Entry<String, ColumnImpl> alias;
+    private final String columnLabel;
+    private final Map.Entry<String, ColumnImpl> alias;
     private GroupByContext.GroupCounter counter;
 
     public GetGroupByFunctionResutsForSimpleMathFunction(String columnLabel,  Map.Entry<String, ColumnImpl> alias) {

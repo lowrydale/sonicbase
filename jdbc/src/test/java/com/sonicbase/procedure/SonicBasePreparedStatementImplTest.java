@@ -105,22 +105,22 @@ public class SonicBasePreparedStatementImplTest {
     try {
       statement.setRef(1, new Ref() {
         @Override
-        public String getBaseTypeName() throws SQLException {
+        public String getBaseTypeName() {
           return null;
         }
 
         @Override
-        public Object getObject(Map<String, Class<?>> map) throws SQLException {
+        public Object getObject(Map<String, Class<?>> map) {
           return null;
         }
 
         @Override
-        public Object getObject() throws SQLException {
+        public Object getObject() {
           return null;
         }
 
         @Override
-        public void setObject(Object value) throws SQLException {
+        public void setObject(Object value) {
 
         }
       });

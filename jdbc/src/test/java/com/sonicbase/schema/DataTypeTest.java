@@ -12,7 +12,6 @@ import java.util.Comparator;
 
 import static org.testng.Assert.assertEquals;
 import static org.testng.Assert.assertNull;
-import static org.testng.Assert.assertTrue;
 
 public class DataTypeTest {
 
@@ -55,7 +54,7 @@ public class DataTypeTest {
   }
 
   @Test
-  public void testByteArrayConverter() throws UnsupportedEncodingException {
+  public void testByteArrayConverter() {
     DataType.Converter c = DataType.getByteArrayConverter();
 
     assertNull(c.convert(null));
@@ -63,7 +62,7 @@ public class DataTypeTest {
   }
 
   @Test
-  public void testBlobConverter() throws UnsupportedEncodingException {
+  public void testBlobConverter() {
     DataType.Converter c = DataType.getBlobConverter();
 
     assertNull(c.convert(null));
@@ -215,8 +214,8 @@ public class DataTypeTest {
     Comparator c = DataType.getBooleanComparator();
 
     assertEquals(c.compare(null, null), 0);
-    assertEquals(c.compare(null, true), -1);
-    assertEquals(c.compare(true, null), 1);
+    assertEquals(c.compare(null, true), 0);
+    assertEquals(c.compare(true, null), 0);
     assertEquals(c.compare("true", 1), 0);
   }
 
@@ -225,8 +224,8 @@ public class DataTypeTest {
     Comparator c = DataType.getLongComparator();
 
     assertEquals(c.compare(null, null), 0);
-    assertEquals(c.compare(null, 1), -1);
-    assertEquals(c.compare(1, null), 1);
+    assertEquals(c.compare(null, 1), 0);
+    assertEquals(c.compare(1, null), 0);
 
     assertEquals(c.compare("1", "1"), 0);
 
@@ -279,8 +278,8 @@ public class DataTypeTest {
     Comparator c = DataType.getIntComparator();
 
     assertEquals(c.compare(null, null), 0);
-    assertEquals(c.compare(null, 1), -1);
-    assertEquals(c.compare(1, null), 1);
+    assertEquals(c.compare(null, 1), 0);
+    assertEquals(c.compare(1, null), 0);
 
     assertEquals(c.compare("1", "1"), 0);
 
@@ -291,8 +290,8 @@ public class DataTypeTest {
     Comparator c = DataType.getDoubleComparator();
 
     assertEquals(c.compare(null, null), 0);
-    assertEquals(c.compare(null, 1), -1);
-    assertEquals(c.compare(1, null), 1);
+    assertEquals(c.compare(null, 1), 0);
+    assertEquals(c.compare(1, null), 0);
 
     assertEquals(c.compare("1.0", "1.0"), 0);
 
@@ -303,8 +302,8 @@ public class DataTypeTest {
     Comparator c = DataType.getFloatComparator();
 
     assertEquals(c.compare(null, null), 0);
-    assertEquals(c.compare(null, 1), -1);
-    assertEquals(c.compare(1, null), 1);
+    assertEquals(c.compare(null, 1), 0);
+    assertEquals(c.compare(1, null), 0);
 
     assertEquals(c.compare("1.0", "1.0"), 0);
 
@@ -315,8 +314,8 @@ public class DataTypeTest {
     Comparator c = DataType.getStringComparator();
 
     assertEquals(c.compare(null, null), 0);
-    assertEquals(c.compare(null, 1), -1);
-    assertEquals(c.compare(1, null), 1);
+    assertEquals(c.compare(null, 1), 0);
+    assertEquals(c.compare(1, null), 0);
 
     assertEquals(c.compare("1.0", "1.0"), 0);
 
@@ -328,8 +327,8 @@ public class DataTypeTest {
     Comparator c = DataType.getStringComparator();
 
     assertEquals(c.compare(null, null), 0);
-    assertEquals(c.compare(null, 1), -1);
-    assertEquals(c.compare(1, null), 1);
+    assertEquals(c.compare(null, 1), 0);
+    assertEquals(c.compare(1, null), 0);
 
     assertEquals(c.compare("1.0", "1.0"), 0);
 
@@ -340,8 +339,8 @@ public class DataTypeTest {
     Comparator c = DataType.getByteComparator();
 
     assertEquals(c.compare(null, null), 0);
-    assertEquals(c.compare(null, 1), -1);
-    assertEquals(c.compare(1, null), 1);
+    assertEquals(c.compare(null, 1), 0);
+    assertEquals(c.compare(1, null), 0);
 
     assertEquals(c.compare("1.0", "1.0"), 0);
 
@@ -352,8 +351,8 @@ public class DataTypeTest {
     Comparator c = DataType.getShortComparator();
 
     assertEquals(c.compare(null, null), 0);
-    assertEquals(c.compare(null, 1), -1);
-    assertEquals(c.compare(1, null), 1);
+    assertEquals(c.compare(null, 1), 0);
+    assertEquals(c.compare(1, null), 0);
 
     assertEquals(c.compare("1.0", "1.0"), 0);
 
@@ -364,8 +363,8 @@ public class DataTypeTest {
     Comparator c = DataType.getBigDecimalComparator();
 
     assertEquals(c.compare(null, null), 0);
-    assertEquals(c.compare(null, 1), -1);
-    assertEquals(c.compare(1, null), 1);
+    assertEquals(c.compare(null, 1), 0);
+    assertEquals(c.compare(1, null), 0);
 
     assertEquals(c.compare("1.0", "1.0"), 0);
 
@@ -376,8 +375,8 @@ public class DataTypeTest {
     Comparator c = DataType.getDateComparator();
 
     assertEquals(c.compare(null, null), 0);
-    assertEquals(c.compare(null, 1), -1);
-    assertEquals(c.compare(1, null), 1);
+    assertEquals(c.compare(null, 1), 0);
+    assertEquals(c.compare(1, null), 0);
 
     assertEquals(c.compare("12-02-01", "12-02-01"), 0);
 
@@ -388,8 +387,8 @@ public class DataTypeTest {
     Comparator c = DataType.getTimeComparator();
 
     assertEquals(c.compare(null, null), 0);
-    assertEquals(c.compare(null, 1), -1);
-    assertEquals(c.compare(1, null), 1);
+    assertEquals(c.compare(null, 1), 0);
+    assertEquals(c.compare(1, null), 0);
 
     assertEquals(c.compare("12:02:01", "12:02:01"), 0);
 
@@ -400,8 +399,8 @@ public class DataTypeTest {
     Comparator c = DataType.getTimestampComparator();
 
     assertEquals(c.compare(null, null), 0);
-    assertEquals(c.compare(null, 1), -1);
-    assertEquals(c.compare(1, null), 1);
+    assertEquals(c.compare(null, 1), 0);
+    assertEquals(c.compare(1, null), 0);
 
     assertEquals(c.compare("12-02-01 12:02:01", "12-02-01 12:02:01"), 0);
 
@@ -412,8 +411,8 @@ public class DataTypeTest {
     Comparator c = DataType.getByteArrayComparator();
 
     assertEquals(c.compare(null, null), 0);
-    assertEquals(c.compare(null, 1), -1);
-    assertEquals(c.compare(1, null), 1);
+    assertEquals(c.compare(null, 1), 0);
+    assertEquals(c.compare(1, null), 0);
 
     assertEquals(c.compare(new byte[]{1,2,3}, new byte[]{1,2,3}), 0);
 
@@ -424,8 +423,8 @@ public class DataTypeTest {
     Comparator c = DataType.getBlobComparator();
 
     assertEquals(c.compare(null, null), 0);
-    assertEquals(c.compare(null, 1), -1);
-    assertEquals(c.compare(1, null), 1);
+    assertEquals(c.compare(null, 1), 0);
+    assertEquals(c.compare(1, null), 0);
 
     assertEquals(c.compare(new byte[]{1,2,3}, new byte[]{1,2,3}), 0);
 

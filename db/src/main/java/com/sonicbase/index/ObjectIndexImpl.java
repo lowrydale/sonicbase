@@ -11,11 +11,24 @@ import java.util.concurrent.ConcurrentSkipListMap;
 public class ObjectIndexImpl implements IndexImpl {
   private final Index index;
 
-  private ConcurrentSkipListMap<Object[], Object> objectSkipIndex;
+  private final ConcurrentSkipListMap<Object[], Object> objectSkipIndex;
 
   ObjectIndexImpl(Index index, Comparator[] comparators) {
     this.index = index;
-    objectSkipIndex = new ConcurrentSkipListMap<>((o1, o2) -> index.getObjectArrayComparator(comparators, o1, o2));
+    //don't make this a lambda
+    objectSkipIndex = new ConcurrentSkipListMap<>(new Comparator<Object[]>() {
+      @Override
+      public int compare(Object[] o1, Object[] o2) {
+        int keyLen = (o1.length <= o2.length) ? o1.length : o2.length;
+        for (int i = 0; i < keyLen; i++) {
+          int value = comparators[i].compare(o1[i], o2[i]);
+          if (value != 0) {
+            return value;
+          }
+        }
+        return 0;
+      }
+    });
   }
 
   public void clear() {
@@ -57,9 +70,8 @@ public class ObjectIndexImpl implements IndexImpl {
       if (objectSkipIndex.isEmpty()) {
         return null;
       }
-      Object[] lastKey = key;
 
-      Iterator<Map.Entry<Object[], Object>> iterator = objectSkipIndex.tailMap(lastKey).entrySet().iterator();
+      Iterator<Map.Entry<Object[], Object>> iterator = objectSkipIndex.tailMap(key).entrySet().iterator();
       if (iterator.hasNext()) {
         Map.Entry<Object[], Object> entry = iterator.next();
         if (entry != null) {
@@ -91,7 +103,7 @@ public class ObjectIndexImpl implements IndexImpl {
     Set<Map.Entry<Object[], Object>> entries = head.entrySet();
     for (Map.Entry<Object[], Object> currEntry : entries) {
       if (0 != objectSkipIndex.comparator().compare(currEntry.getKey(), key)) {
-        break;
+        return;
       }
       lastKey = currEntry.getKey();
       Object value = objectSkipIndex.get(lastKey);

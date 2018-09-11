@@ -4,6 +4,7 @@ import com.fasterxml.jackson.databind.node.ArrayNode;
 import com.fasterxml.jackson.databind.node.ObjectNode;
 import com.sonicbase.client.DatabaseClient;
 import com.sonicbase.common.ComObject;
+import com.sonicbase.common.Config;
 import com.sonicbase.common.DatabaseCommon;
 import com.sonicbase.common.ThreadUtil;
 import com.sonicbase.query.DatabaseException;
@@ -25,19 +26,19 @@ import java.util.concurrent.atomic.AtomicInteger;
 // I don't know a good way to reduce the parameter count
 public class MasterManager {
 
-  public static final String NONE_STR = "__none__";
-  private static Logger logger = LoggerFactory.getLogger(MasterManager.class);
+  private static final String NONE_STR = "__none__";
+  private static final Logger logger = LoggerFactory.getLogger(MasterManager.class);
 
   private final com.sonicbase.server.DatabaseServer server;
   private Timer fixSchemaTimer;
   private ArrayList<Thread> masterMonitorThreadsForShards;
   private Thread masterMonitorThread;
 
-  public MasterManager(DatabaseServer server) {
+  MasterManager(DatabaseServer server) {
     this.server = server;
   }
 
-  public void shutdownFixSchemaTimer() {
+  void shutdownFixSchemaTimer() {
     if (fixSchemaTimer != null) {
       fixSchemaTimer.cancel();
       fixSchemaTimer = null;
@@ -70,11 +71,11 @@ public class MasterManager {
     }
   }
 
-  public void startMasterMonitor() {
+  void startMasterMonitor() {
     startMasterMonitor(null);
   }
 
-  public void startMasterMonitor(Long timeoutOverride) {
+  void startMasterMonitor(Long timeoutOverride) {
     if (server.getReplicationFactor() == 1) {
       if (server.getShard() != 0) {
         return;
@@ -85,7 +86,7 @@ public class MasterManager {
 
     masterMonitorThreadsForShards = new ArrayList<>();
 
-    masterMonitorThread = ThreadUtil.createThread(() -> masterMonitorThread(timeoutOverride), "SonicBase Maste Monitor Thread");
+    masterMonitorThread = ThreadUtil.createThread(() -> masterMonitorThread(timeoutOverride), "SonicBase Master Monitor Thread");
     masterMonitorThread.start();
   }
 
@@ -93,9 +94,9 @@ public class MasterManager {
     final int[] monitorShards = {0, 0, 0};
     final int[] monitorReplicas = {0, 1, 2};
 
-    ArrayNode shards = server.getConfig().withArray("shards");
-    ObjectNode replicasNode = (ObjectNode) shards.get(0);
-    ArrayNode replicas = replicasNode.withArray("replicas");
+    List<Config.Shard> shards = server.getConfig().getShards();
+    Config.Shard shard = shards.get(0);
+    List<Config.Replica> replicas = shard.getReplicas();
     if (replicas.size() < 3) {
       monitorShards[2] = 1;
       monitorReplicas[2] = 0;
@@ -107,9 +108,9 @@ public class MasterManager {
     }
     if (shouldMonitor) {
       for (int i = 0; i < server.getShardCount(); i++) {
-        final int shard = i;
+        final int shardOffset = i;
         Thread masterThreadForShard = ThreadUtil.createThread(() -> masterMonitorThreadForShard(timeoutOverride,
-            monitorShards, monitorReplicas, shard), "SonicBase Master Monitor Thread for Shard: " + shard);
+            monitorShards, monitorReplicas, shardOffset), "SonicBase Master Monitor Thread for Shard: " + shardOffset);
         masterThreadForShard.start();
         masterMonitorThreadsForShards.add(masterThreadForShard);
       }
@@ -171,7 +172,7 @@ public class MasterManager {
       while (!server.getShutdown()) {
         try {
           promoteToMaster(null, false);
-          break;
+          return;
         }
         catch (Exception e) {
           logger.error("Error promoting to master", e);
@@ -180,7 +181,7 @@ public class MasterManager {
           }
           catch (InterruptedException e1) {
             Thread.currentThread().interrupt();
-            break;
+            return;
           }
         }
       }
@@ -203,9 +204,7 @@ public class MasterManager {
       Thread.sleep(5000);
     }
     else {
-      if (doElectMasterAmongCandidates(shard, oldMasterReplica, monitorShards, monitorReplicas, nextMonitor, electedMaster)) {
-        return true;
-      }
+      return doElectMasterAmongCandidates(shard, oldMasterReplica, monitorShards, monitorReplicas, nextMonitor, electedMaster);
     }
     return false;
   }
@@ -216,16 +215,15 @@ public class MasterManager {
     logger.error("ElectNewMaster, shard={}, checking candidates", shard);
     while (!server.getShutdown()) {
       for (int j = 0; j < server.getReplicationFactor(); j++) {
-        if (j == oldMasterReplica) {
-          continue;
-        }
-        Thread.sleep(DatabaseServer.getDeathOverride() == null ? 2000 : 50);
+        if (j != oldMasterReplica) {
+          Thread.sleep(DatabaseServer.getDeathOverride() == null ? 2000 : 50);
 
-        DoElectNewMaster doElectNewMaster = new DoElectNewMaster(shard, monitorShards[nextMonitor.get()],
-            monitorReplicas[nextMonitor.get()], nextMonitor, electedMaster, j).invoke();
-        electedMaster = doElectNewMaster.getElectedMaster();
-        if (doElectNewMaster.is()) {
-          break;
+          DoElectNewMaster doElectNewMaster = new DoElectNewMaster(shard, monitorShards[nextMonitor.get()],
+              monitorReplicas[nextMonitor.get()], nextMonitor, electedMaster, j).invoke();
+          electedMaster = doElectNewMaster.getElectedMaster();
+          if (doElectNewMaster.is()) {
+            break;
+          }
         }
       }
       if (promoteToMaster(shard, electedMaster)) {
@@ -234,6 +232,18 @@ public class MasterManager {
     }
     return false;
   }
+
+  public ComObject promoteToMasterAndPushSchema(ComObject cobj, boolean replayedCommand) {
+    int localShard = cobj.getInt(ComObject.Tag.SHARD);
+    int localReplica = cobj.getInt(ComObject.Tag.REPLICA);
+
+    logger.info("promoting to master: shard={}, replica={}", localShard, localReplica);
+    server.getCommon().getServersConfig().getShards()[localShard].setMasterReplica(localReplica);
+    server.getCommon().saveSchema(server.getDataDir());
+    server.pushSchema();
+    return null;
+  }
+
 
   private boolean promoteToMaster(int shard, int electedMaster) {
     try {
@@ -246,7 +256,7 @@ public class MasterManager {
         cobj.put(ComObject.Tag.REPLICA, electedMaster);
         server.getCommon().getServersConfig().getShards()[shard].setMasterReplica(electedMaster);
 
-        server.getDatabaseClient().sendToMaster("DatabaseServer:promoteToMasterAndPushSchema", cobj);
+        server.getDatabaseClient().sendToMaster("MasterManager:promoteToMasterAndPushSchema", cobj);
 
         cobj = new ComObject();
         cobj.put(ComObject.Tag.DB_NAME, NONE_STR);
@@ -340,13 +350,13 @@ public class MasterManager {
     return retObj;
   }
 
-  public boolean isNoLongerMaster() throws InterruptedException {
+  boolean isNoLongerMaster() throws InterruptedException {
 
     final int[] monitorShards = {0, 0, 0};
     final int[] monitorReplicas = {0, 1, 2};
 
-    ArrayNode shards = server.getConfig().withArray("shards");
-    ArrayNode replicas = (ArrayNode) shards.get(0).withArray("replicas");
+    List<Config.Shard> shards = server.getConfig().getShards();
+    List<Config.Replica> replicas = shards.get(0).getReplicas();
     if (replicas.size() < 3) {
       monitorShards[2] = 1;
       monitorReplicas[2] = 0;
@@ -426,14 +436,14 @@ public class MasterManager {
 
   private class DoElectNewMaster {
     private boolean myResult;
-    private int shard;
-    private int monitorShard;
-    private int monitorReplica;
-    private AtomicInteger nextMonitor;
+    private final int shard;
+    private final int monitorShard;
+    private final int monitorReplica;
+    private final AtomicInteger nextMonitor;
     private int electedMaster;
-    private int j;
+    private final int j;
 
-    public DoElectNewMaster(int shard, int monitorShard, int monitorReplica, AtomicInteger nextMonitor, int electedMaster, int j) {
+    DoElectNewMaster(int shard, int monitorShard, int monitorReplica, AtomicInteger nextMonitor, int electedMaster, int j) {
       this.shard = shard;
       this.monitorShard = monitorShard;
       this.monitorReplica = monitorReplica;
@@ -446,7 +456,7 @@ public class MasterManager {
       return myResult;
     }
 
-    public int getElectedMaster() {
+    int getElectedMaster() {
       return electedMaster;
     }
 

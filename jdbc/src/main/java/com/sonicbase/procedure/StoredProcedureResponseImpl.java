@@ -11,7 +11,7 @@ import java.util.List;
 // I prefer to return null instead of an empty array
 // I don't know a good way to reduce the parameter count
 public class StoredProcedureResponseImpl implements StoredProcedureResponse {
-  private DatabaseCommon common;
+  private final DatabaseCommon common;
   private List<Record> records = new ArrayList<>();
 
   public StoredProcedureResponseImpl(DatabaseCommon common, ComObject comObject) {

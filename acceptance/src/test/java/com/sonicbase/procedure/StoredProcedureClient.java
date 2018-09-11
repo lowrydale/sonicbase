@@ -1,6 +1,5 @@
 package com.sonicbase.procedure;
 
-import com.sonicbase.client.DatabaseClient;
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
 
@@ -62,11 +61,7 @@ public class StoredProcedureClient {
         String query = "call procedure 'com.sonicbase.procedure.MyStoredProcedure3'";
         try (PreparedStatement procedureStmt = conn.prepareStatement(query);
              ResultSet rs = procedureStmt.executeQuery()) {
-          int offset = 3;
-          while (true) {
-            if (!rs.next()) {
-              break;
-            }
+          while (rs.next()) {
             System.out.println("id=" + rs.getLong("id1") + ", socialsecuritynumber=" +
                 rs.getString("socialsecuritynumber") + ", gender=" + rs.getString("gender"));
           }
@@ -77,10 +72,7 @@ public class StoredProcedureClient {
         String query = "call procedure 'com.sonicbase.procedure.MyStoredProcedure4'";
         try (PreparedStatement procedureStmt = conn.prepareStatement(query);
              ResultSet rs = procedureStmt.executeQuery()) {
-          while (true) {
-            if (!rs.next()) {
-              break;
-            }
+          while (rs.next()) {
             System.out.println("id=" + rs.getLong("id1") + ", socialsecuritynumber=" +
                 rs.getString("socialsecuritynumber") + ", gender=" + rs.getString("gender"));
           }

@@ -1,6 +1,7 @@
 package com.sonicbase.procedure;
 
 import com.fasterxml.jackson.databind.node.ObjectNode;
+import com.sonicbase.common.Config;
 import com.sonicbase.jdbcdriver.ConnectionProxy;
 
 
@@ -10,7 +11,7 @@ import com.sonicbase.jdbcdriver.ConnectionProxy;
 public class StoredProcedureContextImpl implements StoredProcedureContext {
   private int shard;
   private int replica;
-  private ObjectNode config;
+  private Config config;
   private long storedProdecureId;
   private SonicBaseConnectionImpl connection;
   private Parameters parameters;
@@ -35,7 +36,7 @@ public class StoredProcedureContextImpl implements StoredProcedureContext {
     return replica;
   }
 
-  public ObjectNode getConfig() {
+  public Config getConfig() {
     return config;
   }
 
@@ -65,7 +66,7 @@ public class StoredProcedureContextImpl implements StoredProcedureContext {
     this.replica = replica;
   }
 
-  public void setConfig(ObjectNode config) {
+  public void setConfig(Config config) {
     this.config = config;
   }
 

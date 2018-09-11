@@ -1,43 +1,41 @@
 package com.sonicbase.client;
 
-import com.fasterxml.jackson.databind.JsonNode;
-import com.fasterxml.jackson.databind.ObjectMapper;
-import com.fasterxml.jackson.databind.node.ArrayNode;
-import com.fasterxml.jackson.databind.node.ObjectNode;
 import com.sonicbase.common.ComObject;
 import com.sonicbase.common.DatabaseCommon;
 import com.sonicbase.common.ServersConfig;
+import com.sonicbase.query.DatabaseException;
 import com.sonicbase.query.ResultSet;
 import com.sonicbase.schema.IndexSchema;
 import com.sonicbase.schema.TableSchema;
-
-import com.sonicbase.util.TestUtils;
-import org.apache.commons.io.IOUtils;
-import org.apache.log4j.Logger;
+import com.sonicbase.util.ClientTestUtils;
+import org.mockito.invocation.InvocationOnMock;
 import org.mockito.stubbing.Answer;
 import org.testng.annotations.Test;
 
-import java.io.IOException;
-import java.util.concurrent.ExecutionException;
-import java.util.concurrent.atomic.AtomicBoolean;
+import java.io.ByteArrayInputStream;
+import java.io.InputStream;
+import java.io.UnsupportedEncodingException;
+import java.net.URL;
+import java.util.concurrent.ArrayBlockingQueue;
+import java.util.concurrent.ThreadPoolExecutor;
+import java.util.concurrent.TimeUnit;
 
-import static org.mockito.Matchers.anyInt;
-import static org.mockito.Matchers.anyObject;
-import static org.mockito.Matchers.eq;
-import static org.mockito.Mockito.doAnswer;
+import static com.sonicbase.client.DatabaseClient.SERIALIZATION_VERSION;
+import static org.mockito.Matchers.*;
 import static org.mockito.Mockito.mock;
 import static org.mockito.Mockito.when;
 import static org.testng.Assert.assertEquals;
+import static org.testng.Assert.assertFalse;
 
 public class DescribeStatementHandlerTest {
 
   @Test
-  public void test() throws InterruptedException, ExecutionException, IOException {
+  public void test() {
     DatabaseClient client = mock(DatabaseClient.class);
     DatabaseCommon common = new DatabaseCommon();
     when(client.getCommon()).thenReturn(common);
-    TableSchema tableSchema = TestUtils.createTable();
-    IndexSchema indexSchema = TestUtils.createIndexSchema(tableSchema);
+    TableSchema tableSchema = ClientTestUtils.createTable();
+    IndexSchema indexSchema = ClientTestUtils.createIndexSchema(tableSchema);
     common.getTables("test").put(tableSchema.getName(), tableSchema);
 
     DescribeStatementHandler handler = new DescribeStatementHandler(client);
@@ -92,12 +90,12 @@ public class DescribeStatementHandlerTest {
 
 
   @Test
-  public void testIndex() throws InterruptedException, ExecutionException, IOException {
+  public void testIndex() {
     DatabaseClient client = mock(DatabaseClient.class);
     DatabaseCommon common = new DatabaseCommon();
     when(client.getCommon()).thenReturn(common);
-    TableSchema tableSchema = TestUtils.createTable();
-    IndexSchema indexSchema = TestUtils.createIndexSchema(tableSchema);
+    TableSchema tableSchema = ClientTestUtils.createTable();
+    IndexSchema indexSchema = ClientTestUtils.createIndexSchema(tableSchema);
     common.getTables("test").put(tableSchema.getName(), tableSchema);
 
     DescribeStatementHandler handler = new DescribeStatementHandler(client);
@@ -118,12 +116,12 @@ public class DescribeStatementHandlerTest {
   }
 
   @Test
-  public void testTables() throws InterruptedException, ExecutionException, IOException {
+  public void testTables() {
     DatabaseClient client = mock(DatabaseClient.class);
     DatabaseCommon common = new DatabaseCommon();
     when(client.getCommon()).thenReturn(common);
-    TableSchema tableSchema = TestUtils.createTable();
-    IndexSchema indexSchema = TestUtils.createIndexSchema(tableSchema);
+    TableSchema tableSchema = ClientTestUtils.createTable();
+    IndexSchema indexSchema = ClientTestUtils.createIndexSchema(tableSchema);
     common.getTables("test").put(tableSchema.getName(), tableSchema);
 
     DescribeStatementHandler handler = new DescribeStatementHandler(client);
@@ -140,12 +138,12 @@ public class DescribeStatementHandlerTest {
   }
 
   @Test
-  public void testShards() throws InterruptedException, ExecutionException, IOException {
+  public void testShards() {
     DatabaseClient client = mock(DatabaseClient.class);
     DatabaseCommon common = new DatabaseCommon();
     when(client.getCommon()).thenReturn(common);
-    TableSchema tableSchema = TestUtils.createTable();
-    IndexSchema indexSchema = TestUtils.createIndexSchema(tableSchema);
+    TableSchema tableSchema = ClientTestUtils.createTable();
+    IndexSchema indexSchema = ClientTestUtils.createIndexSchema(tableSchema);
     common.getTables("test").put(tableSchema.getName(), tableSchema);
 
     DescribeStatementHandler handler = new DescribeStatementHandler(client);
@@ -161,211 +159,264 @@ public class DescribeStatementHandlerTest {
     assertEquals(builder.toString(), expected);
   }
 
-//  @Test
-//  public void testRepartitioner() throws InterruptedException, ExecutionException, IOException {
-//    String configStr = IOUtils.toString(DatabaseServerTest.class.getResourceAsStream("/config/config-1-local.json"), "utf-8");
-//    ObjectNode config = (ObjectNode) new ObjectMapper().readTree(configStr);
-//    com.sonicbase.server.DatabaseServer server = new DatabaseServer() {
-//      @Override
-//      public Logger getErrorLogger() {
-//        Logger mockLogger = mock(Logger.class);
-//        doAnswer((Answer<Object>) invocationOnMock -> {
-//          return null;
-//        }).when(mockLogger).error(anyObject());
-//        return mockLogger;
-//      }
-//    };
-//    server.setConfig(config, "test", "localhost", 9010, true, new AtomicBoolean(), new AtomicBoolean(), "gc.log", true);
-//    DatabaseClient client = mock(DatabaseClient.class);
-//    server.setDatabaseClient(client);
+  @Test
+  public void testServerStats() {
+    DatabaseClient client = mock(DatabaseClient.class);
+    DatabaseCommon common = new DatabaseCommon() {
+      public boolean haveProLicense() {
+        return true;
+      }
+      public ServersConfig getServersConfig() {
+        ServersConfig config = mock(ServersConfig.class);
+        when(config.getShards()).thenAnswer(new Answer(){
+          @Override
+          public Object answer(InvocationOnMock invocationOnMock) throws Throwable {
+            ServersConfig.Shard[] shards = new ServersConfig.Shard[]{
+                new ServersConfig.Shard(new ServersConfig.Host[]{
+                    new ServersConfig.Host("localhost", "localhost", 9010, true),
+                    new ServersConfig.Host("localhost", "localhost", 9060, false)
+                }),
+                new ServersConfig.Shard(new ServersConfig.Host[]{
+                    new ServersConfig.Host("localhost", "localhost", 10010, false),
+                    new ServersConfig.Host("localhost", "localhost", 10060, true)
+                })
+              };
+            return shards;
+          }
+        });
+        return config;
+      }
+    };
+    ThreadPoolExecutor executor = new ThreadPoolExecutor(10, 10, 10_000, TimeUnit.MILLISECONDS, new ArrayBlockingQueue<>(1000), new ThreadPoolExecutor.CallerRunsPolicy());
+    try {
+      when(client.getExecutor()).thenReturn(executor);
+      when(client.getCommon()).thenReturn(common);
+      when(client.getShardCount()).thenReturn(2);
+      when(client.getReplicaCount()).thenReturn(2);
+      when(client.getServersArray()).thenAnswer(new Answer() {
+        @Override
+        public Object answer(InvocationOnMock invocationOnMock) throws Throwable {
+          DatabaseClient.Server[][] servers = new DatabaseClient.Server[][]{
+              new DatabaseClient.Server[]{
+                  new DatabaseClient.Server("localhost", 9010),
+                  new DatabaseClient.Server("localhost", 9060)},
+              new DatabaseClient.Server[]{
+                  new DatabaseClient.Server("localhost", 10010),
+                  new DatabaseClient.Server("localhost", 10060)
+              }};
+          servers[0][0].setDead(true);
+          servers[1][1].setDead(true);
+          return servers;
+        }
+      });
+
+      when(client.send(eq("OSStatsManager:getOSStats"), anyInt(), anyInt(), anyObject(), eq(DatabaseClient.Replica.SPECIFIED))).thenAnswer(new Answer(){
+        @Override
+        public Object answer(InvocationOnMock invocationOnMock) throws Throwable {
+          ComObject retObj = new ComObject();
+          retObj.put(ComObject.Tag.RES_GIG, 40d);
+          retObj.put(ComObject.Tag.CPU, 80d);
+          retObj.put(ComObject.Tag.JAVA_MEM_MIN, 30d);
+          retObj.put(ComObject.Tag.JAVA_MEM_MAX, 40d);
+          retObj.put(ComObject.Tag.AVG_REC_RATE, 20d);
+          retObj.put(ComObject.Tag.AVG_TRANS_RATE, 20d);
+          retObj.put(ComObject.Tag.DISK_AVAIL, "100g");
+          retObj.put(ComObject.Tag.HOST, "localhost");
+          Object[] args = invocationOnMock.getArguments();
+          if ((int)args[1] == 0 && (long)args[2] == 0) {
+            retObj.put(ComObject.Tag.PORT, 9010);
+          }
+          else if ((int)args[1] == 0 && (long)args[2] == 1) {
+            retObj.put(ComObject.Tag.PORT, 9060);
+          }
+          if ((int)args[1] == 1 && (long)args[2] == 0) {
+            retObj.put(ComObject.Tag.PORT, 10010);
+          }
+          else if ((int)args[1] == 1 && (long)args[2] == 1) {
+            retObj.put(ComObject.Tag.PORT, 10060);
+          }
+          return retObj.serialize();
+        }
+      });
+      TableSchema tableSchema = ClientTestUtils.createTable();
+      IndexSchema indexSchema = ClientTestUtils.createIndexSchema(tableSchema);
+      common.getTables("test").put(tableSchema.getName(), tableSchema);
+
+      DescribeStatementHandler handler = new DescribeStatementHandler(client);
+      ResultSet ret = handler.doDescribe("test", "describe server stats");
+
+      for (int i = 0; i < 4; i++) {
+        ret.next();
+
+        String line = ret.getString("host");
+        if (line.equals("localhost:9060") || line.equals("localhost:10010")) {
+          String cpu = ret.getString("cpu");
+          assertEquals(cpu, "80");
+        }
+        else {
+          String cpu = ret.getString("cpu");
+          assertEquals(cpu, "?");
+        }
+      }
+      assertFalse(ret.next());
+
+    }
+    finally {
+      executor.shutdownNow();
+    }
+  }
 //
-//    DatabaseCommon common = new DatabaseCommon();
-//    when(client.getCommon()).thenReturn(common);
-//    TableSchema tableSchema = TestUtils.createTable();
-//    IndexSchema indexSchema = TestUtils.createIndexSchema(tableSchema);
-//    common.getTables("test").put(tableSchema.getName(), tableSchema);
-//
-//    when(client.sendToMaster(eq("PartitionManager:getRepartitionerState"), anyObject())).thenAnswer(
-//        (Answer) invocationOnMock -> {
-//          PartitionManager mgr = server.getPartitionManager();
-//          return mgr.getRepartitionerState(new ComObject(), false).serialize();
-//        });
-//    DescribeStatementHandler handler = new DescribeStatementHandler(client);
-//    ResultSet ret = handler.doDescribe("test", "describe repartitioner");
-//    StringBuilder builder = new StringBuilder();
-//    while (ret.next()) {
-//      String line = ret.getString(1);
-//      builder.append(line).append("\n");
-//    }
-//
-//    String expected = "state=idle\n";
-//
-//    assertEquals(builder.toString(), expected);
-//  }
-//
-//  @Test
-//  public void testServerStats() throws InterruptedException, ExecutionException, IOException {
-//    String configStr = IOUtils.toString(DatabaseServerTest.class.getResourceAsStream("/config/config-1-local.json"), "utf-8");
-//    ObjectNode config = (ObjectNode) new ObjectMapper().readTree(configStr);
-//    com.sonicbase.server.DatabaseServer server = new DatabaseServer() {
-//      @Override
-//      public Logger getErrorLogger() {
-//        Logger mockLogger = mock(Logger.class);
-//        doAnswer((Answer<Object>) invocationOnMock -> {
-//          return null;
-//        }).when(mockLogger).error(anyObject());
-//        return mockLogger;
-//      }
-//    };
-//    server.setConfig(config, "test", "localhost", 9010, true, new AtomicBoolean(), new AtomicBoolean(), "gc.log", true);
-//    DatabaseClient client = mock(DatabaseClient.class);
-//    server.setDatabaseClient(client);
-//
-//    DatabaseCommon common = new DatabaseCommon();
-//    when(client.getCommon()).thenReturn(common);
-//    TableSchema tableSchema = TestUtils.createTable();
-//    IndexSchema indexSchema = TestUtils.createIndexSchema(tableSchema);
-//    common.getTables("test").put(tableSchema.getName(), tableSchema);
-//
-//    when(client.sendToMaster(eq("PartitionManager:getRepartitionerState"), anyObject())).thenAnswer(
-//        (Answer) invocationOnMock -> {
-//          PartitionManager mgr = server.getPartitionManager();
-//          return mgr.getRepartitionerState(new ComObject(), false).serialize();
-//        });
-//    DescribeStatementHandler handler = new DescribeStatementHandler(client);
-//    ResultSet ret = handler.doDescribe("test", "describe server stats");
-//    StringBuilder builder = new StringBuilder();
-//    while (ret.next()) {
-//      String line = ret.getString(1);
-//      builder.append(line).append("\n");
-//    }
-//
-//    String expected = "";
-//
-//    assertEquals(builder.toString(), expected);
-//  }
-//
-//  @Test
-//  public void testServerHealth() throws InterruptedException, ExecutionException, IOException {
-//    String configStr = IOUtils.toString(DatabaseServerTest.class.getResourceAsStream("/config/config-1-local.json"), "utf-8");
-//    ObjectNode config = (ObjectNode) new ObjectMapper().readTree(configStr);
-//    com.sonicbase.server.DatabaseServer server = new DatabaseServer() {
-//      @Override
-//      public Logger getErrorLogger() {
-//        Logger mockLogger = mock(Logger.class);
-//        doAnswer((Answer<Object>) invocationOnMock -> {
-//          return null;
-//        }).when(mockLogger).error(anyObject());
-//        return mockLogger;
-//      }
-//    };
-//    server.setConfig(config, "test", "localhost", 9010, true, new AtomicBoolean(), new AtomicBoolean(), "gc.log", true);
-//    DatabaseClient client = mock(DatabaseClient.class);
-//    server.setDatabaseClient(client);
-//
-//    JsonNode node = new ObjectMapper().readTree(" { \"shards\" : [\n" +
-//        "    {\n" +
-//        "      \"replicas\": [\n" +
-//        "        {\n" +
-//        "          \"publicAddress\": \"localhost\",\n" +
-//        "          \"privateAddress\": \"localhost\",\n" +
-//        "          \"port\": 9010,\n" +
-//        "          \"httpPort\": 8080\n" +
-//        "        }\n" +
-//        "      ]\n" +
-//        "    }\n" +
-//        "  ]}\n");
-//    ServersConfig serversConfig = new ServersConfig("test", (ArrayNode) ((ObjectNode)node).withArray("shards"), 1, true, true);
-//    //when(common.getServersConfig()).thenReturn(serversConfig);
-//    DatabaseCommon common = new DatabaseCommon();
-//    common.setServersConfig(serversConfig);
-//
-//    when(client.getCommon()).thenReturn(common);
-//    TableSchema tableSchema = TestUtils.createTable();
-//    IndexSchema indexSchema = TestUtils.createIndexSchema(tableSchema);
-//    common.getTables("test").put(tableSchema.getName(), tableSchema);
-//
-//    when(client.sendToMaster(eq("PartitionManager:getRepartitionerState"), anyObject())).thenAnswer(
-//        (Answer) invocationOnMock -> {
-//          PartitionManager mgr = server.getPartitionManager();
-//          return mgr.getRepartitionerState(new ComObject(), false).serialize();
-//        });
-//    DescribeStatementHandler handler = new DescribeStatementHandler(client);
-//    ResultSet ret = handler.doDescribe("test", "describe server health");
-//    StringBuilder builder = new StringBuilder();
-//    while (ret.next()) {
-//      String line = ret.getString("host") + " " +
-//          ret.getString("shard") + " " +
-//          ret.getString("replica") + " " +
-//          ret.getString("dead") + " " +
-//          ret.getString("master");
-//      builder.append(line).append("\n");
-//    }
-//
-//    String expected = "localhost:9010 0 0 false true\n";
-//
-//    assertEquals(builder.toString(), expected);
-//  }
-//
-//  @Test
-//  public void testServerSchemaVersion() throws InterruptedException, ExecutionException, IOException {
-//    String configStr = IOUtils.toString(DatabaseServerTest.class.getResourceAsStream("/config/config-1-local.json"), "utf-8");
-//    ObjectNode config = (ObjectNode) new ObjectMapper().readTree(configStr);
-//    com.sonicbase.server.DatabaseServer server = new DatabaseServer() {
-//      @Override
-//      public Logger getErrorLogger() {
-//        Logger mockLogger = mock(Logger.class);
-//        doAnswer((Answer<Object>) invocationOnMock -> {
-//          return null;
-//        }).when(mockLogger).error(anyObject());
-//        return mockLogger;
-//      }
-//    };
-//    server.setConfig(config, "test", "localhost", 9010, true, new AtomicBoolean(), new AtomicBoolean(), "gc.log", true);
-//    DatabaseClient client = mock(DatabaseClient.class);
-//    server.setDatabaseClient(client);
-//    JsonNode node = new ObjectMapper().readTree(" { \"shards\" : [\n" +
-//        "    {\n" +
-//        "      \"replicas\": [\n" +
-//        "        {\n" +
-//        "          \"publicAddress\": \"localhost\",\n" +
-//        "          \"privateAddress\": \"localhost\",\n" +
-//        "          \"port\": 9010,\n" +
-//        "          \"httpPort\": 8080\n" +
-//        "        }\n" +
-//        "      ]\n" +
-//        "    }\n" +
-//        "  ]}\n");
-//    ServersConfig serversConfig = new ServersConfig("test", (ArrayNode) ((ObjectNode)node).withArray("shards"), 1, true, true);
-//    //when(common.getServersConfig()).thenReturn(serversConfig);
-//    DatabaseCommon common = new DatabaseCommon();
-//    common.setServersConfig(serversConfig);
-//
-//    when(client.getCommon()).thenReturn(common);
-//    TableSchema tableSchema = TestUtils.createTable();
-//    IndexSchema indexSchema = TestUtils.createIndexSchema(tableSchema);
-//    common.getTables("test").put(tableSchema.getName(), tableSchema);
-//
-//    when(client.send(eq("DatabaseServer:getSchema"), anyInt(), anyInt(), anyObject(), anyObject())).thenAnswer(
-//        (Answer) invocationOnMock -> {
-//          ComObject retObj = new ComObject();
-//          retObj.put(ComObject.Tag.schemaBytes, common.serializeSchema((short)100));
-//          return retObj.serialize();
-//        });
-//    DescribeStatementHandler handler = new DescribeStatementHandler(client);
-//    ResultSet ret = handler.doDescribe("test", "describe schema version");
-//    StringBuilder builder = new StringBuilder();
-//    while (ret.next()) {
-//      String line = ret.getString("host") + " " +
-//          ret.getString("shard") + " " +
-//          ret.getString("replica") + " " +
-//          ret.getString("version");
-//      builder.append(line).append("\n");
-//    }
-//
-//    String expected = "localhost:9010 0 0 0\n";
-//
-//    assertEquals(builder.toString(), expected);
-//  }
+  @Test
+  public void testSchemaVersion() {
+
+    DatabaseCommon common = new DatabaseCommon() {
+      public int getSchemaVersion() {
+        return 101;
+      }
+      public ServersConfig getServersConfig() {
+        ServersConfig config = mock(ServersConfig.class);
+        when(config.getShards()).thenAnswer(new Answer(){
+          @Override
+          public Object answer(InvocationOnMock invocationOnMock) throws Throwable {
+            ServersConfig.Shard[] shards = new ServersConfig.Shard[]{
+                new ServersConfig.Shard(new ServersConfig.Host[]{
+                    new ServersConfig.Host("localhost", "localhost", 9010, false),
+                    new ServersConfig.Host("localhost", "localhost", 9060, false)
+                }),
+                new ServersConfig.Shard(new ServersConfig.Host[]{
+                    new ServersConfig.Host("localhost", "localhost", 10010, false),
+                    new ServersConfig.Host("localhost", "localhost", 10060, false)
+                })
+            };
+            return shards;
+          }
+        });
+        return config;
+      }
+    };
+    DatabaseClient client = mock(DatabaseClient.class);
+    when(client.getCommon()).thenReturn(common);
+
+    when(client.send(eq("DatabaseServer:getSchema"), anyInt(), anyInt(), anyObject(), anyObject())).thenAnswer(new Answer(){
+      @Override
+      public Object answer(InvocationOnMock invocationOnMock) throws Throwable {
+        ComObject retObj = new ComObject();
+        Object[] args = invocationOnMock.getArguments();
+        if ((int)args[1] == 0 && (long)args[2] == 0) {
+          common.setSchemaVersion(100);
+        }
+        else {
+          common.setSchemaVersion(101);
+        }
+        byte[] bytes = common.serializeSchema(SERIALIZATION_VERSION);
+        retObj.put(ComObject.Tag.SCHEMA_BYTES, bytes);
+        return retObj.serialize();
+      }
+    });
+
+    DescribeStatementHandler handler = new DescribeStatementHandler(client);
+    ResultSet ret = handler.doDescribe("test", "describe schema version");
+    for (int i = 0; i < 4; i++) {
+      ret.next();
+      if (ret.getString("host").equals("localhost:9010")) {
+        assertEquals(ret.getString("version"), "100");
+      }
+      else {
+        assertEquals(ret.getString("version"), "101");
+      }
+    }
+  }
+
+  @Test
+  public void testServerHealth() {
+
+    DatabaseCommon common = new DatabaseCommon() {
+      public int getSchemaVersion() {
+        return 101;
+      }
+      public ServersConfig getServersConfig() {
+        ServersConfig config = mock(ServersConfig.class);
+        when(config.getShards()).thenAnswer(new Answer(){
+          @Override
+          public Object answer(InvocationOnMock invocationOnMock) throws Throwable {
+            ServersConfig.Shard[] shards = new ServersConfig.Shard[]{
+                new ServersConfig.Shard(new ServersConfig.Host[]{
+                    new ServersConfig.Host("localhost", "localhost", 9010, true),
+                    new ServersConfig.Host("localhost", "localhost", 9060, false)
+                }),
+                new ServersConfig.Shard(new ServersConfig.Host[]{
+                    new ServersConfig.Host("localhost", "localhost", 10010, false),
+                    new ServersConfig.Host("localhost", "localhost", 10060, true)
+                })
+            };
+            return shards;
+          }
+        });
+        return config;
+      }
+    };
+    DatabaseClient client = mock(DatabaseClient.class);
+    when(client.getCommon()).thenReturn(common);
+
+    DescribeStatementHandler handler = new DescribeStatementHandler(client);
+    ResultSet ret = handler.doDescribe("test", "describe server health");
+    for (int i = 0; i < 4; i++) {
+      ret.next();
+      if (ret.getString("host").equals("localhost:9010") ||
+          ret.getString("host").equals("localhost:10060")) {
+        assertEquals(ret.getString("dead"), "true");
+      }
+      else {
+        assertEquals(ret.getString("dead"), "false");
+      }
+    }
+    assertFalse(ret.next());
+  }
+
+  @Test
+  public void testLicenses() {
+    DatabaseClient client = mock(DatabaseClient.class);
+
+    DescribeStatementHandler handler = new DescribeStatementHandler(client) {
+      public InputStream urlGet(String url) {
+        String ret = "{\"totalCores\": 8,\n" +
+            "\"allocatedCores\": 32,\n" +
+            "\"inCompliance\": true,\n" +
+            "\"disableNow\": false,\n" +
+            "\"disableDate\": \"08-19-18\",\n" +
+            "\"multipleLicenseServers\": false}";
+        try {
+          return new ByteArrayInputStream(ret.getBytes("utf-8"));
+        }
+        catch (UnsupportedEncodingException e) {
+          throw new DatabaseException(e);
+        }
+      }
+
+      public String getLicenseServerConfig() {
+        return "{\n" +
+            "  \"installDirectory\": \"$HOME/sonicbase\",\n" +
+            "  \"user\": \"ec2-user\",\n" +
+            "  \"server\": {\n" +
+            "    \"publicAddress\": \"localhost\",\n" +
+            "    \"privateAddress\": \"localhost\",\n" +
+            "    \"port\": 8443\n" +
+            "  }\n" +
+            "}";
+      }
+    };
+    ResultSet ret = handler.doDescribe("test", "describe licenses");
+
+    StringBuilder builder = new StringBuilder();
+    while (ret.next()) {
+      builder.append(ret.getString(1) + "\n");
+    }
+    assertEquals(builder.toString(), "total cores in use=8\n" +
+        "total allocated cores=32\n" +
+        "in compliance=true\n" +
+        "disabling now=false\n" +
+        "disabling date=08-19-18\n" +
+        "multiple license servers=false\n");
+  }
 
 }

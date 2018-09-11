@@ -28,22 +28,21 @@ public class IndexLookupWithExpression extends IndexLookup {
 
     Map.Entry<Object[], Object> entry = getFirstEntry();
 
-    outer:
     while (entry != null) {
       if (retRecords.size() >= count) {
-        break;
+        return entry;
       }
 
       CheckForRightIsDone checkForRightIsDone = new CheckForRightIsDone(entry).invoke();
       entry = checkForRightIsDone.getEntry();
       if (checkForRightIsDone.is()) {
-        break;
+        return entry;
       }
 
       ProcessRecord processRecord = new ProcessRecord(countSkipped, entry).invoke();
       entry = processRecord.getEntry();
       if (processRecord.is()) {
-        break outer;
+        return entry;
       }
       if (ascending == null || ascending) {
         entry = index.higherEntry((entry.getKey()));
@@ -82,7 +81,7 @@ public class IndexLookupWithExpression extends IndexLookup {
     private Map.Entry<Object[], Object> entry;
     private byte[][] records;
 
-    public ProcessWithExpression(Map.Entry<Object[], Object> entry, byte[]... records) {
+    ProcessWithExpression(Map.Entry<Object[], Object> entry, byte[]... records) {
       this.entry = entry;
       this.records = records;
     }
@@ -189,7 +188,7 @@ public class IndexLookupWithExpression extends IndexLookup {
     private Map.Entry<Object[], Object> entry;
     private byte[][] records;
 
-    public ProcessWithoutExpression(Map.Entry<Object[], Object> entry, byte[]... records) {
+    ProcessWithoutExpression(Map.Entry<Object[], Object> entry, byte[]... records) {
       this.entry = entry;
       this.records = records;
     }
@@ -247,10 +246,10 @@ public class IndexLookupWithExpression extends IndexLookup {
 
   private class ProcessRecord {
     private boolean myResult;
-    private AtomicInteger countSkipped;
+    private final AtomicInteger countSkipped;
     private Map.Entry<Object[], Object> entry;
 
-    public ProcessRecord(AtomicInteger countSkipped, Map.Entry<Object[], Object> entry) {
+    ProcessRecord(AtomicInteger countSkipped, Map.Entry<Object[], Object> entry) {
       this.countSkipped = countSkipped;
       this.entry = entry;
     }
@@ -267,8 +266,12 @@ public class IndexLookupWithExpression extends IndexLookup {
       boolean shouldProcess = handleProbe();
       if (shouldProcess) {
         byte[][] records = null;
-        if (entry.getValue() != null && !entry.getValue().equals(0L)) {
-          records = server.getAddressMap().fromUnsafeToRecords(entry.getValue());
+        Object[] key = entry.getKey();
+        synchronized (index.getMutex(key)) {
+          Object value = index.get(key);
+          if (value != null && !value.equals(0L)) {
+            records = server.getAddressMap().fromUnsafeToRecords(value);
+          }
         }
         if (expression != null && records != null) {
           ProcessWithExpression processWithExpression = new ProcessWithExpression(entry, records).invoke();
@@ -309,7 +312,7 @@ public class IndexLookupWithExpression extends IndexLookup {
     private boolean myResult;
     private Map.Entry<Object[], Object> entry;
 
-    public CheckForRightIsDone(Map.Entry<Object[], Object> entry) {
+    CheckForRightIsDone(Map.Entry<Object[], Object> entry) {
       this.entry = entry;
     }
 

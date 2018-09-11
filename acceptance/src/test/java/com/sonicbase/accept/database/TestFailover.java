@@ -1,9 +1,8 @@
 package com.sonicbase.accept.database;
 
-import com.fasterxml.jackson.databind.ObjectMapper;
-import com.fasterxml.jackson.databind.node.ObjectNode;
 import com.sonicbase.client.DatabaseClient;
 import com.sonicbase.common.ComObject;
+import com.sonicbase.common.Config;
 import com.sonicbase.jdbcdriver.ConnectionProxy;
 import com.sonicbase.query.impl.ColumnImpl;
 import com.sonicbase.schema.IndexSchema;
@@ -31,8 +30,8 @@ import static org.testng.Assert.*;
 public class TestFailover {
 
   private Connection conn;
-  private int recordCount = 10;
-  List<Long> ids = new ArrayList<>();
+  private final int recordCount = 10;
+  final List<Long> ids = new ArrayList<>();
 
   DatabaseClient client = null;
   final DatabaseServer[][] dbServers = new DatabaseServer[2][];
@@ -50,11 +49,10 @@ public class TestFailover {
   }
 
   @BeforeClass
-  public void beforeClass() throws Exception {
+  public void beforeClass() {
     try {
-      String configStr = IOUtils.toString(new BufferedInputStream(getClass().getResourceAsStream("/config/config-4-servers.json")), "utf-8");
-      ObjectMapper mapper = new ObjectMapper();
-      final ObjectNode config = (ObjectNode) mapper.readTree(configStr);
+      String configStr = IOUtils.toString(new BufferedInputStream(getClass().getResourceAsStream("/config/config-4-servers.yaml")), "utf-8");
+      Config config = new Config(configStr);
 
       FileUtils.deleteDirectory(new File(System.getProperty("user.home"), "db"));
 
@@ -249,7 +247,7 @@ public class TestFailover {
   }
 
   @Test
-  public void testSpecifiedServer() throws SQLException, InterruptedException {
+  public void testSpecifiedServer() throws InterruptedException {
     Thread.sleep(4000);
 
     DatabaseServer.initDeathOverride(2, 2);
@@ -284,7 +282,7 @@ public class TestFailover {
   }
 
   @Test(enabled=false)
-  public void testAllDead() throws SQLException, InterruptedException {
+  public void testAllDead() throws InterruptedException {
     Thread.sleep(4000);
 
     DatabaseServer.initDeathOverride(2, 2);

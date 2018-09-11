@@ -4,7 +4,7 @@ import com.sonicbase.common.DatabaseCommon;
 import com.sonicbase.schema.DataType;
 import com.sonicbase.schema.FieldSchema;
 import com.sonicbase.schema.TableSchema;
-import org.apache.giraph.utils.Varint;
+import com.sonicbase.util.Varint;
 
 import java.io.*;
 import java.util.ArrayList;
@@ -37,15 +37,15 @@ public class GroupByContext {
     private Comparator comparator;
     private TableSchema tableSchema;
 
-    public void setFieldName(String fieldName) {
+    void setFieldName(String fieldName) {
       this.fieldName = fieldName;
     }
 
-    public void setFieldOffset(int fieldOffset) {
+    void setFieldOffset(int fieldOffset) {
       this.fieldOffset = fieldOffset;
     }
 
-    public void setDataType(DataType.Type dataType) {
+    void setDataType(DataType.Type dataType) {
       this.dataType = dataType;
     }
 
@@ -203,7 +203,7 @@ public class GroupByContext {
     return bytesOut.toByteArray();
   }
 
-  public void addCounterTemplate(Counter counterTemplate) {
+  void addCounterTemplate(Counter counterTemplate) {
     counterTemplates.put(counterTemplate.getTableName() + ":" + counterTemplate.getColumnName(), counterTemplate);
   }
 
@@ -215,7 +215,7 @@ public class GroupByContext {
     private Object[] groupValues;
     private Counter counter = new Counter();
 
-    public void setGroupValues(Object[] groupValues) {
+    void setGroupValues(Object[] groupValues) {
       this.groupValues = groupValues;
     }
 

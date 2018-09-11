@@ -5,7 +5,7 @@ import com.sonicbase.common.DatabaseCommon;
 import com.sonicbase.schema.DataType;
 import com.sonicbase.schema.IndexSchema;
 import com.sonicbase.schema.TableSchema;
-import com.sonicbase.util.TestUtils;
+import com.sonicbase.util.ClientTestUtils;
 import org.testng.annotations.Test;
 
 import java.io.IOException;
@@ -25,13 +25,13 @@ public class GroupByContextTest {
     DatabaseClient client = mock(DatabaseClient.class);
     DatabaseCommon common = new DatabaseCommon();
     when(client.getCommon()).thenReturn(common);
-    TableSchema tableSchema = TestUtils.createTable();
-    IndexSchema indexSchema = TestUtils.createIndexSchema(tableSchema);
-    TestUtils.createStringIndexSchema(tableSchema);
+    TableSchema tableSchema = ClientTestUtils.createTable();
+    IndexSchema indexSchema = ClientTestUtils.createIndexSchema(tableSchema);
+    ClientTestUtils.createStringIndexSchema(tableSchema);
     common.getTables("test").put(tableSchema.getName(), tableSchema);
     common.getTablesById("test").put(tableSchema.getTableId(), tableSchema);
 
-    byte[][] records = TestUtils.createRecords(common, tableSchema, 10);
+    byte[][] records = ClientTestUtils.createRecords(common, tableSchema, 10);
 
     List<GroupByContext.FieldContext> fieldContexts = new ArrayList<>();
     GroupByContext.FieldContext context = new GroupByContext.FieldContext();

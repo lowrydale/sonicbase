@@ -2,13 +2,14 @@ package com.sonicbase.server;
 
 import com.sonicbase.client.DatabaseClient;
 import com.sonicbase.query.DatabaseException;
-import org.apache.giraph.utils.Varint;
+import com.sonicbase.util.Varint;
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
 
 import java.io.*;
 import java.nio.file.Files;
 import java.util.HashMap;
+import java.util.List;
 import java.util.Map;
 import java.util.Queue;
 import java.util.concurrent.ConcurrentLinkedQueue;
@@ -19,12 +20,12 @@ import java.util.concurrent.ConcurrentLinkedQueue;
 // I don't know a good way to reduce the parameter count
 public class LongRunningCalls {
 
-  private static Logger logger = LoggerFactory.getLogger(LongRunningCalls.class);
+  private static final Logger logger = LoggerFactory.getLogger(LongRunningCalls.class);
 
   private final com.sonicbase.server.DatabaseServer server;
-  private ConcurrentLinkedQueue<Thread> executionThreads = new ConcurrentLinkedQueue<>();
+  private final ConcurrentLinkedQueue<Thread> executionThreads = new ConcurrentLinkedQueue<>();
 
-  public LongRunningCalls(DatabaseServer server) {
+  LongRunningCalls(DatabaseServer server) {
     this.server = server;
   }
 
@@ -61,6 +62,16 @@ public class LongRunningCalls {
     }
   }
 
+  public void getFiles(List<String> files) {
+    File dir = getReplicaRoot();
+    File[] currFiles = dir.listFiles();
+    if (currFiles != null) {
+      for (File file : currFiles) {
+        files.add(file.getAbsolutePath());
+      }
+    }
+  }
+
   public void save() {
     try {
       synchronized (this) {
@@ -70,12 +81,7 @@ public class LongRunningCalls {
         version++;
         file = new File(file, String.valueOf(version) + ".in-process");
         if (file.exists()) {
-          try {
-            Files.delete(file.toPath());
-          }
-          catch (IOException e) {
-            logger.error("Error deleting file: path={}", file.getAbsolutePath());
-          }
+          deleteFile(file);
         }
 
         try (DataOutputStream out = new DataOutputStream(new BufferedOutputStream(new FileOutputStream(file)))) {
@@ -96,6 +102,15 @@ public class LongRunningCalls {
     }
   }
 
+  private void deleteFile(File file) {
+    try {
+      Files.delete(file.toPath());
+    }
+    catch (IOException e) {
+      logger.error("Error deleting file: path={}", file.getAbsolutePath());
+    }
+  }
+
   private void deleteOldFiles() {
     File dataRootDir = getReplicaRoot();
     dataRootDir.mkdirs();
@@ -113,12 +128,7 @@ public class LongRunningCalls {
         File currFile = new File(dataRootDir, fileStr);
         logger.info("Deleting file: path={}", currFile.getAbsolutePath());
         if (currFile.exists()) {
-          try {
-            Files.delete(currFile.toPath());
-          }
-          catch (IOException e) {
-            logger.error("Error deleting file: path={}", currFile.getAbsolutePath());
-          }
+          deleteFile(currFile);
         }
       }
     }
@@ -136,14 +146,9 @@ public class LongRunningCalls {
         for (String dir : dirs) {
           int pos = dir.indexOf('.');
           if (pos == -1) {
-            try {
-              int value = Integer.parseInt(dir);
-              if (value > highestSnapshot) {
-                highestSnapshot = value;
-              }
-            }
-            catch (Exception t) {
-              logger.error("Error parsing dir: " + dir, t);
+            int value = Integer.parseInt(dir);
+            if (value > highestSnapshot) {
+              highestSnapshot = value;
             }
           }
         }
@@ -187,7 +192,7 @@ public class LongRunningCalls {
       this.longRunningCommands = longRunningCommands;
     }
 
-    public SingleCommand(LongRunningCalls longRunningCommands, byte[] body) {
+    SingleCommand(LongRunningCalls longRunningCommands, byte[] body) {
       this.longRunningCommands = longRunningCommands;
       this.body = body;
     }
@@ -198,7 +203,7 @@ public class LongRunningCalls {
       out.write(body);
     }
 
-    public void deserialize(DataInputStream in) throws IOException {
+    void deserialize(DataInputStream in) throws IOException {
       Varint.readSignedVarLong(in); //serialization version
       int len = (int)Varint.readSignedVarLong(in);
       body = new byte[len];
@@ -227,7 +232,7 @@ public class LongRunningCalls {
     }
   }
 
-  static Map<Integer, Type> lookupTypeById = new HashMap<>();
+  static final Map<Integer, Type> lookupTypeById = new HashMap<>();
   enum Type {
     SINGLE(0),
     COMPOUND(1);
@@ -240,7 +245,7 @@ public class LongRunningCalls {
     }
   }
 
-  private ConcurrentLinkedQueue<SingleCommand> commands = new ConcurrentLinkedQueue<>();
+  private final ConcurrentLinkedQueue<SingleCommand> commands = new ConcurrentLinkedQueue<>();
 
   public void serialize(DataOutputStream out) throws IOException {
     synchronized (commands) {
@@ -252,7 +257,7 @@ public class LongRunningCalls {
     }
   }
 
-  public void deserialize(DataInputStream in) throws IOException {
+  private void deserialize(DataInputStream in) throws IOException {
     synchronized (commands) {
       commands.clear();
       Varint.readSignedVarLong(in); //serialization version

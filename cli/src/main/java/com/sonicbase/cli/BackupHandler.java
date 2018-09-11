@@ -2,26 +2,24 @@ package com.sonicbase.cli;
 
 import com.sonicbase.common.ComObject;
 import com.sonicbase.query.DatabaseException;
-import org.slf4j.Logger;
-import org.slf4j.LoggerFactory;
 
-import java.io.IOException;
 import java.sql.SQLException;
 
 
-public class BackupHandler {
+class BackupHandler {
 
-  private static Logger logger = LoggerFactory.getLogger(BackupHandler.class);
+  private static final String ERROR_NOT_USING_A_CLUSTER_STR = "Error, not using a cluster";
+  private static final String ERROR_STR = ", error=";
   private final Cli cli;
 
-  public BackupHandler(Cli cli) {
+  BackupHandler(Cli cli) {
     this.cli = cli;
   }
 
-  public void startBackup() throws SQLException, ClassNotFoundException {
+  void startBackup() throws SQLException, ClassNotFoundException {
     String cluster = cli.getCurrCluster();
     if (cluster == null) {
-      System.out.println("Error, not using a cluster");
+      cli.println(ERROR_NOT_USING_A_CLUSTER_STR);
       return;
     }
 
@@ -30,10 +28,10 @@ public class BackupHandler {
     cli.getConn().startBackup();
   }
 
-  public void startRestore(String command) throws SQLException, ClassNotFoundException, IOException {
+  void startRestore(String command) throws SQLException, ClassNotFoundException {
     String cluster = cli.getCurrCluster();
     if (cluster == null) {
-      System.out.println("Error, not using a cluster");
+      cli.println(ERROR_NOT_USING_A_CLUSTER_STR);
       return;
     }
 
@@ -48,17 +46,17 @@ public class BackupHandler {
     cli.getConn().startRestore(subDir);
   }
 
-  public void backupStatus() throws SQLException, ClassNotFoundException {
+  void backupStatus() throws SQLException, ClassNotFoundException {
     String cluster = cli.getCurrCluster();
     if (cluster == null) {
-      System.out.println("Error, not using a cluster");
+      cli.println(ERROR_NOT_USING_A_CLUSTER_STR);
       return;
     }
 
     cli.initConnection();
 
     if (cli.getConn().isBackupComplete()) {
-      System.out.println("complete");
+      cli.println("complete");
     }
     else {
       ComObject cobj = new ComObject();
@@ -69,22 +67,22 @@ public class BackupHandler {
       String error = retObj.getString(ComObject.Tag.EXCEPTION);
       percentComplete *= 100d;
       String formatted = String.format("%.2f", percentComplete);
-      System.out.println("running - percentComplete=" + formatted + (error != null ? ", error=" + error : ""));
+      cli.println("running - percentComplete=" + formatted + (error != null ? ERROR_STR + error : ""));
     }
 
   }
 
-  public void restoreStatus() throws SQLException, ClassNotFoundException {
+  void restoreStatus() throws SQLException, ClassNotFoundException {
     String cluster = cli.getCurrCluster();
     if (cluster == null) {
-      System.out.println("Error, not using a cluster");
+      cli.println(ERROR_NOT_USING_A_CLUSTER_STR);
       return;
     }
 
     cli.initConnection();
 
     if (cli.getConn().isRestoreComplete()) {
-      System.out.println("complete");
+      cli.println("complete");
     }
     else {
       ComObject cobj = new ComObject();
@@ -99,10 +97,10 @@ public class BackupHandler {
 
       String stage = retObj.getString(ComObject.Tag.STAGE);
       if (stage.equals("copyingFiles")) {
-        System.out.println("running - stage=copyingFiles, percentComplete=" + formatted +  (error != null ? ", error=" + error : ""));
+        cli.println("running - stage=copyingFiles, percentComplete=" + formatted +  (error != null ? ERROR_STR + error : ""));
       }
       else {
-        System.out.println("running - stage=" + stage + ", percentComplete=" + formatted +  (error != null ? ", error=" + error : ""));
+        cli.println("running - stage=" + stage + ", percentComplete=" + formatted +  (error != null ? ERROR_STR + error : ""));
       }
     }
   }

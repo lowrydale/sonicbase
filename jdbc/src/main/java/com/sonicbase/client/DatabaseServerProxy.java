@@ -12,14 +12,14 @@ import java.lang.reflect.Method;
 // I don't know a good way to reduce the parameter count
 public class DatabaseServerProxy {
 
-  private static Method indexLookupExpression;
-  private static Method invokeMethod;
-  private static Method serverSelect;
-  private static Method indexLookup;
-  private static Method serverSetSelect;
-  private static Method getShard;
-  private static Method getReplica;
-  private static Method getCommon;
+  private static final Method indexLookupExpression;
+  private static final Method invokeMethod;
+  private static final Method serverSelect;
+  private static final Method indexLookup;
+  private static final Method serverSetSelect;
+  private static final Method getShard;
+  private static final Method getReplica;
+  private static final Method getCommon;
 
   static {
     try {

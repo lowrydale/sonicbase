@@ -6,7 +6,7 @@ import com.sonicbase.query.impl.OrderByExpressionImpl;
 import com.sonicbase.schema.FieldSchema;
 import com.sonicbase.schema.TableSchema;
 import com.sonicbase.server.DatabaseServer;
-import org.apache.giraph.utils.Varint;
+import com.sonicbase.util.Varint;
 
 import java.io.*;
 import java.nio.file.Files;
@@ -280,7 +280,7 @@ public class MergeNFiles {
           return -1 * (ascendingFlags[i] ? 1 : -1);
         }
         if (o2.row[tableOffsets[i]] == null) {
-          return 1 * (ascendingFlags[i] ? 1 : -1);
+          return (ascendingFlags[i] ? 1 : -1);
         }
 
         int value = comparators[i].compare(o1.row[tableOffsets[i]].getFields()[fieldOffsets[i]],
@@ -289,7 +289,7 @@ public class MergeNFiles {
           return -1 * (ascendingFlags[i] ? 1 : -1);
         }
         if (value > 0) {
-          return 1 * (ascendingFlags[i] ? 1 : -1);
+          return (ascendingFlags[i] ? 1 : -1);
         }
       }
       return 0;
@@ -325,24 +325,22 @@ public class MergeNFiles {
     comparator = (o1, o2) -> {
       for (int i = 0; i < fieldOffsets.length; i++) {
         for (int j = 0; j < o1.row.length; j++) {
-          if (o1.row[j] == null && o2.row[j] == null) {
-            continue;
+          if (!(o1.row[j] == null && o2.row[j] == null)) {
+            if (o1.row[j] == null) {
+              return -1 * (ascendingFlags[i] ? 1 : -1);
+            }
+            if (o2.row[j] == null) {
+              return (ascendingFlags[i] ? 1 : -1);
+            }
+            int value = comparators[i].compare(o1.row[j].getFields()[fieldOffsets[i][j]], o2.row[j].getFields()[fieldOffsets[i][j]]);
+            if (value < 0) {
+              return -1 * (ascendingFlags[i] ? 1 : -1);
+            }
+            if (value > 0) {
+              return (ascendingFlags[i] ? 1 : -1);
+            }
+            break;
           }
-
-          if (o1.row[j] == null) {
-            return -1 * (ascendingFlags[i] ? 1 : -1);
-          }
-          if (o2.row[j] == null) {
-            return 1 * (ascendingFlags[i] ? 1 : -1);
-          }
-          int value = comparators[i].compare(o1.row[j].getFields()[fieldOffsets[i][j]], o2.row[j].getFields()[fieldOffsets[i][j]]);
-          if (value < 0) {
-            return -1 * (ascendingFlags[i] ? 1 : -1);
-          }
-          if (value > 0) {
-            return 1 * (ascendingFlags[i] ? 1 : -1);
-          }
-          break;
         }
       }
       return 0;

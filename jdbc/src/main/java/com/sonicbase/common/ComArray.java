@@ -1,7 +1,7 @@
 package com.sonicbase.common;
 
 import com.sonicbase.query.DatabaseException;
-import org.apache.giraph.utils.Varint;
+import com.sonicbase.util.Varint;
 
 import java.io.ByteArrayInputStream;
 import java.io.DataInputStream;
@@ -15,11 +15,12 @@ import java.util.List;
 // I prefer to return null instead of an empty array
 // I don't know a good way to reduce the parameter count
 public class ComArray {
-  public static final String UTF_8_STR = "utf-8";
+  private static final String UTF_8_STR = "utf-8";
   private ComObject.DynamicType nestedType;
-  private List<Object> array = new ArrayList<>();
+  private List<Object> array;
 
   public ComArray(ComObject.Type nestedType) {
+    array = new ArrayList<>();
     this.nestedType = new ComObject.DynamicType(nestedType.tag);
   }
 
@@ -122,9 +123,9 @@ public class ComArray {
 
   private void deserialize(DataInputStream in) {
     try {
-      array.clear();
       nestedType = new ComObject.DynamicType((int)Varint.readSignedVarLong(in));
       int count = (int)Varint.readSignedVarLong(in);
+      array = new ArrayList<>(count);
       for (int i = 0; i < count; i++) {
         if (nestedType.tag == ComObject.Type.OBJECT_TYPE.tag) {
           int len = (int)Varint.readSignedVarLong(in);

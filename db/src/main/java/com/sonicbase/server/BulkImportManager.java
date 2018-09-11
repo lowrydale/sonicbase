@@ -38,12 +38,29 @@ public class BulkImportManager {
   private static final String SELECT_STR = "select ";
   private static final int BULK_IMPORT_THREAD_COUNT_PER_SERVER = 4;
 
-  private static Logger logger = LoggerFactory.getLogger(BulkImportManager.class);
+  private static final Logger logger = LoggerFactory.getLogger(BulkImportManager.class);
 
   private final com.sonicbase.server.DatabaseServer server;
   private boolean shutdown;
+  private final ConcurrentHashMap<String, Long> preProcessCountExpected = new ConcurrentHashMap<>();
+  private final ConcurrentHashMap<String, AtomicLong> preProcessCountProcessed = new ConcurrentHashMap<>();
+  private final ConcurrentHashMap<String, Boolean> preProcessFinished = new ConcurrentHashMap<>();
+  private final ConcurrentHashMap<String, String> preProcessException = new ConcurrentHashMap<>();
+  private final ConcurrentHashMap<String, Long> importCountExpected = new ConcurrentHashMap<>();
+  private final ConcurrentHashMap<String, AtomicLong> importCountProcessed = new ConcurrentHashMap<>();
+  private final ConcurrentHashMap<String, Boolean> importFinished = new ConcurrentHashMap<>();
+  private final ConcurrentHashMap<String, String> importException = new ConcurrentHashMap<>();
+  private final ConcurrentHashMap<String, AtomicBoolean> cancelBulkImport = new ConcurrentHashMap<>();
+  private final AtomicInteger countBulkImportRunning = new AtomicInteger();
+  private static final Map<DataType.Type, Extractor> extractorByType = new EnumMap<>(DataType.Type.class);
+  private static final Map<DataType.Type, Extractor> extractorForInternalByType = new EnumMap<>(DataType.Type.class);
+  private static final String UTF_8_STR = "utf-8";
+  private final AtomicInteger countCoordinating = new AtomicInteger();
+  private static final Map<DataType.Type, Setter> setterByType = new EnumMap<>(DataType.Type.class);
+  private final AtomicInteger coordinatesCalled = new AtomicInteger();
 
-  public BulkImportManager(final DatabaseServer server) {
+
+  BulkImportManager(final DatabaseServer server) {
     this.server = server;
   }
 
@@ -61,17 +78,6 @@ public class BulkImportManager {
     private boolean finished;
     private String exception;
   }
-
-  private ConcurrentHashMap<String, Long> preProcessCountExpected = new ConcurrentHashMap<>();
-  private ConcurrentHashMap<String, AtomicLong> preProcessCountProcessed = new ConcurrentHashMap<>();
-  private ConcurrentHashMap<String, Boolean> preProcessFinished = new ConcurrentHashMap<>();
-  private ConcurrentHashMap<String, String> preProcessException = new ConcurrentHashMap<>();
-  private ConcurrentHashMap<String, Long> importCountExpected = new ConcurrentHashMap<>();
-  private ConcurrentHashMap<String, AtomicLong> importCountProcessed = new ConcurrentHashMap<>();
-  private ConcurrentHashMap<String, Boolean> importFinished = new ConcurrentHashMap<>();
-  private ConcurrentHashMap<String, String> importException = new ConcurrentHashMap<>();
-  private ConcurrentHashMap<String, AtomicBoolean> cancelBulkImport = new ConcurrentHashMap<>();
-
 
   @SuppressWarnings("squid:S1172") // cobj and replayedCommand are required
   public ComObject getBulkImportProgressOnServer(ComObject cobj, boolean replayedCommand) {
@@ -123,10 +129,10 @@ public class BulkImportManager {
   private void setPreProcessProgress(String dbName, String tableName, ComObject currObj) {
     AtomicLong preProcessed = preProcessCountProcessed.get(dbName + ":" + tableName);
     if (preProcessed == null) {
-      currObj.put(ComObject.Tag.PRE_POCESS_COUNT_PROCESSED, 0);
+      currObj.put(ComObject.Tag.PRE_PROCESS_COUNT_PROCESSED, 0);
     }
     else {
-      currObj.put(ComObject.Tag.PRE_POCESS_COUNT_PROCESSED, preProcessed.get());
+      currObj.put(ComObject.Tag.PRE_PROCESS_COUNT_PROCESSED, preProcessed.get());
     }
     Long preProcessExpected = preProcessCountExpected.get(dbName + ":" + tableName);
     if (preProcessExpected == null) {
@@ -145,8 +151,6 @@ public class BulkImportManager {
       currObj.put(ComObject.Tag.PRE_PROCESS_EXCEPTION, preException);
     }
   }
-
-  private AtomicInteger countBulkImportRunning = new AtomicInteger();
 
   @SuppressWarnings("squid:S2629") // info is always enabled
   public ComObject startBulkImportOnServer(final ComObject cobj, boolean replayedCommand) {
@@ -472,15 +476,14 @@ public class BulkImportManager {
       final AtomicLong countProcessed = importCountProcessed.get(dbName + ":" + tableName);
       final AtomicInteger countSubmitted = new AtomicInteger();
       final AtomicInteger countFinished = new AtomicInteger();
-      ObjectNode dict = server.getConfig();
-      ObjectNode databaseDict = dict;
-      ArrayNode array = databaseDict.withArray("shards");
-      ObjectNode replicaDict = (ObjectNode) array.get(0);
-      ArrayNode replicasArray = replicaDict.withArray("replicas");
-      final String address = databaseDict.get("clientIsPrivate").asBoolean() ?
-          replicasArray.get(0).get("privateAddress").asText() :
-          replicasArray.get(0).get("publicAddress").asText();
-      final int port = replicasArray.get(0).get("port").asInt();
+      Config config = server.getConfig();
+      List<Config.Shard> shards = config.getShards();
+      Config.Shard shard = shards.get(0);
+      List<Config.Replica> replicasArray = shard.getReplicas();
+      final String address = config.getBoolean("clientIsPrivate") ?
+          replicasArray.get(0).getString("privateAddress") :
+          replicasArray.get(0).getString("publicAddress");
+      final int port = replicasArray.get(0).getInt("port");
 
       Class.forName("com.sonicbase.jdbcdriver.Driver");
       try (Connection insertConn = getConnection(dbName, address, port)) {
@@ -537,8 +540,6 @@ public class BulkImportManager {
     Object extract(ResultSet rs, String field) throws SQLException, UnsupportedEncodingException;
   }
 
-  private static Map<DataType.Type, Extractor> extractorByType = new EnumMap<>(DataType.Type.class);
-
   static {
     extractorByType.put(DataType.Type.BIT, ResultSet::getBoolean);
     extractorByType.put(DataType.Type.TINYINT, ResultSet::getByte);
@@ -568,10 +569,6 @@ public class BulkImportManager {
     extractorByType.put(DataType.Type.LONGNVARCHAR, ResultSet::getString);
     extractorByType.put(DataType.Type.NCLOB, ResultSet::getString);
   }
-
-  private static Map<DataType.Type, Extractor> extractorForInternalByType = new EnumMap<>(DataType.Type.class);
-
-  public static final String UTF_8_STR = "utf-8";
 
   static {
     extractorForInternalByType.put(DataType.Type.BIT, (ResultSet rs, String field) -> rs.getBoolean(field));
@@ -627,8 +624,6 @@ public class BulkImportManager {
       throw new SQLException(e);
     }
   }
-
-  private AtomicInteger countCoordinating = new AtomicInteger();
 
   public int getCountCoordinating() {
     return countCoordinating.get();
@@ -827,15 +822,14 @@ public class BulkImportManager {
     List<Future> futures = new ArrayList<>();
     ThreadPoolExecutor executor = ThreadUtil.createExecutor(8, "SonicBase doImportForNoPrimaryKey Thread");
     try (PreparedStatement stmt = conn.prepareStatement(statementStr)) {
-      ObjectNode dict = server.getConfig();
-      ObjectNode databaseDict = dict;
-      ArrayNode array = databaseDict.withArray("shards");
-      ObjectNode replicaDict = (ObjectNode) array.get(0);
-      ArrayNode replicasArray = replicaDict.withArray("replicas");
-      final String address = databaseDict.get("clientIsPrivate").asBoolean() ?
-          replicasArray.get(0).get("privateAddress").asText() :
-          replicasArray.get(0).get("publicAddress").asText();
-      final int port = replicasArray.get(0).get("port").asInt();
+      Config config = server.getConfig();
+      List<Config.Shard> array = config.getShards();
+      Config.Shard shard = array.get(0);
+      List<Config.Replica> replicasArray = shard.getReplicas();
+      final String address = config.getBoolean("clientIsPrivate") ?
+          replicasArray.get(0).getString("privateAddress") :
+          replicasArray.get(0).getString("publicAddress");
+      final int port = replicasArray.get(0).getInt("port");
 
       Class.forName("com.sonicbase.jdbcdriver.Driver");
       try (Connection insertConn = getConnection(dbName, address, port)) {
@@ -1032,8 +1026,6 @@ public class BulkImportManager {
     void set(PreparedStatement insertStatement, int parmOffset, Object value) throws SQLException;
   }
 
-  private static Map<DataType.Type, Setter> setterByType = new EnumMap<>(DataType.Type.class);
-
   static {
     setterByType.put(DataType.Type.BIT, (PreparedStatement insertStmt, int parmOffset, Object value) ->
         insertStmt.setBoolean(parmOffset, (Boolean) value));
@@ -1155,8 +1147,6 @@ public class BulkImportManager {
     }
   }
 
-  private AtomicInteger coordinatesCalled = new AtomicInteger();
-
   protected ConcurrentHashMap<String, ConcurrentHashMap<String, BulkImportStatus>> getBulkImportStatus(String dbName) {
     ConcurrentHashMap<String, ConcurrentHashMap<String, BulkImportStatus>> bulkImportStatus = new ConcurrentHashMap<>();
 
@@ -1211,7 +1201,7 @@ public class BulkImportManager {
       currStatus.exception = tableStatus.getString(ComObject.Tag.EXCEPTION);
 
       currStatus.preProcessCountExpected = tableStatus.getLong(ComObject.Tag.PRE_PROCESS_EXPECTED_COUNT);
-      currStatus.preProcessCountProcessed = tableStatus.getLong(ComObject.Tag.PRE_POCESS_COUNT_PROCESSED);
+      currStatus.preProcessCountProcessed = tableStatus.getLong(ComObject.Tag.PRE_PROCESS_COUNT_PROCESSED);
       currStatus.preProcessFinished = tableStatus.getBoolean(ComObject.Tag.PRE_PROCESS_FINISHED);
       currStatus.preProcessException = tableStatus.getString(ComObject.Tag.PRE_PROCESS_EXCEPTION);
     }
@@ -1341,7 +1331,7 @@ public class BulkImportManager {
   }
 
   @SuppressWarnings("squid:S1172") // replayedCommand is required
-  public ComObject getBulkImportProgress(ComObject cobj, boolean replayedCommand) {
+  public ComObject  getBulkImportProgress(ComObject cobj, boolean replayedCommand) {
     String dbName = cobj.getString(ComObject.Tag.DB_NAME);
 
     ConcurrentHashMap<String, ConcurrentHashMap<String, BulkImportStatus>> bulkImportStatus = getBulkImportStatus(dbName);
@@ -1407,7 +1397,7 @@ public class BulkImportManager {
       serverObj.put(ComObject.Tag.EXCEPTION, exception);
     }
     serverObj.put(ComObject.Tag.PRE_PROCESS_EXPECTED_COUNT, preProcessCountExpected);
-    serverObj.put(ComObject.Tag.PRE_POCESS_COUNT_PROCESSED, preProcessCountProcessed);
+    serverObj.put(ComObject.Tag.PRE_PROCESS_COUNT_PROCESSED, preProcessCountProcessed);
     serverObj.put(ComObject.Tag.PRE_PROCESS_FINISHED, preProcessFinished);
     if (preProcessEx != null) {
       serverObj.put(ComObject.Tag.PRE_PROCESS_EXCEPTION, preProcessEx);
@@ -1417,17 +1407,17 @@ public class BulkImportManager {
 
   private class ProcessResult {
     private boolean myResult;
-    private AtomicLong countProcessed;
-    private IndexSchema indexSchema;
-    private String[] keyFields;
-    private DataType.Type[] dataTypes;
-    private boolean b;
-    private Object[][] keys;
+    private final AtomicLong countProcessed;
+    private final IndexSchema indexSchema;
+    private final String[] keyFields;
+    private final DataType.Type[] dataTypes;
+    private final boolean b;
+    private final Object[][] keys;
     private int recordOffset;
     private int slice;
-    private ResultSet rs;
+    private final ResultSet rs;
     private long actualCount;
-    private Object[] lastPartialKey;
+    private final Object[] lastPartialKey;
     private boolean lookingForUniqueKey;
 
     public ProcessResult(AtomicLong countProcessed, IndexSchema indexSchema, String[] keyFields,
@@ -1508,9 +1498,9 @@ public class BulkImportManager {
   private class DoProcessBulkImportStatusForTable {
     private boolean myResult;
     private boolean inProgress;
-    private Map.Entry<String, ConcurrentHashMap<String, BulkImportStatus>> entry;
-    private String tableName;
-    private String currTable;
+    private final Map.Entry<String, ConcurrentHashMap<String, BulkImportStatus>> entry;
+    private final String tableName;
+    private final String currTable;
 
     public DoProcessBulkImportStatusForTable(boolean inProgress, Map.Entry<String,
         ConcurrentHashMap<String, BulkImportStatus>> entry, String tableName, String currTable) {

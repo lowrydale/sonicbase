@@ -9,8 +9,8 @@ import java.sql.SQLException;
 // I prefer to return null instead of an empty array
 // I don't know a good way to reduce the parameter count
 public class Blob implements java.sql.Blob {
-  public static final String OUT_OF_BOUNDS_STR = "out of bounds";
-  public static final String NOT_SUPPORTED_STR = "not supported";
+  private static final String OUT_OF_BOUNDS_STR = "out of bounds";
+  private static final String NOT_SUPPORTED_STR = "not supported";
   private byte[] data;
 
   public Blob() {
@@ -30,7 +30,7 @@ public class Blob implements java.sql.Blob {
   }
 
   @Override
-  public long length() throws SQLException {
+  public long length() {
     if (data == null) {
       return 0;
     }
@@ -112,12 +112,12 @@ public class Blob implements java.sql.Blob {
   }
 
   @Override
-  public void free() throws SQLException {
+  public void free() {
     data = null;
   }
 
   @Override
-  public InputStream getBinaryStream(long pos, long length) throws SQLException {
+  public InputStream getBinaryStream(long pos, long length) {
     return new ByteArrayInputStream(data, (int)pos, (int)length);
   }
 }

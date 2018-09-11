@@ -13,7 +13,7 @@ public class IndexSchema {
   private boolean isPrimaryKey;
   private String name;
   private int indexId;
-  String[] fields;
+  private String[] fields;
   private Comparator[] comparators;
   private TableSchema.Partition[] lastPartitions;
   private TableSchema.Partition[] currPartitions;
@@ -123,7 +123,7 @@ public class IndexSchema {
     this.isPrimaryKey = isPrimaryKey;
   }
 
-  public void setIsPrimaryKeyGroup(boolean isPrimaryKeyGroup) {
+  void setIsPrimaryKeyGroup(boolean isPrimaryKeyGroup) {
     this.isPrimaryKeyGroup = isPrimaryKeyGroup;
   }
 
@@ -131,7 +131,11 @@ public class IndexSchema {
     return isUnique;
   }
 
-  public void setIsUnique(boolean isUnique) {
+  void setIsUnique(boolean isUnique) {
     this.isUnique = isUnique;
+  }
+
+  public void setUnique(boolean unique) {
+    this.isUnique = unique;
   }
 }

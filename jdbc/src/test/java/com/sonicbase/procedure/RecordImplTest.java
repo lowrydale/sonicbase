@@ -4,7 +4,7 @@ import com.sonicbase.common.ComArray;
 import com.sonicbase.common.ComObject;
 import com.sonicbase.common.DatabaseCommon;
 import com.sonicbase.schema.TableSchema;
-import com.sonicbase.util.TestUtils;
+import com.sonicbase.util.ClientTestUtils;
 import org.testng.annotations.Test;
 
 import java.io.UnsupportedEncodingException;
@@ -20,11 +20,11 @@ public class RecordImplTest {
   @Test
   public void test() throws UnsupportedEncodingException {
 
-    TableSchema tableSchema = TestUtils.createTable();
+    TableSchema tableSchema = ClientTestUtils.createTable();
     DatabaseCommon common = new DatabaseCommon();
     common.getTables("test").put(tableSchema.getName(), tableSchema);
     common.getTablesById("test").put(tableSchema.getTableId(), tableSchema);
-    byte[][] records = TestUtils.createRecords(common, tableSchema, 10);
+    byte[][] records = ClientTestUtils.createRecords(common, tableSchema, 10);
 
     RecordImpl record = new RecordImpl("test", common, (short)100, "test", tableSchema, new com.sonicbase.common.Record("test", common, records[0]));
     assertEquals((long)record.getLong("field1"), 200L);
@@ -91,11 +91,11 @@ public class RecordImplTest {
   @Test
   public void testNoTableSchema() throws UnsupportedEncodingException {
 
-    TableSchema tableSchema = TestUtils.createTable();
+    TableSchema tableSchema = ClientTestUtils.createTable();
     DatabaseCommon common = new DatabaseCommon();
     common.getTables("test").put(tableSchema.getName(), tableSchema);
     common.getTablesById("test").put(tableSchema.getTableId(), tableSchema);
-    byte[][] records = TestUtils.createRecords(common, tableSchema, 10);
+    byte[][] records = ClientTestUtils.createRecords(common, tableSchema, 10);
 
     ComObject cobj = new ComObject();
     ComArray array  = cobj.putArray(ComObject.Tag.FIELDS, ComObject.Type.OBJECT_TYPE);
@@ -335,11 +335,11 @@ public class RecordImplTest {
 
   @Test
   public void testSetWithSchema() throws UnsupportedEncodingException {
-    TableSchema tableSchema = TestUtils.createTable();
+    TableSchema tableSchema = ClientTestUtils.createTable();
     DatabaseCommon common = new DatabaseCommon();
     common.getTables("test").put(tableSchema.getName(), tableSchema);
     common.getTablesById("test").put(tableSchema.getTableId(), tableSchema);
-    byte[][] records = TestUtils.createRecords(common, tableSchema, 10);
+    byte[][] records = ClientTestUtils.createRecords(common, tableSchema, 10);
 
     RecordImpl record = new RecordImpl("test", common, (short)100, "test", tableSchema, new com.sonicbase.common.Record("test", common, records[1]));
     record.setLong("field1", 200L);

@@ -27,6 +27,16 @@ public class TestUtils {
     return ret;
   }
 
+  public static List<Object[]> createNonUniqueKeys(int count) {
+    List<Object[]> ret = new ArrayList<>();
+    for (int i = 0; i < count; i++) {
+      Object[] fieldArray = new Object[1];
+      fieldArray[0] = 200L + (i % 3);
+      ret.add(fieldArray);
+    }
+    return ret;
+  }
+
   public static DatabaseCommon createCommon(TableSchema tableSchema) {
     DatabaseCommon common = new DatabaseCommon();
     common.addDatabase("test");
@@ -51,10 +61,53 @@ public class TestUtils {
 
 
   public static byte[][] createRecords(DatabaseCommon common, TableSchema tableSchema, int count) throws UnsupportedEncodingException {
+    return createRecords(common, tableSchema, count, null);
+  }
+
+  public static byte[][] createRecords(DatabaseCommon common, TableSchema tableSchema, int count, List<Object[]> keys) throws UnsupportedEncodingException {
     byte[][] records = new byte[count][];
     for (int i = 0; i < records.length; i++) {
       Object[] fieldArray = new Object[28];
-      fieldArray[1] = 200L + (100 * i);
+      fieldArray[1] = keys != null ? keys.get(i)[0] : 200L + (100 * i);
+      fieldArray[2] = ((i % 2) + "-value").getBytes("utf-8");
+      fieldArray[3] = new Timestamp(200 + (100 * i));
+      fieldArray[4] = (int)(1200 + (100 * i));
+      fieldArray[5] = (short)i;
+      fieldArray[6] = (byte)i;
+      fieldArray[7] = (i + "-value").getBytes("utf-8");
+      fieldArray[8] = (i + "-value").getBytes("utf-8");
+      fieldArray[9] = (double) i;
+      fieldArray[10] = (float) i;
+      fieldArray[11] = (double) i;
+      fieldArray[12] = true;
+      fieldArray[13] = true;
+      fieldArray[14] = (i + "-value").getBytes("utf-8");
+      fieldArray[15] = (i + "-value").getBytes("utf-8");
+      fieldArray[16] = (i + "-value").getBytes("utf-8");
+      fieldArray[17] = (i + "-value").getBytes("utf-8");
+      fieldArray[18] = (i + "-value").getBytes("utf-8");
+      fieldArray[19] = (i + "-value").getBytes("utf-8");
+      fieldArray[20] = (i + "-value").getBytes("utf-8");
+      fieldArray[21] = (i + "-value").getBytes("utf-8");
+      fieldArray[22] = (i + "-value").getBytes("utf-8");
+      fieldArray[23] = new BigDecimal(i);
+      fieldArray[24] = new BigDecimal(i);
+      fieldArray[25] = new Date(1900 + i, 10, 1);
+      fieldArray[26] = new Time(1, i, 0);
+      fieldArray[27] = new Timestamp(i);
+
+      Record record = new Record(tableSchema);
+      record.setFields(fieldArray);
+      records[i] = record.serialize(common, DatabaseClient.SERIALIZATION_VERSION);
+    }
+    return records;
+  }
+
+  public static byte[][] createNonUniqueRecords(DatabaseCommon common, TableSchema tableSchema, int count) throws UnsupportedEncodingException {
+    byte[][] records = new byte[count][];
+    for (int i = 0; i < records.length; i++) {
+      Object[] fieldArray = new Object[28];
+      fieldArray[1] = 200L + (i % 3);
       fieldArray[2] = ((i % 2) + "-value").getBytes("utf-8");
       fieldArray[3] = new Timestamp(200 + (100 * i));
       fieldArray[4] = (int)(1200 + (100 * i));
@@ -135,7 +188,7 @@ public class TestUtils {
     return ret;
   }
 
-  public static List<Object[]> createKeysForBigDecimalIndex(int count) throws UnsupportedEncodingException {
+  public static List<Object[]> createKeysForBigDecimalIndex(int count) {
     List<Object[]> ret = new ArrayList<>();
     for (int i = 0; i < count; i++) {
       Object[] fieldArray = new Object[1];
@@ -269,6 +322,130 @@ public class TestUtils {
     return tableSchema;
   }
 
+  public static TableSchema createTableNonUnique() {
+    TableSchema tableSchema = new TableSchema();
+    tableSchema.setName("table1");
+    tableSchema.setTableId(100);
+    List<FieldSchema> fields = new ArrayList<>();
+    FieldSchema fSchema = new FieldSchema();
+    fSchema.setName("_id");
+    fSchema.setType(DataType.Type.BIGINT);
+    fields.add(fSchema);
+    fSchema = new FieldSchema();
+    fSchema.setName("field1");
+    fSchema.setType(DataType.Type.BIGINT);
+    fields.add(fSchema);
+    fSchema = new FieldSchema();
+    fSchema.setName("field2");
+    fSchema.setType(DataType.Type.VARCHAR);
+    fields.add(fSchema);
+    fSchema = new FieldSchema();
+    fSchema.setName("field3");
+    fSchema.setType(DataType.Type.TIMESTAMP);
+    fields.add(fSchema);
+    fSchema = new FieldSchema();
+    fSchema.setName("field4");
+    fSchema.setType(DataType.Type.INTEGER);
+    fields.add(fSchema);
+    fSchema = new FieldSchema();
+    fSchema.setName("field5");
+    fSchema.setType(DataType.Type.SMALLINT);
+    fields.add(fSchema);
+    fSchema = new FieldSchema();
+    fSchema.setName("field6");
+    fSchema.setType(DataType.Type.TINYINT);
+    fields.add(fSchema);
+    fSchema = new FieldSchema();
+    fSchema.setName("field7");
+    fSchema.setType(DataType.Type.CHAR);
+    fields.add(fSchema);
+    fSchema = new FieldSchema();
+    fSchema.setName("field8");
+    fSchema.setType(DataType.Type.NCHAR);
+    fields.add(fSchema);
+    fSchema = new FieldSchema();
+    fSchema.setName("field9");
+    fSchema.setType(DataType.Type.FLOAT);
+    fields.add(fSchema);
+    fSchema = new FieldSchema();
+    fSchema.setName("field10");
+    fSchema.setType(DataType.Type.REAL);
+    fields.add(fSchema);
+    fSchema = new FieldSchema();
+    fSchema.setName("field11");
+    fSchema.setType(DataType.Type.DOUBLE);
+    fields.add(fSchema);
+    fSchema = new FieldSchema();
+    fSchema.setName("field12");
+    fSchema.setType(DataType.Type.BOOLEAN);
+    fields.add(fSchema);
+    fSchema = new FieldSchema();
+    fSchema.setName("field13");
+    fSchema.setType(DataType.Type.BIT);
+    fields.add(fSchema);
+    fSchema = new FieldSchema();
+    fSchema.setName("field14");
+    fSchema.setType(DataType.Type.VARCHAR);
+    fields.add(fSchema);
+    fSchema = new FieldSchema();
+    fSchema.setName("field15");
+    fSchema.setType(DataType.Type.CLOB);
+    fields.add(fSchema);
+    fSchema = new FieldSchema();
+    fSchema.setName("field16");
+    fSchema.setType(DataType.Type.NCLOB);
+    fields.add(fSchema);
+    fSchema = new FieldSchema();
+    fSchema.setName("field17");
+    fSchema.setType(DataType.Type.LONGVARCHAR);
+    fields.add(fSchema);
+    fSchema = new FieldSchema();
+    fSchema.setName("field18");
+    fSchema.setType(DataType.Type.NVARCHAR);
+    fields.add(fSchema);
+    fSchema = new FieldSchema();
+    fSchema.setName("field19");
+    fSchema.setType(DataType.Type.LONGNVARCHAR);
+    fields.add(fSchema);
+    fSchema = new FieldSchema();
+    fSchema.setName("field20");
+    fSchema.setType(DataType.Type.LONGVARBINARY);
+    fields.add(fSchema);
+    fSchema = new FieldSchema();
+    fSchema.setName("field21");
+    fSchema.setType(DataType.Type.VARBINARY);
+    fields.add(fSchema);
+    fSchema = new FieldSchema();
+    fSchema.setName("field22");
+    fSchema.setType(DataType.Type.BLOB);
+    fields.add(fSchema);
+    fSchema = new FieldSchema();
+    fSchema.setName("field23");
+    fSchema.setType(DataType.Type.NUMERIC);
+    fields.add(fSchema);
+    fSchema = new FieldSchema();
+    fSchema.setName("field24");
+    fSchema.setType(DataType.Type.DECIMAL);
+    fields.add(fSchema);
+    fSchema = new FieldSchema();
+    fSchema.setName("field25");
+    fSchema.setType(DataType.Type.DATE);
+    fields.add(fSchema);
+    fSchema = new FieldSchema();
+    fSchema.setName("field26");
+    fSchema.setType(DataType.Type.TIME);
+    fields.add(fSchema);
+    fSchema = new FieldSchema();
+    fSchema.setName("field27");
+    fSchema.setType(DataType.Type.TIMESTAMP);
+    fields.add(fSchema);
+    tableSchema.setFields(fields);
+    List<String> primaryKey = new ArrayList<>();
+    primaryKey.add("_sonicbase_id");
+    tableSchema.setPrimaryKey(primaryKey);
+    return tableSchema;
+  }
+
   public static TableSchema createTable2() {
     TableSchema tableSchema = new TableSchema();
     tableSchema.setName("table2");
@@ -303,6 +480,25 @@ public class TestUtils {
     indexSchema.setIndexId(1);
     indexSchema.setIsPrimaryKey(true);
     indexSchema.setName("_primarykey");
+    indexSchema.setComparators(tableSchema.getComparators(new String[]{"field1"}));
+
+    TableSchema.Partition[] partitions = new TableSchema.Partition[partitionCount];
+    for (int i = 0; i < partitionCount; i++) {
+      partitions[i] = new TableSchema.Partition();
+      partitions[i].setUnboundUpper(true);
+    }
+    indexSchema.setCurrPartitions(partitions);
+    tableSchema.addIndex(indexSchema);
+    return indexSchema;
+  }
+
+  public static IndexSchema createIndexSchemaNonUnique(TableSchema tableSchema, int partitionCount) {
+    IndexSchema indexSchema = new IndexSchema();
+    indexSchema.setFields(new String[]{"field1"}, tableSchema);
+    indexSchema.setIndexId(1);
+    indexSchema.setIsPrimaryKey(false);
+    indexSchema.setUnique(false);
+    indexSchema.setName("field1_idx");
     indexSchema.setComparators(tableSchema.getComparators(new String[]{"field1"}));
 
     TableSchema.Partition[] partitions = new TableSchema.Partition[partitionCount];

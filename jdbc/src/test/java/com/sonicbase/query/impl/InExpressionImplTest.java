@@ -8,7 +8,7 @@ import com.sonicbase.common.DatabaseCommon;
 import com.sonicbase.common.Record;
 import com.sonicbase.schema.IndexSchema;
 import com.sonicbase.schema.TableSchema;
-import com.sonicbase.util.TestUtils;
+import com.sonicbase.util.ClientTestUtils;
 import net.sf.jsqlparser.JSQLParserException;
 import net.sf.jsqlparser.expression.Expression;
 import net.sf.jsqlparser.expression.operators.relational.ExpressionList;
@@ -46,14 +46,14 @@ public class InExpressionImplTest {
       when(client.getExecutor()).thenReturn(executor);
       DatabaseCommon common = new DatabaseCommon();
       when(client.getCommon()).thenReturn(common);
-      TableSchema tableSchema = TestUtils.createTable();
-      IndexSchema indexSchema = TestUtils.createIndexSchema(tableSchema);
-      TestUtils.createStringIndexSchema(tableSchema);
+      TableSchema tableSchema = ClientTestUtils.createTable();
+      IndexSchema indexSchema = ClientTestUtils.createIndexSchema(tableSchema);
+      ClientTestUtils.createStringIndexSchema(tableSchema);
       common.getTables("test").put(tableSchema.getName(), tableSchema);
       common.getTablesById("test").put(tableSchema.getTableId(), tableSchema);
       when(client.getShardCount()).thenReturn(2);
 
-      byte[][] records = TestUtils.createRecords(common, tableSchema, 10);
+      byte[][] records = ClientTestUtils.createRecords(common, tableSchema, 10);
 
       final AtomicBoolean calledLookup = new AtomicBoolean();
       when(client.send(eq("ReadManager:batchIndexLookup"), anyInt(), anyInt(), anyObject(), anyObject())).thenAnswer(invocationOnMock -> {

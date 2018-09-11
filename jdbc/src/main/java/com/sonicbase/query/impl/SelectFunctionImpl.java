@@ -6,8 +6,8 @@ import net.sf.jsqlparser.expression.operators.relational.ExpressionList;
 // I prefer to return null instead of an empty array
 // I don't know a good way to reduce the parameter count
 public class SelectFunctionImpl {
-  private String name;
-  private ExpressionList parms;
+  private final String name;
+  private final ExpressionList parms;
 
   public SelectFunctionImpl(String function, ExpressionList parameters) {
     this.name = function;

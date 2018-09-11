@@ -2,7 +2,7 @@ package com.sonicbase.common;
 
 import com.sonicbase.query.DatabaseException;
 import com.sonicbase.schema.TableSchema;
-import org.apache.giraph.utils.Varint;
+import com.sonicbase.util.Varint;
 
 import java.io.*;
 import java.util.Set;
@@ -31,11 +31,16 @@ public class Record {
     deserialize(dbName, common, bytes, null);
   }
 
+  public Record(String dbName, DatabaseCommon common, byte[] bytes, TableSchema tableSchema) {
+    this.tableSchema = tableSchema;
+    deserialize(dbName, common, bytes, null);
+  }
+
   public Record(String dbName, DatabaseCommon common, byte[] bytes, Set<Integer> columns, boolean readHeader) {
     deserialize(dbName, common, bytes, columns, readHeader);
   }
 
-  public void recoverFromSnapshot(String dbName, DatabaseCommon common, byte[] bytes, Set<Integer> columns, boolean readHeader) {
+  private void recoverFromSnapshot(String dbName, DatabaseCommon common, byte[] bytes, Set<Integer> columns, boolean readHeader) {
     try {
       DataInputStream sin = new DataInputStream(new ByteArrayInputStream(bytes, !readHeader ? 26 : 0, !readHeader ?
           bytes.length - 26 : bytes.length));
@@ -49,7 +54,10 @@ public class Record {
         dbViewFlags = sin.readShort();
       }
       transId = Varint.readSignedVarLong(sin);
-      this.tableSchema = common.getTablesById(dbName).get((int) Varint.readSignedVarLong(sin));
+      int tableId = (int) Varint.readSignedVarLong(sin);
+      if (tableSchema == null) {
+        this.tableSchema = common.getTablesById(dbName).get(tableId);
+      }
 
       Varint.readSignedVarLong(sin); //len
       fields = DatabaseCommon.deserializeFields(sin, tableSchema,
@@ -74,17 +82,9 @@ public class Record {
   }
 
   public static void setSequences(byte[] recordBytes, long sequence0, long sequence1, short sequence2) {
-    ByteArrayOutputStream bytesOut = new ByteArrayOutputStream();
-    DataOutputStream out = new DataOutputStream(bytesOut);
-    try {
-      out.writeLong(sequence0);
-      out.writeLong(sequence1);
-      out.writeShort(sequence2);
-      System.arraycopy(bytesOut.toByteArray(), 0, recordBytes, 2, 8 + 8 + 2);
-    }
-    catch (IOException e) {
-      throw new DatabaseException(e);
-    }
+    DataUtils.longToBytes(sequence0, recordBytes, 2);
+    DataUtils.longToBytes(sequence1, recordBytes, 2 + 8);
+    DataUtils.shortToBytes(sequence2, recordBytes, 2 + 16);
   }
 
   public static void setDbViewFlags(byte[] bytes, short dbViewFlag) {
@@ -125,7 +125,7 @@ public class Record {
     return DataUtils.bytesToLong(bytes, offset);
   }
 
-  public static long getSequence0(byte[] bytes) {
+  private static long getSequence0(byte[] bytes) {
     int offset = 2;
     return DataUtils.bytesToLong(bytes, offset);
   }

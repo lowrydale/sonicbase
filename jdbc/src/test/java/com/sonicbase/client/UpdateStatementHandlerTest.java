@@ -8,14 +8,13 @@ import com.sonicbase.query.BinaryExpression;
 import com.sonicbase.query.impl.*;
 import com.sonicbase.schema.IndexSchema;
 import com.sonicbase.schema.TableSchema;
-import com.sonicbase.util.TestUtils;
+import com.sonicbase.util.ClientTestUtils;
 import net.sf.jsqlparser.JSQLParserException;
 import net.sf.jsqlparser.parser.CCJSqlParserManager;
 import net.sf.jsqlparser.statement.Statement;
 import org.testng.annotations.Test;
 
 import java.io.StringReader;
-import java.sql.SQLException;
 
 import static org.mockito.Mockito.mock;
 import static org.mockito.Mockito.when;
@@ -24,13 +23,13 @@ import static org.testng.Assert.assertEquals;
 public class UpdateStatementHandlerTest {
 
   @Test
-  public void test() throws SQLException, JSQLParserException {
+  public void test() throws JSQLParserException {
     DatabaseClient client = mock(DatabaseClient.class);
     DatabaseCommon common = new DatabaseCommon();
     when(client.getCommon()).thenReturn(common);
-    TableSchema tableSchema = TestUtils.createTable();
-    IndexSchema indexSchema = TestUtils.createIndexSchema(tableSchema);
-    TestUtils.createStringIndexSchema(tableSchema);
+    TableSchema tableSchema = ClientTestUtils.createTable();
+    IndexSchema indexSchema = ClientTestUtils.createIndexSchema(tableSchema);
+    ClientTestUtils.createStringIndexSchema(tableSchema);
     common.getTables("test").put(tableSchema.getName(), tableSchema);
     common.getTablesById("test").put(tableSchema.getTableId(), tableSchema);
 

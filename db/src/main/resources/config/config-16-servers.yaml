@@ -1,0 +1,96 @@
+replicationFactor: 1
+dataDirectory: $HOME/db
+installDirectory: $HOME/sonicbase
+compressRecords: false
+useUnsafe: true
+maxJavaHeap: 20%
+user: ubuntu
+clientIsPrivate: false
+backup:
+  bucket: sonicbase-test-backup
+  period: daily
+  prefix: backups
+  time: 23:00
+  type: AWS
+  maxBackupCount: 10
+shards:
+- shard:
+    replicas:
+    - replica:
+        publicAddress: localhost
+        privateAddress: localhost
+        port: 9010
+    - replica:
+        publicAddress: localhost
+        privateAddress: localhost
+        port: 9060
+- shard:
+    replicas:
+    - replica:
+        publicAddress: localhost
+        privateAddress: localhost
+        port: 9110
+    - replica:
+        publicAddress: localhost
+        privateAddress: localhost
+        port: 9160
+- shard:
+    replicas:
+    - replica:
+        publicAddress: localhost
+        privateAddress: localhost
+        port: 9210
+    - replica:
+        publicAddress: localhost
+        privateAddress: localhost
+        port: 9260
+- shard:
+    replicas:
+    - replica:
+        publicAddress: localhost
+        privateAddress: localhost
+        port: 9310
+    - replica:
+        publicAddress: localhost
+        privateAddress: localhost
+        port: 9360
+- shard:
+    replicas:
+    - replica:
+        publicAddress: localhost
+        privateAddress: localhost
+        port: 9410
+    - replica:
+        publicAddress: localhost
+        privateAddress: localhost
+        port: 9460
+- shard:
+    replicas:
+    - replica:
+        publicAddress: localhost
+        privateAddress: localhost
+        port: 9510
+    - replica:
+        publicAddress: localhost
+        privateAddress: localhost
+        port: 9560
+- shard:
+    replicas:
+    - replica:
+        publicAddress: localhost
+        privateAddress: localhost
+        port: 9610
+    - replica:
+        publicAddress: localhost
+        privateAddress: localhost
+        port: 9660
+- shard:
+    replicas:
+    - replica:
+        publicAddress: localhost
+        privateAddress: localhost
+        port: 9710
+    - replica:
+        publicAddress: localhost
+        privateAddress: localhost
+        port: 9760

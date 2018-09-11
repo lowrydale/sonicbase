@@ -22,17 +22,4 @@ public class TestAdressMap {
       throw new DatabaseException(e);
     }
   }
-  @Test
-  public void test() {
-//    AddressMap map = new AddressMap();
-//    for (int i = 1; i < 100_000; i++) {
-//      assertEquals(map.addAddress(i, 0), i);
-//    }
-//    for (int i = 1; i < 100_000; i++) {
-//      map.removeAddress(i, unsafe);
-//    }
-//    for (int i = 1; i < 100_000; i++) {
-//      assertEquals(map.addAddress(i, 0), i);
-//    }
-  }
 }

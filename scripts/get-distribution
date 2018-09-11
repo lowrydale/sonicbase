@@ -1,19 +1,19 @@
 #!/bin/bash
 
-export SEARCH_HOME=$1
+export SONIC_BASE_HOME=$1
 
 if [ ${1:0:1} != "/" ]
 then
-  export SEARCH_HOME=$HOME/$SEARCH_HOME
+  export SONIC_BASE_HOME=$HOME/$SONIC_BASE_HOME
 fi
 
-mkdir -p $SEARCH_HOME/tmp
+mkdir -p $SONIC_BASE_HOME/tmp
 
 export mac=`which sw_vers`
 echo $mac
 if [ "$mac" == '' ]; then
-    cat /etc/*-release > $SEARCH_HOME/tmp/distribution
+    cat /etc/*-release > $SONIC_BASE_HOME/tmp/distribution
 else
-    sw_vers > $SEARCH_HOME/tmp/distribution
+    sw_vers > $SONIC_BASE_HOME/tmp/distribution
 fi
 

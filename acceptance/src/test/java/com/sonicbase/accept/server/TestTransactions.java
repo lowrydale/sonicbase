@@ -1,10 +1,7 @@
 package com.sonicbase.accept.server;
 
-import com.fasterxml.jackson.databind.ObjectMapper;
-import com.fasterxml.jackson.databind.node.ArrayNode;
-import com.fasterxml.jackson.databind.node.JsonNodeFactory;
-import com.fasterxml.jackson.databind.node.ObjectNode;
 import com.sonicbase.client.DatabaseClient;
+import com.sonicbase.common.Config;
 import com.sonicbase.common.DatabaseCommon;
 import com.sonicbase.common.KeyRecord;
 import com.sonicbase.index.Index;
@@ -32,7 +29,7 @@ import static org.testng.Assert.*;
 public class TestTransactions {
 
   private Connection conn;
-  private int recordCount = 10;
+  private final int recordCount = 10;
   List<Long> ids = new ArrayList<>();
   private Connection conn2;
   com.sonicbase.server.DatabaseServer[] dbServers;
@@ -57,9 +54,8 @@ public class TestTransactions {
   public void beforeClass() throws Exception {
     System.setProperty("log4j.configuration", "test-log4j.xml");
 
-    String configStr = IOUtils.toString(new BufferedInputStream(getClass().getResourceAsStream("/config/config-4-servers.json")), "utf-8");
-    ObjectMapper mapper = new ObjectMapper();
-    final ObjectNode config = (ObjectNode) mapper.readTree(configStr);
+    String configStr = IOUtils.toString(new BufferedInputStream(getClass().getResourceAsStream("/config/config-4-servers.yaml")), "utf-8");
+    Config config = new Config(configStr);
 
     FileUtils.deleteDirectory(new File(System.getProperty("user.home"), "db"));
 
@@ -72,10 +68,9 @@ public class TestTransactions {
 
     List<Future> futures = new ArrayList<>();
     for (int i = 0; i < dbServers.length; i++) {
-      final int shard = i;
-      dbServers[shard] = new com.sonicbase.server.DatabaseServer();
-      dbServers[shard].setConfig(config, "test", "localhost", 9010 + (50 * shard), true, new AtomicBoolean(true), new AtomicBoolean(true),null);
-      dbServers[shard].setRole(role);
+      dbServers[i] = new com.sonicbase.server.DatabaseServer();
+      dbServers[i].setConfig(config, "test", "localhost", 9010 + (50 * i), true, new AtomicBoolean(true), new AtomicBoolean(true),null);
+      dbServers[i].setRole(role);
     }
     for (Future future : futures) {
       future.get();
@@ -164,19 +159,16 @@ public class TestTransactions {
     stmt.setString(2,"model-0");
     stmt.executeUpdate();
 
-    Thread thread = new Thread(new Runnable(){
-      @Override
-      public void run() {
-        try {
-          PreparedStatement stmt = conn.prepareStatement("select * from secondary_delete where make='make-0'");
-          ResultSet rs = stmt.executeQuery();
-          assertTrue(rs.next());
-        }
-        catch (SQLException e) {
-          e.printStackTrace();
-        }
-
+    Thread thread = new Thread(() -> {
+      try {
+        PreparedStatement stmt1 = conn.prepareStatement("select * from secondary_delete where make='make-0'");
+        ResultSet rs = stmt1.executeQuery();
+        assertTrue(rs.next());
       }
+      catch (SQLException e) {
+        e.printStackTrace();
+      }
+
     });
     thread.start();
     thread.join();
@@ -203,7 +195,7 @@ public class TestTransactions {
   }
 
   @Test
-   public void test() throws SQLException, InterruptedException {
+   public void test() throws SQLException {
 
      PreparedStatement stmt = conn.prepareStatement("truncate table persons");
      stmt.execute();
@@ -238,7 +230,7 @@ public class TestTransactions {
    }
 
   @Test
-  public void testRollback() throws SQLException, InterruptedException {
+  public void testRollback() throws SQLException {
 
     PreparedStatement stmt = conn.prepareStatement("truncate table persons");
     stmt.execute();
@@ -311,23 +303,20 @@ public class TestTransactions {
      assertEquals(count, 1);
 
      final CountDownLatch latch = new CountDownLatch(1);
-     Thread thread = new Thread(new Runnable() {
-       @Override
-       public void run() {
-         try {
-           PreparedStatement stmt = conn2.prepareStatement("update persons set id = ?, socialSecurityNumber=? where id=?");
-           stmt.setLong(1, 1000);
-           stmt.setString(2, "ssn");
-           stmt.setLong(3, 100);
-           int count = stmt.executeUpdate();
-           assertEquals(count, 0); // record not found
-         }
-         catch (Exception e) {
-           e.printStackTrace();
-         }
-         finally {
-           latch.countDown();
-         }
+     Thread thread = new Thread(() -> {
+       try {
+         PreparedStatement stmt1 = conn2.prepareStatement("update persons set id = ?, socialSecurityNumber=? where id=?");
+         stmt1.setLong(1, 1000);
+         stmt1.setString(2, "ssn");
+         stmt1.setLong(3, 100);
+         int count1 = stmt1.executeUpdate();
+         assertEquals(count1, 0); // record not found
+       }
+       catch (Exception e) {
+         e.printStackTrace();
+       }
+       finally {
+         latch.countDown();
        }
      });
      thread.start();
@@ -383,29 +372,26 @@ public class TestTransactions {
 
      final AtomicBoolean updated = new AtomicBoolean();
      final CountDownLatch latch = new CountDownLatch(1);
-     Thread thread = new Thread(new Runnable() {
-       @Override
-       public void run() {
-         try {
+     Thread thread = new Thread(() -> {
+       try {
 
-           PreparedStatement stmt = conn2.prepareStatement("update persons set id = ?, socialSecurityNumber=? where id=?");
-           stmt.setLong(1, 1000);
-           stmt.setString(2, "ssn");
-           stmt.setLong(3, 100);
-           try {
-             int count = stmt.executeUpdate();
-             if (count == 1) {
-               updated.set(true);
-             }
+         PreparedStatement stmt1 = conn2.prepareStatement("update persons set id = ?, socialSecurityNumber=? where id=?");
+         stmt1.setLong(1, 1000);
+         stmt1.setString(2, "ssn");
+         stmt1.setLong(3, 100);
+         try {
+           int count1 = stmt1.executeUpdate();
+           if (count1 == 1) {
+             updated.set(true);
            }
-           catch (Exception e) {
-             //expected
-           }
-           latch.countDown();
          }
          catch (Exception e) {
-           e.printStackTrace();
+           //expected
          }
+         latch.countDown();
+       }
+       catch (Exception e) {
+         e.printStackTrace();
        }
      });
      thread.start();
@@ -466,42 +452,39 @@ public class TestTransactions {
      final AtomicBoolean updated = new AtomicBoolean();
      final CountDownLatch latch = new CountDownLatch(1);
      final CountDownLatch latch2 = new CountDownLatch(1);
-     Thread thread = new Thread(new Runnable() {
-       @Override
-       public void run() {
+     Thread thread = new Thread(() -> {
+       try {
+
+         conn2.setAutoCommit(false);
+         PreparedStatement stmt1 = conn2.prepareStatement("update persons set id = ?, socialSecurityNumber=? where id=?");
+         stmt1.setLong(1, 100);
+         stmt1.setString(2, "ssn2");
+         stmt1.setLong(3, 100);
+         int count1 = stmt1.executeUpdate();
+         assertEquals(count1, 1);
+         latch.countDown();
+
+         stmt1 = conn2.prepareStatement("update persons set id = ?, socialSecurityNumber=? where id=?");
+         stmt1.setLong(1, 100);
+         stmt1.setString(2, "ssn2");
+         stmt1.setLong(3, 100);
+         count1 = stmt1.executeUpdate();
+         assertEquals(count1, 1);
+         latch2.countDown();
+         conn2.commit();
+         System.out.println("committed");
+         updated.set(true);
+       }
+       catch (Exception e) {
          try {
-
-           conn2.setAutoCommit(false);
-           PreparedStatement stmt = conn2.prepareStatement("update persons set id = ?, socialSecurityNumber=? where id=?");
-           stmt.setLong(1, 100);
-           stmt.setString(2, "ssn2");
-           stmt.setLong(3, 100);
-           int count = stmt.executeUpdate();
-           assertEquals(count, 1);
-           latch.countDown();
-
-           stmt = conn2.prepareStatement("update persons set id = ?, socialSecurityNumber=? where id=?");
-           stmt.setLong(1, 100);
-           stmt.setString(2, "ssn2");
-           stmt.setLong(3, 100);
-           count = stmt.executeUpdate();
-           assertEquals(count, 1);
-           latch2.countDown();
-           conn2.commit();
-           System.out.println("committed");
-           updated.set(true);
+           conn2.rollback();
          }
-         catch (Exception e) {
-           try {
-             conn2.rollback();
-           }
-           catch (SQLException e1) {
-             e1.printStackTrace();
-           }
-           e.printStackTrace();
-           latch.countDown();
-           latch2.countDown();
+         catch (SQLException e1) {
+           e1.printStackTrace();
          }
+         e.printStackTrace();
+         latch.countDown();
+         latch2.countDown();
        }
      });
      thread.start();
@@ -566,42 +549,39 @@ public class TestTransactions {
 
      final CountDownLatch latch = new CountDownLatch(1);
      final CountDownLatch latch2 = new CountDownLatch(1);
-     Thread thread = new Thread(new Runnable() {
-       @Override
-       public void run() {
+     Thread thread = new Thread(() -> {
+       try {
+         conn2.setAutoCommit(false);
+         PreparedStatement stmt1 = conn2.prepareStatement("update persons set id = ?, socialSecurityNumber=? where id=?");
+         stmt1.setLong(1, 100);
+         stmt1.setString(2, "ssn2");
+         stmt1.setLong(3, 100);
+         int count1 = stmt1.executeUpdate();
+         assertEquals(count1, 1);
+         conn2.commit();
+         latch.countDown();
+
+         latch2.await();
+
+         conn2.setAutoCommit(false);
+
+         stmt1 = conn2.prepareStatement("update persons set id = ?, socialSecurityNumber=? where id=?");
+         stmt1.setLong(1, 1000);
+         stmt1.setString(2, "ssn2");
+         stmt1.setLong(3, 1000);
+         count1 = stmt1.executeUpdate();
+         assertEquals(count1, 1);
+         conn2.commit();
+
+       }
+       catch (Exception e) {
          try {
-           conn2.setAutoCommit(false);
-           PreparedStatement stmt = conn2.prepareStatement("update persons set id = ?, socialSecurityNumber=? where id=?");
-           stmt.setLong(1, 100);
-           stmt.setString(2, "ssn2");
-           stmt.setLong(3, 100);
-           int count = stmt.executeUpdate();
-           assertEquals(count, 1);
-           conn2.commit();
-           latch.countDown();
-
-           latch2.await();
-
-           conn2.setAutoCommit(false);
-
-           stmt = conn2.prepareStatement("update persons set id = ?, socialSecurityNumber=? where id=?");
-           stmt.setLong(1, 1000);
-           stmt.setString(2, "ssn2");
-           stmt.setLong(3, 1000);
-           count = stmt.executeUpdate();
-           assertEquals(count, 1);
-           conn2.commit();
-
+           conn2.rollback();
          }
-         catch (Exception e) {
-           try {
-             conn2.rollback();
-           }
-           catch (SQLException e1) {
-             e1.printStackTrace();
-           }
-           e.printStackTrace();
+         catch (SQLException e1) {
+           e1.printStackTrace();
          }
+         e.printStackTrace();
        }
      });
      thread.start();
@@ -664,27 +644,24 @@ public class TestTransactions {
 
        final AtomicBoolean updated = new AtomicBoolean();
        final CountDownLatch latch = new CountDownLatch(1);
-       Thread thread = new Thread(new Runnable() {
-         @Override
-         public void run() {
-           try {
+       Thread thread = new Thread(() -> {
+         try {
 
-             PreparedStatement stmt = conn2.prepareStatement("update persons set id = ?, socialSecurityNumber=? where id=?");
-             stmt.setLong(1, 1000);
-             stmt.setString(2, "933-28-" + (4));
-             stmt.setLong(3, 100);
-             try {
-               int count = stmt.executeUpdate();
-               updated.set(true);
-             }
-             catch (Exception e) {
-               //expected
-             }
-             latch.countDown();
+           PreparedStatement stmt1 = conn2.prepareStatement("update persons set id = ?, socialSecurityNumber=? where id=?");
+           stmt1.setLong(1, 1000);
+           stmt1.setString(2, "933-28-" + (4));
+           stmt1.setLong(3, 100);
+           try {
+             int count1 = stmt1.executeUpdate();
+             updated.set(true);
            }
            catch (Exception e) {
-             e.printStackTrace();
+             //expected
            }
+           latch.countDown();
+         }
+         catch (Exception e) {
+           e.printStackTrace();
          }
        });
        thread.start();

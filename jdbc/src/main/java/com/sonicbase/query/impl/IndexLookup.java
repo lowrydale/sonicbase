@@ -33,7 +33,7 @@ import java.util.concurrent.atomic.AtomicReference;
 // I don't know a good way to reduce the parameter count
 public class IndexLookup {
 
-  private static Logger logger = LoggerFactory.getLogger(IndexLookup.class);
+  private static final Logger logger = LoggerFactory.getLogger(IndexLookup.class);
   private int count;
   private String indexName;
   private BinaryExpression.Operator leftOp;
@@ -254,14 +254,12 @@ public class IndexLookup {
         nextShard = processResponse.getNextShard();
         localShard = processResponse.getLocalShard();
         localLeftValue = processResponse.getLocalLeftValue();
-        if (processResponse.shouldBreak()) {
-          break;
-        }
-
-        if (/*originalShard != -1 ||*/localShard == -1 || localShard == -2 ||
+        if (processResponse.shouldBreak() || localShard == -1 || localShard == -2 ||
             (retKeys != null && retKeys.length >= count) || (recordRet != null && recordRet.length >= count)) {
           break;
         }
+
+        /*originalShard != -1 ||*/
       }
 
       retKeys = loadRecordCache(expression.dbName, client, expression.isForceSelectOnServer(), expression.getColumns(),
@@ -500,23 +498,23 @@ public class IndexLookup {
   }
 
   private class ProcessResponseKeys {
-    private TableSchema tableSchema;
-    private AtomicReference<Object[]> nextKey;
-    private ComObject retObj;
+    private final TableSchema tableSchema;
+    private final AtomicReference<Object[]> nextKey;
+    private final ComObject retObj;
     private Object[][][] currRetKeys;
     private KeyRecord[][] currRetKeyRecords;
 
-    public ProcessResponseKeys(TableSchema tableSchema, AtomicReference<Object[]> nextKey, ComObject retObj) {
+    ProcessResponseKeys(TableSchema tableSchema, AtomicReference<Object[]> nextKey, ComObject retObj) {
       this.tableSchema = tableSchema;
       this.nextKey = nextKey;
       this.retObj = retObj;
     }
 
-    public Object[][][] getCurrRetKeys() {
+    Object[][][] getCurrRetKeys() {
       return currRetKeys;
     }
 
-    public KeyRecord[][] getCurrRetKeyRecords() {
+    KeyRecord[][] getCurrRetKeyRecords() {
       return currRetKeyRecords;
     }
 
@@ -558,15 +556,15 @@ public class IndexLookup {
   }
 
   private class GetNextShard {
-    private boolean restrictToThisServer;
-    private List<Integer> selectedShards;
-    private AtomicReference<Object[]> nextKey;
+    private final boolean restrictToThisServer;
+    private final List<Integer> selectedShards;
+    private final AtomicReference<Object[]> nextKey;
     private int nextShard;
     private int localShard;
     private boolean switchedShards;
 
-    public GetNextShard(boolean restrictToThisServer, List<Integer> selectedShards, AtomicReference<Object[]> nextKey,
-                        int nextShard, int localShard, boolean switchedShards) {
+    GetNextShard(boolean restrictToThisServer, List<Integer> selectedShards, AtomicReference<Object[]> nextKey,
+                 int nextShard, int localShard, boolean switchedShards) {
       this.restrictToThisServer = restrictToThisServer;
       this.selectedShards = selectedShards;
       this.nextKey = nextKey;
@@ -575,15 +573,15 @@ public class IndexLookup {
       this.switchedShards = switchedShards;
     }
 
-    public int getNextShard() {
+    int getNextShard() {
       return nextShard;
     }
 
-    public int getLocalShard() {
+    int getLocalShard() {
       return localShard;
     }
 
-    public boolean isSwitchedShards() {
+    boolean isSwitchedShards() {
       return switchedShards;
     }
 
@@ -618,17 +616,17 @@ public class IndexLookup {
   }
 
   private class SelectShard {
-    private List<OrderByExpressionImpl> orderByExpressions;
-    private TableSchema tableSchema;
-    private IndexSchema indexSchema;
+    private final List<OrderByExpressionImpl> orderByExpressions;
+    private final TableSchema tableSchema;
+    private final IndexSchema indexSchema;
     private boolean currPartitions;
-    private int currShardOffset;
+    private final int currShardOffset;
     private int nextShard;
     private int localShard;
     private List<Integer> selectedShards;
 
-    public SelectShard(List<OrderByExpressionImpl> orderByExpressions, TableSchema tableSchema, IndexSchema indexSchema,
-                       boolean currPartitions, int currShardOffset, int nextShard, int localShard) {
+    SelectShard(List<OrderByExpressionImpl> orderByExpressions, TableSchema tableSchema, IndexSchema indexSchema,
+                boolean currPartitions, int currShardOffset, int nextShard, int localShard) {
 
       this.orderByExpressions = orderByExpressions;
       this.tableSchema = tableSchema;
@@ -647,11 +645,11 @@ public class IndexLookup {
       return selectedShards;
     }
 
-    public int getNextShard() {
+    int getNextShard() {
       return nextShard;
     }
 
-    public int getLocalShard() {
+    int getLocalShard() {
       return localShard;
     }
 
@@ -678,24 +676,24 @@ public class IndexLookup {
 
   private class ProcessResponse {
     private boolean myResult;
-    private ExpressionImpl expression;
-    private DatabaseClient client;
-    private TableSchema tableSchema;
-    private List<Integer> selectedShards;
+    private final ExpressionImpl expression;
+    private final DatabaseClient client;
+    private final TableSchema tableSchema;
+    private final List<Integer> selectedShards;
     private KeyRecord[][] retKeyRecords;
     private Object[][][] retKeys;
     private Record[] recordRet;
-    private AtomicReference<Object[]> nextKey;
+    private final AtomicReference<Object[]> nextKey;
     private int nextShard;
     private int localShard;
     private Object[] localLeftValue;
     private boolean switchedShards;
-    private ComObject retObj;
+    private final ComObject retObj;
 
-    public ProcessResponse(ExpressionImpl expression, DatabaseClient client, TableSchema tableSchema,
-                           List<Integer> selectedShards, KeyRecord[][] retKeyRecords, Object[][][] retKeys, Record[] recordRet,
-                           AtomicReference<Object[]> nextKey, int nextShard, int localShard, Object[] localLeftValue,
-                           boolean switchedShards, ComObject retObj) {
+    ProcessResponse(ExpressionImpl expression, DatabaseClient client, TableSchema tableSchema,
+                    List<Integer> selectedShards, KeyRecord[][] retKeyRecords, Object[][][] retKeys, Record[] recordRet,
+                    AtomicReference<Object[]> nextKey, int nextShard, int localShard, Object[] localLeftValue,
+                    boolean switchedShards, ComObject retObj) {
       this.expression = expression;
       this.client = client;
       this.tableSchema = tableSchema;
@@ -715,27 +713,27 @@ public class IndexLookup {
       return myResult;
     }
 
-    public KeyRecord[][] getRetKeyRecords() {
+    KeyRecord[][] getRetKeyRecords() {
       return retKeyRecords;
     }
 
-    public Object[][][] getRetKeys() {
+    Object[][][] getRetKeys() {
       return retKeys;
     }
 
-    public Record[] getRecordRet() {
+    Record[] getRecordRet() {
       return recordRet;
     }
 
-    public int getNextShard() {
+    int getNextShard() {
       return nextShard;
     }
 
-    public int getLocalShard() {
+    int getLocalShard() {
       return localShard;
     }
 
-    public Object[] getLocalLeftValue() {
+    Object[] getLocalLeftValue() {
       return localLeftValue;
     }
 

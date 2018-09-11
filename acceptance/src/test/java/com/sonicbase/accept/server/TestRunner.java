@@ -64,7 +64,7 @@ public class TestRunner {
         for (ITestResult testResult : failedTests) {
           String stackTraceString = Throwables.getStackTraceAsString(testResult.getThrowable());
           String template = "Message-%d: %n %s";
-          builder.append(String.format(template, i++, stackTraceString) + "\n");
+          builder.append(String.format(template, i++, stackTraceString)).append("\n");
 
         }
         System.out.println("Test errors: class=" + clz.getName() + ", errors=" + builder.toString());

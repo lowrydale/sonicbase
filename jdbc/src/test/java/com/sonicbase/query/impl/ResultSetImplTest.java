@@ -17,7 +17,7 @@ import com.sonicbase.schema.DataType;
 import com.sonicbase.schema.FieldSchema;
 import com.sonicbase.schema.IndexSchema;
 import com.sonicbase.schema.TableSchema;
-import com.sonicbase.util.TestUtils;
+import com.sonicbase.util.ClientTestUtils;
 import net.sf.jsqlparser.expression.operators.relational.ExpressionList;
 import net.sf.jsqlparser.schema.Column;
 import net.sf.jsqlparser.schema.Table;
@@ -58,14 +58,14 @@ public class ResultSetImplTest {
 
   @BeforeMethod
   public void beforeMethod() throws IOException {
-    tableSchema = TestUtils.createTable();
-    indexSchema = TestUtils.createIndexSchema(tableSchema);
+    tableSchema = ClientTestUtils.createTable();
+    indexSchema = ClientTestUtils.createIndexSchema(tableSchema);
     tableSchema.addIndex(indexSchema);
 
     client = mock(DatabaseClient.class);
     when(client.getShardCount()).thenReturn(1);
 
-    common = TestUtils.createCommon(tableSchema);
+    common = ClientTestUtils.createCommon(tableSchema);
     JsonNode node = new ObjectMapper().readTree(" { \"shards\" : [\n" +
         "    {\n" +
         "      \"replicas\": [\n" +
@@ -84,9 +84,9 @@ public class ResultSetImplTest {
     when(client.getCommon()).thenReturn(common);
 
 
-    records = TestUtils.createRecords(common, tableSchema, 10);
+    records = ClientTestUtils.createRecords(common, tableSchema, 10);
 
-    keys = TestUtils.createKeys(10);
+    keys = ClientTestUtils.createKeys(10);
 
     uniqueRecords = new HashSet<>();
     Object[][][] keysForRet = new Object[records.length][][];
@@ -128,9 +128,9 @@ public class ResultSetImplTest {
 //                return ret;
 //              }
 //            });
-        IndexLookup ret = new IndexLookup() {
+        return new IndexLookup() {
           @Override
-          public SelectContextImpl lookup(ExpressionImpl expression, Expression topLevelExpression) {
+          public SelectContextImpl lookup(ExpressionImpl expression1, Expression topLevelExpression) {
             assertEquals(getCount(), 1000);
             assertEquals(getIndexName(), "_primarykey");
             assertEquals(getLeftOp(), Operator.EQUAL);
@@ -147,10 +147,9 @@ public class ResultSetImplTest {
             }
 
             return new SelectContextImpl("table1", "_primary", Operator.LESS_EQUAL, 0, null,
-                retKeys, expression.getRecordCache(), 0, true);
+                retKeys, expression1.getRecordCache(), 0, true);
           }
         };
-        return ret;
       }
 
       protected SelectContextImpl tableScan(String dbName, long viewVersion, DatabaseClient client, int count,
@@ -160,8 +159,7 @@ public class ResultSetImplTest {
                                             RecordCache recordCache, Counter[] counters, GroupByContext groupByContext, AtomicLong currOffset,
                                             Limit limit, Offset offset, boolean isProbe,
                                             boolean isRestrictToThisServer, StoredProcedureContextImpl storedProcesudureContext) {
-        SelectContextImpl ret = new SelectContextImpl();
-        return ret;
+        return new SelectContextImpl();
       }
 
       protected NextReturn evaluateOneSidedIndex(
@@ -255,7 +253,7 @@ public class ResultSetImplTest {
   }
 
   @Test
-  public void testAliases() throws Exception {
+  public void testAliases() {
 
 
     columns.set(0, new ColumnImpl(null, null, "table1", "field1", "alias1"));
@@ -286,7 +284,7 @@ public class ResultSetImplTest {
   }
 
   @Test(enabled=false)
-  public void testGroupBy() throws Exception {
+  public void testGroupBy() {
 
 
     List<net.sf.jsqlparser.expression.Expression> groupByColumns = new ArrayList<>();
@@ -353,7 +351,7 @@ public class ResultSetImplTest {
   }
 
   @Test
-  public void testCounters() throws Exception {
+  public void testCounters() {
 
 
     Counter counter = new Counter();

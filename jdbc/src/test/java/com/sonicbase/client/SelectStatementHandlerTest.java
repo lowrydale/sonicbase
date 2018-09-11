@@ -11,7 +11,7 @@ import com.sonicbase.query.ResultSet;
 import com.sonicbase.query.impl.*;
 import com.sonicbase.schema.IndexSchema;
 import com.sonicbase.schema.TableSchema;
-import com.sonicbase.util.TestUtils;
+import com.sonicbase.util.ClientTestUtils;
 import net.sf.jsqlparser.JSQLParserException;
 import net.sf.jsqlparser.parser.CCJSqlParserManager;
 import net.sf.jsqlparser.statement.Statement;
@@ -23,6 +23,7 @@ import org.testng.annotations.Test;
 
 import java.io.IOException;
 import java.io.StringReader;
+import java.sql.PreparedStatement;
 import java.util.HashSet;
 import java.util.Set;
 import java.util.concurrent.atomic.AtomicInteger;
@@ -30,7 +31,6 @@ import java.util.concurrent.atomic.AtomicLong;
 
 import static org.testng.Assert.assertEquals;
 import static org.testng.Assert.assertFalse;
-import static org.testng.Assert.assertTrue;
 
 public class SelectStatementHandlerTest {
 
@@ -38,6 +38,8 @@ public class SelectStatementHandlerTest {
   private ServersConfig serversConfig;
   private DatabaseClient client;
   private byte[][] records;
+  private byte[][] records2;
+  private AtomicInteger setOpeeratorCallCount = new AtomicInteger();
 
   @BeforeMethod
   public void beforeMethod() throws IOException {
@@ -107,6 +109,34 @@ public class SelectStatementHandlerTest {
         if (method.equals("ReadManager:indexLookupExpression")) {
           return new ComObject().serialize();
         }
+        else if (method.equals("ReadManager:serverSetSelect")) {
+          ComObject retObj = new ComObject();
+
+          retObj.put(ComObject.Tag.RESULT_SET_ID, 100L);
+          retObj.put(ComObject.Tag.SERVER_SELECT_PAGE_NUMBER, 0L);
+          retObj.put(ComObject.Tag.SHARD, 0);
+          retObj.put(ComObject.Tag.REPLICA, 0);
+
+          if (0 == setOpeeratorCallCount.getAndIncrement()) {
+            if (records != null) {
+              ComArray tableArray = retObj.putArray(ComObject.Tag.TABLE_RECORDS, ComObject.Type.ARRAY_TYPE);
+              for (byte[] tableRecords : records) {
+                ComArray recordArray = tableArray.addArray(ComObject.Type.BYTE_ARRAY_TYPE);
+
+                for (int i = 0; i < tableRecords.length; i++) {
+                  byte[] record = tableRecords;
+                  if (record == null) {
+                    recordArray.add(new byte[]{});
+                  }
+                  else {
+                    recordArray.add(record);
+                  }
+                }
+              }
+            }
+          }
+          return retObj.serialize();
+        }
         else if (method.equals("ReadManager:indexLookup")) {
           ComObject retObj = new ComObject();
           ComArray array = retObj.putArray(ComObject.Tag.KEYS, ComObject.Type.BYTE_ARRAY_TYPE);
@@ -158,7 +188,6 @@ public class SelectStatementHandlerTest {
           retObj.put(ComObject.Tag.LEGACY_SELECT_STATEMENT, body.getByteArray(ComObject.Tag.LEGACY_SELECT_STATEMENT));
 
           ComArray tableArray = retObj.putArray(ComObject.Tag.TABLE_RECORDS, ComObject.Type.ARRAY_TYPE);
-          outer:
           for (byte[] record : records) {
             ComArray recordArray = tableArray.addArray(ComObject.Type.BYTE_ARRAY_TYPE);
             recordArray.add(record);
@@ -179,17 +208,21 @@ public class SelectStatementHandlerTest {
       }
     });
 
-    TableSchema tableSchema = TestUtils.createTable();
+    TableSchema tableSchema = ClientTestUtils.createTable();
+    TableSchema tableSchema2 = ClientTestUtils.createTable2();
     common.getTables("test").put(tableSchema.getName(), tableSchema);
     common.getTablesById("test").put(tableSchema.getTableId(), tableSchema);
-    IndexSchema indexSchema = TestUtils.createIndexSchema(tableSchema);
+    common.getTables("test").put(tableSchema2.getName(), tableSchema2);
+    common.getTablesById("test").put(tableSchema2.getTableId(), tableSchema2);
+    IndexSchema indexSchema = ClientTestUtils.createIndexSchema(tableSchema);
 
-    records = TestUtils.createRecords(common, tableSchema, 10);
+    records = ClientTestUtils.createRecords(common, tableSchema, 10);
+    //records2 = ClientTestUtils.createRecords(common, tableSchema2, 10);
 
-    tableSchema = TestUtils.createTable2();
+    tableSchema = ClientTestUtils.createTable2();
     common.getTables("test").put(tableSchema.getName(), tableSchema);
     common.getTablesById("test").put(tableSchema.getTableId(), tableSchema);
-    indexSchema = TestUtils.createIndexSchema(tableSchema);
+    indexSchema = ClientTestUtils.createIndexSchema(tableSchema);
 
 
   }
@@ -210,6 +243,22 @@ public class SelectStatementHandlerTest {
     BinaryExpressionImpl where = (BinaryExpressionImpl) selectStatement.getWhereClause();
     assertEquals(((BinaryExpressionImpl) where.getLeftExpression()).getOperator(), BinaryExpression.Operator.LESS);
     assertEquals(((BinaryExpressionImpl) where.getRightExpression()).getOperator(), BinaryExpression.Operator.GREATER);
+  }
+
+  @Test
+  public void testSetOperator() throws JSQLParserException {
+
+    String sql = "select * from table1 union select * from table2";
+    CCJSqlParserManager parser = new CCJSqlParserManager();
+    Statement statement = parser.parse(new StringReader(sql));
+
+    SelectStatementHandler handler = new SelectStatementHandler(client);
+    ResultSetImpl ret = (ResultSetImpl) handler.execute("test", new ParameterHandler(), sql, statement, null, null, null, null, false, null, 0);
+    for (int i = 200; i < 1200; i += 100) {
+      ret.next();
+      System.out.println(ret.getLong("field1"));
+    }
+    assertFalse(ret.next());
   }
 
   @Test

@@ -3,6 +3,7 @@ package com.sonicbase.server;
 import com.fasterxml.jackson.databind.ObjectMapper;
 import com.fasterxml.jackson.databind.node.ObjectNode;
 import com.sonicbase.client.DatabaseClient;
+import com.sonicbase.common.Config;
 import org.apache.commons.io.IOUtils;
 import org.mockito.stubbing.Answer;
 import org.slf4j.Logger;
@@ -20,8 +21,8 @@ public class MasterManagerTest {
   @Test
   public void test() throws IOException, InterruptedException {
     final AtomicBoolean calledErrorLogger = new AtomicBoolean();
-    String configStr = IOUtils.toString(DatabaseServerTest.class.getResourceAsStream("/config/config-1-local.json"), "utf-8");
-    ObjectNode config = (ObjectNode) new ObjectMapper().readTree(configStr);
+    String configStr = IOUtils.toString(DatabaseServerTest.class.getResourceAsStream("/config/config-1-local.yaml"), "utf-8");
+    Config config = new Config(configStr);
     com.sonicbase.server.DatabaseServer server = new DatabaseServer() {
       @Override
       public Logger getErrorLogger() {

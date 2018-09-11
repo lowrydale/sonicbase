@@ -10,7 +10,6 @@ import net.sf.jsqlparser.schema.Column;
 import net.sf.jsqlparser.statement.Statement;
 import net.sf.jsqlparser.statement.update.Update;
 
-import java.sql.SQLException;
 import java.util.ArrayList;
 import java.util.List;
 import java.util.concurrent.atomic.AtomicInteger;
@@ -58,14 +57,6 @@ public class UpdateStatementHandler implements StatementHandler {
         updateStatement.getTableName(), parms);
     updateStatement.setWhereClause(whereExpression);
 
-    if (client.isExplicitTrans()) {
-      List<DatabaseClient.TransactionOperation> ops = client.getTransactionOps().get();
-      if (ops == null) {
-        ops = new ArrayList<>();
-        client.getTransactionOps().set(ops);
-      }
-      ops.add(new DatabaseClient.TransactionOperation(updateStatement, parms));
-    }
     updateStatement.setParms(parms);
     return updateStatement.execute(dbName, null, null, sequence0, sequence1, sequence2,
         restrictToThisServer, procedureContext, schemaRetryCount);

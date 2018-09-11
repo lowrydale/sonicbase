@@ -1,7 +1,11 @@
 #!/bin/bash
 
-export SEARCH_HOME=$(echo $SEARCH_HOME | sed 's/\/bin\/..//g')
-echo "SH=$SEARCH_HOME"
+export SONIC_BASE_HOME=$(echo $SONIC_BASE_HOME | sed 's/\/bin\/..//g')
+echo "SH=$SONIC_BASE_HOME"
+if [ "$SONIC_BASE_HOME" = "" ]
+then
+    export SONIC_BASE_HOME="../"
+fi
 
 if [ "$_XMX_" = "" ]
 then
@@ -12,7 +16,7 @@ export _GC_=$_GC_LOG_FILENAME_
 
 if [ "$_GC_LOG_FILENAME_" == "" ]
 then
-  export _GC_="$SEARCH_HOME/logs/gc.log"
+  export _GC_="$SONIC_BASE_HOME/logs/gc.log"
 fi
 
 #-XX:NewRatio=2 -XX:SurvivorRatio=10 -XX:ParallelGCThreads=4 -XX:ConcGCThreads=2
@@ -47,11 +51,10 @@ java_opts="$java_opts -XX:+PrintGCDetails -XX:+PrintGCTimeStamps "
 java_opts="$java_opts -XX:-OmitStackTraceInFastThrow -XX:-UseLoopPredicate"
 java_opts="$java_opts -Xmx$_XMX_ -XX:MaxDirectMemorySize=2g"
 #-XX:ReservedCodeCacheSize=32m
-java_opts="$java_opts -Dfamilysearch.search.disable.foreign.node.registration -Dfamilysearch.search.disable.central.log "
 if [ "$LOG4J_FILE" = "cli-log4j.xml" ]; then
-java_opts="$java_opts -Dlog4j.configuration=cli-log4j.xml"
+java_opts="$java_opts -Dlog4j.configuration=file://$SONIC_BASE_HOME/config/cli-log4j.xml -Dlog4j.debug=true"
 else
-java_opts="$java_opts -Dlog4j.configuration=log4j.xml"
+java_opts="$java_opts -Dlog4j.configuration=file://$SONIC_BASE_HOME/config/log4j.xml -Dlog4j.debug=true"
 fi
 
 export _JAVA_OPTS_=$java_opts
@@ -59,13 +62,13 @@ export _JAVA_OPTS_=$java_opts
 if [ "$_JMX_PORT_" != "" ]; then
   export _JAVA_OPTS_=$_JAVA_OPTS_' -Dcom.sun.management.jmxremote.port='$_JMX_PORT_
 fi
-echo "search_home=$SEARCH_HOME"
-_SEARCH_CLASSPATH_=$SEARCH_HOME/target/:$SEARCH_HOME/config/:$SEARCH_HOME/mgmt/
-for f in $SEARCH_HOME/lib/*.jar; do
+echo "SONIC_BASE_HOME=$SONIC_BASE_HOME"
+_SEARCH_CLASSPATH_=$SONIC_BASE_HOME/target/:$SONIC_BASE_HOME/config/:$SONIC_BASE_HOME/mgmt/
+for f in $SONIC_BASE_HOME/lib/*.jar; do
   _SEARCH_CLASSPATH_=$_SEARCH_CLASSPATH_:$f
 done
 
-LD_LIBRARY_PATH=$LD_LIBRARY_PATH:$SEARCH_HOME/lib/linux64
+LD_LIBRARY_PATH=$LD_LIBRARY_PATH:$SONIC_BASE_HOME/lib/linux64
 
 if [ "$MODE" = "debug" ]; then
 
@@ -77,14 +80,14 @@ elif [ "$MODE" = "yprof" ]; then
 
 export LD_LIBRARY_PATH=$LD_LIBRARY_PATH:~/yjp-linux/bin/linux-x86-64
 echo java $_JAVA_OPTS_ $_SYS_PROPS_ -agentlib:yjpagent=port=9009,probe_disable=* -cp $_SEARCH_CLASSPATH_ "$@" >&2
-java $_JAVA_OPTS_ $_SYS_PROPS_ -agentlib:yjpagent=port=9009,dir=$SEARCH_HOME,probe_disable=* -cp $_SEARCH_CLASSPATH_ "$@"
+java $_JAVA_OPTS_ $_SYS_PROPS_ -agentlib:yjpagent=port=9009,dir=$SONIC_BASE_HOME,probe_disable=* -cp $_SEARCH_CLASSPATH_ "$@"
 
 else
 
 export LD_LIBRARY_PATH=$LD_LIBRARY_PATH
 echo java $_JAVA_OPTS_ $_SYS_PROPS_ -cp $_SEARCH_CLASSPATH_ "$@" >&2
-pushd $SEARCH_HOME
-echo $SEARCH_HOME
+pushd $SONIC_BASE_HOME
+echo $SONIC_BASE_HOME
 java $_JAVA_OPTS_ $_SYS_PROPS_ -classpath $_SEARCH_CLASSPATH_ "$@"
 popd
 

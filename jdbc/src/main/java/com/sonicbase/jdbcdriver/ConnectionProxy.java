@@ -21,8 +21,8 @@ import java.util.concurrent.atomic.AtomicInteger;
 public class ConnectionProxy implements Connection {
 
   private static final Object clientMutex = new Object();
-  public static final String NOT_SUPPORTED_STR = "not supported";
-  private static Map<String, ClientEntry> clients = new ConcurrentHashMap<>();
+  private static final String NOT_SUPPORTED_STR = "not supported";
+  private static final Map<String, ClientEntry> clients = new ConcurrentHashMap<>();
   private final String dbName;
   private final String url;
   private DatabaseClient client;
@@ -40,10 +40,10 @@ public class ConnectionProxy implements Connection {
 
 
   private class ClientEntry {
-    private DatabaseClient client;
-    private AtomicInteger refCount = new AtomicInteger();
+    private final DatabaseClient client;
+    private final AtomicInteger refCount = new AtomicInteger();
 
-    public ClientEntry(DatabaseClient client) {
+    ClientEntry(DatabaseClient client) {
       this.client = client;
     }
   }
@@ -180,8 +180,9 @@ public class ConnectionProxy implements Connection {
     return clients.get(url).client.getCommon().getSchemaVersion();
   }
 
-  public static com.sonicbase.query.ResultSet describeLicenses() {
-    return DescribeStatementHandler.describeLicenses();
+  public com.sonicbase.query.ResultSet describeLicenses() {
+    DescribeStatementHandler handler = new DescribeStatementHandler(client);
+    return handler.describeLicenses();
   }
 
   public enum Replica {
@@ -274,7 +275,7 @@ public class ConnectionProxy implements Connection {
     }
   }
 
-  public void beginExplicitTransaction(String dbName) throws SQLException {
+  private void beginExplicitTransaction(String dbName) throws SQLException {
     try {
       if (client != null) {
         client.beginExplicitTransaction(dbName);
@@ -288,7 +289,7 @@ public class ConnectionProxy implements Connection {
     }
   }
 
-  public boolean getAutoCommit() throws SQLException {
+  public boolean getAutoCommit() {
     return autoCommit;
   }
 
@@ -359,7 +360,7 @@ public class ConnectionProxy implements Connection {
     }
   }
 
-  public boolean isClosed() throws SQLException {
+  public boolean isClosed() {
     return closed;
   }
 
@@ -371,7 +372,7 @@ public class ConnectionProxy implements Connection {
     throw new NotImplementedException();
   }
 
-  public boolean isReadOnly() throws SQLException {
+  public boolean isReadOnly() {
     return false;
   }
 
@@ -379,7 +380,7 @@ public class ConnectionProxy implements Connection {
     throw new NotImplementedException();
   }
 
-  public String getCatalog() throws SQLException {
+  public String getCatalog() {
     return null;
   }
 
@@ -387,7 +388,7 @@ public class ConnectionProxy implements Connection {
     throw new NotImplementedException();
   }
 
-  public int getTransactionIsolation() throws SQLException {
+  public int getTransactionIsolation() {
     return TRANSACTION_READ_COMMITTED;
   }
 
@@ -478,7 +479,7 @@ public class ConnectionProxy implements Connection {
     }
   }
 
-  public void setTypeMap(Map<String, Class<?>> map) throws SQLException {
+  public void setTypeMap(Map<String, Class<?>> map) {
     typemap = map;
   }
 
@@ -506,15 +507,15 @@ public class ConnectionProxy implements Connection {
     throw new NotImplementedException();
   }
 
-  public Clob createClob() throws SQLException {
+  public Clob createClob() {
     return new com.sonicbase.query.impl.Clob();
   }
 
-  public Blob createBlob() throws SQLException {
+  public Blob createBlob() {
     return new com.sonicbase.query.impl.Blob();
   }
 
-  public NClob createNClob() throws SQLException {
+  public NClob createNClob() {
     return new com.sonicbase.query.impl.NClob();
   }
 

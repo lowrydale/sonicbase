@@ -1,6 +1,7 @@
 
 mkdir -p $HOME/sonicbase/bin
 mkdir -p $HOME/sonicbase/config
+mkdir -p $HOME/sonicbase/scripts
 rm -rf $HOME/sonicbase/logs
 mkdir -p $HOME/sonicbase/logs
 #mkdir -p $HOME/sonicbase/lib/linux64
@@ -8,8 +9,12 @@ mkdir -p $HOME/sonicbase/logs
 ./build-jar
 mkdir -p $HOME/sonicbase/lib
 
-rsync -rvlLt /Users/lowryda/.m2/repository/com/amazonaws/aws-java-sdk-bundle/1.11.279/aws-java-sdk-bundle-1.11.279.jar $HOME/sonicbase/lib
-rsync -rvlLt /Users/lowryda/.m2/repository/com/amazonaws/aws-java-sdk/1.11.279/aws-java-sdk-1.11.279.jar $HOME/sonicbase/lib
+rsync -rvlLt /Users/lowryda/.m2/repository/com/amazonaws/aws-java-sdk-sqs/1.11.400/aws-java-sdk-sqs-1.11.400.jar $HOME/sonicbase/lib
+rsync -rvlLt /Users/lowryda/.m2/repository/com/amazonaws/aws-java-sdk-kinesis/1.11.400/aws-java-sdk-kinesis-1.11.400.jar $HOME/sonicbase/lib
+rsync -rvlLt /Users/lowryda/.m2/repository/com/amazonaws/aws-java-sdk-s3/1.11.400/aws-java-sdk-s3-1.11.400.jar $HOME/sonicbase/lib
+rsync -rvlLt /Users/lowryda/.m2/repository/com/amazonaws/aws-java-sdk/1.11.400/aws-java-sdk-1.11.400.jar $HOME/sonicbase/lib
+rsync -rvlLt /Users/lowryda/.m2/repository/com/amazonaws/aws-java-sdk-core/1.11.400/aws-java-sdk-core-1.11.400.jar $HOME/sonicbase/lib
+rsync -rvlLt /Users/lowryda/.m2/repository/com/amazonaws/aws-java-sdk-ec2/1.11.400/aws-java-sdk-ec2-1.11.400.jar $HOME/sonicbase/lib
 rsync -rvlLt /Users/lowryda/.m2/repository/it/unimi/dsi/fastutil/7.0.2/fastutil-7.0.2.jar $HOME/sonicbase/lib
 rsync -rvlLt /Users/lowryda/.m2/repository/org/apache/kafka/kafka-clients/0.11.0.1/kafka-clients-0.11.0.1.jar $HOME/sonicbase/lib
 rsync -rvlLt /Users/lowryda/.m2/repository/org/eclipse/jetty/jetty-continuation/9.4.11.v20180605/jetty-continuation-9.4.11.v20180605.jar $HOME/sonicbase/lib
@@ -41,12 +46,15 @@ rsync -vlLt --exclude original*sonicbase-*.jar --exclude sonicbase-*tests.jar cl
 #rsync -rvlLt repo/linux64/* $HOME/sonicbase/lib/linux64
 
 rsync -rvlLt dependencies/kafka-clients-0.11.0.1.jar $HOME/sonicbase/lib
-rsync -rvlLt db/target/classes/config/config-1-local.json $HOME/sonicbase/config
+rsync -rvlLt db/target/classes/config/config-1-local.yaml $HOME/sonicbase/config
+rsync -rvlLt cli/src/main/resources/init-tables.command $HOME/sonicbase/scripts
 rsync -rvlLt $HOME/Dropbox/sonicbase-config/* $HOME/sonicbase/config
+rsync -rvlLt db/src/main/resources/log4j.xml $HOME/sonicbase/config
+rsync -rvlLt db/src/main/resources/cli-log4j.xml $HOME/sonicbase/config
+rsync -rvlLt win $HOME/sonicbase/lib
 cd scripts
 rsync -rvlLt get-distribution $HOME/sonicbase/bin
 rsync -rvlLt get-df $HOME/sonicbase/bin
-rsync -rvlLt win $HOME/sonicbase/lib
 rsync -rvlLt get-jarlist $HOME/sonicbase/bin
 rsync -rvlLt get-cpu.bat $HOME/sonicbase/bin
 rsync -rvlLt disk-avail.bat $HOME/sonicbase/bin
@@ -105,8 +113,6 @@ rsync -rvlLt do-start-license-server.bat $HOME/sonicbase/bin
 rsync -rvlLt get-mem-total $HOME/sonicbase/bin
 rsync -rvlLt get-mem-total.bat $HOME/sonicbase/bin
 rsync -rvlLt remote-get-mem-total $HOME/sonicbase/bin
-rsync -rvlLt db/src/main/resources/log4j.xml $HOME/sonicbase/config
-rsync -rvlLt db/src/main/resources/cli-log4j.xml $HOME/sonicbase/config
 chmod +x $HOME/sonicbase/bin/get-distribution
 chmod +x $HOME/sonicbase/bin/get-jarlist
 chmod +x $HOME/sonicbase/bin/get-df

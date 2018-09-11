@@ -1,6 +1,7 @@
 package com.sonicbase.procedure;
 
 import com.fasterxml.jackson.databind.node.ObjectNode;
+import com.sonicbase.common.Config;
 
 
 public interface StoredProcedureContext {
@@ -18,7 +19,7 @@ public interface StoredProcedureContext {
   /**
    * @return the configuration object for this cluster
    */
-  ObjectNode getConfig();
+  Config getConfig();
 
   /**
    * @return a number that uniquely identifies this stored procedure

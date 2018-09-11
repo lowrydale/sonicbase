@@ -32,8 +32,8 @@ public class TransactionManager {
   }
 
   private final com.sonicbase.server.DatabaseServer server;
-  private ConcurrentHashMap<Long, Transaction> transactions = new ConcurrentHashMap<>();
-  private ConcurrentHashMap<String, ConcurrentHashMap<String, ConcurrentSkipListMap<Object[], RecordLock>>> locks =
+  private final ConcurrentHashMap<Long, Transaction> transactions = new ConcurrentHashMap<>();
+  private final ConcurrentHashMap<String, ConcurrentHashMap<String, ConcurrentSkipListMap<Object[], RecordLock>>> locks =
       new ConcurrentHashMap<>();
 
   TransactionManager(
@@ -74,10 +74,10 @@ public class TransactionManager {
   }
 
   static class Operation {
-    private OperationType type;
-    private byte[] body;
-    private String command;
-    private boolean replayed;
+    private final OperationType type;
+    private final byte[] body;
+    private final String command;
+    private final boolean replayed;
 
     Operation(OperationType type, String command, byte[] body, boolean replayedCommand) {
       this.type = type;
@@ -104,10 +104,10 @@ public class TransactionManager {
   }
 
   static class Transaction {
-    private long id;
-    private List<RecordLock> locks = new ArrayList<>();
-    private ConcurrentHashMap<String, List<Record>> records = new ConcurrentHashMap<>();
-    private List<Operation> operations = new ArrayList<>();
+    private final long id;
+    private final List<RecordLock> locks = new ArrayList<>();
+    private final ConcurrentHashMap<String, List<Record>> records = new ConcurrentHashMap<>();
+    private final List<Operation> operations = new ArrayList<>();
 
     Transaction(long transactionId) {
       this.id = transactionId;
@@ -160,9 +160,7 @@ public class TransactionManager {
       if (comparators == null) {
         throw new DatabaseException("Comparators are null: dbName=" + dbName + ", table=" + tableName);
       }
-      if (doDeleteLock(transactionId, primaryKey, lock, trans, i, comparators)) {
-        return true;
-      }
+      return doDeleteLock(transactionId, primaryKey, lock, trans, i, comparators);
     }
     return false;
   }

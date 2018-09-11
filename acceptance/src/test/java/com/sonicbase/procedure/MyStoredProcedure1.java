@@ -32,9 +32,7 @@ public class MyStoredProcedure1 implements StoredProcedure {
             }
             Long id = record.getLong("id1");
             if (id != null && id > 2 && id < 100 && passesComplicatedLogic(record)) {
-              if (!record.isDeleting()) {
-                return true;
-              }
+              return !record.isDeleting();
             }
             return false;
           }

@@ -5,7 +5,7 @@ import com.sonicbase.query.CreateTableStatement;
 import com.sonicbase.query.DatabaseException;
 import com.sonicbase.schema.DataType;
 import com.sonicbase.schema.FieldSchema;
-import org.apache.giraph.utils.Varint;
+import com.sonicbase.util.Varint;
 
 import java.io.*;
 import java.util.ArrayList;
@@ -68,7 +68,7 @@ public class CreateTableStatementImpl implements CreateTableStatement {
     return bytesOut.toByteArray();
   }
 
-  public void serialize(DataOutputStream out) {
+  private void serialize(DataOutputStream out) {
     try {
       Varint.writeSignedVarLong(DatabaseClient.SERIALIZATION_VERSION, out);
       out.writeUTF(tableName);
@@ -91,7 +91,7 @@ public class CreateTableStatementImpl implements CreateTableStatement {
     deserialize(in);
   }
 
-  public void deserialize(DataInputStream in) {
+  private void deserialize(DataInputStream in) {
     try {
       long serializationVersion = Varint.readSignedVarLong(in);
       tableName = in.readUTF();

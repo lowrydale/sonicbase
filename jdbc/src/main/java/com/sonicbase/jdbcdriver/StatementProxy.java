@@ -20,12 +20,12 @@ import java.util.Calendar;
 // I don't know a good way to reduce the parameter count
 public class StatementProxy extends ParameterHandler implements java.sql.Statement, PreparedStatement {
 
-  public static final String NOT_SUPPORTED_STR = "not supported";
+  private static final String NOT_SUPPORTED_STR = "not supported";
   private final String dbName;
 
-  private String sql;
-  private DatabaseClient databaseClient;
-  private ConnectionProxy connectionProxy;
+  private final String sql;
+  private final DatabaseClient databaseClient;
+  private final ConnectionProxy connectionProxy;
 
   private Integer maxFieldSize;
   private Integer maxRows;

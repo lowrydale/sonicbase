@@ -2,9 +2,7 @@ package com.sonicbase.common;
 
 import com.sonicbase.client.DatabaseClient;
 import com.sonicbase.query.DatabaseException;
-import it.unimi.dsi.fastutil.ints.Int2ObjectMap;
-import it.unimi.dsi.fastutil.ints.Int2ObjectOpenHashMap;
-import org.apache.giraph.utils.Varint;
+import com.sonicbase.util.Varint;
 
 import java.io.ByteArrayInputStream;
 import java.io.ByteArrayOutputStream;
@@ -14,6 +12,7 @@ import java.math.BigDecimal;
 import java.sql.Date;
 import java.sql.Time;
 import java.sql.Timestamp;
+import java.util.HashMap;
 import java.util.Iterator;
 import java.util.Map;
 
@@ -25,13 +24,15 @@ import static com.sonicbase.common.ComObject.Type.*;
 // I don't know a good way to reduce the parameter count
 public class ComObject {
 
-  public static final String UTF_8_STR = "utf-8";
-  static Int2ObjectOpenHashMap<DynamicType> typesByTag = new Int2ObjectOpenHashMap<>();
+  private static final String UTF_8_STR = "utf-8";
+  static final Map<Integer, DynamicType> typesByTag = new HashMap<>();
+  static final Map<Integer, DynamicTag> tagsByTag = new HashMap<>();
+  private final Map<Integer, Object> map = new HashMap<>();
 
   public static class DynamicType {
-    int tag;
+    final int tag;
 
-    public DynamicType(int tag) {
+    DynamicType(int tag) {
       this.tag = tag;
     }
   }
@@ -62,13 +63,11 @@ public class ComObject {
     }
   }
 
-  static Int2ObjectOpenHashMap<DynamicTag> tagsByTag = new Int2ObjectOpenHashMap<>();
-
   public static class DynamicTag {
     private final DynamicType type;
     private final Tag tagEnum;
 
-    public DynamicTag(Tag tagEnum, DynamicType type) {
+    DynamicTag(Tag tagEnum, DynamicType type) {
       this.tagEnum = tagEnum;
       this.type = type;
     }
@@ -210,7 +209,7 @@ public class ComObject {
     CURR_OFFSET(133, LONG_TYPE),
     ACCEPTED(134, BOOLEAN_TYPE),
     STATUSES(135, ARRAY_TYPE),
-    PRE_POCESS_COUNT_PROCESSED(136, LONG_TYPE),
+    PRE_PROCESS_COUNT_PROCESSED(136, LONG_TYPE),
     PRE_PROCESS_EXPECTED_COUNT(137, LONG_TYPE),
     PRE_PROCESS_FINISHED(138, BOOLEAN_TYPE),
     SHOULD_PROCESS(139, BOOLEAN_TYPE),
@@ -276,7 +275,8 @@ public class ComObject {
     TABLE_SCHEMA(207, BYTE_ARRAY_TYPE),
     INDEX_SCHEMA(208, BYTE_ARRAY_TYPE),
     PREV_BYTES(209, BYTE_ARRAY_TYPE),
-    PREV_KEY_BYTES(210, BYTE_ARRAY_TYPE);
+    PREV_KEY_BYTES(210, BYTE_ARRAY_TYPE),
+    RAW_SIZE(211, LONG_TYPE);
 
     public final int tag;
 
@@ -305,13 +305,11 @@ public class ComObject {
     deserialize(in);
   }
 
-  private Int2ObjectOpenHashMap map = new Int2ObjectOpenHashMap();
-
   public String toString() {
     StringBuilder builder = new StringBuilder();
     for (Object entry : map.entrySet()) {
-      Int2ObjectOpenHashMap.Entry<Object> entryObj = (Int2ObjectOpenHashMap.Entry<Object>) entry;
-      builder.append("[").append(ComObject.getTag( entryObj.getIntKey()).name()).append("=").append(entryObj.getValue()).append("]");
+      Map.Entry<Integer, Object> entryObj = (Map.Entry<Integer, Object>) entry;
+      builder.append("[").append(ComObject.getTag( entryObj.getKey()).name()).append("=").append(entryObj.getValue()).append("]");
     }
     return builder.toString();
   }
@@ -529,16 +527,13 @@ public class ComObject {
           value = new java.math.BigDecimal(str);
         }
         else if (type.tag == DATE_TYPE.tag) {
-          java.sql.Date date = new java.sql.Date(Varint.readSignedVarLong(in));
-          value = date;
+          value = new Date(Varint.readSignedVarLong(in));
         }
         else if (type.tag == TIME_TYPE.tag) {
-          java.sql.Time time = new java.sql.Time(Varint.readSignedVarLong(in));
-          value = time;
+          value = new Time(Varint.readSignedVarLong(in));
         }
         else if (type.tag == TIME_STAMP_TYPE.tag) {
-          java.sql.Timestamp timestamp = Timestamp.valueOf(in.readUTF());
-          value = timestamp;
+          value = Timestamp.valueOf(in.readUTF());
         }
 
         else {
@@ -557,7 +552,7 @@ public class ComObject {
       ByteArrayOutputStream bytesOut = new ByteArrayOutputStream();
       DataOutputStream out = new DataOutputStream(bytesOut);
       Varint.writeSignedVarLong(map.size(), out);
-      Iterator<Int2ObjectMap.Entry<Object>> iterator = map.int2ObjectEntrySet().fastIterator();
+      Iterator<Map.Entry<Integer, Object>> iterator = map.entrySet().iterator();
       while (iterator.hasNext()) {
         doSerialize(out, iterator);
       }
@@ -570,11 +565,11 @@ public class ComObject {
     }
   }
 
-  private void doSerialize(DataOutputStream out, Iterator<Int2ObjectMap.Entry<Object>> iterator) {
+  private void doSerialize(DataOutputStream out, Iterator<Map.Entry<Integer, Object>> iterator) {
     int tag = -1;
     try {
-      Int2ObjectMap.Entry<Object> entry = iterator.next();
-      tag = entry.getIntKey();
+      Map.Entry<Integer, Object> entry = iterator.next();
+      tag = entry.getKey();
       Object value = entry.getValue();
       DynamicTag tagObj = tagsByTag.get(tag);
       if (tagObj == null) {

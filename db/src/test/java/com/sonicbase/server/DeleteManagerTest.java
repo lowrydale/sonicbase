@@ -4,10 +4,7 @@ import com.fasterxml.jackson.databind.JsonNode;
 import com.fasterxml.jackson.databind.ObjectMapper;
 import com.fasterxml.jackson.databind.node.ArrayNode;
 import com.fasterxml.jackson.databind.node.ObjectNode;
-import com.sonicbase.common.ComObject;
-import com.sonicbase.common.DatabaseCommon;
-import com.sonicbase.common.Record;
-import com.sonicbase.common.ServersConfig;
+import com.sonicbase.common.*;
 import com.sonicbase.index.AddressMap;
 import com.sonicbase.index.Index;
 import com.sonicbase.index.Indices;
@@ -19,6 +16,7 @@ import org.testng.annotations.Test;
 
 import java.io.BufferedInputStream;
 import java.io.IOException;
+import java.util.ArrayList;
 import java.util.HashMap;
 import java.util.List;
 import java.util.Map;
@@ -46,9 +44,8 @@ public class DeleteManagerTest {
     when(server.getShardCount()).thenReturn(2);
     when(server.getReplicationFactor()).thenReturn(1);
 
-    String configStr = IOUtils.toString(new BufferedInputStream(getClass().getResourceAsStream("/config/config-4-servers.json")), "utf-8");
-    ObjectMapper mapper = new ObjectMapper();
-    final ObjectNode config = (ObjectNode) mapper.readTree(configStr);
+    String configStr = IOUtils.toString(new BufferedInputStream(getClass().getResourceAsStream("/config/config-4-servers.yaml")), "utf-8");
+    Config config = new Config(configStr);
 
     when(server.getConfig()).thenReturn(config);
      TransactionManager transManager = new TransactionManager(server);
@@ -96,7 +93,7 @@ public class DeleteManagerTest {
 
     DeleteManager deleteManager = new DeleteManager(server);
 
-    ConcurrentLinkedQueue<DeleteManager.DeleteRequest> requests = new ConcurrentLinkedQueue<>();
+    List<DeleteManager.DeleteRequest> requests = new ArrayList<>();
     for (int i = 0; i < 4; i++) {
       DeleteManager.DeleteRequest request = new DeleteManager.DeleteRequest(keys.get(i));
       requests.add(request);

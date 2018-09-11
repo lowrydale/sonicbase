@@ -12,6 +12,7 @@ import net.sf.jsqlparser.statement.drop.Drop;
 // I prefer to return null instead of an empty array
 // I don't know a good way to reduce the parameter count
 public class DropStatementHandler implements StatementHandler {
+  public static final String MASTER_STR = "master";
   private final DatabaseClient client;
 
   public DropStatementHandler(DatabaseClient client) {
@@ -31,7 +32,7 @@ public class DropStatementHandler implements StatementHandler {
       cobj.put(ComObject.Tag.DB_NAME, dbName);
       cobj.put(ComObject.Tag.SCHEMA_VERSION, client.getCommon().getSchemaVersion());
       cobj.put(ComObject.Tag.METHOD, "SchemaManager:dropTable");
-      cobj.put(ComObject.Tag.MASTER_SLAVE, "master");
+      cobj.put(ComObject.Tag.MASTER_SLAVE, MASTER_STR);
       cobj.put(ComObject.Tag.TABLE_NAME, table);
       byte[] ret = client.sendToMaster(cobj);
       ComObject retObj = new ComObject(ret);
@@ -48,7 +49,7 @@ public class DropStatementHandler implements StatementHandler {
       cobj.put(ComObject.Tag.METHOD, "SchemaManager:dropIndex");
       cobj.put(ComObject.Tag.TABLE_NAME, tableName);
       cobj.put(ComObject.Tag.INDEX_NAME, indexName);
-      cobj.put(ComObject.Tag.MASTER_SLAVE, "master");
+      cobj.put(ComObject.Tag.MASTER_SLAVE, MASTER_STR);
       byte[] ret = client.send(null, 0, 0, cobj, DatabaseClient.Replica.MASTER);
       ComObject retObj = new ComObject(ret);
       client.getCommon().deserializeSchema(retObj.getByteArray(ComObject.Tag.SCHEMA_BYTES));
@@ -66,7 +67,7 @@ public class DropStatementHandler implements StatementHandler {
       cobj.put(ComObject.Tag.DB_NAME, dbName);
       cobj.put(ComObject.Tag.SCHEMA_VERSION, client.getCommon().getSchemaVersion());
       cobj.put(ComObject.Tag.METHOD, "SchemaManager:dropDatabase");
-      cobj.put(ComObject.Tag.MASTER_SLAVE, "master");
+      cobj.put(ComObject.Tag.MASTER_SLAVE, MASTER_STR);
       byte[] ret = client.send(null, 0, 0, cobj, DatabaseClient.Replica.MASTER);
       ComObject retObj = new ComObject(ret);
       client.getCommon().deserializeSchema(retObj.getByteArray(ComObject.Tag.SCHEMA_BYTES));

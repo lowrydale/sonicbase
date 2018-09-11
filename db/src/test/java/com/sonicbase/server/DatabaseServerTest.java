@@ -11,14 +11,12 @@ import com.sonicbase.schema.IndexSchema;
 import com.sonicbase.schema.TableSchema;
 import com.sonicbase.util.TestUtils;
 import org.apache.commons.io.IOUtils;
-import org.mockito.invocation.InvocationOnMock;
 import org.mockito.stubbing.Answer;
 import org.slf4j.Logger;
 import org.testng.annotations.BeforeMethod;
 import org.testng.annotations.Test;
 
 import java.io.*;
-import java.sql.SQLException;
 import java.util.Comparator;
 import java.util.HashSet;
 import java.util.Set;
@@ -32,7 +30,7 @@ import static org.mockito.Mockito.mock;
 import static org.mockito.Mockito.when;
 import static org.testng.Assert.*;
 
-public class DatabaseServerTest {
+public class  DatabaseServerTest {
 
   @BeforeMethod
   public void beforeMethod() throws IOException {
@@ -67,8 +65,8 @@ public class DatabaseServerTest {
   public void testSetConfig() throws Exception {
 
     final AtomicBoolean calledErrorLogger = new AtomicBoolean();
-    String configStr = IOUtils.toString(DatabaseServerTest.class.getResourceAsStream("/config/config-1-local.json"), "utf-8");
-    ObjectNode config = (ObjectNode) new ObjectMapper().readTree(configStr);
+    String configStr = IOUtils.toString(DatabaseServerTest.class.getResourceAsStream("/config/config-1-local.yaml"), "utf-8");
+    Config config = new Config(configStr);
     com.sonicbase.server.DatabaseServer server = new DatabaseServer() {
       @Override
       public Logger getErrorLogger() {
@@ -81,6 +79,7 @@ public class DatabaseServerTest {
       }
     };
     server.setConfig(config, "test", "localhost", 9010, true, new AtomicBoolean(), new AtomicBoolean(), "gc.log");
+    server.setIsRunning(true);
     DatabaseClient client = mock(DatabaseClient.class);
     server.setDatabaseClient(client);
 
@@ -97,8 +96,8 @@ public class DatabaseServerTest {
     server.getMethodInvoker().invokeMethod(cobj.serialize(), 0, 0, false, true, new AtomicLong(), new AtomicLong());
     assertEquals(server.getMethodInvoker().getEchoCount(), 1);
 
-    server.initDeathOverride(2, 2);
-    boolean[][] override = server.getDeathOverride();
+    DatabaseServer.initDeathOverride(2, 2);
+    boolean[][] override = DatabaseServer.getDeathOverride();
     assertEquals(override.length, 2);
     assertEquals(override[0].length, 2);
 
@@ -180,7 +179,7 @@ public class DatabaseServerTest {
   }
 
   @Test
-  public void testGetIndexSchema() throws IOException {
+  public void testGetIndexSchema() {
     DatabaseServer server = new DatabaseServer();
     DatabaseClient client = mock(DatabaseClient.class);
     server.setDatabaseClient(client);
@@ -204,8 +203,8 @@ public class DatabaseServerTest {
 
   @Test
   public void testProcedurePrimary() throws IOException {
-    String configStr = IOUtils.toString(DatabaseServerTest.class.getResourceAsStream("/config/config-1-local.json"), "utf-8");
-    ObjectNode config = (ObjectNode) new ObjectMapper().readTree(configStr);
+    String configStr = IOUtils.toString(DatabaseServerTest.class.getResourceAsStream("/config/config-1-local.yaml"), "utf-8");
+    Config config = new Config(configStr);
     DatabaseServer server = new DatabaseServer();
     server.setConfig(config, "test", "localhost", 9010, true, new AtomicBoolean(), new AtomicBoolean(), "gc.log");
 
@@ -232,7 +231,7 @@ public class DatabaseServerTest {
     when(conn.getDatabaseClient()).thenReturn(client);
 
     DatabaseServer server = new DatabaseServer() {
-      public ConnectionProxy getConnectionForStoredProcedure(String dbName) throws ClassNotFoundException, SQLException {
+      public ConnectionProxy getConnectionForStoredProcedure(String dbName) {
         return conn;
       }
     };
@@ -272,8 +271,8 @@ public class DatabaseServerTest {
   @Test
   public void testReconfigure() throws IOException {
     final AtomicBoolean calledPush = new AtomicBoolean();
-    String configStr = IOUtils.toString(DatabaseServerTest.class.getResourceAsStream("/config/config-1-local.json"), "utf-8");
-    ObjectNode config = (ObjectNode) new ObjectMapper().readTree(configStr);
+    String configStr = IOUtils.toString(DatabaseServerTest.class.getResourceAsStream("/config/config-1-local.yaml"), "utf-8");
+    Config config = new Config(configStr);
     DatabaseServer server = new DatabaseServer() {
       public void pushSchema() {
         calledPush.set(true);
@@ -281,7 +280,7 @@ public class DatabaseServerTest {
     };
     server.setConfig(config, "test", "localhost", 9010, true, new AtomicBoolean(), new AtomicBoolean(), "gc.log");
 
-    ((ObjectNode)config.withArray("shards").get(0).withArray("replicas").get(0)).put("port", 50);
+    config.getShards().get(0).getReplicas().get(0).put("port", 50);
 
     File configFile = new File(System.getProperty("user.dir"), "config/config-test.json");
     configFile.getParentFile().mkdirs();
@@ -292,15 +291,15 @@ public class DatabaseServerTest {
     ComObject cobj = new ComObject();
     server.reconfigureCluster(cobj, false);
 
-    assertEquals(server.getConfig().withArray("shards").get(0).withArray("replicas").get(0).get("port").asInt(), 50);
+    assertEquals((int)server.getConfig().getShards().get(0).getReplicas().get(0).getInt("port"), 50);
     assertTrue(calledPush.get());
   }
 
   @Test
   public void testSyncDbNames() throws IOException {
     final AtomicBoolean calledPush = new AtomicBoolean();
-    String configStr = IOUtils.toString(DatabaseServerTest.class.getResourceAsStream("/config/config-1-local.json"), "utf-8");
-    ObjectNode config = (ObjectNode) new ObjectMapper().readTree(configStr);
+    String configStr = IOUtils.toString(DatabaseServerTest.class.getResourceAsStream("/config/config-1-local.yaml"), "utf-8");
+    Config config = new Config(configStr);
     DatabaseServer server = new DatabaseServer();
     server.setConfig(config, "test", "localhost", 9010, true, new AtomicBoolean(), new AtomicBoolean(), "gc.log");
 
@@ -325,8 +324,8 @@ public class DatabaseServerTest {
   @Test
   public void testMarkReplicaDead() throws IOException {
     final AtomicBoolean calledPush = new AtomicBoolean();
-    String configStr = IOUtils.toString(DatabaseServerTest.class.getResourceAsStream("/config/config-1-local.json"), "utf-8");
-    ObjectNode config = (ObjectNode) new ObjectMapper().readTree(configStr);
+    String configStr = IOUtils.toString(DatabaseServerTest.class.getResourceAsStream("/config/config-1-local.yaml"), "utf-8");
+    Config config = new Config(configStr);
     DatabaseServer server = new DatabaseServer();
     server.setConfig(config, "test", "localhost", 9010, true, new AtomicBoolean(), new AtomicBoolean(), "gc.log");
 
@@ -352,10 +351,10 @@ public class DatabaseServerTest {
   public void testDeathMonitor() throws IOException, InterruptedException {
 
     final AtomicBoolean calledPush = new AtomicBoolean();
-    String configStr = IOUtils.toString(DatabaseServerTest.class.getResourceAsStream("/config/config-1-local.json"), "utf-8");
-    ObjectNode config = (ObjectNode) new ObjectMapper().readTree(configStr);
+    String configStr = IOUtils.toString(DatabaseServerTest.class.getResourceAsStream("/config/config-1-local.yaml"), "utf-8");
+    Config config = new Config(configStr);
     DatabaseServer server = new DatabaseServer() {
-      public void checkHealthOfServer(final int shard, final int replica, final AtomicBoolean isHealthy, final boolean ignoreDeath) throws InterruptedException {
+      public void checkHealthOfServer(final int shard, final int replica, final AtomicBoolean isHealthy, final boolean ignoreDeath) {
         if (shard == 0 && replica == 0) {
           isHealthy.set(false);
         }

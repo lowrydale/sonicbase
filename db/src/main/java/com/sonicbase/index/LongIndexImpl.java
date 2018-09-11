@@ -13,7 +13,7 @@ import java.util.concurrent.ConcurrentSkipListMap;
 public class LongIndexImpl implements IndexImpl {
   private final Index index;
 
-  private ConcurrentSkipListMap<Long, Object> longSkipIndex;
+  private final ConcurrentSkipListMap<Long, Object> longSkipIndex;
 
   public LongIndexImpl(Index index) {
     this.index = index;

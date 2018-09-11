@@ -3,13 +3,13 @@
   <parent>
     <artifactId>sonicbase-root</artifactId>
     <groupId>com.sonicbase</groupId>
-    <version>1.2.13</version>
+    <version>1.2.15</version>
   </parent>
   <modelVersion>4.0.0</modelVersion>
   <groupId>com.sonicbase</groupId>
   <artifactId>sonicbase-cli</artifactId>
   <name>sonicbase-cli</name>
-  <version>1.2.13</version>
+  <version>1.2.15</version>
   <url>http://maven.apache.org</url>
   <build>
     <pluginManagement>
@@ -79,46 +79,66 @@
   <dependencies>
     <dependency>
       <groupId>com.amazonaws</groupId>
-      <artifactId>aws-java-sdk-bundle</artifactId>
-      <version>1.11.279</version>
-      <scope>provided</scope>
-      <exclusions>
-        <exclusion>
-          <artifactId>netty-codec-http</artifactId>
-          <groupId>io.netty</groupId>
-        </exclusion>
-        <exclusion>
-          <artifactId>netty-codec</artifactId>
-          <groupId>io.netty</groupId>
-        </exclusion>
-        <exclusion>
-          <artifactId>netty-handler</artifactId>
-          <groupId>io.netty</groupId>
-        </exclusion>
-        <exclusion>
-          <artifactId>netty-buffer</artifactId>
-          <groupId>io.netty</groupId>
-        </exclusion>
-        <exclusion>
-          <artifactId>netty-common</artifactId>
-          <groupId>io.netty</groupId>
-        </exclusion>
-        <exclusion>
-          <artifactId>netty-transport</artifactId>
-          <groupId>io.netty</groupId>
-        </exclusion>
-        <exclusion>
-          <artifactId>netty-resolver</artifactId>
-          <groupId>io.netty</groupId>
-        </exclusion>
-      </exclusions>
-    </dependency>
-    <dependency>
-      <groupId>com.amazonaws</groupId>
       <artifactId>aws-java-sdk</artifactId>
-      <version>1.11.279</version>
+      <version>1.11.400</version>
       <scope>provided</scope>
       <exclusions>
+        <exclusion>
+          <artifactId>aws-java-sdk-signer</artifactId>
+          <groupId>com.amazonaws</groupId>
+        </exclusion>
+        <exclusion>
+          <artifactId>aws-java-sdk-dlm</artifactId>
+          <groupId>com.amazonaws</groupId>
+        </exclusion>
+        <exclusion>
+          <artifactId>aws-java-sdk-macie</artifactId>
+          <groupId>com.amazonaws</groupId>
+        </exclusion>
+        <exclusion>
+          <artifactId>aws-java-sdk-eks</artifactId>
+          <groupId>com.amazonaws</groupId>
+        </exclusion>
+        <exclusion>
+          <artifactId>aws-java-sdk-mediatailor</artifactId>
+          <groupId>com.amazonaws</groupId>
+        </exclusion>
+        <exclusion>
+          <artifactId>aws-java-sdk-neptune</artifactId>
+          <groupId>com.amazonaws</groupId>
+        </exclusion>
+        <exclusion>
+          <artifactId>aws-java-sdk-pi</artifactId>
+          <groupId>com.amazonaws</groupId>
+        </exclusion>
+        <exclusion>
+          <artifactId>aws-java-sdk-iot1clickprojects</artifactId>
+          <groupId>com.amazonaws</groupId>
+        </exclusion>
+        <exclusion>
+          <artifactId>aws-java-sdk-iot1clickdevices</artifactId>
+          <groupId>com.amazonaws</groupId>
+        </exclusion>
+        <exclusion>
+          <artifactId>aws-java-sdk-iotanalytics</artifactId>
+          <groupId>com.amazonaws</groupId>
+        </exclusion>
+        <exclusion>
+          <artifactId>aws-java-sdk-acmpca</artifactId>
+          <groupId>com.amazonaws</groupId>
+        </exclusion>
+        <exclusion>
+          <artifactId>aws-java-sdk-secretsmanager</artifactId>
+          <groupId>com.amazonaws</groupId>
+        </exclusion>
+        <exclusion>
+          <artifactId>aws-java-sdk-fms</artifactId>
+          <groupId>com.amazonaws</groupId>
+        </exclusion>
+        <exclusion>
+          <artifactId>aws-java-sdk-connect</artifactId>
+          <groupId>com.amazonaws</groupId>
+        </exclusion>
         <exclusion>
           <artifactId>aws-java-sdk-transcribe</artifactId>
           <groupId>com.amazonaws</groupId>
@@ -357,10 +377,6 @@
         </exclusion>
         <exclusion>
           <artifactId>aws-java-sdk-elastictranscoder</artifactId>
-          <groupId>com.amazonaws</groupId>
-        </exclusion>
-        <exclusion>
-          <artifactId>aws-java-sdk-ec2</artifactId>
           <groupId>com.amazonaws</groupId>
         </exclusion>
         <exclusion>
@@ -612,10 +628,6 @@
           <groupId>com.amazonaws</groupId>
         </exclusion>
         <exclusion>
-          <artifactId>aws-java-sdk-core</artifactId>
-          <groupId>com.amazonaws</groupId>
-        </exclusion>
-        <exclusion>
           <artifactId>aws-java-sdk-models</artifactId>
           <groupId>com.amazonaws</groupId>
         </exclusion>
@@ -636,12 +648,6 @@
       <artifactId>jetty-server</artifactId>
       <version>9.4.11.v20180605</version>
       <scope>provided</scope>
-      <exclusions>
-        <exclusion>
-          <artifactId>javax.servlet-api</artifactId>
-          <groupId>javax.servlet</groupId>
-        </exclusion>
-      </exclusions>
     </dependency>
     <dependency>
       <groupId>org.eclipse.jetty</groupId>
@@ -662,9 +668,125 @@
       <scope>provided</scope>
     </dependency>
     <dependency>
+      <groupId>io.dropwizard.metrics</groupId>
+      <artifactId>metrics-core</artifactId>
+      <version>4.0.2</version>
+      <scope>provided</scope>
+      <exclusions>
+        <exclusion>
+          <artifactId>slf4j-api</artifactId>
+          <groupId>org.slf4j</groupId>
+        </exclusion>
+      </exclusions>
+    </dependency>
+    <dependency>
       <groupId>com.sonicbase</groupId>
       <artifactId>sonicbase-jdbc</artifactId>
-      <version>1.2.13</version>
+      <version>1.2.15</version>
+      <scope>provided</scope>
+      <exclusions>
+        <exclusion>
+          <artifactId>snakeyaml</artifactId>
+          <groupId>org.yaml</groupId>
+        </exclusion>
+        <exclusion>
+          <artifactId>guava</artifactId>
+          <groupId>com.google.guava</groupId>
+        </exclusion>
+        <exclusion>
+          <artifactId>commons-lang</artifactId>
+          <groupId>commons-lang</groupId>
+        </exclusion>
+        <exclusion>
+          <artifactId>slf4j-log4j12</artifactId>
+          <groupId>org.slf4j</groupId>
+        </exclusion>
+        <exclusion>
+          <artifactId>gson</artifactId>
+          <groupId>com.google.code.gson</groupId>
+        </exclusion>
+        <exclusion>
+          <artifactId>hadoop-core</artifactId>
+          <groupId>org.apache.hadoop</groupId>
+        </exclusion>
+        <exclusion>
+          <artifactId>lzo-core</artifactId>
+          <groupId>org.anarres.lzo</groupId>
+        </exclusion>
+        <exclusion>
+          <artifactId>commons-cli</artifactId>
+          <groupId>commons-cli</groupId>
+        </exclusion>
+      </exclusions>
+    </dependency>
+    <dependency>
+      <groupId>com.sonicbase</groupId>
+      <artifactId>sonicbase-server</artifactId>
+      <version>1.2.15</version>
+      <scope>provided</scope>
+      <exclusions>
+        <exclusion>
+          <artifactId>netty-all</artifactId>
+          <groupId>io.netty</groupId>
+        </exclusion>
+        <exclusion>
+          <artifactId>aws-java-sdk-lexmodelbuilding</artifactId>
+          <groupId>com.amazonaws</groupId>
+        </exclusion>
+      </exclusions>
+    </dependency>
+    <dependency>
+      <groupId>com.fasterxml.jackson.core</groupId>
+      <artifactId>jackson-databind</artifactId>
+      <version>2.9.6</version>
+      <scope>provided</scope>
+      <exclusions>
+        <exclusion>
+          <artifactId>jackson-annotations</artifactId>
+          <groupId>com.fasterxml.jackson.core</groupId>
+        </exclusion>
+      </exclusions>
+    </dependency>
+    <dependency>
+      <groupId>com.fasterxml.jackson.core</groupId>
+      <artifactId>jackson-core</artifactId>
+      <version>2.9.6</version>
+      <scope>provided</scope>
+    </dependency>
+    <dependency>
+      <groupId>commons-io</groupId>
+      <artifactId>commons-io</artifactId>
+      <version>2.5</version>
+      <scope>provided</scope>
+    </dependency>
+    <dependency>
+      <groupId>net.jpountz.lz4</groupId>
+      <artifactId>lz4</artifactId>
+      <version>1.3.0</version>
+      <scope>provided</scope>
+    </dependency>
+    <dependency>
+      <groupId>org.apache.commons</groupId>
+      <artifactId>commons-crypto</artifactId>
+      <version>1.0.0</version>
+      <scope>provided</scope>
+      <exclusions>
+        <exclusion>
+          <artifactId>jna</artifactId>
+          <groupId>net.java.dev.jna</groupId>
+        </exclusion>
+      </exclusions>
+    </dependency>
+    <dependency>
+      <groupId>org.apache.commons</groupId>
+      <artifactId>commons-lang3</artifactId>
+      <version>3.3.2</version>
+      <scope>provided</scope>
+    </dependency>
+    <dependency>
+      <groupId>log4j</groupId>
+      <artifactId>log4j</artifactId>
+      <version>1.2.17</version>
       <scope>provided</scope>
     </dependency>
     <dependency>
@@ -673,6 +795,10 @@
       <version>6.8</version>
       <scope>test</scope>
       <exclusions>
+        <exclusion>
+          <artifactId>junit</artifactId>
+          <groupId>junit</groupId>
+        </exclusion>
         <exclusion>
           <artifactId>bsh</artifactId>
           <groupId>org.beanshell</groupId>
@@ -688,22 +814,94 @@
       </exclusions>
     </dependency>
     <dependency>
+      <groupId>com.github.jsqlparser</groupId>
+      <artifactId>jsqlparser</artifactId>
+      <version>0.9.5</version>
+      <scope>provided</scope>
+    </dependency>
+    <dependency>
       <groupId>org.quartz-scheduler</groupId>
       <artifactId>quartz</artifactId>
       <version>2.2.1</version>
       <scope>provided</scope>
+      <exclusions>
+        <exclusion>
+          <artifactId>slf4j-api</artifactId>
+          <groupId>org.slf4j</groupId>
+        </exclusion>
+      </exclusions>
     </dependency>
     <dependency>
-      <groupId>it.unimi.dsi</groupId>
-      <artifactId>fastutil</artifactId>
-      <version>7.0.2</version>
+      <groupId>com.amazonaws</groupId>
+      <artifactId>aws-java-sdk-ec2</artifactId>
+      <version>1.11.400</version>
       <scope>provided</scope>
+      <exclusions>
+        <exclusion>
+          <artifactId>jmespath-java</artifactId>
+          <groupId>com.amazonaws</groupId>
+        </exclusion>
+      </exclusions>
+    </dependency>
+    <dependency>
+      <groupId>com.amazonaws</groupId>
+      <artifactId>aws-java-sdk-core</artifactId>
+      <version>1.11.400</version>
+      <scope>provided</scope>
+      <exclusions>
+        <exclusion>
+          <artifactId>ion-java</artifactId>
+          <groupId>software.amazon.ion</groupId>
+        </exclusion>
+        <exclusion>
+          <artifactId>jackson-dataformat-cbor</artifactId>
+          <groupId>com.fasterxml.jackson.dataformat</groupId>
+        </exclusion>
+        <exclusion>
+          <artifactId>joda-time</artifactId>
+          <groupId>joda-time</groupId>
+        </exclusion>
+      </exclusions>
+    </dependency>
+    <dependency>
+      <groupId>org.anarres.lzo</groupId>
+      <artifactId>lzo-hadoop</artifactId>
+      <version>1.0.5</version>
+      <scope>provided</scope>
+      <exclusions>
+        <exclusion>
+          <artifactId>servlet-api</artifactId>
+          <groupId>org.mortbay.jetty</groupId>
+        </exclusion>
+        <exclusion>
+          <artifactId>servlet-api-2.5</artifactId>
+          <groupId>org.mortbay.jetty</groupId>
+        </exclusion>
+        <exclusion>
+          <artifactId>annotations</artifactId>
+          <groupId>com.google.code.findbugs</groupId>
+        </exclusion>
+        <exclusion>
+          <artifactId>hadoop-core</artifactId>
+          <groupId>org.apache.hadoop</groupId>
+        </exclusion>
+        <exclusion>
+          <artifactId>lzo-core</artifactId>
+          <groupId>org.anarres.lzo</groupId>
+        </exclusion>
+      </exclusions>
     </dependency>
     <dependency>
       <groupId>org.apache.httpcomponents</groupId>
       <artifactId>httpclient</artifactId>
       <version>4.4</version>
       <scope>provided</scope>
+      <exclusions>
+        <exclusion>
+          <artifactId>commons-codec</artifactId>
+          <groupId>commons-codec</groupId>
+        </exclusion>
+      </exclusions>
     </dependency>
     <dependency>
       <groupId>org.apache.httpcomponents</groupId>

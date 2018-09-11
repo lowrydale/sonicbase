@@ -1,0 +1,35 @@
+replicationFactor: 1
+dataDirectory: $HOME/db/b
+installDirectory: $WORKING_DIR
+compressRecords: false
+useUnsafe: true
+maxJavaHeap: 20%
+user: ubuntu
+clientIsPrivate: false
+backup:
+  bucket: sonicbase-test-backup
+  period: daily
+  prefix: backups
+  time: 23:00
+  type: AWS
+  maxBackupCount: 10
+shards:
+- shard:
+    replicas:
+    - replica:
+        publicAddress: localhost
+        privateAddress: localhost
+        port: 9110
+        httpPort: 8080
+- shard:
+    replicas:
+    - replica:
+        publicAddress: localhost
+        privateAddress: localhost
+        port: 9160
+        httpPort: 8080
+clients:
+- client:
+    publicAddress: localhost
+    privateAddress: localhost
+    port: 8090

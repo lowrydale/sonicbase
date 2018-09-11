@@ -4,7 +4,7 @@ import com.sonicbase.client.DatabaseClient;
 import com.sonicbase.common.DatabaseCommon;
 import com.sonicbase.jdbcdriver.ConnectionProxy;
 import com.sonicbase.schema.TableSchema;
-import com.sonicbase.util.TestUtils;
+import com.sonicbase.util.ClientTestUtils;
 import org.testng.annotations.Test;
 
 import java.sql.*;
@@ -27,7 +27,7 @@ public class ConnectionProxyTest {
     connWithClient.setClient(standaloneClient);
     final DatabaseCommon common = new DatabaseCommon();
 
-    TableSchema tableSchema = TestUtils.createTable();
+    TableSchema tableSchema = ClientTestUtils.createTable();
     common.getTables("test").put(tableSchema.getName(), tableSchema);
     common.setSchemaVersion(100);
     when(standaloneClient.getCommon()).thenReturn(common);

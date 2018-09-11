@@ -14,14 +14,11 @@ public class TestSocket {
 
   @Test
   public void test() throws InterruptedException {
-    Thread thread = new Thread(new Runnable(){
-      @Override
-      public void run() {
-        NettyServer server = new NettyServer();
-        String argsStr = "-host localhost -port 9010 -cluster 1-local -gclog gc.log -xmx 2G";
-        String[] args = argsStr.split(" ");
-        server.startServer(args);
-      }
+    Thread thread = new Thread(() -> {
+      NettyServer server = new NettyServer();
+      String argsStr = "-host localhost -port 9010 -cluster 1-local -gclog gc.log -xmx 2G";
+      String[] args = argsStr.split(" ");
+      server.startServer(args);
     });
     thread.start();
     Thread.sleep(5000);

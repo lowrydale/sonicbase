@@ -64,20 +64,19 @@ public class SelectStatementHandler implements StatementHandler {
   private Object executeSetOperation(String dbName, ParameterHandler parms, boolean restrictToThisServer,
                                      StoredProcedureContextImpl procedureContext, SetOperationList selectBody,
                                      AtomicInteger currParmNum) {
-    SetOperationList opList = selectBody;
-    String[] tableNames = new String[opList.getSelects().size()];
-    SelectStatementImpl[] statements = new SelectStatementImpl[opList.getSelects().size()];
-    for (int i = 0; i < opList.getSelects().size(); i++) {
-      SelectBody innerBody = opList.getSelects().get(i);
+    String[] tableNames = new String[selectBody.getSelects().size()];
+    SelectStatementImpl[] statements = new SelectStatementImpl[selectBody.getSelects().size()];
+    for (int i = 0; i < selectBody.getSelects().size(); i++) {
+      SelectBody innerBody = selectBody.getSelects().get(i);
       SelectStatementImpl selectStatement = parseSelectStatement(client, parms, (PlainSelect) innerBody, currParmNum);
       tableNames[i] = selectStatement.getFromTable();
       statements[i] = selectStatement;
     }
-    String[] operations = new String[opList.getOperations().size()];
+    String[] operations = new String[selectBody.getOperations().size()];
     for (int i = 0; i < operations.length; i++) {
-      operations[i] = opList.getOperations().get(i).toString();
+      operations[i] = selectBody.getOperations().get(i).toString();
     }
-    List<OrderByElement> orderByElements = opList.getOrderByElements();
+    List<OrderByElement> orderByElements = selectBody.getOrderByElements();
     OrderByExpressionImpl[] orderBy = null;
     if (orderByElements != null) {
       orderBy = new OrderByExpressionImpl[orderByElements.size()];
@@ -139,7 +138,7 @@ public class SelectStatementHandler implements StatementHandler {
       return serverSelectPageNumber;
     }
 
-    public void setServerSelectPageNumber(long serverSelectPageNumber) {
+    void setServerSelectPageNumber(long serverSelectPageNumber) {
       this.serverSelectPageNumber = serverSelectPageNumber;
     }
 
@@ -147,7 +146,7 @@ public class SelectStatementHandler implements StatementHandler {
       return resultSetId;
     }
 
-    public void setResultSetId(long resultSetId) {
+    void setResultSetId(long resultSetId) {
       this.resultSetId = resultSetId;
     }
 
@@ -168,8 +167,8 @@ public class SelectStatementHandler implements StatementHandler {
     }
   }
 
-  public ResultSet serverSetSelect(String dbName, String[] tableNames, SetOperation setOperation,
-                                   boolean restrictToThisServer, StoredProcedureContextImpl procedureContext) {
+  private ResultSet serverSetSelect(String dbName, String[] tableNames, SetOperation setOperation,
+                                    boolean restrictToThisServer, StoredProcedureContextImpl procedureContext) {
     while (true) {
       if (client.getShutdown()) {
         throw new DatabaseException("Shutting down");
@@ -189,10 +188,8 @@ public class SelectStatementHandler implements StatementHandler {
         return ret;
       }
       catch (Exception e) {
-        if (e.getMessage() != null && e.getMessage().contains("SchemaOutOfSyncException")) {
-          continue;
-        }
-        if (-1 != ExceptionUtils.indexOfThrowable(e, SchemaOutOfSyncException.class)) {
+        if (e.getMessage() != null && e.getMessage().contains("SchemaOutOfSyncException") ||
+            -1 != ExceptionUtils.indexOfThrowable(e, SchemaOutOfSyncException.class)) {
           continue;
         }
         throw new DatabaseException(e);
@@ -225,7 +222,6 @@ public class SelectStatementHandler implements StatementHandler {
     }
     cobj.put(ComObject.Tag.SCHEMA_VERSION, client.getCommon().getSchemaVersion());
     cobj.put(ComObject.Tag.COUNT, DatabaseClient.SELECT_PAGE_SIZE);
-    cobj.put(ComObject.Tag.METHOD, "ReadManager:serverSetSelect");
     cobj.put(ComObject.Tag.DB_NAME, dbName);
     cobj.put(ComObject.Tag.SERVER_SELECT_PAGE_NUMBER, setOperation.getServerSelectPageNumber());
     cobj.put(ComObject.Tag.RESULT_SET_ID, setOperation.getResultSetId());
@@ -237,11 +233,11 @@ public class SelectStatementHandler implements StatementHandler {
     else {
       byte[] recordRet = null;
       if (setOperation.getShard() == null) {
-        recordRet = client.send(null, Math.abs(ThreadLocalRandom.current().nextInt() % client.getShardCount()),
+        recordRet = client.send("ReadManager:serverSetSelect", Math.abs(ThreadLocalRandom.current().nextInt() % client.getShardCount()),
             Math.abs(ThreadLocalRandom.current().nextLong()), cobj, DatabaseClient.Replica.DEF);
       }
       else {
-        recordRet = client.send(null, setOperation.getShard(), setOperation.getReplica(), cobj,
+        recordRet = client.send("ReadManager:serverSetSelect", setOperation.getShard(), setOperation.getReplica(), cobj,
             DatabaseClient.Replica.SPECIFIED);
       }
       retObj = new ComObject(recordRet);
@@ -390,9 +386,7 @@ public class SelectStatementHandler implements StatementHandler {
 
   private static ExpressionImpl getFunctionExpression(DatabaseClient client, AtomicInteger currParmNum,
                                                       Function whereExpression, String tableName, ParameterHandler parms) {
-    ExpressionImpl retExpression;
-    Function sourceFunc = whereExpression;
-    ExpressionList sourceParms = sourceFunc.getParameters();
+    ExpressionList sourceParms = whereExpression.getParameters();
     List<ExpressionImpl> expressions = new ArrayList<>();
     if (sourceParms != null) {
       for (Expression expression : sourceParms.getExpressions()) {
@@ -400,38 +394,33 @@ public class SelectStatementHandler implements StatementHandler {
         expressions.add(expressionImpl);
       }
     }
-    FunctionImpl func = new FunctionImpl(sourceFunc.getName(), expressions);
-    retExpression = func;
-    return retExpression;
+    return new FunctionImpl(whereExpression.getName(), expressions);
   }
 
   private static ExpressionImpl getLongValueExpression(LongValue whereExpression) {
     ExpressionImpl retExpression;
-    LongValue longValue = whereExpression;
     ConstantImpl constant = new ConstantImpl();
     constant.setSqlType(Types.BIGINT);
-    constant.setValue(longValue.getValue());
+    constant.setValue(whereExpression.getValue());
     retExpression = constant;
     return retExpression;
   }
 
   private static ExpressionImpl getDoubleValueExpression(DoubleValue whereExpression) {
     ExpressionImpl retExpression;
-    DoubleValue doubleValue = whereExpression;
     ConstantImpl constant = new ConstantImpl();
     constant.setSqlType(Types.DOUBLE);
-    constant.setValue(doubleValue.getValue());
+    constant.setValue(whereExpression.getValue());
     retExpression = constant;
     return retExpression;
   }
 
   private static ExpressionImpl getStringValueExpression(StringValue whereExpression) {
     ExpressionImpl retExpression;
-    StringValue string = whereExpression;
     ConstantImpl constant = new ConstantImpl();
     constant.setSqlType(Types.VARCHAR);
     try {
-      constant.setValue(string.getValue().getBytes("utf-8"));
+      constant.setValue(whereExpression.getValue().getBytes("utf-8"));
     }
     catch (UnsupportedEncodingException e) {
       throw new DatabaseException(e);
@@ -442,16 +431,15 @@ public class SelectStatementHandler implements StatementHandler {
 
   private static ExpressionImpl getColumnExpression(Column whereExpression, String tableName) {
     ExpressionImpl retExpression;
-    Column column = whereExpression;
     ColumnImpl columnNode = new ColumnImpl();
-    String colTableName = column.getTable().getName();
+    String colTableName = whereExpression.getTable().getName();
     if (colTableName != null) {
       columnNode.setTableName(toLower(colTableName));
     }
     else {
       columnNode.setTableName(tableName);
     }
-    columnNode.setColumnName(toLower(column.getColumnName()));
+    columnNode.setColumnName(toLower(whereExpression.getColumnName()));
     retExpression = columnNode;
     return retExpression;
   }
@@ -460,10 +448,9 @@ public class SelectStatementHandler implements StatementHandler {
                                                 InExpression whereExpression, String tableName, ParameterHandler parms) {
     ExpressionImpl retExpression;
     InExpressionImpl retInExpression = new InExpressionImpl(client, parms, tableName);
-    InExpression inExpression = whereExpression;
-    retInExpression.setNot(inExpression.isNot());
-    retInExpression.setLeftExpression(getExpression(client, currParmNum, inExpression.getLeftExpression(), tableName, parms));
-    ItemsList items = inExpression.getRightItemsList();
+    retInExpression.setNot(whereExpression.isNot());
+    retInExpression.setLeftExpression(getExpression(client, currParmNum, whereExpression.getLeftExpression(), tableName, parms));
+    ItemsList items = whereExpression.getRightItemsList();
     if (items instanceof ExpressionList) {
       ExpressionList expressionList = (ExpressionList) items;
       List expressions = expressionList.getExpressions();
@@ -558,10 +545,9 @@ public class SelectStatementHandler implements StatementHandler {
     BinaryExpressionImpl binaryOp = new BinaryExpressionImpl();
 
     binaryOp.setOperator(com.sonicbase.query.BinaryExpression.Operator.OR);
-    OrExpression andExpression = whereExpression;
-    Expression leftExpression = andExpression.getLeftExpression();
+    Expression leftExpression = whereExpression.getLeftExpression();
     binaryOp.setLeftExpression(getExpression(client, currParmNum, leftExpression, tableName, parms));
-    Expression rightExpression = andExpression.getRightExpression();
+    Expression rightExpression = whereExpression.getRightExpression();
     binaryOp.setRightExpression(getExpression(client, currParmNum, rightExpression, tableName, parms));
     retExpression = binaryOp;
     return retExpression;
@@ -572,10 +558,9 @@ public class SelectStatementHandler implements StatementHandler {
     ExpressionImpl retExpression;
     BinaryExpressionImpl binaryOp = new BinaryExpressionImpl();
     binaryOp.setOperator(com.sonicbase.query.BinaryExpression.Operator.AND);
-    AndExpression andExpression = whereExpression;
-    Expression leftExpression = andExpression.getLeftExpression();
+    Expression leftExpression = whereExpression.getLeftExpression();
     binaryOp.setLeftExpression(getExpression(client, currParmNum, leftExpression, tableName, parms));
-    Expression rightExpression = andExpression.getRightExpression();
+    Expression rightExpression = whereExpression.getRightExpression();
     binaryOp.setRightExpression(getExpression(client, currParmNum, rightExpression, tableName, parms));
     retExpression = binaryOp;
     return retExpression;
@@ -583,11 +568,10 @@ public class SelectStatementHandler implements StatementHandler {
 
   private static ExpressionImpl getBetweenExpression(Between whereExpression) {
     ExpressionImpl retExpression;
-    Between between = whereExpression;
-    Column column = (Column) between.getLeftExpression();
+    Column column = (Column) whereExpression.getLeftExpression();
 
     BinaryExpressionImpl ret = new BinaryExpressionImpl();
-    ret.setNot(between.isNot());
+    ret.setNot(whereExpression.isNot());
     ret.setOperator(com.sonicbase.query.BinaryExpression.Operator.AND);
 
     BinaryExpressionImpl leftExpression = new BinaryExpressionImpl();
@@ -614,9 +598,9 @@ public class SelectStatementHandler implements StatementHandler {
 
     ConstantImpl leftValue = new ConstantImpl();
     ConstantImpl rightValue = new ConstantImpl();
-    if (between.getBetweenExpressionStart() instanceof LongValue) {
-      long start = ((LongValue) between.getBetweenExpressionStart()).getValue();
-      long end = ((LongValue) between.getBetweenExpressionEnd()).getValue();
+    if (whereExpression.getBetweenExpressionStart() instanceof LongValue) {
+      long start = ((LongValue) whereExpression.getBetweenExpressionStart()).getValue();
+      long end = ((LongValue) whereExpression.getBetweenExpressionEnd()).getValue();
       if (start > end) {
         long temp = start;
         start = end;
@@ -627,9 +611,9 @@ public class SelectStatementHandler implements StatementHandler {
       rightValue.setValue(end);
       rightValue.setSqlType(Types.BIGINT);
     }
-    else if (between.getBetweenExpressionStart() instanceof StringValue) {
-      String start = ((StringValue) between.getBetweenExpressionStart()).getValue();
-      String end = ((StringValue) between.getBetweenExpressionEnd()).getValue();
+    else if (whereExpression.getBetweenExpressionStart() instanceof StringValue) {
+      String start = ((StringValue) whereExpression.getBetweenExpressionStart()).getValue();
+      String end = ((StringValue) whereExpression.getBetweenExpressionEnd()).getValue();
       if (0 < start.compareTo(end)) {
         String temp = start;
         start = end;
@@ -652,9 +636,8 @@ public class SelectStatementHandler implements StatementHandler {
                                                          PlainSelect selectBody, AtomicInteger currParmNum) {
     SelectStatementImpl selectStatement = new SelectStatementImpl(client);
 
-    PlainSelect pselect = selectBody;
-    selectStatement.setFromTable(((Table) pselect.getFromItem()).getName());
-    Expression whereExpression = pselect.getWhere();
+    selectStatement.setFromTable(((Table) selectBody.getFromItem()).getName());
+    Expression whereExpression = selectBody.getWhere();
     ExpressionImpl expression = getExpression(client, currParmNum, whereExpression, selectStatement.getFromTable(), parms);
     if (expression == null) {
       expression = new AllRecordsExpressionImpl();
@@ -662,12 +645,12 @@ public class SelectStatementHandler implements StatementHandler {
     }
     selectStatement.setWhereClause(expression);
 
-    Limit limit = pselect.getLimit();
+    Limit limit = selectBody.getLimit();
     selectStatement.setLimit(limit);
-    Offset offset = pselect.getOffset();
+    Offset offset = selectBody.getOffset();
     selectStatement.setOffset(offset);
 
-    parseJoins(client, parms, currParmNum, selectStatement, pselect);
+    parseJoins(client, parms, currParmNum, selectStatement, selectBody);
 
     Distinct distinct = selectBody.getDistinct();
     if (distinct != null) {
@@ -677,11 +660,11 @@ public class SelectStatementHandler implements StatementHandler {
     List<SelectItem> selectItems = selectBody.getSelectItems();
     for (SelectItem selectItem : selectItems) {
       if (selectItem instanceof SelectExpressionItem) {
-        parseSelectExpression(selectStatement, pselect, expression, selectItems, (SelectExpressionItem) selectItem);
+        parseSelectExpression(selectStatement, selectBody, expression, selectItems, (SelectExpressionItem) selectItem);
       }
     }
 
-    List<Expression> groupColumns = pselect.getGroupByColumnReferences();
+    List<Expression> groupColumns = selectBody.getGroupByColumnReferences();
     if (groupColumns != null && !groupColumns.isEmpty()) {
       for (int i = 0; i < groupColumns.size(); i++) {
         Column column = (Column) groupColumns.get(i);
@@ -690,7 +673,7 @@ public class SelectStatementHandler implements StatementHandler {
       selectStatement.setGroupByColumns(groupColumns);
     }
 
-    List<OrderByElement> orderByElements = pselect.getOrderByElements();
+    List<OrderByElement> orderByElements = selectBody.getOrderByElements();
     if (orderByElements != null) {
       for (OrderByElement element : orderByElements) {
         selectStatement.addOrderBy(((Column) element.getExpression()).getTable().getName(),
@@ -705,19 +688,18 @@ public class SelectStatementHandler implements StatementHandler {
   private static void parseSelectExpression(SelectStatementImpl selectStatement, PlainSelect pselect,
                                             ExpressionImpl expression, List<SelectItem> selectItems,
                                             SelectExpressionItem selectItem) {
-    SelectExpressionItem item = selectItem;
-    Alias alias = item.getAlias();
+    Alias alias = selectItem.getAlias();
     String aliasName = null;
     if (alias != null) {
       aliasName = alias.getName();
     }
 
-    if (item.getExpression() instanceof Column) {
-      selectStatement.addSelectColumn(null, null, ((Column) item.getExpression()).getTable().getName(),
-          ((Column) item.getExpression()).getColumnName(), aliasName);
+    if (selectItem.getExpression() instanceof Column) {
+      selectStatement.addSelectColumn(null, null, ((Column) selectItem.getExpression()).getTable().getName(),
+          ((Column) selectItem.getExpression()).getColumnName(), aliasName);
     }
-    else if (item.getExpression() instanceof Function) {
-      parseFunction(selectStatement, pselect, expression, selectItems, item, aliasName);
+    else if (selectItem.getExpression() instanceof Function) {
+      parseFunction(selectStatement, pselect, expression, selectItems, selectItem, aliasName);
     }
   }
 
@@ -815,5 +797,4 @@ public class SelectStatementHandler implements StatementHandler {
       }
     }
   }
-
 }

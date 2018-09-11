@@ -11,7 +11,7 @@ import java.util.concurrent.Executor;
 // I prefer to return null instead of an empty array
 // I don't know a good way to reduce the parameter count
 public class SonicBaseConnectionImpl implements SonicBaseConnection {
-  private Connection proxy;
+  private final Connection proxy;
 
   public SonicBaseConnectionImpl(Connection connection) {
     this.proxy = connection;

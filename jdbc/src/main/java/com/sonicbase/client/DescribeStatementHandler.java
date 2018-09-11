@@ -18,6 +18,7 @@ import org.slf4j.LoggerFactory;
 
 import javax.net.ssl.*;
 import java.io.BufferedInputStream;
+import java.io.IOException;
 import java.io.InputStream;
 import java.net.URL;
 import java.net.URLConnection;
@@ -30,10 +31,10 @@ import java.util.concurrent.Future;
 // I prefer to return null instead of an empty array
 // I don't know a good way to reduce the parameter count
 public class DescribeStatementHandler {
-  public static final String TABLE_NAME_STR = ", tableName=";
-  public static final String WIDTH_STR = "Width";
-  public static final String SERVER_STR = "server";
-  private static Logger logger = LoggerFactory.getLogger(DescribeStatementHandler.class);
+  private static final String TABLE_NAME_STR = ", tableName=";
+  private static final String WIDTH_STR = "Width";
+  private static final String SERVER_STR = "server";
+  private static final Logger logger = LoggerFactory.getLogger(DescribeStatementHandler.class);
 
   private final DatabaseClient client;
 
@@ -41,7 +42,7 @@ public class DescribeStatementHandler {
     this.client = client;
   }
 
-  public ResultSet doDescribe(String dbName, String sql) {
+  ResultSet doDescribe(String dbName, String sql) {
     String[] parts = sql.split(" ");
     if (parts[1].trim().equalsIgnoreCase("table")) {
       return doDescribeTable(dbName, parts[2]);
@@ -59,7 +60,7 @@ public class DescribeStatementHandler {
       return describeShards(dbName);
     }
     else if (parts[1].trim().equalsIgnoreCase("repartitioner")) {
-      return describeRepartitioner(dbName);
+      return null;
     }
     else if (parts[1].trim().equalsIgnoreCase(SERVER_STR) &&
         parts[2].trim().equalsIgnoreCase("stats")) {
@@ -98,7 +99,7 @@ public class DescribeStatementHandler {
   private ResultSet doDescribeTables(String dbName) {
     StringBuilder builder = new StringBuilder();
     for (TableSchema tableSchema : client.getCommon().getTables(dbName).values()) {
-      builder.append(tableSchema.getName() + "\n");
+      builder.append(tableSchema.getName()).append("\n");
     }
     String ret = builder.toString();
     String[] lines = ret.split("\\n");
@@ -177,10 +178,7 @@ public class DescribeStatementHandler {
     }
   }
 
-
-
-
-  public static ResultSet describeLicenses() {
+  public ResultSet describeLicenses() {
     try {
       TrustManager[] trustAllCerts = new TrustManager[]{
           new X509TrustManager() {
@@ -211,26 +209,24 @@ public class DescribeStatementHandler {
        * end of the fix
        */
 
-      String json = IOUtils.toString(DatabaseClient.class.getResourceAsStream("/config-license-server.json"), "utf-8");
+      String json = getLicenseServerConfig();
+      Config config = new Config(json);
+
+      InputStream in = urlGet("https://" + config.getString("publicAddress") + ":" +
+          config.getInt("port") + "/license/currUsage");
+
       ObjectMapper mapper = new ObjectMapper();
-      ObjectNode config = (ObjectNode) mapper.readTree(json);
-
-      URL url = new URL("https://" + config.get(SERVER_STR).get("publicAddress").asText() + ":" +
-          config.get(SERVER_STR).get("port").asInt() + "/license/currUsage");
-      URLConnection con = url.openConnection();
-      InputStream in = new BufferedInputStream(con.getInputStream());
-
       ObjectNode dict = (ObjectNode) mapper.readTree(IOUtils.toString(in, "utf-8"));
       StringBuilder builder = new StringBuilder();
-      builder.append("total cores in use=" + dict.get("totalCores").asInt() + "\n");
-      builder.append("total allocated cores=" + dict.get("allocatedCores").asInt() + "\n");
-      builder.append("in compliance=" + dict.get("inCompliance").asBoolean() + "\n");
-      builder.append("disabling now=" + dict.get("disableNow").asBoolean() + "\n");
-      builder.append("disabling date=" + dict.get("disableDate").asText() + "\n");
-      builder.append("multiple license servers=" + dict.get("multipleLicenseServers").asBoolean() + "\n");
+      builder.append("total cores in use=").append(dict.get("totalCores").asInt()).append("\n");
+      builder.append("total allocated cores=").append(dict.get("allocatedCores").asInt()).append("\n");
+      builder.append("in compliance=").append(dict.get("inCompliance").asBoolean()).append("\n");
+      builder.append("disabling now=").append(dict.get("disableNow").asBoolean()).append("\n");
+      builder.append("disabling date=").append(dict.get("disableDate").asText()).append("\n");
+      builder.append("multiple license servers=").append(dict.get("multipleLicenseServers").asBoolean()).append("\n");
       ArrayNode servers = dict.withArray("clusters");
       for (int i = 0; i < servers.size(); i++) {
-        builder.append(servers.get(i).get("cluster").asText() + "=" + servers.get(i).get("cores").asInt() + "\n");
+        builder.append(servers.get(i).get("cluster").asText()).append("=").append(servers.get(i).get("cores").asInt()).append("\n");
       }
 
       String ret = builder.toString();
@@ -240,6 +236,17 @@ public class DescribeStatementHandler {
     catch (Exception e) {
       throw new DatabaseException(e);
     }
+  }
+
+  public String getLicenseServerConfig() throws IOException {
+    return IOUtils.toString(DatabaseClient.class.getResourceAsStream("/config-license-server.yaml"), "utf-8");
+  }
+
+  public InputStream urlGet(String urlStr) throws IOException {
+    URL url = new URL(urlStr);
+
+    URLConnection con = url.openConnection();
+    return new BufferedInputStream(con.getInputStream());
   }
 
   private ResultSet describeServerHeath() {
@@ -297,17 +304,8 @@ public class DescribeStatementHandler {
           ComObject cobj = new ComObject();
           cobj.put(ComObject.Tag.DB_NAME, "__none__");
           cobj.put(ComObject.Tag.SCHEMA_VERSION, client.getCommon().getSchemaVersion());
-          byte[] ret = null;
-          try {
-            ret = client.send("DatabaseServer:getSchema", j, i, cobj, DatabaseClient.Replica.SPECIFIED);
-            ComObject retObj = new ComObject(ret);
-            DatabaseCommon tmpCommon = new DatabaseCommon();
-            tmpCommon.deserializeSchema(retObj.getByteArray(ComObject.Tag.SCHEMA_BYTES));
-            line.put("version", String.valueOf(tmpCommon.getSchemaVersion()));
-          }
-          catch (Exception e) {
-            logger.error("Error getting schema from server: shard=" + j + ", replica=" + i, e);
-          }
+
+          deserializeSchema(j, i, line, cobj);
 
           serverStatsData.add(line);
         }
@@ -316,6 +314,20 @@ public class DescribeStatementHandler {
     }
     catch (Exception e) {
       throw new DatabaseException(e);
+    }
+  }
+
+  private void deserializeSchema(int j, int i, Map<String, String> line, ComObject cobj) {
+    byte[] ret;
+    try {
+      ret = client.send("DatabaseServer:getSchema", j, i, cobj, DatabaseClient.Replica.SPECIFIED);
+      ComObject retObj = new ComObject(ret);
+      DatabaseCommon tmpCommon = new DatabaseCommon();
+      tmpCommon.deserializeSchema(retObj.getByteArray(ComObject.Tag.SCHEMA_BYTES));
+      line.put("version", String.valueOf(tmpCommon.getSchemaVersion()));
+    }
+    catch (Exception e) {
+      logger.error("Error getting schema from server: shard=" + j + ", replica=" + i, e);
     }
   }
 
@@ -336,14 +348,8 @@ public class DescribeStatementHandler {
 
         List<Future<Map<String, String>>> futures = describeServerStatsForEachServer();
 
-        for (Future<Map<String, String>> future : futures) {
-          try {
-            serverStatsData.add(future.get());
-          }
-          catch (Exception e) {
-            logger.error("Error getting stats", e);
-          }
-        }
+        waitForFutures(serverStatsData, futures);
+
         return new ResultSetImpl(serverStatsData);
       }
       catch (Exception e) {
@@ -357,16 +363,23 @@ public class DescribeStatementHandler {
 
   }
 
+  private void waitForFutures(List<Map<String, String>> serverStatsData, List<Future<Map<String, String>>> futures) {
+    for (Future<Map<String, String>> future : futures) {
+      try {
+        serverStatsData.add(future.get());
+      }
+      catch (Exception e) {
+        logger.error("Error getting stats", e);
+      }
+    }
+  }
+
   private List<Future<Map<String, String>>> describeServerStatsForEachServer() {
     List<Future<Map<String, String>>> futures = new ArrayList<>();
     for (int i = 0; i < client.getShardCount(); i++) {
       for (int j = 0; j < client.getReplicaCount(); j++) {
         final int shard = i;
         final int replica = j;
-        boolean dead = client.getServersArray()[i][j].isDead();
-        if (dead) {
-          continue;
-        }
         futures.add(client.getExecutor().submit(() -> doDescribeServerStats(shard, replica)));
       }
     }
@@ -390,9 +403,8 @@ public class DescribeStatementHandler {
     ComObject cobj = new ComObject();
     cobj.put(ComObject.Tag.DB_NAME, "__none__");
     cobj.put(ComObject.Tag.SCHEMA_VERSION, client.getCommon().getSchemaVersion());
-    cobj.put(ComObject.Tag.METHOD, "OSStatsManager:getOSStats");
 
-    byte[] ret = client.send(null, shard, replica, cobj, DatabaseClient.Replica.SPECIFIED);
+    byte[] ret = client.send("OSStatsManager:getOSStats", shard, replica, cobj, DatabaseClient.Replica.SPECIFIED);
     ComObject retObj = new ComObject(ret);
 
     double resGig = retObj.getDouble(ComObject.Tag.RES_GIG);
@@ -430,10 +442,10 @@ public class DescribeStatementHandler {
       return table + ":" + index + ":" + shard;
     }
 
-    private String table;
-    private String index;
-    private int shard;
-    private String result;
+    private final String table;
+    private final String index;
+    private final int shard;
+    private final String result;
   }
 
 
@@ -512,53 +524,9 @@ public class DescribeStatementHandler {
     if (lastPartitions != null && lastPartitions[i].getUpperKey() != null) {
       lastKey = DatabaseCommon.keyToString(lastPartitions[i].getUpperKey());
     }
-    ret.append("Table=" + table.getKey() + ", Index=" + indexSchema.getKey() + ", shard=" + shard + ", key=" +
-        key).append(", lastKey=").append(lastKey).append("\n");
+    ret.append("Table=").append(table.getKey()).append(", Index=").append(indexSchema.getKey()).append(", shard=").append(shard).append(", key=").append(key).append(", lastKey=").append(lastKey).append("\n");
     shard++;
     return shard;
-  }
-
-  class ShardState {
-    private int shard;
-    private long count;
-    private String exception;
-  }
-
-  public ResultSetImpl describeRepartitioner(String dbName) {
-    ComObject cobj = new ComObject();
-    cobj.put(ComObject.Tag.DB_NAME, dbName);
-    cobj.put(ComObject.Tag.SCHEMA_VERSION, client.getCommon().getSchemaVersion());
-    byte[] ret = client.sendToMaster("PartitionManager:getRepartitionerState", cobj);
-    ComObject retObj = new ComObject(ret);
-
-    StringBuilder builder = new StringBuilder();
-    String state = retObj.getString(ComObject.Tag.STATE);
-    builder.append("state=" + state).append("\n");
-    if (state.equals("rebalancing")) {
-      builder.append("table=").append(retObj.getString(ComObject.Tag.TABLE_NAME)).append("\n");
-      builder.append("index=").append(retObj.getString(ComObject.Tag.INDEX_NAME)).append("\n");
-      builder.append("shards:\n");
-      List<ShardState> shards = new ArrayList<>();
-      ComArray array = retObj.getArray(ComObject.Tag.SHARDS);
-      for (int i = 0; i < array.getArray().size(); i++) {
-        ShardState shardState = new ShardState();
-        shardState.shard = ((ComObject) array.getArray().get(i)).getInt(ComObject.Tag.SHARD);
-        shardState.count = ((ComObject) array.getArray().get(i)).getLong(ComObject.Tag.COUNT_LONG);
-        shardState.exception = ((ComObject) array.getArray().get(i)).getString(ComObject.Tag.EXCEPTION);
-
-        shards.add(shardState);
-      }
-      Collections.sort(shards, Comparator.comparingInt(o -> o.shard));
-      for (ShardState shardState : shards) {
-        builder.append("shard " + shardState.shard + "=" + shardState.count).append("\n");
-        if (shardState.exception != null) {
-          builder.append(shardState.exception.substring(0, 300));
-        }
-      }
-    }
-    String retStr = builder.toString();
-    String[] lines = retStr.split("\\n");
-    return new ResultSetImpl(lines);
   }
 
   private StringBuilder doDescribeIndex(String dbName, String table, String index, StringBuilder builder) {

@@ -4,6 +4,7 @@ import com.fasterxml.jackson.databind.ObjectMapper;
 import com.fasterxml.jackson.databind.node.ObjectNode;
 import com.sonicbase.client.DatabaseClient;
 import com.sonicbase.common.ComObject;
+import com.sonicbase.common.Config;
 import com.sonicbase.common.ThreadUtil;
 import com.sonicbase.query.DatabaseException;
 import com.sonicbase.socket.DatabaseSocketClient;
@@ -53,24 +54,25 @@ public class NettyServer {
   private static final String STARTUP_ERROR_TXT_STR = "startupError.txt";
   private static final String ERROR_STARTING_SERVER_STR = "Error starting server";
   private static final String USER_DIR = System.getProperty("user.dir");
-  private static Logger logger = LoggerFactory.getLogger(NettyServer.class);
+  private static final Logger logger = LoggerFactory.getLogger(NettyServer.class);
 
   public static final boolean ENABLE_COMPRESSION = false;
   private static final String UTF8_STR = "utf-8";
   private static final String PORT_STR = "port";
   private static final String HOST_STR = "host";
+  public static final String DISABLE_STR = "disable";
   private final int threadCount;
 
-  final AtomicBoolean isRunning = new AtomicBoolean(false);
-  final AtomicBoolean isRecovered = new AtomicBoolean(false);
+  private final AtomicBoolean isRunning = new AtomicBoolean(false);
+  private final AtomicBoolean isRecovered = new AtomicBoolean(false);
   private int port;
   private DatabaseServer databaseServer = null;
   private ChannelFuture f;
   private EventLoopGroup bossGroup;
   private EventLoopGroup workerGroup;
-  private AtomicLong totalRequestSize = new AtomicLong();
-  private AtomicLong totalResponseSize = new AtomicLong();
-  private AtomicLong totalTimeProcessing = new AtomicLong();
+  private final AtomicLong totalRequestSize = new AtomicLong();
+  private final AtomicLong totalResponseSize = new AtomicLong();
+  private final AtomicLong totalTimeProcessing = new AtomicLong();
 
   private Thread nettyThread = null;
   private Thread serverThread = null;
@@ -177,8 +179,8 @@ public class NettyServer {
     DLQ_BYTES
   }
 
-  public static byte[] writeResponse(byte[] intBuff, OutputStream to, int requestCount, List<byte[]> retBytes,
-                                     ByteArrayOutputStream out) throws IOException {
+  private static byte[] writeResponse(byte[] intBuff, OutputStream to, int requestCount, List<byte[]> retBytes,
+                                      ByteArrayOutputStream out) throws IOException {
     long checksumValue;
     Util.writeRawLittleEndian32(requestCount, intBuff);
     out.write(intBuff);
@@ -231,7 +233,7 @@ public class NettyServer {
     return body;
   }
 
-  public static Request deserializeRequest(InputStream from, byte[] intBuff) {
+  private static Request deserializeRequest(InputStream from, byte[] intBuff) {
     try {
       from.read(intBuff);
       int bodyLen = Util.readRawLittleEndian32(intBuff);
@@ -256,24 +258,24 @@ public class NettyServer {
     }
   }
 
-  private AtomicLong totalCallCount = new AtomicLong();
-  private AtomicLong callCount = new AtomicLong();
-  private AtomicLong lastLoggedSocketServerStats = new AtomicLong(System.currentTimeMillis());
-  private AtomicLong requestDuration = new AtomicLong();
-  private AtomicLong responseDuration = new AtomicLong();
-  private AtomicLong lastLogReset = new AtomicLong();
-  private AtomicLong timeLogging = new AtomicLong();
-  private AtomicLong handlerTime = new AtomicLong();
+  private final AtomicLong totalCallCount = new AtomicLong();
+  private final AtomicLong callCount = new AtomicLong();
+  private final AtomicLong lastLoggedSocketServerStats = new AtomicLong(System.currentTimeMillis());
+  private final AtomicLong requestDuration = new AtomicLong();
+  private final AtomicLong responseDuration = new AtomicLong();
+  private final AtomicLong lastLogReset = new AtomicLong();
+  private final AtomicLong timeLogging = new AtomicLong();
+  private final AtomicLong handlerTime = new AtomicLong();
 
   class ServerHandler extends ChannelInboundHandlerAdapter {
-    private ByteBufAllocator alloc = PooledByteBufAllocator.DEFAULT;
+    private final ByteBufAllocator alloc = PooledByteBufAllocator.DEFAULT;
     private int len;
     private int bodyLen;
     private ReadState readState = ReadState.SIZE;
     private ByteBuf destBuff = alloc.directBuffer(1024);
     private ByteBuf respBuffer = alloc.directBuffer(1024);
-    private byte[] intBuff = new byte[4];
-    private List<ByteBuf> buffers = new ArrayList<>();
+    private final byte[] intBuff = new byte[4];
+    private final List<ByteBuf> buffers = new ArrayList<>();
 
     public void handlerAdded(ChannelHandlerContext ctx) {
       destBuff.clear();
@@ -358,26 +360,9 @@ public class NettyServer {
         byte[] body = readRequest(m);
         requestDuration.addAndGet(System.nanoTime() - requestBegin);
         if (body != null) {
-          try {
-            requestSize = body.length;
-            ByteArrayInputStream bytesIn = new ByteArrayInputStream(body);
-
-            List<Request> requests = new ArrayList<>();
-            int batchSize = getRequests(bytesIn, requests);
-
-            ArrayList<byte[]> retBytes = new ArrayList<>();
-            try {
-              responseSize = doRead(ctx, batchSize, requests, retBytes);
-            }
-            catch (Exception t) {
-              handleReadError(ctx, batchSize, t);
-            }
-          }
-          catch (Exception t) {
-            logger.error("Error processing request", t);
-            readState = ReadState.SIZE;
-            buffers.clear();
-          }
+          DoRead doRead = new DoRead(ctx, requestSize, responseSize, body).invoke();
+          requestSize = doRead.getRequestSize();
+          responseSize = doRead.getResponseSize();
 
           callCount.incrementAndGet();
           boolean shouldLog = false;
@@ -419,75 +404,6 @@ public class NettyServer {
         logger.error("Error: " + e.getMessage(), e);
         readState = ReadState.SIZE;
       }
-    }
-
-    private int getRequests(ByteArrayInputStream bytesIn, List<Request> requests) throws IOException {
-      int batchSize = 1;
-      if (DatabaseSocketClient.ENABLE_BATCH) {
-        bytesIn.read(intBuff);
-        batchSize = Util.readRawLittleEndian32(intBuff);
-      }
-
-      for (int i = 0; i < batchSize; i++) {
-        Request request = deserializeRequest(bytesIn, intBuff);
-        requests.add(request);
-      }
-      return batchSize;
-    }
-
-    private int doRead(ChannelHandlerContext ctx, int batchSize, List<Request> requests,
-                       ArrayList<byte[]> retBytes) throws IOException, InterruptedException {
-      List<LogManager.LogRequest> logRequests = new ArrayList<>();
-
-      long beginProcess = System.nanoTime();
-      List<byte[]> ret = doProcessRequests(requests, timeLogging, handlerTime);
-      for (byte[] bytes : ret) {
-        retBytes.add(bytes);
-      }
-      totalTimeProcessing.addAndGet(System.nanoTime() - beginProcess);
-
-      ByteArrayOutputStream out = new ByteArrayOutputStream();
-      ByteArrayOutputStream to = new ByteArrayOutputStream();
-
-      long responseBegin = System.nanoTime();
-      writeResponse(intBuff, to, batchSize, retBytes, out);
-      responseDuration.addAndGet(System.nanoTime() - responseBegin);
-
-      respBuffer.clear();
-      respBuffer.retain();
-
-      byte[] bytes = to.toByteArray();
-      respBuffer.writeBytes(bytes);
-      respBuffer.retain();
-
-
-      for (LogManager.LogRequest logRequest : logRequests) {
-        logRequest.getLatch().await();
-      }
-
-      ctx.writeAndFlush(respBuffer);
-      return bytes.length;
-    }
-
-    private void handleReadError(ChannelHandlerContext ctx, int batchSize, Exception t) throws IOException {
-      ArrayList<byte[]> retBytes;
-      logger.error("Transport error", t);
-
-      ByteArrayOutputStream bytesOut = new ByteArrayOutputStream();
-      retBytes = new ArrayList<>();
-      for (int i = 0; i < batchSize; i++) {
-        byte[] currRetBytes = returnException(EXCEPTION_STR + t.getMessage(), t);
-        retBytes.add(currRetBytes);
-      }
-      ByteArrayOutputStream to = new ByteArrayOutputStream();
-      writeResponse(intBuff, to, batchSize, retBytes, bytesOut);
-
-      respBuffer.clear();
-      respBuffer.retain();
-
-      respBuffer.writeBytes(to.toByteArray());
-      respBuffer.retain();
-      ctx.writeAndFlush(respBuffer);
     }
 
     List<byte[]> doProcessRequests(List<Request> requests, AtomicLong timeLogging, AtomicLong handlerTime) {
@@ -583,7 +499,7 @@ public class NettyServer {
         return body;
       }
 
-      public int getOrigBodyLen() {
+      int getOrigBodyLen() {
         return origBodyLen;
       }
 
@@ -623,6 +539,120 @@ public class NettyServer {
         return this;
       }
     }
+
+    private class DoRead {
+      private ChannelHandlerContext ctx;
+      private int requestSize;
+      private int responseSize;
+      private byte[] body;
+
+      public DoRead(ChannelHandlerContext ctx, int requestSize, int responseSize, byte... body) {
+        this.ctx = ctx;
+        this.requestSize = requestSize;
+        this.responseSize = responseSize;
+        this.body = body;
+      }
+
+      public int getRequestSize() {
+        return requestSize;
+      }
+
+      public int getResponseSize() {
+        return responseSize;
+      }
+
+      public DoRead invoke() {
+        try {
+          requestSize = body.length;
+          ByteArrayInputStream bytesIn = new ByteArrayInputStream(body);
+
+          List<Request> requests = new ArrayList<>();
+          int batchSize = getRequests(bytesIn, requests);
+
+          ArrayList<byte[]> retBytes = new ArrayList<>();
+          responseSize = doRead(ctx, batchSize, requests, retBytes);
+        }
+        catch (Exception t) {
+          logger.error("Error processing request", t);
+          readState = ReadState.SIZE;
+          buffers.clear();
+        }
+        return this;
+      }
+
+      private int getRequests(ByteArrayInputStream bytesIn, List<Request> requests) throws IOException {
+        int batchSize = 1;
+        if (DatabaseSocketClient.ENABLE_BATCH) {
+          bytesIn.read(intBuff);
+          batchSize = Util.readRawLittleEndian32(intBuff);
+        }
+
+        for (int i = 0; i < batchSize; i++) {
+          Request request = deserializeRequest(bytesIn, intBuff);
+          requests.add(request);
+        }
+        return batchSize;
+      }
+
+      private int doRead(ChannelHandlerContext ctx, int batchSize, List<Request> requests,
+                         ArrayList<byte[]> retBytes) throws IOException, InterruptedException {
+        try {
+          List<LogManager.LogRequest> logRequests = new ArrayList<>();
+
+          long beginProcess = System.nanoTime();
+          List<byte[]> ret = doProcessRequests(requests, timeLogging, handlerTime);
+          retBytes.addAll(ret);
+          totalTimeProcessing.addAndGet(System.nanoTime() - beginProcess);
+
+          ByteArrayOutputStream out = new ByteArrayOutputStream();
+          ByteArrayOutputStream to = new ByteArrayOutputStream();
+
+          long responseBegin = System.nanoTime();
+          writeResponse(intBuff, to, batchSize, retBytes, out);
+          responseDuration.addAndGet(System.nanoTime() - responseBegin);
+
+          respBuffer.clear();
+          respBuffer.retain();
+
+          byte[] bytes = to.toByteArray();
+          respBuffer.writeBytes(bytes);
+          respBuffer.retain();
+
+
+          for (LogManager.LogRequest logRequest : logRequests) {
+            logRequest.getLatch().await();
+          }
+
+          ctx.writeAndFlush(respBuffer);
+          return bytes.length;
+        }
+        catch (Exception t) {
+          handleReadError(ctx, batchSize, t);
+        }
+        return 0;
+      }
+
+      private void handleReadError(ChannelHandlerContext ctx, int batchSize, Exception t) throws IOException {
+        ArrayList<byte[]> retBytes;
+        logger.error("Transport error", t);
+
+        ByteArrayOutputStream bytesOut = new ByteArrayOutputStream();
+        retBytes = new ArrayList<>();
+        for (int i = 0; i < batchSize; i++) {
+          byte[] currRetBytes = returnException(EXCEPTION_STR + t.getMessage(), t);
+          retBytes.add(currRetBytes);
+        }
+        ByteArrayOutputStream to = new ByteArrayOutputStream();
+        writeResponse(intBuff, to, batchSize, retBytes, bytesOut);
+
+        respBuffer.clear();
+        respBuffer.retain();
+
+        respBuffer.writeBytes(to.toByteArray());
+        respBuffer.retain();
+        ctx.writeAndFlush(respBuffer);
+      }
+    }
   }
 
   public void setDatabaseServer(DatabaseServer databaseServer) {
@@ -636,7 +666,7 @@ public class NettyServer {
   class MyChannelInitializer extends ChannelInitializer<SocketChannel> { // (4)
 
     @Override
-    protected void initChannel(SocketChannel socketChannel) throws Exception {
+    protected void initChannel(SocketChannel socketChannel) {
       socketChannel.pipeline().addLast(new ServerHandler());
     }
   }
@@ -693,88 +723,36 @@ public class NettyServer {
       this.port = Integer.valueOf(portStr);
       String gclog = line.getOptionValue(GCLOG_STR);
       String xmx = line.getOptionValue(XMX_STR);
-
+      String disableStr = line.getOptionValue(DISABLE_STR);
+      boolean disable = DISABLE_STR.equals(disableStr);
       String configStr;
-      InputStream in = NettyServer.class.getResourceAsStream("/config/config-" + cluster + JSON_STR);
-      if (in != null) {
-        configStr = IOUtils.toString(new BufferedInputStream(in), UTF8_STR);
-      }
-      else {
-        File file = new File(USER_DIR, "config/config-" + cluster + JSON_STR);
-        if (!file.exists()) {
-          file = new File(USER_DIR, "db/src/main/resources/config/config-" + cluster + JSON_STR);
-        }
-        configStr = IOUtils.toString(new BufferedInputStream(new FileInputStream(file)), UTF8_STR);
-      }
-      ObjectMapper mapper = new ObjectMapper();
-      ObjectNode config = (ObjectNode) mapper.readTree(configStr);
-      String role = line.getOptionValue("role");
 
+      InputStream in = null;
+      File file = new File(USER_DIR, "config/config-" + cluster + ".yaml");
+      if (file.exists()) {
+        in = new FileInputStream(file);
+      }
 
-      int localPort = Integer.parseInt(portStr);
+      if (in == null) {
+        in = NettyServer.class.getResourceAsStream("/config/config-" + cluster + ".yaml");
+      }
       try {
+        configStr = IOUtils.toString(new BufferedInputStream(in), UTF8_STR);
 
-        final DatabaseServer localDatabaseServer = new DatabaseServer();
+        Config config = new Config(configStr);
+        String role = line.getOptionValue("role");
 
-        localDatabaseServer.setConfig(config, cluster, host, localPort, isRunning, isRecovered, gclog, xmx);
-        localDatabaseServer.setRole(role);
 
-        setDatabaseServer(localDatabaseServer);
+        int localPort = Integer.parseInt(portStr);
 
-        nettyThread = new Thread(() -> {
-          try {
-            logger.info("starting netty server");
-            NettyServer.this.run();
-          }
-          catch (Exception e) {
-            handleStartupException(e, "Error starting netty server");
-          }
-        });
-        nettyThread.start();
+        doStartServer(host, cluster, gclog, xmx, config, role, localPort, disable);
 
-        serverThread = new Thread(() -> {
-          try {
-            isRunning.set(true);
-
-            Thread thread = ThreadUtil.createThread(() -> {
-              waitForServersToStart();
-
-              localDatabaseServer.getSchemaManager().reconcileSchema();
-
-            }, "SonicBase Reconcile Thread");
-            thread.start();
-
-            localDatabaseServer.recoverFromSnapshot();
-
-            logger.info("applying queues");
-            localDatabaseServer.getLogManager().applyLogs();
-
-            localDatabaseServer.getDeleteManager().forceDeletes(null,  false);
-            localDatabaseServer.getDeleteManager().start();
-
-            localDatabaseServer.getMasterManager().startMasterMonitor();
-
-            logger.info("running snapshot loop");
-            localDatabaseServer.getSnapshotManager().runSnapshotLoop();
-
-            isRecovered.set(true);
-          }
-          catch (Exception e) {
-            logger.error(ERROR_STARTING_SERVER_STR, e);
-            writeError(e);
-          }
-        });
-        serverThread.start();
+        nettyThread.join();
+        logger.info("joined netty thread");
       }
-      catch (Exception e) {
-        writeError(e);
-        logger.error("Error recovering snapshot", e);
-        System.exit(1);
+      finally {
+        in.close();
       }
-
-
-      nettyThread.join();
-      logger.info("joined netty thread");
     }
     catch (Exception e) {
       handleStartupException(e, ERROR_STARTING_SERVER_STR);
@@ -782,6 +760,72 @@ public class NettyServer {
       throw new DatabaseException(e);
     }
     logger.info("exiting netty server");
+  }
+
+  private void doStartServer(String host, String cluster, String gclog, String xmx, Config config, String role, int localPort, boolean disable) {
+    try {
+      final DatabaseServer localDatabaseServer = new DatabaseServer();
+
+      localDatabaseServer.setConfig(config, cluster, host, localPort, isRunning, isRecovered, gclog, xmx);
+      localDatabaseServer.setRole(role);
+
+      setDatabaseServer(localDatabaseServer);
+
+      nettyThread = new Thread(() -> {
+        try {
+          logger.info("starting netty server");
+          NettyServer.this.run();
+        }
+        catch (Exception e) {
+          handleStartupException(e, "Error starting netty server");
+        }
+      });
+      nettyThread.start();
+
+      serverThread = new Thread(() -> {
+        try {
+          if (disable) {
+            isRunning.set(false);
+          }
+          else {
+            isRunning.set(true);
+          }
+
+          Thread thread = ThreadUtil.createThread(() -> {
+            waitForServersToStart();
+
+            localDatabaseServer.getSchemaManager().reconcileSchema();
+
+          }, "SonicBase Reconcile Thread");
+          thread.start();
+
+          localDatabaseServer.recoverFromSnapshot();
+
+          logger.info("applying queues");
+          localDatabaseServer.getLogManager().applyLogs();
+
+          localDatabaseServer.getDeleteManager().forceDeletes(null,  false);
+          localDatabaseServer.getDeleteManager().start();
+
+          localDatabaseServer.getMasterManager().startMasterMonitor();
+
+          logger.info("running snapshot loop");
+          localDatabaseServer.getSnapshotManager().runSnapshotLoop();
+
+          isRecovered.set(true);
+        }
+        catch (Exception e) {
+          logger.error(ERROR_STARTING_SERVER_STR, e);
+          writeError(e);
+        }
+      });
+      serverThread.start();
+    }
+    catch (Exception e) {
+      writeError(e);
+      logger.error("Error recovering snapshot", e);
+      System.exit(1);
+    }
   }
 
   private void handleStartupException(Exception e, String s) {
@@ -812,6 +856,9 @@ public class NettyServer {
     op.setRequired(false);
     options.addOption(op);
     op = new Option("x", XMX_STR, true, XMX_STR);
+    op.setRequired(false);
+    options.addOption(op);
+    op = new Option("d", DISABLE_STR, true, DISABLE_STR);
     op.setRequired(false);
     options.addOption(op);
 

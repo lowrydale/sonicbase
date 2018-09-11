@@ -8,8 +8,9 @@ import com.fasterxml.jackson.databind.node.ArrayNode;
 import com.fasterxml.jackson.databind.node.JsonNodeFactory;
 import com.fasterxml.jackson.databind.node.ObjectNode;
 import com.sonicbase.common.AssertUtils;
-import com.sonicbase.query.DatabaseException;
 import org.apache.commons.io.IOUtils;
+import org.slf4j.Logger;
+import org.slf4j.LoggerFactory;
 
 import java.io.BufferedInputStream;
 import java.io.File;
@@ -29,9 +30,12 @@ import static com.sonicbase.common.AssertUtils.assertTrue;
 
 public class BenchmarkIdentityQuery {
 
+  public static final Logger logger = LoggerFactory.getLogger(BenchmarkIdentityQuery.class);
+
   private static final MetricRegistry METRICS = new MetricRegistry();
 
-  public static final com.codahale.metrics.Timer LOOKUP_STATS = METRICS.timer("lookup");
+  private static final com.codahale.metrics.Timer LOOKUP_STATS = METRICS.timer("lookup");
+  public static final String LAST_ID_STR = "lastId=";
   private Thread mainThread;
   private boolean shutdown;
   final AtomicLong totalSelectDuration = new AtomicLong();
@@ -39,11 +43,11 @@ public class BenchmarkIdentityQuery {
   final AtomicLong selectBegin = new AtomicLong(System.currentTimeMillis());
   final AtomicLong selectOffset = new AtomicLong();
 
-  private ConcurrentHashMap<Integer, Long> threadLiveliness = new ConcurrentHashMap<>();
+  private final ConcurrentHashMap<Integer, Long> threadLiveliness = new ConcurrentHashMap<>();
   private int countDead = 0;
-  private AtomicInteger activeThreads = new AtomicInteger();
+  private final AtomicInteger activeThreads = new AtomicInteger();
 
-  public void start(final String cluster, final int shardCount, final Integer shard, final long count, final String queryType) {
+  public void start(String address, final String cluster, final int shardCount, final Integer shard, final long count, final String queryType) {
     shutdown = false;
     selectBegin.set(System.currentTimeMillis());
     doResetStats();
@@ -52,51 +56,38 @@ public class BenchmarkIdentityQuery {
         final AtomicInteger cycle = new AtomicInteger();
         final long startId = shard * count;
 
-        System.out.println("Starting client");
+        logger.info("Starting client");
 
-        File file = new File(System.getProperty("user.dir"), "config/config-" + cluster + ".json");
+        File file = new File(System.getProperty("user.dir"), "config/config-" + cluster + ".yaml");
         if (!file.exists()) {
-          file = new File(System.getProperty("user.dir"), "db/src/main/resources/config/config-" + cluster + ".json");
-          System.out.println("Loaded config resource dir");
+          file = new File(System.getProperty("user.dir"), "db/src/main/resources/config/config-" + cluster + ".yaml");
+          logger.info("Loaded config resource dir");
         }
         else {
-          System.out.println("Loaded config default dir");
+          logger.info("Loaded config default dir");
         }
-        String configStr = IOUtils.toString(new BufferedInputStream(new FileInputStream(file)), "utf-8");
 
-        ObjectMapper mapper = new ObjectMapper();
-        ObjectNode dict = (ObjectNode) mapper.readTree(configStr);
-        ObjectNode databaseDict = dict;
-
-        ArrayNode array = databaseDict.withArray("shards");
-        ObjectNode replica = (ObjectNode) array.get(0);
-        ArrayNode replicasArray = replica.withArray("replicas");
-        String address = replicasArray.get(0).get("publicAddress").asText();
-        if (databaseDict.get("clientIsPrivate").asBoolean()) {
-          address = replicasArray.get(0).get("privateAddress").asText();
-        }
-        System.out.println("Using address: address=" + address);
+        logger.info("Using address: address={}", address);
 
         Class.forName("com.sonicbase.jdbcdriver.Driver");
 
-        //       final java.sql.Connection conn = DriverManager.getConnection("jdbc:voltdb://localhost:21212");
-
-        //    final java.sql.Connection conn = java.sql.DriverManager.getConnection("jdbc:mysql://localhost/test", "test", "test");
-        //    final java.sql.Connection conn = java.sql.DriverManager.getConnection("jdbc:mysql://127.0.0.1:4306/test", "test", "test");
-
-        //54.173.145.214
         final java.sql.Connection conn = DriverManager.getConnection("jdbc:sonicbase:" + address + ":9010/db", "user", "password");
 
         //test insert
 
         final AtomicInteger logMod = new AtomicInteger(10000);
         int threadCount = 32;
+        if (queryType.equals("batch") || queryType.equals("cbatch")) {
+          threadCount = 32;
+        }
         if (queryType.equals("limitOffset") || queryType.equals("sort")) {
           threadCount = 4;
         }
         if (queryType.equals("equalNonIndex") || queryType.equals("orTableScan")) {
           threadCount = 4;
         }
+
+        final int lessShardCount = shardCount;//(int) (shardCount * 0.75);
 
         final AtomicLong firstId = new AtomicLong(-1);
 
@@ -105,343 +96,373 @@ public class BenchmarkIdentityQuery {
         Thread[] threads = new Thread[threadCount];
         for (int i = 0; i < threads.length; i++) {
           final int threadOffset = i;
-          threads[i] = new Thread(new Runnable() {
-            @Override
-            public void run() {
-              try {
-                long offset = firstId.get();
-                activeThreads.incrementAndGet();
-                int countMissing = 0;
-                outer:
-                while (!shutdown) {
-                  try {
-                    cycle.incrementAndGet();
-                    byte[] bytes = new byte[100];
-                    for (int i = 0; i < bytes.length; i++) {
-                      bytes[i] = (byte) ThreadLocalRandom.current().nextInt(256);
+          threads[i] = new Thread(() -> {
+            try {
+              long offset = firstId.get();
+              final AtomicInteger currOffset = new AtomicInteger();
+              activeThreads.incrementAndGet();
+              while (!shutdown) {
+                try {
+                  cycle.incrementAndGet();
+                  byte[] bytes = new byte[100];
+                  for (int i1 = 0; i1 < bytes.length; i1++) {
+                    bytes[i1] = (byte) ThreadLocalRandom.current().nextInt(256);
+                  }
+                  long lastId = -1;
+                  while (true) {
+                    threadLiveliness.put(threadOffset, System.currentTimeMillis());
+                    long beginSelect = System.nanoTime();
+
+                    if (queryType.equals("id")) {
+                      PreparedStatement stmt = conn.prepareStatement("select id1  " +
+                          "from persons where persons.id1=?");
+                      stmt.setLong(1, offset);
+                      ResultSet rs = stmt.executeQuery();
+                      boolean found = rs.next();
+                      if (!found) {
+                        logger.info("lastId={}", lastId);
+                        break;
+                      }
+                      else {
+                        lastId = rs.getLong("id1");
+                      }
                     }
-                    long lastId = -1;
-                    while (true) {
-                      threadLiveliness.put(threadOffset, System.currentTimeMillis());
-                      long beginSelect = System.nanoTime();
-
-                      if (queryType.equals("id")) {
-                        PreparedStatement stmt = conn.prepareStatement("select id1  " +
-                            "from persons where persons.id1=?");
-                        stmt.setLong(1, offset);
-                        ResultSet rs = stmt.executeQuery();
-                        boolean found = rs.next();
-                        if (!found) {
-                          System.out.println("lastId=" + lastId);
-                          //if (countMissing++ > 100_000) {
-                            break;
-                          //}
+                    else   if (queryType.equals("batch")) {
+                      int batchSize = 1600;
+                      int innerBatchSize = batchSize / lessShardCount;
+                      long startOffset = offset;
+                      StringBuilder builder = new StringBuilder("select id1 from persons where id1 in (");
+                      for (int i1 = 0 ; i1 < innerBatchSize * lessShardCount; i1++) {
+                        if (i1 == 0) {
+                          builder.append("?");
                         }
                         else {
-                          countMissing = 0;
-                          lastId = rs.getLong("id1");
+                          builder.append(", ?");
                         }
                       }
-                      else if (queryType.equals("batch")) {
-                        int batchSize = 400;
-                        long startOffset = offset;
-                        StringBuilder builder = new StringBuilder("select id1 from persons where id1 in (");
-                        for (int i = 0; i < batchSize; i++) {
-                          if (i == 0) {
-                            builder.append("?");
-                          }
-                          else {
-                            builder.append(", ?");
-                          }
-                        }
-                        builder.append(")");
-                        //System.out.println(builder.toString());
-                        PreparedStatement stmt = conn.prepareStatement(builder.toString());
+                      builder.append(")");
+                      PreparedStatement stmt = conn.prepareStatement(builder.toString());
 
-                        for (int i = 0; i < batchSize; i++) {
-                          stmt.setLong(i + 1, offset++);
-                        }
-                        ResultSet rs = stmt.executeQuery();
-                        boolean found = rs.next();
-                        if (!found) {
-                          System.out.println("lastId=" + lastId);
-                          //if (countMissing++ > 100_000) {
-                          break;
-                          //}
-                        }
-                        else {
-                          for (long i = startOffset + 1; i < startOffset + batchSize; i++) {
-                            if (rs.next()) {
-                              if (i == rs.getLong("id1")) {
-                                selectOffset.incrementAndGet();
-                              }
-                              else {
-                                System.out.println("missing record from persons: id=" + i);
-                              }
-                            }
+                      //spread the ids across all shards for fairness
+//                      for (int i1 = 0; i1 < batchSize;) {
+//                        for (int j = 0; j < shardCount; j++) {
+//                          long shardedOffset = currOffset.get() + (j * count);
+//                          stmt.setLong(i1 + 1, shardedOffset);
+//                          i1++;
+//                          if (i1 >= batchSize) {
+//                            break;
+//                          }
+//                        }
+//                        offset++;
+//
+//                      }
+//
 
-                          }
-                          countMissing = 0;
-                          lastId = rs.getLong("id1");
+                      int parm = 0;
+                      for (int j = 0; j < lessShardCount; j++) {
+                        for (int k = 0; k < innerBatchSize; k++) {
+                          long shardedOffset = (j * count) + currOffset.get() + k;
+                          stmt.setLong(parm++ + 1, shardedOffset);
                         }
                       }
-                      else if (queryType.equals("cbatch")) {
-                        long startOffset = offset;
-                        int batchSize = 400;
-                        StringBuilder builder = new StringBuilder("select personId from memberships where personId=? and personId2=0 ");
-                        for (int i = 0; i < batchSize - 1; i++) {
-                          builder.append(" or personId=? and personId2=0 ");
-                        }
-                        //System.out.println(builder.toString());
-                        PreparedStatement stmt = conn.prepareStatement(builder.toString());
-
-                        for (int i = 0; i < batchSize; i++) {
-                          stmt.setLong(i + 1, offset++);
-                        }
-                        ResultSet rs = stmt.executeQuery();
-                        boolean found = rs.next();
-                        if (!found) {
-                          System.out.println("lastId=" + lastId);
-                          //if (countMissing++ > 100_000) {
-                          break;
-                          //}
-                        }
-                        else {
-                          for (long i = startOffset + 1; i < startOffset + batchSize; i++) {
-                            if (rs.next()) {
-                              if (i == rs.getLong("personId")) {
-                                selectOffset.incrementAndGet();
-                              }
-                              else {
-                                System.out.println("missing record from membership: personId=" + i);
-                              }
-                            }
-
-                          }
-                          countMissing = 0;
-                          lastId = rs.getLong("id1");
-                        }
-                        selectOffset.addAndGet(batchSize - 1);
+                      currOffset.addAndGet(innerBatchSize);
+                      if (currOffset.get() > 100_000) {
+                        currOffset.set(0);
                       }
-                      else if (queryType.equals("twoFieldId")) {
+//                      offset += shardCount * innerBatchSize;
+//                      for (int i1 = 0; i1 < batchSize; ) {
+//                        for (int j = 0; j < shardCount; j++) {
+//                           long shardedOffset = offset + j * count;
+//                           stmt.setLong(i1 + 1, shardedOffset);
+//                           i1++;
+//                           if (i1 >= batchSize) {
+//                             break;
+//                           }
+//                        }
+//                        offset++;
+//
+//                      }
+                      ResultSet rs = stmt.executeQuery();
+                      boolean found = rs.next();
+                      if (!found) {
+                        logger.info("lastId={}", lastId);
+                        offset = firstId.get();
+                        break;
+                      }
+                      else {
+                        boolean hadSome = false;
+                        for (long i1 = startOffset + 1; i1 < startOffset + batchSize; i1++) {
+                          if (rs.next()) {
+                            hadSome = true;
+                            selectOffset.incrementAndGet();
+                            lastId = rs.getLong("id1");
+                          }
+                        }
+                        if (!hadSome) {
+                          offset = firstId.get();
+                        }
+                      }
+                    }
+                    else if (queryType.equals("cbatch")) {
+                      long startOffset = offset;
+                      int batchSize = 1600;
+                      StringBuilder builder = new StringBuilder("select personId from memberships where personId=? and personId2=0 ");
+                      for (int i1 = 0; i1 < batchSize - 1; i1++) {
+                        builder.append(" or personId=? and personId2=0 ");
+                      }
+                      PreparedStatement stmt = conn.prepareStatement(builder.toString());
 
-                        boolean missing = false;
-                        for (int i = 0; i < 5; i++) {
-                          Timer.Context ctx = LOOKUP_STATS.time();
-                          PreparedStatement stmt = conn.prepareStatement("select id1, id2  " +
-                              "from persons where id1=? and id2=?");                                              //
-                          stmt.setLong(1, offset);
-                          stmt.setLong(2, 0);
-                          ResultSet ret = stmt.executeQuery();
-                          if (ret.next()) {
-                            missing = false;
-                            AssertUtils.assertEquals(ret.getLong("id1"), offset);
-                            AssertUtils.assertEquals(ret.getLong("id2"), 0);
-                            ctx.stop();
+                      //spread the ids across all shards for fairness
+                      for (int i1 = 0; i1 < batchSize;) {
+                        for (int j = 0; j < shardCount; j++) {
+                          long shardedOffset = offset + j * count;
+                          stmt.setLong(i1 + 1, shardedOffset);
+                          i1++;
+                          if (i1 >= batchSize) {
                             break;
                           }
-                          else {
-                            offset++;
-                            missing = true;
-                            ctx.stop();
+                        }
+                        offset++;
+
+                      }
+                      ResultSet rs = stmt.executeQuery();
+                      boolean found = rs.next();
+                      if (!found) {
+                        logger.info("lastId={}", lastId);
+                        offset = firstId.get();
+                        break;
+                      }
+                      else {
+                        boolean hadSome = false;
+                        for (long i1 = startOffset + 1; i1 < startOffset + batchSize; i1++) {
+                          if (rs.next()) {
+                            hadSome = true;
+                            selectOffset.incrementAndGet();
+                            lastId = rs.getLong("id1");
                           }
                         }
-
-                        if (missing) {
-                          System.out.println("max=" + offset);
-                          break;
+                        if (!hadSome) {
+                          offset = firstId.get();
                         }
                       }
-                      else if (queryType.equals("max")) {
-                        Timer.Context ctx = LOOKUP_STATS.time();
-                        PreparedStatement stmt = conn.prepareStatement("select max(id1) as maxValue from persons");
-                        ResultSet ret = stmt.executeQuery();
+                    }
+                    else if (queryType.equals("twoFieldId")) {
 
-                        assertTrue(ret.next());
-                        assertFalse(ret.next());
-                        logMod.set(1);
-                        ctx.stop();
-                      }
-                      else if (queryType.equals("maxTableScan")) {
+                      boolean missing = false;
+                      for (int i1 = 0; i1 < 5; i1++) {
                         Timer.Context ctx = LOOKUP_STATS.time();
-                        PreparedStatement stmt = conn.prepareStatement("select max(id1) as maxValue from persons where id2 < 1");
-                        ResultSet ret = stmt.executeQuery();
-
-                        assertTrue(ret.next());
-                        ctx.stop();
-                      }
-                      else if (queryType.equals("maxWhere")) {
-                        Timer.Context ctx = LOOKUP_STATS.time();
-                        PreparedStatement stmt = conn.prepareStatement("select max(id1) as maxValue from persons where id1 < 100000");
-                        ResultSet ret = stmt.executeQuery();
-
-                        assertTrue(ret.next());
-                        assertFalse(ret.next());
-                        ctx.stop();
-                      }
-                      else if (queryType.equals("sum")) {
-                        Timer.Context ctx = LOOKUP_STATS.time();
-                        PreparedStatement stmt = conn.prepareStatement("select sum(id1) as sumValue from persons");
-                        ResultSet ret = stmt.executeQuery();
-
-                        assertTrue(ret.next());
-                        assertFalse(ret.next());
-                        ctx.stop();
-                      }
-                      else if (queryType.equals("limit")) {
-                        Timer.Context ctx = LOOKUP_STATS.time();
-                        PreparedStatement stmt = conn.prepareStatement("select * from persons where id1 < ? and id1 > ? limit 3");
+                        PreparedStatement stmt = conn.prepareStatement("select id1, id2  " +
+                            "from persons where id1=? and id2=?");                                              //
                         stmt.setLong(1, offset);
-                        stmt.setLong(2, 2);
+                        stmt.setLong(2, 0);
                         ResultSet ret = stmt.executeQuery();
-
-                        assertTrue(ret.next());
-                        ctx.stop();
-                      }
-                      else if (queryType.equals("limitOffset")) {
-                        Timer.Context ctx = LOOKUP_STATS.time();
-                        PreparedStatement stmt = conn.prepareStatement("select * from persons where id1 < ? and id1 > ? limit 3 offset 2");
-                        stmt.setLong(1, offset);
-                        stmt.setLong(2, offset / 2);
-                        ResultSet ret = stmt.executeQuery();
-
-                        ret.next();
-                        ctx.stop();
-
-                        int innerOffset = 0;
-                        while (true) {
-                          ctx = LOOKUP_STATS.time();
-                          boolean found = ret.next();
+                        if (ret.next()) {
+                          missing = false;
+                          AssertUtils.assertEquals(ret.getLong("id1"), offset);
+                          AssertUtils.assertEquals(ret.getLong("id2"), 0);
                           ctx.stop();
-                          if (!found) {
-                            break;
-                          }
-                          if (++innerOffset % 10000 == 0) {
-                            logProgress(selectOffset, selectErrorCount, selectBegin, totalSelectDuration);
-                          }
+                          break;
+                        }
+                        else {
+                          offset++;
+                          missing = true;
+                          ctx.stop();
                         }
                       }
-                      else if (queryType.equals("sort")) {
-                        Timer.Context ctx = LOOKUP_STATS.time();
-                        PreparedStatement stmt = conn.prepareStatement("select * from persons order by id2 asc, id1 desc");
-                        ResultSet ret = stmt.executeQuery();
+
+                      if (missing) {
+                        logger.info("max={}", offset);
+                        break;
+                      }
+                    }
+                    else if (queryType.equals("max")) {
+                      Timer.Context ctx = LOOKUP_STATS.time();
+                      PreparedStatement stmt = conn.prepareStatement("select max(id1) as maxValue from persons");
+                      ResultSet ret = stmt.executeQuery();
+
+                      assertTrue(ret.next());
+                      assertFalse(ret.next());
+                      logMod.set(1);
+                      ctx.stop();
+                    }
+                    else if (queryType.equals("maxTableScan")) {
+                      Timer.Context ctx = LOOKUP_STATS.time();
+                      PreparedStatement stmt = conn.prepareStatement("select max(id1) as maxValue from persons where id2 < 1");
+                      ResultSet ret = stmt.executeQuery();
+
+                      assertTrue(ret.next());
+                      ctx.stop();
+                    }
+                    else if (queryType.equals("maxWhere")) {
+                      Timer.Context ctx = LOOKUP_STATS.time();
+                      PreparedStatement stmt = conn.prepareStatement("select max(id1) as maxValue from persons where id1 < 100000");
+                      ResultSet ret = stmt.executeQuery();
+
+                      assertTrue(ret.next());
+                      assertFalse(ret.next());
+                      ctx.stop();
+                    }
+                    else if (queryType.equals("sum")) {
+                      Timer.Context ctx = LOOKUP_STATS.time();
+                      PreparedStatement stmt = conn.prepareStatement("select sum(id1) as sumValue from persons");
+                      ResultSet ret = stmt.executeQuery();
+
+                      assertTrue(ret.next());
+                      assertFalse(ret.next());
+                      ctx.stop();
+                    }
+                    else if (queryType.equals("limit")) {
+                      Timer.Context ctx = LOOKUP_STATS.time();
+                      PreparedStatement stmt = conn.prepareStatement("select * from persons where id1 < ? and id1 > ? limit 3");
+                      stmt.setLong(1, offset);
+                      stmt.setLong(2, 2);
+                      ResultSet ret = stmt.executeQuery();
+
+                      assertTrue(ret.next());
+                      ctx.stop();
+                    }
+                    else if (queryType.equals("limitOffset")) {
+                      Timer.Context ctx = LOOKUP_STATS.time();
+                      PreparedStatement stmt = conn.prepareStatement("select * from persons where id1 < ? and id1 > ? limit 3 offset 2");
+                      stmt.setLong(1, offset);
+                      stmt.setLong(2, offset / 2);
+                      ResultSet ret = stmt.executeQuery();
+
+                      ret.next();
+                      ctx.stop();
+
+                      int innerOffset = 0;
+                      while (true) {
+                        ctx = LOOKUP_STATS.time();
+                        boolean found = ret.next();
                         ctx.stop();
-                        while (ret.next()) {
-                          ctx = LOOKUP_STATS.time();
+                        if (!found) {
+                          break;
+                        }
+                        if (++innerOffset % 10000 == 0) {
                           logProgress(selectOffset, selectErrorCount, selectBegin, totalSelectDuration);
-                          ctx.stop();
                         }
                       }
-                      else if (queryType.equals("complex")) {
-                        Timer.Context ctx = LOOKUP_STATS.time();
-                        PreparedStatement stmt = conn.prepareStatement("select persons.id1  " +
-                            "from persons where persons.id1>=100 AND id1 < " + offset + " AND ID2=0 OR id1> 6 AND ID1 < " + offset);                                              //
-                        ResultSet ret = stmt.executeQuery();
-                        assertTrue(ret.next());
-                        ctx.stop();
-                      }
-                      else if (queryType.equals("or")) {
-                        Timer.Context ctx = LOOKUP_STATS.time();
-                        PreparedStatement stmt = conn.prepareStatement("select * from persons where id1>" + offset + " and id2=0 or id1<" +
-                            (offset + 10000) + " and id2=1 order by id1 desc");
-                        ResultSet ret = stmt.executeQuery();
-
-                        assertTrue(ret.next());
-                        ctx.stop();
-                      }
-                      else if (queryType.equals("mixed")) {
-                        Timer.Context ctx = LOOKUP_STATS.time();
-                        PreparedStatement stmt = conn.prepareStatement("select persons.id1  " +
-                            "from persons where persons.id1>2 AND id1 < " + offset / 4 + " OR id1> 6 AND ID1 < " + offset * 0.75);                                              //
-                        ResultSet ret = stmt.executeQuery();
-                        assertTrue(ret.next());
-                        ctx.stop();
-                      }
-                      else if (queryType.equals("equalNonIndex")) {
-                        PreparedStatement stmt = conn.prepareStatement("select * from persons where id2=1");
-                        ResultSet ret = stmt.executeQuery();
-                        int innerOffset = 0;
-                        while (true) {
-                          Timer.Context ctx = LOOKUP_STATS.time();
-                          boolean found = ret.next();
-                          ctx.stop();
-                          if (!found) {
-                            break;
-                          }
-                          if (innerOffset++ % 10000 == 0) {
-                            logProgress(selectOffset, selectErrorCount, selectBegin, totalSelectDuration);
-                          }
-                        }
-                      }
-                      else if (queryType.equals("in")) {
-                        Timer.Context ctx = LOOKUP_STATS.time();
-                        PreparedStatement stmt = conn.prepareStatement("select * from persons where id1 in (0, 1, 2, 3, 4)");
-                        ResultSet ret = stmt.executeQuery();
-                        assertTrue(ret.next());
-                        ctx.stop();
-                      }
-                      else if (queryType.equals("secondaryIndex")) {
-                        Timer.Context ctx = LOOKUP_STATS.time();
-                        PreparedStatement stmt = conn.prepareStatement("select * from persons where socialSecurityNumber=?");
-                        stmt.setString(1, "933-28-" + offset);
-                        ResultSet ret = stmt.executeQuery();
-                        assertTrue(ret.next());
-                        ctx.stop();
-                      }
-                      else if (queryType.equals("orTableScan")) {
-                        PreparedStatement stmt = conn.prepareStatement("select * from persons where id2=1 or id2=0");
-                        ResultSet ret = stmt.executeQuery();
-                        int innerOffset = 0;
-                        while (true) {
-                          Timer.Context ctx = LOOKUP_STATS.time();
-                          boolean found = ret.next();
-                          ctx.stop();
-                          if (!found) {
-                            break;
-                          }
-                          if (innerOffset++ % 10000 == 0) {
-                            logProgress(selectOffset, selectErrorCount, selectBegin, totalSelectDuration);
-                          }
-                        }
-                      }
-                      else if (queryType.equals("orIndex")) {
-
-                        Timer.Context ctx = LOOKUP_STATS.time();
-                        PreparedStatement stmt = conn.prepareStatement("select * from persons where id1=0 OR id1=1 OR id1=2 OR id1=3 OR id1=4");
-                        ResultSet ret = stmt.executeQuery();
-                        ret.next();
-                        ctx.stop();
-                        while (true) {
-                          ctx = LOOKUP_STATS.time();
-                          boolean found = ret.next();
-                          ctx.stop();
-                          if (!found) {
-                            break;
-                          }
-                        }
-                      }
-
-                      totalSelectDuration.addAndGet(System.nanoTime() - beginSelect);
-                      if (selectOffset.incrementAndGet() % logMod.get() == 0) {
-                        logProgress(selectOffset, selectErrorCount, selectBegin, totalSelectDuration);
-                      }
-                      offset++;
                     }
-                    offset = firstId.get();
+                    else if (queryType.equals("sort")) {
+                      Timer.Context ctx = LOOKUP_STATS.time();
+                      PreparedStatement stmt = conn.prepareStatement("select * from persons order by id2 asc, id1 desc");
+                      ResultSet ret = stmt.executeQuery();
+                      ctx.stop();
+                      while (ret.next()) {
+                        ctx = LOOKUP_STATS.time();
+                        logProgress(selectOffset, selectErrorCount, selectBegin, totalSelectDuration);
+                        ctx.stop();
+                      }
+                    }
+                    else if (queryType.equals("complex")) {
+                      Timer.Context ctx = LOOKUP_STATS.time();
+                      PreparedStatement stmt = conn.prepareStatement("select persons.id1  " +
+                          "from persons where persons.id1>=100 AND id1 < " + offset + " AND ID2=0 OR id1> 6 AND ID1 < " + offset);                                              //
+                      ResultSet ret = stmt.executeQuery();
+                      assertTrue(ret.next());
+                      ctx.stop();
+                    }
+                    else if (queryType.equals("or")) {
+                      Timer.Context ctx = LOOKUP_STATS.time();
+                      PreparedStatement stmt = conn.prepareStatement("select * from persons where id1>" + offset + " and id2=0 or id1<" +
+                          (offset + 10000) + " and id2=1 order by id1 desc");
+                      ResultSet ret = stmt.executeQuery();
+
+                      assertTrue(ret.next());
+                      ctx.stop();
+                    }
+                    else if (queryType.equals("mixed")) {
+                      Timer.Context ctx = LOOKUP_STATS.time();
+                      PreparedStatement stmt = conn.prepareStatement("select persons.id1  " +
+                          "from persons where persons.id1>2 AND id1 < " + offset / 4 + " OR id1> 6 AND ID1 < " + offset * 0.75);                                              //
+                      ResultSet ret = stmt.executeQuery();
+                      assertTrue(ret.next());
+                      ctx.stop();
+                    }
+                    else if (queryType.equals("equalNonIndex")) {
+                      PreparedStatement stmt = conn.prepareStatement("select * from persons where id2=1");
+                      ResultSet ret = stmt.executeQuery();
+                      int innerOffset = 0;
+                      while (true) {
+                        Timer.Context ctx = LOOKUP_STATS.time();
+                        boolean found = ret.next();
+                        ctx.stop();
+                        if (!found) {
+                          break;
+                        }
+                        if (innerOffset++ % 10000 == 0) {
+                          logProgress(selectOffset, selectErrorCount, selectBegin, totalSelectDuration);
+                        }
+                      }
+                    }
+                    else if (queryType.equals("in")) {
+                      Timer.Context ctx = LOOKUP_STATS.time();
+                      PreparedStatement stmt = conn.prepareStatement("select * from persons where id1 in (0, 1, 2, 3, 4)");
+                      ResultSet ret = stmt.executeQuery();
+                      assertTrue(ret.next());
+                      ctx.stop();
+                    }
+                    else if (queryType.equals("secondaryIndex")) {
+                      Timer.Context ctx = LOOKUP_STATS.time();
+                      PreparedStatement stmt = conn.prepareStatement("select * from persons where socialSecurityNumber=?");
+                      stmt.setString(1, "933-28-" + offset);
+                      ResultSet ret = stmt.executeQuery();
+                      assertTrue(ret.next());
+                      ctx.stop();
+                    }
+                    else if (queryType.equals("orTableScan")) {
+                      PreparedStatement stmt = conn.prepareStatement("select * from persons where id2=1 or id2=0");
+                      ResultSet ret = stmt.executeQuery();
+                      int innerOffset = 0;
+                      while (true) {
+                        Timer.Context ctx = LOOKUP_STATS.time();
+                        boolean found = ret.next();
+                        ctx.stop();
+                        if (!found) {
+                          break;
+                        }
+                        if (innerOffset++ % 10000 == 0) {
+                          logProgress(selectOffset, selectErrorCount, selectBegin, totalSelectDuration);
+                        }
+                      }
+                    }
+                    else if (queryType.equals("orIndex")) {
+
+                      Timer.Context ctx = LOOKUP_STATS.time();
+                      PreparedStatement stmt = conn.prepareStatement("select * from persons where id1=0 OR id1=1 OR id1=2 OR id1=3 OR id1=4");
+                      ResultSet ret = stmt.executeQuery();
+                      ret.next();
+                      ctx.stop();
+                      while (true) {
+                        ctx = LOOKUP_STATS.time();
+                        boolean found = ret.next();
+                        ctx.stop();
+                        if (!found) {
+                          break;
+                        }
+                      }
+                    }
+
+                    totalSelectDuration.addAndGet(System.nanoTime() - beginSelect);
+                    if (selectOffset.incrementAndGet() % logMod.get() == 0) {
+                      logProgress(selectOffset, selectErrorCount, selectBegin, totalSelectDuration);
+                    }
+                    offset++;
                   }
-                  catch (Exception e) {
-                    e.printStackTrace();
-                  }
+                  offset = firstId.get();
+                }
+                catch (Exception e) {
+                  logger.error("Error", e);
                 }
               }
-              catch (Exception e) {
-                e.printStackTrace();
-              }
-              finally {
-                activeThreads.decrementAndGet();
-              }
             }
-
+            catch (Exception e) {
+              logger.error("Error", e);
+            }
+            finally {
+              activeThreads.decrementAndGet();
+            }
           });
           threads[i].start();
         }
@@ -460,7 +481,7 @@ public class BenchmarkIdentityQuery {
 
       }
       catch (Exception e) {
-        e.printStackTrace();
+        logger.error("Error", e);
       }
     });
     mainThread.start();
@@ -478,13 +499,12 @@ public class BenchmarkIdentityQuery {
     StringBuilder builder = new StringBuilder();
     builder.append("select: count=").append(selectOffset.get());
     Snapshot snapshot = LOOKUP_STATS.getSnapshot();
-    builder.append(String.format(", rate=%.4f", selectOffset.get() / (double) (System.currentTimeMillis() - selectBegin.get()) * 1000f));//LOOKUP_STATS.getFiveMinuteRate()));
-    builder.append(String.format(", avg=%.2f nanos", totalSelectDuration.get() / (double) selectOffset.get()));//snapshot.getMean()));
-    //builder.append(String.format(", avg=%.4f", snapshot.getMean() / 1000000d));
+    builder.append(String.format(", rate=%.4f", selectOffset.get() / (double) (System.currentTimeMillis() - selectBegin.get()) * 1000f));
+    builder.append(String.format(", avg=%.2f nanos", totalSelectDuration.get() / (double) selectOffset.get()));
     builder.append(String.format(", 99th=%.4f", snapshot.get99thPercentile() / 1000000d));
     builder.append(String.format(", max=%.4f", (double) snapshot.getMax() / 1000000d));
-    builder.append(", errorCount=" + selectErrorCount.get());
-    System.out.println(builder.toString());
+    builder.append(", errorCount=").append(selectErrorCount.get());
+    logger.info(builder.toString());
   }
 
   public void stop() {

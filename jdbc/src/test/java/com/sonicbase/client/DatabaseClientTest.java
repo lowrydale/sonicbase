@@ -11,18 +11,22 @@ import com.sonicbase.common.ServersConfig;
 import com.sonicbase.jdbcdriver.ParameterHandler;
 import com.sonicbase.procedure.StoredProcedureContextImpl;
 import com.sonicbase.query.DatabaseException;
+import com.sonicbase.query.impl.ResultSetImpl;
 import com.sonicbase.query.impl.SelectStatementImpl;
 import com.sonicbase.schema.Schema;
 import com.sonicbase.schema.TableSchema;
 import com.sonicbase.socket.DatabaseSocketClient;
-import com.sonicbase.util.TestUtils;
+import com.sonicbase.util.ClientTestUtils;
 import net.sf.jsqlparser.statement.Statement;
 import net.sf.jsqlparser.statement.select.Limit;
 import net.sf.jsqlparser.statement.select.Offset;
+import org.mockito.invocation.InvocationOnMock;
+import org.mockito.stubbing.Answer;
 import org.testng.annotations.BeforeMethod;
 import org.testng.annotations.Test;
 
 import java.io.IOException;
+import java.sql.PreparedStatement;
 import java.sql.SQLException;
 import java.util.HashSet;
 import java.util.List;
@@ -30,6 +34,11 @@ import java.util.Set;
 import java.util.concurrent.atomic.AtomicBoolean;
 import java.util.concurrent.atomic.AtomicInteger;
 
+import static org.mockito.Matchers.anyInt;
+import static org.mockito.Matchers.anyObject;
+import static org.mockito.Matchers.eq;
+import static org.mockito.Mockito.mock;
+import static org.mockito.Mockito.when;
 import static org.testng.Assert.*;
 
 public class DatabaseClientTest {
@@ -90,7 +99,7 @@ public class DatabaseClientTest {
   }
 
   @Test
-  public void testCreateDatabase() throws IOException {
+  public void testCreateDatabase() {
 
     DatabaseClient client = new DatabaseClient("localhost", 9010, 0, 0, false, common, null) {
       public byte[] sendToMaster(ComObject cobj) {
@@ -110,6 +119,51 @@ public class DatabaseClientTest {
     client.createDatabase("test");
 
     client.shutdown();
+  }
+
+  @Test
+  public void testGetPartitionSize() {
+    DatabaseClient client = new DatabaseClient("localhost", 9010, 0, 0, false, common, null) {
+      public byte[] send(String verb, int shard, long partition, ComObject cobj, Replica replica) {
+
+          ComObject ret = new ComObject();
+          ret.put(ComObject.Tag.SIZE, 1001L);
+          return ret.serialize();
+      }
+      public String getCluster() {
+        return "test";
+      }
+      protected void syncConfig() {
+
+      }
+    };
+
+    long size = client.getPartitionSize("test", 0, 0, "table1", "index1");
+    assertEquals(size, 1001);
+  }
+
+  @Test
+  public void testIsRepartitioningComplete() {
+    DatabaseClient client = new DatabaseClient("localhost", 9010, 0, 0, false, common, null) {
+      public byte[] sendToMaster(String verb, ComObject cobj) {
+
+        if (verb.equals("PartitionManager:isRepartitioningComplete")) {
+          ComObject ret = new ComObject();
+          ret.put(ComObject.Tag.FINISHED, true);
+          return ret.serialize();
+        }
+        return null;
+      }
+      public String getCluster() {
+        return "test";
+      }
+      protected void syncConfig() {
+
+      }
+    };
+
+    boolean complete = client.isRepartitioningComplete("test");
+    assertEquals(complete, true);
   }
 
   @Test
@@ -166,6 +220,117 @@ public class DatabaseClientTest {
   }
 
   @Test
+  public void testAllocateId() {
+    DatabaseClient client = new DatabaseClient("localhost", 9010, 0, 0, false, common, null) {
+      public byte[] sendToMaster(String method, ComObject cobj) {
+        ComObject retObj = new ComObject();
+        retObj.put(ComObject.Tag.NEXT_ID, 1001L);
+        retObj.put(ComObject.Tag.MAX_ID, 2000);
+        return retObj.serialize();
+      }
+      public byte[] send(String method,
+                         int shard, long authUser, ComObject body, Replica replica) {
+
+        ComObject retObj = new ComObject();
+        try {
+          TableSchema tableSchema = ClientTestUtils.createTable();
+          DatabaseCommon common = new DatabaseCommon();
+          common.getTables("test").put(tableSchema.getName(), tableSchema);
+          common.getTablesById("test").put(tableSchema.getTableId(), tableSchema);
+          byte[] bytes = common.serializeSchema((short)1000);
+          retObj.put(ComObject.Tag.SCHEMA_BYTES, bytes);
+          return retObj.serialize();
+        }
+        catch (IOException e) {
+          throw new DatabaseException(e);
+        }
+      }
+
+      public String getCluster() {
+        return "test";
+      }
+    };
+
+    assertEquals(client.allocateId("test"), 1001L);
+  }
+
+  @Test
+  public void testBackupRestoreComplete() {
+    final DatabaseCommon common = new DatabaseCommon();
+
+    ServersConfig config = new ServersConfig();
+    config.setShards(new ServersConfig.Shard[]{
+            new ServersConfig.Shard(new ServersConfig.Host[]{
+                new ServersConfig.Host("localhost", "localhost", 9010, true),
+                new ServersConfig.Host("localhost", "localhost", 9060, false)
+            }),
+            new ServersConfig.Shard(new ServersConfig.Host[]{
+                new ServersConfig.Host("localhost", "localhost", 10010, false),
+                new ServersConfig.Host("localhost", "localhost", 10060, true)
+            })
+        });
+    config.setCluster("test");
+    common.setServersConfig(config);
+
+    DatabaseClient client = new DatabaseClient("localhost", 9010, 0, 0, false, common, null) {
+      public byte[] sendToMaster(String method, ComObject cobj) {
+        ComObject retObj = new ComObject();
+        retObj.put(ComObject.Tag.NEXT_ID, 1001L);
+        retObj.put(ComObject.Tag.MAX_ID, 2000);
+        return retObj.serialize();
+      }
+      public byte[] send(String method,
+                         int shard, long authUser, ComObject body, Replica replica) {
+
+        if (method.equals("BackupManager:isEntireRestoreComplete")) {
+          ComObject retObj = new ComObject();
+          retObj.put(ComObject.Tag.IS_COMPLETE, true);
+          return retObj.serialize();
+        }
+        if (method.equals("BackupManager:isEntireBackupComplete")) {
+          ComObject retObj = new ComObject();
+          retObj.put(ComObject.Tag.IS_COMPLETE, true);
+          return retObj.serialize();
+        }
+        if (method.equals("DatabaseServer:getConfig")) {
+          ComObject retObj = new ComObject();
+          try {
+            byte[] bytes = common.serializeConfig(SERIALIZATION_VERSION);
+            retObj.put(ComObject.Tag.CONFIG_BYTES, bytes);
+            return retObj.serialize();
+          }
+          catch (IOException e) {
+            throw new DatabaseException(e);
+          }
+        }
+
+        ComObject retObj = new ComObject();
+        try {
+          TableSchema tableSchema = ClientTestUtils.createTable();
+          DatabaseCommon common = new DatabaseCommon();
+          common.getTables("test").put(tableSchema.getName(), tableSchema);
+          common.getTablesById("test").put(tableSchema.getTableId(), tableSchema);
+          byte[] bytes = common.serializeSchema((short)1000);
+          retObj.put(ComObject.Tag.SCHEMA_BYTES, bytes);
+          return retObj.serialize();
+        }
+        catch (IOException e) {
+          throw new DatabaseException(e);
+        }
+      }
+
+      public String getCluster() {
+        return "test";
+      }
+    };
+
+    assertTrue(client.isBackupComplete());
+    assertTrue(client.isRestoreComplete());
+    client.getConfig();
+    assertTrue(client.getCommon().getServersConfig().getShards()[0].getReplicas()[0].isDead());
+  }
+
+  @Test
   public void testSyncSchema() {
 
     DatabaseClient client = new DatabaseClient("localhost", 9010, 0, 0, false, common, null) {
@@ -177,7 +342,7 @@ public class DatabaseClientTest {
 
         ComObject retObj = new ComObject();
         try {
-          TableSchema tableSchema = TestUtils.createTable();
+          TableSchema tableSchema = ClientTestUtils.createTable();
           DatabaseCommon common = new DatabaseCommon();
           common.getTables("test").put(tableSchema.getName(), tableSchema);
           common.getTablesById("test").put(tableSchema.getTableId(), tableSchema);
@@ -198,7 +363,7 @@ public class DatabaseClientTest {
     common.getServersConfig().getShards()[0].getReplicas()[0].setDead(true);
     common.getServersConfig().getShards()[0].getReplicas()[1].setDead(true);
 
-    client.doSyncSchema(1);
+    client.doSyncSchema();
 
     assertTrue(common.getTables("test").containsKey("table1"));
   }
@@ -242,7 +407,7 @@ public class DatabaseClientTest {
       public StatementHandler getHandler(Statement statement) {
         return new StatementHandler() {
           @Override
-          public Object execute(String dbName, ParameterHandler parms, String sqlToUse, Statement statement, SelectStatementImpl.Explain explain, Long sequence0, Long sequence1, Short sequence2, boolean restrictToThisServer, StoredProcedureContextImpl procedureContext, int schemaRetryCount) throws SQLException {
+          public Object execute(String dbName, ParameterHandler parms, String sqlToUse, Statement statement, SelectStatementImpl.Explain explain, Long sequence0, Long sequence1, Short sequence2, boolean restrictToThisServer, StoredProcedureContextImpl procedureContext, int schemaRetryCount) {
             handled.set(true);
             return null;
           }
@@ -259,13 +424,50 @@ public class DatabaseClientTest {
       }
     };
     DatabaseClient.getSharedClients().put("test", client);
-    TableSchema tableSchema = TestUtils.createTable();
+    TableSchema tableSchema = ClientTestUtils.createTable();
     common.getTables("test").put(tableSchema.getName(), tableSchema);
     common.getTablesById("test").put(tableSchema.getTableId(), tableSchema);
 
     common.getDatabases().put("test", new Schema());
     client.executeQuery("test", "select * from table1 limit 5 offset 10", new ParameterHandler(), false, null, false);
 
+    assertTrue(handled.get());
+  }
+
+  @Test
+  public void testExecuteQueryExplain() throws SQLException {
+    final AtomicBoolean handled = new AtomicBoolean();
+    DatabaseClient client = new DatabaseClient("localhost", 9010, 0, 0, false, common, null) {
+      public StatementHandler getHandler(Statement statement) {
+        return new StatementHandler() {
+          @Override
+          public Object execute(String dbName, ParameterHandler parms, String sqlToUse, Statement statement, SelectStatementImpl.Explain explain, Long sequence0, Long sequence1, Short sequence2, boolean restrictToThisServer, StoredProcedureContextImpl procedureContext, int schemaRetryCount) {
+            handled.set(true);
+            ResultSetImpl ret = new ResultSetImpl(new String[]{"explain"});
+            ret.setCurrPos(0);
+            return ret;
+          }
+        };
+      }
+
+      public byte[] sendToMaster(ComObject body) {
+        return null;
+      }
+      public String getCluster() {
+        return "test";
+      }
+      public void syncSchema() {
+      }
+    };
+    DatabaseClient.getSharedClients().put("test", client);
+    TableSchema tableSchema = ClientTestUtils.createTable();
+    common.getTables("test").put(tableSchema.getName(), tableSchema);
+    common.getTablesById("test").put(tableSchema.getTableId(), tableSchema);
+
+    common.getDatabases().put("test", new Schema());
+    ResultSetImpl ret = (ResultSetImpl) client.executeQuery("test", "explain select * from table1 limit 5 offset 10", new ParameterHandler(), false, null, false);
+
+    assertEquals(ret.getString(1), "explain");
     assertTrue(handled.get());
   }
 

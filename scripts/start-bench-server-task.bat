@@ -1,6 +1,6 @@
-SET SEARCH_HOME=%2
+SET SONIC_BASE_HOME=%2
 
-schtasks /end /tn "BenchServer%1"
-schtasks /delete /f /tn "BenchServer%1"
-schtasks /create /tn "BenchServer%1" /tr "%SEARCH_HOME%/bin/start-bench-server.vbs %SEARCH_HOME%/bin/start-bench-server.bat %1 %2" /sc once /sd 01/01/2017 /st 00:00
-schtasks /run /tn "BenchServer%1"
+schtasks /end /tn "BenchServer"
+schtasks /delete /f /tn "BenchServer"
+schtasks /create /tn "BenchServer" /tr "%SONIC_BASE_HOME%/bin/start-bench-server.vbs %SONIC_BASE_HOME%/bin/start-bench-server.bat %1 %2"  /sc ONEVENT /EC Application
+schtasks /run /tn "BenchServer"

@@ -29,9 +29,9 @@ import static com.sonicbase.common.DatabaseCommon.sortSchemaFiles;
 // I don't know a good way to reduce the parameter count
 public class SchemaManager {
 
-  public static final String SLAVE_STR = "slave";
-  public static final String MASTER_STR = "master";
-  private static Logger logger = LoggerFactory.getLogger(SchemaManager.class);
+  private static final String SLAVE_STR = "slave";
+  private static final String MASTER_STR = "master";
+  private static final Logger logger = LoggerFactory.getLogger(SchemaManager.class);
 
   private final com.sonicbase.server.DatabaseServer server;
 
@@ -42,7 +42,7 @@ public class SchemaManager {
   public static class AutoIncrementValue {
     private final Object mutex = new Object();
     private Object currValue = null;
-    DataType.Type dataType;
+    final DataType.Type dataType;
 
     public AutoIncrementValue(DataType.Type type) {
       this.dataType = type;
@@ -674,10 +674,8 @@ public class SchemaManager {
             }
           }
 
-          String fullIndexName = indexName;
-
           if (server.getCommon().getTableSchema(dbName, table.get(),
-              server.getDataDir()).getIndices().containsKey(fullIndexName.toLowerCase())) {
+              server.getDataDir()).getIndices().containsKey(indexName.toLowerCase())) {
             ComObject retObj = new ComObject();
             retObj.put(ComObject.Tag.SCHEMA_BYTES, server.getCommon().serializeSchema(
                 cobj.getShort(ComObject.Tag.SERIALIZATION_VERSION)));
@@ -858,8 +856,7 @@ public class SchemaManager {
         for (Map.Entry<String, IndexSchema> entry : server.getCommon().getTableSchema(dbName, table,
             server.getDataDir()).getIndices().entrySet()) {
           String name = entry.getValue().getName();
-          String outerName = name;
-          if (outerName.equals(indexName)) {
+          if (name.equals(indexName)) {
             toDrop.add(entry.getValue());
             if (entry.getValue().isPrimaryKey()) {
               throw new DatabaseException("Cannot drop primary key index: table=" + table + ", index=" + indexName);
@@ -921,7 +918,7 @@ public class SchemaManager {
       logger.info("reconcile schema - begin");
       int threadCount = server.getShardCount() * server.getReplicationFactor();
       ThreadPoolExecutor executor = new ThreadPoolExecutor(threadCount, threadCount, 10_000,
-          TimeUnit.MILLISECONDS, new ArrayBlockingQueue<Runnable>(1000), new ThreadPoolExecutor.CallerRunsPolicy());
+          TimeUnit.MILLISECONDS, new ArrayBlockingQueue<>(1000), new ThreadPoolExecutor.CallerRunsPolicy());
       try {
         final ComObject highestSchemaVersions = readSchemaVersions();
         List<Future> futures = new ArrayList<>();
@@ -932,28 +929,7 @@ public class SchemaManager {
             futures.add(executor.submit((Callable) () -> getSchemaVersion(shard, replica)));
           }
         }
-        try {
-          List<ComObject> retObjs = new ArrayList<>();
-          for (Future future : futures) {
-            ComObject cobj = (ComObject) future.get();
-            if (cobj != null) {
-              retObjs.add(cobj);
-            }
-          }
-          for (ComObject retObj : retObjs) {
-            getHighestSchemaVersions(retObj.getInt(ComObject.Tag.SHARD), retObj.getInt(ComObject.Tag.REPLICA),
-                highestSchemaVersions, retObj);
-          }
-
-          pushHighestSchema(highestSchemaVersions);
-
-          if (server.getShard() == 0 && server.getReplica() == 0) {
-            server.pushSchema();
-          }
-        }
-        catch (Exception e) {
-          logger.error("Error pushing schema", e);
-        }
+        doReconcileSchema(highestSchemaVersions, futures);
       }
       finally {
         executor.shutdownNow();
@@ -965,10 +941,39 @@ public class SchemaManager {
     }
   }
 
+  private void doReconcileSchema(ComObject highestSchemaVersions, List<Future> futures) {
+    try {
+      List<ComObject> retObjs = new ArrayList<>();
+      for (Future future : futures) {
+        ComObject cobj = (ComObject) future.get();
+        if (cobj != null) {
+          retObjs.add(cobj);
+        }
+      }
+      for (ComObject retObj : retObjs) {
+        getHighestSchemaVersions(retObj.getInt(ComObject.Tag.SHARD), retObj.getInt(ComObject.Tag.REPLICA),
+            highestSchemaVersions, retObj);
+      }
+
+      pushHighestSchema(highestSchemaVersions);
+
+      if (server.getShard() == 0 && server.getReplica() == 0) {
+        server.pushSchema();
+      }
+    }
+    catch (Exception e) {
+      logger.error("Error pushing schema", e);
+    }
+  }
+
   private Object getSchemaVersion(int shard, int replica) {
     long beginTime = System.currentTimeMillis();
     while (!server.getShutdown()) {
       try {
+        if (server.getCommon().getServersConfig().getShards()[shard].getReplicas()[replica].isDead()) {
+          logger.error("Server appears to be dead, skipping: shard={}, replica={}", shard, replica);
+          return null;
+        }
         if (server.getShard() == shard && server.getReplica() == replica) {
           break;
         }
@@ -981,17 +986,19 @@ public class SchemaManager {
           retObj.put(ComObject.Tag.REPLICA, replica);
           return retObj;
         }
-        Thread.sleep(1_000);
-      }
-      catch (InterruptedException e) {
-        Thread.currentThread().interrupt();
-        return null;
       }
       catch (Exception e) {
         logger.error("Error checking if server is healthy: shard={}, replica={}", shard, replica);
       }
       if (System.currentTimeMillis() - beginTime > 2 * 60 * 1000) {
         logger.error("Server appears to be dead, skipping: shard={}, replica={}", shard, replica);
+        return null;
+      }
+      try {
+        Thread.sleep(1_000);
+      }
+      catch (InterruptedException e) {
+        Thread.currentThread().interrupt();
         return null;
       }
     }

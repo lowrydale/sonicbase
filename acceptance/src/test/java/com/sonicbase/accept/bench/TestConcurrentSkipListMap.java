@@ -32,15 +32,12 @@ public class TestConcurrentSkipListMap {
     for (int i = 0; i < 1000000000; i++) {
 
       final int offset = i;
-      executor.submit(new Runnable(){
-        @Override
-        public void run() {
-          Object[] key = new Long[]{(long) rand.nextLong()};
-          map.get(key);
-          map.put(key, "9");
-          if (offset % 100000 == 0) {
-            System.out.println("count=" + offset + ", rate=" + ((float)offset / (float)(System.currentTimeMillis() - begin) * 1000f));
-          }
+      executor.submit(() -> {
+        Object[] key = new Long[]{(long) rand.nextLong()};
+        map.get(key);
+        map.put(key, "9");
+        if (offset % 100000 == 0) {
+          System.out.println("count=" + offset + ", rate=" + ((float)offset / (float)(System.currentTimeMillis() - begin) * 1000f));
         }
       });
 

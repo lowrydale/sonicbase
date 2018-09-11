@@ -1,10 +1,8 @@
 package com.sonicbase.accept.bench;
 
-import com.fasterxml.jackson.databind.ObjectMapper;
-import com.fasterxml.jackson.databind.node.ObjectNode;
 import com.sonicbase.client.DatabaseClient;
+import com.sonicbase.common.Config;
 import com.sonicbase.jdbcdriver.ParameterHandler;
-import com.sonicbase.jdbcdriver.QueryType;
 import com.sonicbase.server.DatabaseServer;
 import org.apache.commons.io.FileUtils;
 import org.apache.commons.io.IOUtils;
@@ -26,9 +24,8 @@ public class TestRebalance {
 
   @Test(enabled=false)
   public void testBasics() throws Exception {
-    String configStr = IOUtils.toString(new BufferedInputStream(getClass().getResourceAsStream("/config/config-4-servers.json")), "utf-8");
-    ObjectMapper mapper = new ObjectMapper();
-    final ObjectNode config = (ObjectNode) mapper.readTree(configStr);
+    String configStr = IOUtils.toString(new BufferedInputStream(getClass().getResourceAsStream("/config/config-4-servers.yaml")), "utf-8");
+    Config config = new Config(configStr);
 
     FileUtils.deleteDirectory(new File(System.getProperty("user.home"), "db"));
 
@@ -38,15 +35,12 @@ public class TestRebalance {
     List<Future> futures = new ArrayList<>();
     for (int i = 0; i < dbServers.length; i++) {
       final int shard = i;
-      futures.add(executor.submit(new Callable(){
-        @Override
-        public Object call() throws Exception {
-          String role = "primaryMaster";
-          dbServers[shard] = new DatabaseServer();
-          dbServers[shard].setConfig(config, "test", "localhost", 9010 + (50 * shard), true, new AtomicBoolean(true), new AtomicBoolean(true),null);
-          dbServers[shard].setRole(role);
-          return null;
-        }
+      futures.add(executor.submit((Callable) () -> {
+        String role = "primaryMaster";
+        dbServers[shard] = new DatabaseServer();
+        dbServers[shard].setConfig(config, "test", "localhost", 9010 + (50 * shard), true, new AtomicBoolean(true), new AtomicBoolean(true),null);
+        dbServers[shard].setRole(role);
+        return null;
       }));
     }
     for (Future future : futures) {

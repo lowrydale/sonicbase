@@ -28,15 +28,15 @@ import static com.sonicbase.client.DatabaseClient.SERIALIZATION_VERSION;
 // I prefer to return null instead of an empty array
 // I don't know a good way to reduce the parameter count
 public class UpdateStatementImpl extends StatementImpl implements UpdateStatement {
-  private static Logger logger = LoggerFactory.getLogger(UpdateStatementImpl.class);
+  private static final Logger logger = LoggerFactory.getLogger(UpdateStatementImpl.class);
 
-  public static final String UTF_8_STR = "utf-8";
+  private static final String UTF_8_STR = "utf-8";
   private final DatabaseClient client;
   private final ExpressionImpl.RecordCache recordCache;
   private String tableName;
-  private List<ExpressionImpl> setExpressions = new ArrayList<>();
+  private final List<ExpressionImpl> setExpressions = new ArrayList<>();
   private ExpressionImpl whereClause;
-  private List<ColumnImpl> columns = new ArrayList<>();
+  private final List<ColumnImpl> columns = new ArrayList<>();
 
   public UpdateStatementImpl(DatabaseClient client) {
     this.client = client;
@@ -47,7 +47,7 @@ public class UpdateStatementImpl extends StatementImpl implements UpdateStatemen
     return columns;
   }
 
-  public ExpressionImpl getWhereClause() {
+  private ExpressionImpl getWhereClause() {
     return whereClause;
   }
 
@@ -175,20 +175,20 @@ public class UpdateStatementImpl extends StatementImpl implements UpdateStatemen
   private class DoExecute {
     private final SelectStatementImpl select;
     private boolean myResult;
-    private String dbName;
-    private SelectStatementImpl.Explain explain;
-    private Long sequence0;
-    private Long sequence1;
-    private Short sequence2;
-    private boolean restrictToThisServer;
-    private StoredProcedureContextImpl procedureContext;
-    private int schemaRetryCount;
-    private Random rand;
+    private final String dbName;
+    private final SelectStatementImpl.Explain explain;
+    private final Long sequence0;
+    private final Long sequence1;
+    private final Short sequence2;
+    private final boolean restrictToThisServer;
+    private final StoredProcedureContextImpl procedureContext;
+    private final int schemaRetryCount;
+    private final Random rand;
     private int countUpdated;
 
-    public DoExecute(SelectStatementImpl select, String dbName, SelectStatementImpl.Explain explain, Long sequence0, Long sequence1, Short sequence2,
-                     boolean restrictToThisServer, StoredProcedureContextImpl procedureContext, int schemaRetryCount,
-                     Random rand, int countUpdated) {
+    DoExecute(SelectStatementImpl select, String dbName, SelectStatementImpl.Explain explain, Long sequence0, Long sequence1, Short sequence2,
+              boolean restrictToThisServer, StoredProcedureContextImpl procedureContext, int schemaRetryCount,
+              Random rand, int countUpdated) {
       this.select = select;
       this.dbName = dbName;
       this.explain = explain;
@@ -206,7 +206,7 @@ public class UpdateStatementImpl extends StatementImpl implements UpdateStatemen
       return myResult;
     }
 
-    public int getCountUpdated() {
+    int getCountUpdated() {
       return countUpdated;
     }
 

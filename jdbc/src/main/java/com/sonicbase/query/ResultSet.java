@@ -32,7 +32,7 @@ public interface ResultSet {
 
   Double getDouble(String columnLabel);
 
-  BigDecimal getBigDecimal(String columnLabel, int scale) throws NotImplementedException;
+  BigDecimal getBigDecimal(String columnLabel, int scale);
 
   byte[] getBytes(String columnLabel);
 

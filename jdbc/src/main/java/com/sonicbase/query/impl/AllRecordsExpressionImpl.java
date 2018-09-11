@@ -16,7 +16,6 @@ import java.io.DataOutputStream;
 import java.io.IOException;
 import java.util.List;
 import java.util.Map;
-import java.util.Set;
 import java.util.concurrent.atomic.AtomicLong;
 import java.util.concurrent.atomic.AtomicReference;
 
@@ -33,11 +32,6 @@ public class AllRecordsExpressionImpl extends ExpressionImpl {
   @Override
   public Type getType() {
     return Type.ALL_EXPRESSION;
-  }
-
-  @Override
-  public void getColumns(Set<ColumnImpl> columns) {
-
   }
 
   public String toString() {
@@ -77,7 +71,7 @@ public class AllRecordsExpressionImpl extends ExpressionImpl {
     return null;
   }
 
-  public String getFromTable() {
+  private String getFromTable() {
     return fromTable;
   }
 
@@ -157,35 +151,30 @@ public class AllRecordsExpressionImpl extends ExpressionImpl {
   }
 
   @Override
-  public void queryRewrite() {
-
-  }
-
-  @Override
   public ColumnImpl getPrimaryColumn() {
     return null;
   }
 
   private class GetIndexSchema {
-    private String orderByColumn;
-    private TableSchema tableSchema;
+    private final String orderByColumn;
+    private final TableSchema tableSchema;
     private IndexSchema indexSchema;
     private IndexSchema primaryIndex;
 
-    public GetIndexSchema(String orderByColumn, TableSchema tableSchema) {
+    GetIndexSchema(String orderByColumn, TableSchema tableSchema) {
       this.orderByColumn = orderByColumn;
       this.tableSchema = tableSchema;
     }
 
-    public IndexSchema getIndexSchema() {
+    IndexSchema getIndexSchema() {
       return indexSchema;
     }
 
-    public IndexSchema getPrimaryIndex() {
+    IndexSchema getPrimaryIndex() {
       return primaryIndex;
     }
 
-    public GetIndexSchema invoke() {
+    GetIndexSchema invoke() {
       for (Map.Entry<String, IndexSchema> entry : tableSchema.getIndices().entrySet()) {
         if (entry.getValue().isPrimaryKey()) {
           primaryIndex = entry.getValue();
@@ -193,13 +182,13 @@ public class AllRecordsExpressionImpl extends ExpressionImpl {
         if (orderByColumn == null || getGroupByContext() != null) {
           if (entry.getValue().isPrimaryKey()) {
             indexSchema = entry.getValue();
-            break;
+            return this;
           }
         }
         else {
           if (entry.getValue().getFields()[0].equals(orderByColumn)) {
             indexSchema = entry.getValue();
-            break;
+            return this;
           }
         }
       }

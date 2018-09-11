@@ -24,7 +24,7 @@ import static org.testng.Assert.assertTrue;
 public class CreateTableStatementHandlerTest {
 
   @Test
-  public void test() throws SQLException {
+  public void test() {
     DatabaseClient client = mock(DatabaseClient.class);
     DatabaseCommon common = new DatabaseCommon();
     when(client.getCommon()).thenReturn(common);

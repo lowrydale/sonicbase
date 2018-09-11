@@ -20,10 +20,10 @@ import java.util.concurrent.ConcurrentHashMap;
 // I don't know a good way to reduce the parameter count
 public class ResultSetProxy implements java.sql.ResultSet {
 
-  public static final String NOT_SUPPORTED_STR = "not supported";
-  private static Logger logger = LoggerFactory.getLogger(ResultSetProxy.class);
+  private static final String NOT_SUPPORTED_STR = "not supported";
+  private static final Logger logger = LoggerFactory.getLogger(ResultSetProxy.class);
 
-  private List<ResultSetInfo> resultSets = new ArrayList<>();
+  private final List<ResultSetInfo> resultSets = new ArrayList<>();
   private int currResultSetOffset;
   private int currRow = 0;
   private ResultSetImpl resultSet;
@@ -83,8 +83,8 @@ public class ResultSetProxy implements java.sql.ResultSet {
 
     OID("OID", 9000000);
 
-    private String name;
-    private int type;
+    private final String name;
+    private final int type;
 
     FieldType(String name, int type) {
       this.name = name;
@@ -92,7 +92,7 @@ public class ResultSetProxy implements java.sql.ResultSet {
     }
   }
 
-  private static Map<String, Integer> lookupTypeByName = new HashMap<>();
+  private static final Map<String, Integer> lookupTypeByName = new HashMap<>();
 
   static {
     try {
@@ -120,11 +120,11 @@ public class ResultSetProxy implements java.sql.ResultSet {
   private static final ThreadLocal<ConcurrentHashMap<Long, Blob>> loadedBlobs = new ThreadLocal<>();
 
   public static class ResultSetInfo {
-    private ResultSetImpl resultSet;
+    private final ResultSetImpl resultSet;
     private int currRow = 0;
     private int highestIndex;
 
-    public ResultSetInfo(ResultSetImpl resultSet) {
+    ResultSetInfo(ResultSetImpl resultSet) {
       this.resultSet = resultSet;
     }
 
@@ -234,7 +234,7 @@ public class ResultSetProxy implements java.sql.ResultSet {
     throw new SQLException(NOT_SUPPORTED_STR);
   }
 
-  public int getRow() throws SQLException {
+  public int getRow() {
     return currRow;
   }
 
@@ -251,7 +251,7 @@ public class ResultSetProxy implements java.sql.ResultSet {
   }
 
 
-  public void close() throws SQLException {
+  public void close() {
     for (ResultSetInfo info : resultSets) {
       if (info.resultSet != null) {
         try {
@@ -264,7 +264,7 @@ public class ResultSetProxy implements java.sql.ResultSet {
     }
   }
 
-  public boolean wasNull() throws SQLException {
+  public boolean wasNull() {
     return wasNull;
   }
 

@@ -8,7 +8,7 @@ import com.sonicbase.common.DatabaseCommon;
 import com.sonicbase.jdbcdriver.ParameterHandler;
 import com.sonicbase.schema.IndexSchema;
 import com.sonicbase.schema.TableSchema;
-import com.sonicbase.util.TestUtils;
+import com.sonicbase.util.ClientTestUtils;
 import net.sf.jsqlparser.JSQLParserException;
 import net.sf.jsqlparser.parser.CCJSqlParserManager;
 import net.sf.jsqlparser.statement.delete.Delete;
@@ -31,13 +31,13 @@ public class DeleteStatementImplTest {
     DatabaseClient client = mock(DatabaseClient.class);
     DatabaseCommon common = new DatabaseCommon();
     when(client.getCommon()).thenReturn(common);
-    TableSchema tableSchema = TestUtils.createTable();
-    IndexSchema indexSchema = TestUtils.createIndexSchema(tableSchema);
-    TestUtils.createStringIndexSchema(tableSchema);
+    TableSchema tableSchema = ClientTestUtils.createTable();
+    IndexSchema indexSchema = ClientTestUtils.createIndexSchema(tableSchema);
+    ClientTestUtils.createStringIndexSchema(tableSchema);
     common.getTables("test").put(tableSchema.getName(), tableSchema);
     common.getTablesById("test").put(tableSchema.getTableId(), tableSchema);
 
-    byte[][] records = TestUtils.createRecords(common, tableSchema, 10);
+    byte[][] records = ClientTestUtils.createRecords(common, tableSchema, 10);
 
     final AtomicBoolean calledDeleteRecord = new AtomicBoolean();
     when(client.send(eq("UpdateManager:deleteRecord"), anyInt(), anyInt(), anyObject(), anyObject())).thenAnswer(invocationOnMock -> {

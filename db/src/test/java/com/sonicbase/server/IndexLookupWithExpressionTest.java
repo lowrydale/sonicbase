@@ -89,4 +89,58 @@ public class IndexLookupWithExpressionTest {
     assertEquals(indexLookup.retRecords.size(), 1);
 
   }
+
+  @Test
+  public void testLookupWithoutExpression() throws UnsupportedEncodingException {
+    com.sonicbase.server.DatabaseServer server = mock(DatabaseServer.class);
+    AddressMap addressMap = new AddressMap(server);
+    when(server.getAddressMap()).thenReturn(addressMap);
+
+    IndexLookupWithExpression indexLookup = new IndexLookupWithExpression(server);
+    indexLookup.setDbName("test");
+    AtomicBoolean done = new AtomicBoolean();
+
+    Map<Integer, TableSchema> tables = new HashMap<>();
+    TableSchema tableSchema = TestUtils.createTable();
+    indexLookup.indexSchema = TestUtils.createIndexSchema(tableSchema);
+    indexLookup.setTableSchema(tableSchema);
+
+    DatabaseCommon common = TestUtils.createCommon(tableSchema);
+    when(server.getCommon()).thenReturn(common);
+
+    byte[][] records = TestUtils.createRecords(common, tableSchema, 10);
+
+    List<Object[]> keys = TestUtils.createKeys(10);
+
+    indexLookup.currOffset = new AtomicLong();
+    indexLookup.countReturned = new AtomicLong();
+    indexLookup.retRecords = new ArrayList<>();
+    indexLookup.retKeyRecords = new ArrayList<>();
+
+    indexLookup.index = new Index(tableSchema, indexLookup.indexSchema.getName(), indexLookup.indexSchema.getComparators());
+
+
+
+    int i = 0;
+    for (Object[] key : keys) {
+      Object address = addressMap.toUnsafeFromRecords(new byte[][]{records[i]});
+      indexLookup.index.put(key, address);
+      i++;
+    }
+
+    indexLookup.setLeftKey(new Object[]{300L});
+    indexLookup.setRightKey(new Object[]{700L});
+    indexLookup.setLeftOperator(BinaryExpression.Operator.GREATER);
+    indexLookup.setRightOperator(BinaryExpression.Operator.LESS);
+    indexLookup.count = 100;
+
+    indexLookup.lookup();
+
+    assertEquals(indexLookup.retRecords.get(0), records[1]);
+    assertEquals(indexLookup.retRecords.get(1), records[2]);
+    assertEquals(indexLookup.retRecords.get(2), records[3]);
+    assertEquals(indexLookup.retRecords.get(3), records[4]);
+    assertEquals(indexLookup.retRecords.size(), 4);
+
+  }
 }

@@ -19,19 +19,16 @@ public class TestServers {
     final ThreadPoolExecutor executor = new ThreadPoolExecutor(32, 32, 10000, TimeUnit.MILLISECONDS, new ArrayBlockingQueue<Runnable>(1000), new ThreadPoolExecutor.CallerRunsPolicy());
     final ThreadPoolExecutor selectExecutor = new ThreadPoolExecutor(256, 256, 10000, TimeUnit.MILLISECONDS, new ArrayBlockingQueue<Runnable>(1000), new ThreadPoolExecutor.CallerRunsPolicy());
 
-    executor.submit(new Callable() {
-      @Override
-      public Object call() throws Exception {
-        try {
-          dbServers[0].startServer(new String[]{"-port", String.valueOf(9010 + (50 * 0)), "-host", "localhost",
-              "-mport", String.valueOf(9010), "-mhost", "localhost", "-cluster", "4-bench", "-shard", String.valueOf(0)});
-          //dbServers[0].getDatabaseServer().shutdownRepartitioner();
-        }
-        catch (Exception e) {
-          e.printStackTrace();
-        }
-        return null;
+    executor.submit((Callable) () -> {
+      try {
+        dbServers[0].startServer(new String[]{"-port", String.valueOf(9010 + (50 * 0)), "-host", "localhost",
+            "-mport", String.valueOf(9010), "-mhost", "localhost", "-cluster", "4-bench", "-shard", String.valueOf(0)});
+        //dbServers[0].getDatabaseServer().shutdownRepartitioner();
       }
+      catch (Exception e) {
+        e.printStackTrace();
+      }
+      return null;
     });
     while (!dbServers[0].isRunning()) {
       Thread.sleep(1000);
@@ -41,28 +38,25 @@ public class TestServers {
     List<Future> futures = new ArrayList<>();
     for (int i = 0; i < dbServers.length; i++) {
       final int shard = i;
-      futures.add(executor.submit(new Callable() {
-        @Override
-        public Object call() throws Exception {
-          if (shard == 0) {
-            return null;
-          }
-          try {
-            dbServers[shard].startServer(new String[]{"-port", String.valueOf(9010 + (50 * shard)), "-host", "localhost",
-                "-mport", String.valueOf(9010), "-mhost", "localhost",
-                "-shard", String.valueOf(shard), "-cluster", "4-bench"});
-            //dbServers[shard].getDatabaseServer().shutdownRepartitioner();
-          }
-          catch (Exception e) {
-            e.printStackTrace();
-          }
-          //          String role = "primaryMaster";
-          //          dbServers[shard] = new DatabaseServer();
-          //          dbServers[shard].setConfig(config, Integer.valueOf(shard));
-          //          dbServers[shard].setRole(role);
-          //          dbServers[shard].disableLogProcessor();
+      futures.add(executor.submit((Callable) () -> {
+        if (shard == 0) {
           return null;
         }
+        try {
+          dbServers[shard].startServer(new String[]{"-port", String.valueOf(9010 + (50 * shard)), "-host", "localhost",
+              "-mport", String.valueOf(9010), "-mhost", "localhost",
+              "-shard", String.valueOf(shard), "-cluster", "4-bench"});
+          //dbServers[shard].getDatabaseServer().shutdownRepartitioner();
+        }
+        catch (Exception e) {
+          e.printStackTrace();
+        }
+        //          String role = "primaryMaster";
+        //          dbServers[shard] = new DatabaseServer();
+        //          dbServers[shard].setConfig(config, Integer.valueOf(shard));
+        //          dbServers[shard].setRole(role);
+        //          dbServers[shard].disableLogProcessor();
+        return null;
       }));
     }
         for (Future future : futures) {

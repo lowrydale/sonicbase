@@ -1,5 +1,5 @@
 export _XMX_=2048m
-export SEARCH_HOME=$4
+export SONIC_BASE_HOME=$4
 #export MODE=yprof
 mkdir $4/logs
 
@@ -7,14 +7,14 @@ mkdir $4/logs
 
 if [ ${4:0:1} != "/" ]
 then
-  export SEARCH_HOME=$HOME/$SEARCH_HOME
+  export SONIC_BASE_HOME=$HOME/$SONIC_BASE_HOME
 fi
 
-cd $SEARCH_HOME
-echo "start-search_home=$SEARCH_HOME"
+cd $SONIC_BASE_HOME
+echo "start-SONIC_BASE_HOME=$SONIC_BASE_HOME"
 
-export _LOG4J_FILENAME_=$SEARCH_HOME/logs/bench-$2.log
-export _GC_LOG_FILENAME_=$SEARCH_HOME/logs/gc-bench-$2.log
+export _LOG4J_FILENAME_=$SONIC_BASE_HOME/logs/bench-$2.log
+export _GC_LOG_FILENAME_=$SONIC_BASE_HOME/logs/gc-bench-$2.log
 export LOG4J_FILE="log4j.xml"
-echo "starting BenchmarkServer: search_home=" + $SEARCH_HOME
-nohup $SEARCH_HOME/bin/runclass com.sonicbase.bench.BenchServer -port $2 > $SEARCH_HOME/logs/bench-$2.sysout.log 2>&1 &
+echo "starting BenchmarkServer: SONIC_BASE_HOME=" + $SONIC_BASE_HOME
+nohup $SONIC_BASE_HOME/bin/runclass com.sonicbase.bench.BenchServer -port $2 > $SONIC_BASE_HOME/logs/bench-$2.sysout.log 2>&1 &

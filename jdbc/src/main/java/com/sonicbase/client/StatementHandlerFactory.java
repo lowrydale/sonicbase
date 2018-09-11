@@ -19,7 +19,7 @@ import java.util.concurrent.ConcurrentHashMap;
 // I don't know a good way to reduce the parameter count
 public class StatementHandlerFactory {
 
-  private ConcurrentHashMap<String, StatementHandler> handlers = new ConcurrentHashMap<>();
+  private final ConcurrentHashMap<String, StatementHandler> handlers = new ConcurrentHashMap<>();
 
   public StatementHandlerFactory(DatabaseClient client) {
     handlers.put(Select.class.getName(), new SelectStatementHandler(client));

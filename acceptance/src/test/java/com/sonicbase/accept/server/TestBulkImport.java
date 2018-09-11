@@ -5,6 +5,7 @@ import com.fasterxml.jackson.databind.node.ObjectNode;
 import com.sonicbase.client.DatabaseClient;
 import com.sonicbase.common.ComArray;
 import com.sonicbase.common.ComObject;
+import com.sonicbase.common.Config;
 import com.sonicbase.jdbcdriver.ConnectionProxy;
 import com.sonicbase.query.DatabaseException;
 import com.sonicbase.server.DatabaseServer;
@@ -60,9 +61,8 @@ public class TestBulkImport {
   @BeforeClass
   public void beforeClass() throws IOException, InterruptedException, SQLException, ClassNotFoundException {
     try {
-      String configStr = IOUtils.toString(new BufferedInputStream(getClass().getResourceAsStream("/config/config-2-servers-a.json")), "utf-8");
-      ObjectMapper mapper = new ObjectMapper();
-      final ObjectNode config = (ObjectNode) mapper.readTree(configStr);
+      String configStr = IOUtils.toString(new BufferedInputStream(getClass().getResourceAsStream("/config/config-2-servers-a.yaml")), "utf-8");
+      Config config = new Config(configStr);
 
       FileUtils.deleteDirectory(new File(System.getProperty("user.home"), "db"));
 
@@ -75,13 +75,10 @@ public class TestBulkImport {
 
       final CountDownLatch latch = new CountDownLatch(4);
       serverA1 = new NettyServer(128);
-      Thread thread = new Thread(new Runnable(){
-        @Override
-        public void run() {
-          serverA1.startServer(new String[]{"-port", String.valueOf(9010), "-host", "localhost",
-              "-mport", String.valueOf(9010), "-mhost", "localhost", "-cluster", "2-servers-a", "-shard", String.valueOf(0)});
-          latch.countDown();
-        }
+      Thread thread = new Thread(() -> {
+        serverA1.startServer(new String[]{"-port", String.valueOf(9010), "-host", "localhost",
+            "-mport", String.valueOf(9010), "-mhost", "localhost", "-cluster", "2-servers-a", "-shard", String.valueOf(0)});
+        latch.countDown();
       });
       thread.start();
       while (true) {
@@ -92,13 +89,10 @@ public class TestBulkImport {
       }
 
       serverA2 = new NettyServer(128);
-      thread = new Thread(new Runnable(){
-        @Override
-        public void run() {
-          serverA2.startServer(new String[]{"-port", String.valueOf(9060), "-host", "localhost",
-              "-mport", String.valueOf(9060), "-mhost", "localhost", "-cluster", "2-servers-a", "-shard", String.valueOf(1)});
-          latch.countDown();
-        }
+      thread = new Thread(() -> {
+        serverA2.startServer(new String[]{"-port", String.valueOf(9060), "-host", "localhost",
+            "-mport", String.valueOf(9060), "-mhost", "localhost", "-cluster", "2-servers-a", "-shard", String.valueOf(1)});
+        latch.countDown();
       });
       thread.start();
       while (true) {
@@ -109,13 +103,10 @@ public class TestBulkImport {
       }
 
       serverB1 = new NettyServer(128);
-      thread = new Thread(new Runnable(){
-        @Override
-        public void run() {
-          serverB1.startServer(new String[]{"-port", String.valueOf(9110), "-host", "localhost",
-              "-mport", String.valueOf(9110), "-mhost", "localhost", "-cluster", "2-servers-b", "-shard", String.valueOf(0)});
-          latch.countDown();
-        }
+      thread = new Thread(() -> {
+        serverB1.startServer(new String[]{"-port", String.valueOf(9110), "-host", "localhost",
+            "-mport", String.valueOf(9110), "-mhost", "localhost", "-cluster", "2-servers-b", "-shard", String.valueOf(0)});
+        latch.countDown();
       });
       thread.start();
       while (true) {
@@ -126,13 +117,10 @@ public class TestBulkImport {
       }
 
       serverB2 = new NettyServer(128);
-      thread = new Thread(new Runnable(){
-        @Override
-        public void run() {
-          serverB2.startServer(new String[]{"-port", String.valueOf(9160), "-host", "localhost",
-              "-mport", String.valueOf(9160), "-mhost", "localhost", "-cluster", "2-servers-b", "-shard", String.valueOf(1)});
-          latch.countDown();
-        }
+      thread = new Thread(() -> {
+        serverB2.startServer(new String[]{"-port", String.valueOf(9160), "-host", "localhost",
+            "-mport", String.valueOf(9160), "-mhost", "localhost", "-cluster", "2-servers-b", "-shard", String.valueOf(1)});
+        latch.countDown();
       });
       thread.start();
       while (true) {
@@ -376,7 +364,7 @@ public class TestBulkImport {
   }
 
 
-  public String bulkImportStatus(ConnectionProxy conn) throws Exception {
+  private String bulkImportStatus(ConnectionProxy conn) throws Exception {
     ComObject cobj = new ComObject();
     cobj.put(ComObject.Tag.METHOD, "BulkImportManager:getBulkImportProgress");
     cobj.put(ComObject.Tag.DB_NAME, "test");
@@ -390,7 +378,7 @@ public class TestBulkImport {
       long countProcessed = tableObj.getLong(ComObject.Tag.COUNT_LONG);
       long expectedCount = tableObj.getLong(ComObject.Tag.EXPECTED_COUNT);
       boolean finished = tableObj.getBoolean(ComObject.Tag.FINISHED);
-      long preProcessCountProcessed = tableObj.getLong(ComObject.Tag.PRE_POCESS_COUNT_PROCESSED);
+      long preProcessCountProcessed = tableObj.getLong(ComObject.Tag.PRE_PROCESS_COUNT_PROCESSED);
       long preProcessExpectedCount = tableObj.getLong(ComObject.Tag.PRE_PROCESS_EXPECTED_COUNT);
       boolean preProcessFinished = tableObj.getBoolean(ComObject.Tag.PRE_PROCESS_FINISHED);
       if (!preProcessFinished) {
@@ -415,7 +403,7 @@ public class TestBulkImport {
   }
 
 
-  public void startBulkImport(ConnectionProxy conn, String command) {
+  private void startBulkImport(ConnectionProxy conn, String command) {
     ComObject cobj = new ComObject();
     cobj.put(ComObject.Tag.DB_NAME, "test");
     int pos = command.indexOf("from");

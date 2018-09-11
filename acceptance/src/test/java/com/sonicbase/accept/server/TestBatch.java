@@ -1,9 +1,8 @@
 /* © 2018 by Intellectual Reserve, Inc. All rights reserved. */
 package com.sonicbase.accept.server;
 
-import com.fasterxml.jackson.databind.ObjectMapper;
-import com.fasterxml.jackson.databind.node.ObjectNode;
 import com.sonicbase.client.DatabaseClient;
+import com.sonicbase.common.Config;
 import com.sonicbase.jdbcdriver.ConnectionProxy;
 import com.sonicbase.query.DatabaseException;
 import com.sonicbase.server.DatabaseServer;
@@ -15,7 +14,6 @@ import org.testng.annotations.Test;
 
 import java.io.BufferedInputStream;
 import java.io.File;
-import java.io.IOException;
 import java.sql.*;
 import java.util.ArrayList;
 import java.util.List;
@@ -34,7 +32,7 @@ import static org.testng.Assert.assertTrue;
 public class TestBatch {
 
   private Connection conn;
-  private int recordCount = 10;
+  private final int recordCount = 10;
   private DatabaseServer[] dbServers;
   private DatabaseClient client;
 
@@ -54,9 +52,8 @@ public class TestBatch {
   public void beforeClass() throws Exception {
     System.setProperty("log4j.configuration", "test-log4j.xml");
 
-    String configStr = IOUtils.toString(new BufferedInputStream(getClass().getResourceAsStream("/config/config-4-servers.json")), "utf-8");
-    ObjectMapper mapper = new ObjectMapper();
-    final ObjectNode config = (ObjectNode) mapper.readTree(configStr);
+    String configStr = IOUtils.toString(new BufferedInputStream(getClass().getResourceAsStream("/config/config-4-servers.yaml")), "utf-8");
+    Config config = new Config(configStr);
 
     FileUtils.deleteDirectory(new File(System.getProperty("user.home"), "db"));
 
@@ -70,11 +67,10 @@ public class TestBatch {
 
     List<Future> futures = new ArrayList<>();
     for (int i = 0; i < dbServers.length; i++) {
-      final int shard = i;
 
-      dbServers[shard] = new DatabaseServer();
-      dbServers[shard].setConfig(config, "4-servers", "localhost", 9010 + (50 * shard), true, new AtomicBoolean(true), new AtomicBoolean(true),null);
-      dbServers[shard].setRole(role);
+      dbServers[i] = new DatabaseServer();
+      dbServers[i].setConfig(config, "4-servers", "localhost", 9010 + (50 * i), true, new AtomicBoolean(true), new AtomicBoolean(true),null);
+      dbServers[i].setRole(role);
     }
     for (Future future : futures) {
       future.get();
@@ -258,9 +254,15 @@ public class TestBatch {
   @Test
   public void testIn() throws SQLException {
 
-    PreparedStatement stmt = conn.prepareStatement("select * from persons where id in (0, 1, 2, 3, 4) order by id desc");
+    PreparedStatement stmt = conn.prepareStatement("select * from persons where id in (0, 1, 2, 3, 4, 109, 108, 107) order by id desc");
     ResultSet ret = stmt.executeQuery();
 
+    ret.next();
+    assertEquals(ret.getLong("id"), 109);
+    ret.next();
+    assertEquals(ret.getLong("id"), 108);
+    ret.next();
+    assertEquals(ret.getLong("id"), 107);
     ret.next();
     assertEquals(ret.getLong("id"), 4);
     ret.next();
@@ -324,7 +326,7 @@ public class TestBatch {
   public void singleKeyBatch() throws SQLException {
 
     try (PreparedStatement stmt = conn.prepareStatement(
-        "explain select * from persons where id=0 or id=1 or id=2 or id=3 order by id desc")) {
+        "explain select * from persons where id=0 or id=1 or id=109 or id=108 order by id desc")) {
       try (ResultSet rs = stmt.executeQuery()) {
         rs.next();
         String value = rs.getString(1);
@@ -333,19 +335,23 @@ public class TestBatch {
     }
 
     try (PreparedStatement stmt = conn.prepareStatement(
-        "select * from persons where id=0 or id=1 or id=2 or id=3 order by id desc")) {
+        "select * from persons where id=0 or id=1 or id=109 or id=108 order by id desc")) {
       try (ResultSet rs = stmt.executeQuery()) {
-        for (int i = 3; i >= 0; i--) {
-          rs.next();
-          assertEquals(rs.getLong("id"), i);
-        }
+        rs.next();
+        assertEquals(rs.getLong("id"), 109);
+        rs.next();
+        assertEquals(rs.getLong("id"), 108);
+        rs.next();
+        assertEquals(rs.getLong("id"), 1);
+        rs.next();
+        assertEquals(rs.getLong("id"), 0);
         assertFalse(rs.next());
       }
     }
   }
 
   @Test
-  public void compositedBatch() throws SQLException {
+  public void compositeBatch() throws SQLException {
 
     try (PreparedStatement stmt = conn.prepareStatement(
         "explain select * from memberships where personId=? and membershipname='membership-1' or " +
@@ -398,7 +404,7 @@ public class TestBatch {
   }
 
   @Test
-  public void compoundBatchTriKey() throws SQLException {
+  public void compositeBatchTriKey() throws SQLException {
 
     try (PreparedStatement stmt = conn.prepareStatement(
         "explain select * from trikey where id1=0 and id2='id-3' and id3=2 or " +
@@ -446,7 +452,7 @@ public class TestBatch {
   }
 
   //@Test
-  public void testBatchInsertNoKeySecondaryIndex() throws SQLException, InterruptedException {
+  public void testBatchInsertNoKeySecondaryIndex() throws SQLException {
 
     try {
       client.syncSchema();
@@ -477,7 +483,7 @@ public class TestBatch {
   }
 
   @Test
-  public void testBatchInsertNoKey() throws SQLException, InterruptedException {
+  public void testBatchInsertNoKey() throws SQLException {
 
 //    LocalConsumer consumer = new LocalConsumer();
 //    while (true) {
@@ -538,7 +544,7 @@ public class TestBatch {
   }
 
   @Test
-  public void testBatchInsert() throws SQLException, InterruptedException, IOException {
+  public void testBatchInsert() throws SQLException, InterruptedException {
 
     try {
 

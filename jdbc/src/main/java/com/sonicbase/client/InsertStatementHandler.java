@@ -46,7 +46,7 @@ import static java.sql.Statement.SUCCESS_NO_INFO;
 public class InsertStatementHandler implements StatementHandler {
   private static final String SONICBASE_ID_STR = "_sonicbase_id";
   private static final String SHUTTING_DOWN_STR = "Shutting down";
-  private static Logger logger = LoggerFactory.getLogger(InsertStatementHandler.class);
+  private static final Logger logger = LoggerFactory.getLogger(InsertStatementHandler.class);
 
   public static final int BATCH_STATUS_SUCCCESS = SUCCESS_NO_INFO;
   public static final int BATCH_STATUS_FAILED = EXECUTE_FAILED;
@@ -101,14 +101,6 @@ public class InsertStatementHandler implements StatementHandler {
     }
     insertStatement.setColumns(columnNames);
 
-    if (client.isExplicitTrans()) {
-      List<DatabaseClient.TransactionOperation> ops = client.getTransactionOps().get();
-      if (ops == null) {
-        ops = new ArrayList<>();
-        client.getTransactionOps().set(ops);
-      }
-      ops.add(new DatabaseClient.TransactionOperation(insertStatement, parms));
-    }
     if (insertStatement.getSelect() != null) {
       return doInsertWithSelect(dbName, insertStatement);
     }
@@ -123,7 +115,7 @@ public class InsertStatementHandler implements StatementHandler {
   }
 
   public class PreparedInsert {
-    public int insertId;
+    int insertId;
     private String dbName;
     private int tableId;
     private int indexId;
@@ -441,18 +433,19 @@ public class InsertStatementHandler implements StatementHandler {
     insertStatement.setIgnore(false);
     List<PreparedInsert> completed = new ArrayList<>();
     AtomicLong recordId = new AtomicLong(-1L);
+    if (getBatch().get() != null) {
+      getBatch().get().add(request);
+    }
     while (!client.getShutdown()) {
       try {
-        if (getBatch().get() != null) {
-          getBatch().get().add(request);
-        }
-        else {
+        if (getBatch().get() == null) {
           doInsert(dbName, insertStatement, schemaRetryCount, request, completed, recordId);
         }
         break;
       }
       catch (FailedToInsertException e) {
         logger.error(e.getMessage());
+        break;
       }
       catch (Exception e) {
         String stack = ExceptionUtils.getStackTrace(e);
@@ -500,50 +493,63 @@ public class InsertStatementHandler implements StatementHandler {
       }
     }
 
-    try {
-      for (int i = 0; i < insertsWithRecords.size(); i++) {
-        PreparedInsert insert = insertsWithRecords.get(i);
-        insertKeyWithRecord(dbName, insertStatement.getTableName(), insert.keyInfo, insert.record, insertStatement.isIgnore(), schemaRetryCount);
-        completed.add(insert);
-      }
+    while (true) {
+      try {
+        for (int i = 0; i < insertsWithRecords.size(); i++) {
+          PreparedInsert insert = insertsWithRecords.get(i);
+          insertKeyWithRecord(dbName, insertStatement.getTableName(), insert.keyInfo, insert.record, insertStatement.isIgnore(), schemaRetryCount);
+          completed.add(insert);
+        }
 
-      for (int i = 0; i < insertsWithKey.size(); i++) {
-        PreparedInsert insert = insertsWithKey.get(i);
-        insertKey(client, dbName, insertStatement.getTableName(), insert.keyInfo, insert.primaryKeyIndexName,
-            insert.primaryKey, insert.record, insert.keyRecord, insertStatement.isIgnore(), schemaRetryCount);
-        completed.add(insert);
+        for (int i = 0; i < insertsWithKey.size(); i++) {
+          PreparedInsert insert = insertsWithKey.get(i);
+          insertKey(client, dbName, insertStatement.getTableName(), insert.keyInfo, insert.primaryKeyIndexName,
+              insert.primaryKey, insert.record, insert.keyRecord, insertStatement.isIgnore(), schemaRetryCount);
+          completed.add(insert);
+        }
+        break;
       }
-    }
-    catch (Exception e) {
-      for (PreparedInsert insert : completed) {
-        UpdateStatementImpl.deleteKey(client, dbName, insertStatement.getTableName(), insert.keyInfo,
-            insert.keyInfo.indexSchema.getName(), insert.primaryKey, schemaRetryCount);
+      catch (Exception e) {
+        for (PreparedInsert insert : completed) {
+          UpdateStatementImpl.deleteKey(client, dbName, insertStatement.getTableName(), insert.keyInfo,
+              insert.keyInfo.indexSchema.getName(), insert.primaryKey, schemaRetryCount);
+        }
+        int index = ExceptionUtils.indexOfThrowable(e, SchemaOutOfSyncException.class);
+        if (-1 != index) {
+          continue;
+        }
+
+        throw new DatabaseException(e);
       }
-      throw new DatabaseException(e);
     }
   }
 
   public static void insertKey(DatabaseClient client, String dbName, String tableName, KeyInfo keyInfo,
                                String primaryKeyIndexName, Object[] primaryKey, Record record,
                                KeyRecord keyRecord, boolean ignore, int schemaRetryCount) {
-    int tableId = client.getCommon().getTables(dbName).get(tableName).getTableId();
-    int indexId = client.getCommon().getTables(dbName).get(tableName).getIndices().get(keyInfo.indexSchema.getName()).getIndexId();
-    ComObject cobj = serializeInsertKey(client, client.getCommon(), 0, dbName, 0, tableId, indexId, tableName, keyInfo, primaryKeyIndexName,
-        primaryKey, record, keyRecord, ignore);
+    try {
+      int tableId = client.getCommon().getTables(dbName).get(tableName).getTableId();
+      int indexId = client.getCommon().getTables(dbName).get(tableName).getIndices().get(keyInfo.indexSchema.getName()).getIndexId();
+      ComObject cobj = serializeInsertKey(client, client.getCommon(), 0, dbName, 0, tableId, indexId, tableName, keyInfo, primaryKeyIndexName,
+          primaryKey, record, keyRecord, ignore);
 
-    byte[] keyRecordBytes = keyRecord.serialize(SERIALIZATION_VERSION);
-    cobj.put(ComObject.Tag.KEY_RECORD_BYTES, keyRecordBytes);
+      byte[] keyRecordBytes = keyRecord.serialize(SERIALIZATION_VERSION);
+      cobj.put(ComObject.Tag.KEY_RECORD_BYTES, keyRecordBytes);
 
-    cobj.put(ComObject.Tag.DB_NAME, dbName);
-    cobj.put(ComObject.Tag.SCHEMA_VERSION, client.getCommon().getSchemaVersion());
-    if (schemaRetryCount < 2) {
+      cobj.put(ComObject.Tag.DB_NAME, dbName);
       cobj.put(ComObject.Tag.SCHEMA_VERSION, client.getCommon().getSchemaVersion());
-    }
-    cobj.put(ComObject.Tag.IS_EXCPLICITE_TRANS, client.isExplicitTrans());
-    cobj.put(ComObject.Tag.IS_COMMITTING, client.isCommitting());
-    cobj.put(ComObject.Tag.TRANSACTION_ID, client.getTransactionId());
+      if (schemaRetryCount < 2) {
+        cobj.put(ComObject.Tag.SCHEMA_VERSION, client.getCommon().getSchemaVersion());
+      }
+      cobj.put(ComObject.Tag.IS_EXCPLICITE_TRANS, client.isExplicitTrans());
+      cobj.put(ComObject.Tag.IS_COMMITTING, client.isCommitting());
+      cobj.put(ComObject.Tag.TRANSACTION_ID, client.getTransactionId());
 
-    client.send("UpdateManager:insertIndexEntryByKey", keyInfo.shard, 0, cobj, DatabaseClient.Replica.DEF);
+      client.send("UpdateManager:insertIndexEntryByKey", keyInfo.shard, 0, cobj, DatabaseClient.Replica.DEF);
+    }
+    catch (Exception e) {
+      throw new DatabaseException("Error inserting key: db=" + dbName + ", table=" + tableName + ", index=" + keyInfo.indexSchema.getName(), e);
+    }
   }
 
   public static ComObject serializeInsertKey(DatabaseClient client, DatabaseCommon common, int insertId, String dbName, int originalOffset, int tableId, int indexId,
@@ -562,6 +568,9 @@ public class InsertStatementHandler implements StatementHandler {
       byte[] recordBytes = record.serialize(client.getCommon(), SERIALIZATION_VERSION);
       cobj.put(ComObject.Tag.RECORD_BYTES, recordBytes);
     }
+    else {
+      System.out.println("error");
+    }
     byte[] keyRecordBytes = keyRecord.serialize(SERIALIZATION_VERSION);
     cobj.put(ComObject.Tag.KEY_RECORD_BYTES, keyRecordBytes);
     byte[] primaryKeyBytes = DatabaseCommon.serializeKey(common.getTables(dbName).get(tableName), primaryKeyIndexName, primaryKey);
@@ -571,13 +580,13 @@ public class InsertStatementHandler implements StatementHandler {
   }
 
   class FailedToInsertException extends RuntimeException {
-    public FailedToInsertException(String msg) {
+    FailedToInsertException(String msg) {
       super(msg);
     }
   }
 
-  public void insertKeyWithRecord(String dbName, String tableName, KeyInfo keyInfo, Record record, boolean ignore,
-                                  int schemaRetryCount) {
+  private void insertKeyWithRecord(String dbName, String tableName, KeyInfo keyInfo, Record record, boolean ignore,
+                                   int schemaRetryCount) {
     int tableId = client.getCommon().getTables(dbName).get(tableName).getTableId();
     int indexId = client.getCommon().getTables(dbName).get(tableName).getIndices().get(keyInfo.indexSchema.getName()).getIndexId();
     ComObject cobj = serializeInsertKeyWithRecord(0, dbName, 0, tableId, indexId, tableName, keyInfo, record, ignore);
@@ -631,7 +640,7 @@ public class InsertStatementHandler implements StatementHandler {
     return cobj;
   }
 
-  public int convertInsertToUpdate(String dbName, InsertStatementImpl insertStatement) throws SQLException {
+  int convertInsertToUpdate(String dbName, InsertStatementImpl insertStatement) throws SQLException {
     List<String> columns = insertStatement.getColumns();
     StringBuilder sql = new StringBuilder();
     sql.append("update ").append(insertStatement.getTableName()).append(" set ");
@@ -708,7 +717,7 @@ public class InsertStatementHandler implements StatementHandler {
     }
   }
 
-  public void setFieldInParms(FieldSchema field, Object obj, int parmIndex, ParameterHandler newParms) throws SQLException {
+  private void setFieldInParms(FieldSchema field, Object obj, int parmIndex, ParameterHandler newParms) throws SQLException {
     switch (field.getType()) {
       case BIGINT:
       case ROWID:
@@ -954,7 +963,7 @@ public class InsertStatementHandler implements StatementHandler {
         if (!client.isExplicitTrans()) {
           nonTransId = client.allocateId(getBatch().get().get(0).dbName);
         }
-        break;
+        return nonTransId;
       }
       catch (Exception e) {
         int index = ExceptionUtils.indexOfThrowable(e, SchemaOutOfSyncException.class);
@@ -964,14 +973,12 @@ public class InsertStatementHandler implements StatementHandler {
         throw new DatabaseException(e);
       }
     }
-    return nonTransId;
   }
 
   private void removeInsertedRecord(Object mutex, List<PreparedInsert> withRecordPrepared,
                                     List<List<PreparedInsert>> withRecordProcessed, List<ByteArrayOutputStream> bytesOut) {
     for (int i = 0; i < bytesOut.size(); i++) {
-      final int offset = i;
-      for (PreparedInsert insert : withRecordProcessed.get(offset)) {
+      for (PreparedInsert insert : withRecordProcessed.get(i)) {
         synchronized (mutex) {
           withRecordPrepared.remove(insert);
         }
@@ -984,7 +991,7 @@ public class InsertStatementHandler implements StatementHandler {
                                       List<List<PreparedInsert>> withRecordProcessed, List<List<PreparedInsert>> processed,
                                       List<ByteArrayOutputStream> withRecordBytesOut, List<DataOutputStream> withRecordOut,
                                       List<ByteArrayOutputStream> bytesOut, List<DataOutputStream> out, List<ComObject> cobjs1,
-                                      List<ComObject> cobjs2) throws IOException {
+                                      List<ComObject> cobjs2) {
     for (int i = 0; i < client.getShardCount(); i++) {
       ByteArrayOutputStream bOut = new ByteArrayOutputStream();
       withRecordBytesOut.add(bOut);
@@ -1220,12 +1227,12 @@ public class InsertStatementHandler implements StatementHandler {
   }
 
   private class GetValuesFromParms {
-    private ParameterHandler parms;
-    private Insert insert;
+    private final ParameterHandler parms;
+    private final Insert insert;
     private List<Object> values;
     private List<String> columnNames;
 
-    public GetValuesFromParms(ParameterHandler parms, Insert insert) {
+    GetValuesFromParms(ParameterHandler parms, Insert insert) {
       this.parms = parms;
       this.insert = insert;
     }

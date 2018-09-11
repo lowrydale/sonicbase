@@ -8,7 +8,7 @@ import com.sonicbase.common.ComObject;
 import com.sonicbase.common.ServersConfig;
 import com.sonicbase.common.ThreadUtil;
 import com.sonicbase.query.DatabaseException;
-import org.apache.giraph.utils.Varint;
+import com.sonicbase.util.Varint;
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
 
@@ -23,9 +23,9 @@ import java.util.concurrent.atomic.AtomicBoolean;
 // I prefer to return null instead of an empty array
 // I don't know a good way to reduce the parameter count
 public class ClientStatsHandler {
-  private static Logger logger = LoggerFactory.getLogger(ClientStatsHandler.class);
+  private static final Logger logger = LoggerFactory.getLogger(ClientStatsHandler.class);
 
-  private static ConcurrentHashMap<String, ConcurrentHashMap<String, HistogramEntry>> registeredQueries = new ConcurrentHashMap<>();
+  private static final ConcurrentHashMap<String, ConcurrentHashMap<String, HistogramEntry>> registeredQueries = new ConcurrentHashMap<>();
   private final Thread statsEnabler;
   private boolean disableStats;
 
@@ -75,7 +75,7 @@ public class ClientStatsHandler {
 
     private final String cluster;
     private final DatabaseClient client;
-    private Long sleepOverride;
+    private final Long sleepOverride;
     public QueryStatsRecorder(DatabaseClient client, String cluster) {
       this.client = client;
       this.cluster = cluster;

@@ -124,21 +124,21 @@ public class DeleteStatementImpl extends StatementImpl implements DeleteStatemen
 
   private class DoDelete {
     private boolean myResult;
-    private String dbName;
-    private SelectStatementImpl.Explain explain;
-    private Long sequence0;
-    private Long sequence1;
-    private Short sequence2;
-    private boolean restrictToThisServer;
-    private StoredProcedureContextImpl procedureContext;
-    private int schemaRetryCount;
-    private TableSchema tableSchema;
-    private Random rand;
+    private final String dbName;
+    private final SelectStatementImpl.Explain explain;
+    private final Long sequence0;
+    private final Long sequence1;
+    private final Short sequence2;
+    private final boolean restrictToThisServer;
+    private final StoredProcedureContextImpl procedureContext;
+    private final int schemaRetryCount;
+    private final TableSchema tableSchema;
+    private final Random rand;
     private int countDeleted;
 
-    public DoDelete(String dbName, SelectStatementImpl.Explain explain, Long sequence0, Long sequence1,
-                    Short sequence2, boolean restrictToThisServer, StoredProcedureContextImpl procedureContext,
-                    int schemaRetryCount, TableSchema tableSchema, Random rand, int countDeleted) {
+    DoDelete(String dbName, SelectStatementImpl.Explain explain, Long sequence0, Long sequence1,
+             Short sequence2, boolean restrictToThisServer, StoredProcedureContextImpl procedureContext,
+             int schemaRetryCount, TableSchema tableSchema, Random rand, int countDeleted) {
       this.dbName = dbName;
       this.explain = explain;
       this.sequence0 = sequence0;
@@ -156,7 +156,7 @@ public class DeleteStatementImpl extends StatementImpl implements DeleteStatemen
       return myResult;
     }
 
-    public int getCountDeleted() {
+    int getCountDeleted() {
       return countDeleted;
     }
 

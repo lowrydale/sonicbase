@@ -1,8 +1,6 @@
 /* © 2018 by Intellectual Reserve, Inc. All rights reserved. */
 package com.sonicbase.cli;
 
-import com.mashape.unirest.http.exceptions.UnirestException;
-import com.sonicbase.jdbcdriver.ConnectionProxy;
 import com.sonicbase.jdbcdriver.ResultSetProxy;
 import com.sonicbase.query.impl.ResultSetImpl;
 import com.sonicbase.schema.DataType;
@@ -15,8 +13,13 @@ import java.util.ArrayList;
 import java.util.List;
 import java.util.concurrent.ExecutionException;
 
-public class DescribeHandler {
+class DescribeHandler {
 
+  public static final String ERROR_NOT_USING_A_CLUSTER_STR = "Error, not using a cluster";
+  public static final String ERROR_NOT_USING_A_DATABASE_STR = "Error, not using a database";
+  public static final String ADDRESS_STR = "Address";
+  public static final String SHARD_STR = "shard";
+  public static final String REPLICA_STR = "replica";
   private static ResultSet describeSchemaVersionRet;
   private static ResultSet describeServerStatsRet;
   private static ResultSet ret;
@@ -24,11 +27,11 @@ public class DescribeHandler {
   private static ResultSet describeServerHealthRet;
   private final Cli cli;
 
-  public DescribeHandler(Cli cli) {
+  DescribeHandler(Cli cli) {
     this.cli = cli;
   }
 
-  public void getPartitionSizes(String command) throws IOException, SQLException, ClassNotFoundException, InterruptedException {
+  private void getPartitionSizes(String command) throws IOException, SQLException, ClassNotFoundException, InterruptedException {
 
     describeShards(command);
   }
@@ -36,12 +39,12 @@ public class DescribeHandler {
   private void describeShards(String command) throws IOException, SQLException, ClassNotFoundException, InterruptedException {
     String cluster = cli.getCurrCluster();
     if (cluster == null) {
-      System.out.println("Error, not using a cluster");
+      cli.println(ERROR_NOT_USING_A_CLUSTER_STR);
       return;
     }
 
     if (cli.getCurrDbName() == null) {
-      System.out.println("Error, not using a database");
+      cli.println(ERROR_NOT_USING_A_DATABASE_STR);
       return;
     }
 
@@ -49,72 +52,71 @@ public class DescribeHandler {
 
     PreparedStatement stmt = cli.getConn().prepareStatement(command);
     ret = stmt.executeQuery();
+    cli.setRet(ret);
 
     String str = cli.getTerminalSize();
     String[] parts = str.split(",");
-    String height = parts[1];
+    String height = parts[1].trim();
 
     int currLine = 0;
-    System.out.println();
-    for (int i = 0; currLine < Integer.valueOf(height) - 3; i++) {
+    cli.println("");
+    for (int i = 0; currLine < Integer.valueOf(height) - 3; i++, currLine++) {
       if (!ret.next()) {
         break;
       }
-      System.out.println(ret.getString(1));
-      currLine++;
+      cli.println(ret.getString(1));
     }
     if (!ret.isLast()) {
-      System.out.println("next");
+      cli.println("next");
     }
     cli.setLastCommand(command);
 
   }
 
-  public void describeRepartitioner(String command) throws IOException, SQLException, ClassNotFoundException, InterruptedException {
+  private void describeRepartitioner(String command) throws IOException, SQLException, ClassNotFoundException, InterruptedException {
     String cluster = cli.getCurrCluster();
     if (cluster == null) {
-      System.out.println("Error, not using a cluster");
+      cli.println(ERROR_NOT_USING_A_CLUSTER_STR);
       return;
     }
 
     if (cli.getCurrDbName() == null) {
-      System.out.println("Error, not using a database");
+      cli.println(ERROR_NOT_USING_A_DATABASE_STR);
       return;
     }
 
     cli.initConnection();
 
     PreparedStatement stmt = cli.getConn().prepareStatement(command);
-    ret = stmt.executeQuery();
+    cli.setRet(stmt.executeQuery());
 
     String str = cli.getTerminalSize();
     String[] parts = str.split(",");
-    String height = parts[1];
+    String height = parts[1].trim();
 
     int currLine = 0;
-    System.out.println();
-    for (int i = 0; currLine < Integer.valueOf(height) - 3; i++) {
+    cli.println("");
+    for (int i = 0; currLine < Integer.valueOf(height) - 3; i++, currLine++) {
       if (!ret.next()) {
         break;
       }
-      System.out.println(ret.getString(1));
-      currLine++;
+      cli.println(ret.getString(1));
     }
     if (!ret.isLast()) {
-      System.out.println("next");
+      cli.println("next");
     }
     cli.setLastCommand(command);
   }
 
-  public void describe(String command) throws SQLException, ClassNotFoundException, IOException, InterruptedException, ExecutionException {
+  void describe(String command) throws SQLException, ClassNotFoundException, IOException, InterruptedException {
     String cluster = cli.getCurrCluster();
     if (cluster == null) {
-      System.out.println("Error, not using a cluster");
+      cli.println(ERROR_NOT_USING_A_CLUSTER_STR);
       return;
     }
 
     if (cli.getCurrDbName() == null) {
-      System.out.println("Error, not using a database");
+      cli.println(ERROR_NOT_USING_A_DATABASE_STR);
       return;
     }
 
@@ -141,36 +143,36 @@ public class DescribeHandler {
 
     cli.initConnection();
 
-    System.out.println("Executing select request");
+    cli.println("Executing select request");
 
     PreparedStatement stmt = cli.getConn().prepareStatement(command);
     ret = stmt.executeQuery();
+    cli.setRet(ret);
 
     String str = cli.getTerminalSize();
     String[] parts = str.split(",");
-    String height = parts[1];
+    String height = parts[1].trim();
 
     int currLine = 0;
-    System.out.println();
-    for (int i = 0; currLine < Integer.valueOf(height) - 2; i++) {
+    cli.println("");
+    for (int i = 0; currLine < Integer.valueOf(height) - 2; i++, currLine++) {
       if (!ret.next()) {
         break;
       }
-      System.out.println(ret.getString(1));
-      currLine++;
+      cli.println(ret.getString(1));
     }
     cli.setLastCommand(command);
   }
 
-  public void describeServerStats(String command) throws SQLException, ClassNotFoundException, IOException, InterruptedException, ExecutionException {
+  private void describeServerStats(String command) throws SQLException, ClassNotFoundException, IOException, InterruptedException {
     String cluster = cli.getCurrCluster();
     if (cluster == null) {
-      System.out.println("Error, not using a cluster");
+      cli.println(ERROR_NOT_USING_A_CLUSTER_STR);
       return;
     }
 
     if (cli.getCurrDbName() == null) {
-      System.out.println("Error, not using a database");
+      cli.println(ERROR_NOT_USING_A_DATABASE_STR);
       return;
     }
 
@@ -185,23 +187,23 @@ public class DescribeHandler {
     cli.setLastCommand(command);
   }
 
-  public void displayServerStatsPage(int offset) throws IOException, InterruptedException, SQLException {
+  void displayServerStatsPage(int offset) throws IOException, InterruptedException, SQLException {
 
 
     List<Cli.SelectColumn> columns = new ArrayList<>();
-    columns.add(new Cli.SelectColumn("Address", "", "host", DataType.Type.VARCHAR));
-    columns.add(new Cli.SelectColumn("CPU", "%", "cpu", DataType.Type.VARCHAR));
-    columns.add(new Cli.SelectColumn("ResMem", "Gig", "resGig", DataType.Type.VARCHAR));
-    columns.add(new Cli.SelectColumn("JMemMin", "Gig", "javaMemMin", DataType.Type.VARCHAR));
-    columns.add(new Cli.SelectColumn("JMemMax", "Gig", "javaMemMax", DataType.Type.VARCHAR));
-    columns.add(new Cli.SelectColumn("NetIn", "GByte", "receive", DataType.Type.VARCHAR));
-    columns.add(new Cli.SelectColumn("NetOut", "GByte", "transmit", DataType.Type.VARCHAR));
-    columns.add(new Cli.SelectColumn("Disk", "Gig", "diskAvail", DataType.Type.VARCHAR));
+    columns.add(new Cli.SelectColumn(ADDRESS_STR, ""));
+    columns.add(new Cli.SelectColumn("CPU", "%"));
+    columns.add(new Cli.SelectColumn("ResMem", "Gig"));
+    columns.add(new Cli.SelectColumn("JMemMin", "Gig"));
+    columns.add(new Cli.SelectColumn("JMemMax", "Gig"));
+    columns.add(new Cli.SelectColumn("NetIn", "GByte"));
+    columns.add(new Cli.SelectColumn("NetOut", "GByte"));
+    columns.add(new Cli.SelectColumn("Disk", "Gig"));
 
     String str = cli.getTerminalSize();
     String[] parts = str.split(",");
-    String width = parts[0];
-    String height = parts[1];
+    String width = parts[0].trim();
+    String height = parts[1].trim();
 
     List<List<String>> data = new ArrayList<>();
     for (int i = 0; i < Integer.valueOf(height) - 8; i++) {
@@ -227,10 +229,10 @@ public class DescribeHandler {
     nextStatsOffset = offset;
   }
 
-  public void describeServerHealth(String command) throws SQLException, ClassNotFoundException, IOException, InterruptedException, ExecutionException {
+  private void describeServerHealth(String command) throws SQLException, ClassNotFoundException, IOException, InterruptedException {
     String cluster = cli.getCurrCluster();
     if (cluster == null) {
-      System.out.println("Error, not using a cluster");
+      cli.println(ERROR_NOT_USING_A_CLUSTER_STR);
       return;
     }
 
@@ -244,26 +246,26 @@ public class DescribeHandler {
     cli.setLastCommand(command);
   }
 
-  public void displayServerHealthPage(int offset) throws IOException, InterruptedException, SQLException {
+  void displayServerHealthPage(int offset) throws IOException, InterruptedException, SQLException {
     List<Cli.SelectColumn> columns = new ArrayList<>();
-    columns.add(new Cli.SelectColumn("Address", "", "host", DataType.Type.VARCHAR));
-    columns.add(new Cli.SelectColumn("Shard", "", "shard", DataType.Type.VARCHAR));
-    columns.add(new Cli.SelectColumn("Replica", "", "replica", DataType.Type.VARCHAR));
-    columns.add(new Cli.SelectColumn("Dead", "", "dead", DataType.Type.VARCHAR));
-    columns.add(new Cli.SelectColumn("Master", "", "master", DataType.Type.VARCHAR));
+    columns.add(new Cli.SelectColumn(ADDRESS_STR, ""));
+    columns.add(new Cli.SelectColumn("Shard", ""));
+    columns.add(new Cli.SelectColumn("Replica", ""));
+    columns.add(new Cli.SelectColumn("Dead", ""));
+    columns.add(new Cli.SelectColumn("Master", ""));
 
     String str = cli.getTerminalSize();
     String[] parts = str.split(",");
-    String width = parts[0];
-    String height = parts[1];
+    String width = parts[0].trim();
+    String height = parts[1].trim();
 
     List<List<String>> data = new ArrayList<>();
     for (int i = 0; i < Integer.valueOf(height) - 8; i++) {
       if (describeServerHealthRet.next()) {
         List<String> row = new ArrayList<>();
         row.add(describeServerHealthRet.getString("host"));
-        row.add(describeServerHealthRet.getString("shard"));
-        row.add(describeServerHealthRet.getString("replica"));
+        row.add(describeServerHealthRet.getString(SHARD_STR));
+        row.add(describeServerHealthRet.getString(REPLICA_STR));
         row.add(describeServerHealthRet.getString("dead"));
         row.add(describeServerHealthRet.getString("master"));
         data.add(row);
@@ -279,10 +281,10 @@ public class DescribeHandler {
   }
 
 
-  public void describeSchemaVersion(String command) throws SQLException, ClassNotFoundException, IOException, InterruptedException, ExecutionException {
+  private void describeSchemaVersion(String command) throws SQLException, ClassNotFoundException, IOException, InterruptedException {
     String cluster = cli.getCurrCluster();
     if (cluster == null) {
-      System.out.println("Error, not using a cluster");
+      cli.println(ERROR_NOT_USING_A_CLUSTER_STR);
       return;
     }
 
@@ -298,23 +300,23 @@ public class DescribeHandler {
 
   private void displaySchemaVersionPage(int offset) throws IOException, InterruptedException, SQLException {
     List<Cli.SelectColumn> columns = new ArrayList<>();
-    columns.add(new Cli.SelectColumn("Address", "", "host", DataType.Type.VARCHAR));
-    columns.add(new Cli.SelectColumn("Shard", "", "shard", DataType.Type.VARCHAR));
-    columns.add(new Cli.SelectColumn("Replica", "", "replica", DataType.Type.VARCHAR));
-    columns.add(new Cli.SelectColumn("Version", "", "version", DataType.Type.VARCHAR));
+    columns.add(new Cli.SelectColumn(ADDRESS_STR, ""));
+    columns.add(new Cli.SelectColumn("Shard", ""));
+    columns.add(new Cli.SelectColumn("Replica", ""));
+    columns.add(new Cli.SelectColumn("Version", ""));
 
     String str = cli.getTerminalSize();
     String[] parts = str.split(",");
-    String width = parts[0];
-    String height = parts[1];
+    String width = parts[0].trim();
+    String height = parts[1].trim();
 
     List<List<String>> data = new ArrayList<>();
     for (int i = 0; i < Integer.valueOf(height) - 8; i++) {
       if (describeSchemaVersionRet.next()) {
         List<String> row = new ArrayList<>();
         row.add(describeSchemaVersionRet.getString("host"));
-        row.add(describeSchemaVersionRet.getString("shard"));
-        row.add(describeSchemaVersionRet.getString("replica"));
+        row.add(describeSchemaVersionRet.getString(SHARD_STR));
+        row.add(describeSchemaVersionRet.getString(REPLICA_STR));
         row.add(describeSchemaVersionRet.getString("version"));
         data.add(row);
       }
@@ -328,25 +330,26 @@ public class DescribeHandler {
     nextStatsOffset = offset;
   }
 
-  public void describeLicenses() throws IOException, UnirestException, SQLException, InterruptedException, ClassNotFoundException {
+  void describeLicenses() throws IOException, SQLException, InterruptedException, ClassNotFoundException {
 
-    ret = new ResultSetProxy((ResultSetImpl) ConnectionProxy.describeLicenses());
+    cli.initConnection();
 
+    ret = new ResultSetProxy((ResultSetImpl) cli.getConn().describeLicenses());
+    cli.setRet(ret);
     String str = cli.getTerminalSize();
     String[] parts = str.split(",");
-    String height = parts[1];
+    String height = parts[1].trim();
 
     int currLine = 0;
-    System.out.println();
-    for (int i = 0; currLine < Integer.valueOf(height) - 3; i++) {
+    cli.println("");
+    for (int i = 0; currLine < Integer.valueOf(height) - 3; i++, currLine++) {
       if (!ret.next()) {
         break;
       }
-      System.out.println(ret.getString(1));
-      currLine++;
+      cli.println(ret.getString(1));
     }
     if (!ret.isLast()) {
-      System.out.println("next");
+      cli.println("next");
     }
     cli.setLastCommand(cli.getCommand());
   }

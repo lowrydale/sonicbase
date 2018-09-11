@@ -10,7 +10,6 @@ import net.sf.jsqlparser.statement.Statement;
 import net.sf.jsqlparser.statement.create.index.CreateIndex;
 import net.sf.jsqlparser.statement.create.table.Index;
 
-import java.sql.SQLException;
 import java.util.List;
 
 @SuppressWarnings({"squid:S1168", "squid:S00107"})
@@ -26,7 +25,7 @@ public class CreateIndexStatementHandler implements StatementHandler {
   @Override
   public Object execute(String dbName, ParameterHandler parms, String sqlToUse, Statement statement,
                         SelectStatementImpl.Explain explain, Long sequence0, Long sequence1, Short sequence2,
-                        boolean restrictToThisServer, StoredProcedureContextImpl procedureContext, int schemaRetryCount) throws SQLException {
+                        boolean restrictToThisServer, StoredProcedureContextImpl procedureContext, int schemaRetryCount) {
     CreateIndex createIndex = (CreateIndex) statement;
     Index index = createIndex.getIndex();
     String indexName = index.getName().toLowerCase();
@@ -51,7 +50,7 @@ public class CreateIndexStatementHandler implements StatementHandler {
 
   }
 
-  public void doCreateIndex(String dbName, CreateIndexStatementImpl statement) {
+  private void doCreateIndex(String dbName, CreateIndexStatementImpl statement) {
     ComObject cobj = new ComObject();
     cobj.put(ComObject.Tag.DB_NAME, dbName);
     cobj.put(ComObject.Tag.SCHEMA_VERSION, client.getCommon().getSchemaVersion());

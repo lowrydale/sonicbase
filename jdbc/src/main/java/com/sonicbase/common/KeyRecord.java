@@ -1,7 +1,7 @@
 package com.sonicbase.common;
 
 import com.sonicbase.query.DatabaseException;
-import org.apache.giraph.utils.Varint;
+import com.sonicbase.util.Varint;
 
 import java.io.*;
 
@@ -26,7 +26,7 @@ public class KeyRecord {
     deserialize(bytes);
   }
 
-  public void deserialize(byte[] bytes) {
+  private void deserialize(byte[] bytes) {
     try {
 
       DataInputStream sin = new DataInputStream(new ByteArrayInputStream(bytes));

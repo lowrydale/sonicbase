@@ -4,6 +4,7 @@ import com.fasterxml.jackson.databind.ObjectMapper;
 import com.fasterxml.jackson.databind.node.ObjectNode;
 import com.sonicbase.client.DatabaseClient;
 import com.sonicbase.common.ComObject;
+import com.sonicbase.common.Config;
 import com.sonicbase.common.DatabaseCommon;
 import com.sonicbase.jdbcdriver.ConnectionProxy;
 import com.sonicbase.jdbcdriver.ParameterHandler;
@@ -27,7 +28,6 @@ import javax.crypto.*;
 import java.io.BufferedInputStream;
 import java.io.File;
 import java.io.FileInputStream;
-import java.io.IOException;
 import java.security.InvalidKeyException;
 import java.security.Key;
 import java.sql.*;
@@ -45,8 +45,8 @@ import static org.testng.Assert.*;
 public class TestDatabase {
 
   private Connection conn;
-  private int recordCount = 10;
-  List<Long> ids = new ArrayList<>();
+  private final int recordCount = 10;
+  final List<Long> ids = new ArrayList<>();
 
   DatabaseClient client = null;
   DatabaseServer[] dbServers;
@@ -71,9 +71,8 @@ public class TestDatabase {
       System.setProperty("log4j.configuration", "test-log4j.xml");
 
 
-      String configStr = IOUtils.toString(new BufferedInputStream(getClass().getResourceAsStream("/config/config-4-servers.json")), "utf-8");
-      ObjectMapper mapper = new ObjectMapper();
-      final ObjectNode config = (ObjectNode) mapper.readTree(configStr);
+      String configStr = IOUtils.toString(new BufferedInputStream(getClass().getResourceAsStream("/config/config-4-servers.yaml")), "utf-8");
+      Config config = new Config(configStr);
 
       FileUtils.deleteDirectory(new File(System.getProperty("user.home"), "db"));
 
@@ -86,15 +85,14 @@ public class TestDatabase {
 
       List<Future> futures = new ArrayList<>();
       for (int i = 0; i < dbServers.length; i++) {
-        final int shard = i;
         //      futures.add(executor.submit(new Callable() {
         //        @Override
         //        public Object call() throws Exception {
         //          String role = "primaryMaster";
 
-        dbServers[shard] = new DatabaseServer();
-        dbServers[shard].setConfig(config, "4-servers", "localhost", 9010 + (50 * shard), true, new AtomicBoolean(true), new AtomicBoolean(true),null);
-        dbServers[shard].setRole(role);
+        dbServers[i] = new DatabaseServer();
+        dbServers[i].setConfig(config, "4-servers", "localhost", 9010 + (50 * i), true, new AtomicBoolean(true), new AtomicBoolean(true),null);
+        dbServers[i].setRole(role);
 
 //        if (shard == 0) {
 //          Map<Integer, Object> map = new HashMap<>();
@@ -445,10 +443,10 @@ public class TestDatabase {
 //      dbServers[0].getSnapshotManager().unlockSnapshot(1);
 //
 //      long commandCount = dbServers[1].getCommandCount();
-//      dbServers[2].purgeMemory();
+//      dbServers[2].unsafePurgeMemoryForTests();
 //      dbServers[2].recoverFromSnapshot();
 //      dbServers[2].replayLogs();
-//      dbServers[3].purgeMemory();
+//      dbServers[3].unsafePurgeMemoryForTests();
 //      dbServers[3].recoverFromSnapshot();
 //      dbServers[3].replayLogs();
 
@@ -459,7 +457,7 @@ public class TestDatabase {
 
 
 //      for (DatabaseServer server : dbServers) {
-//        server.purgeMemory();
+//        server.unsafePurgeMemoryForTests();
 //      }
 //
 //      for (DatabaseServer server : dbServers) {
@@ -480,6 +478,7 @@ public class TestDatabase {
 //      }
 
 
+      ObjectMapper mapper = new ObjectMapper();
       ObjectNode backupConfig = (ObjectNode) mapper.readTree("{\n" +
           "    \"type\" : \"fileSystem\",\n" +
           "    \"directory\": \"$HOME/db/backup\",\n" +
@@ -3165,7 +3164,7 @@ public class TestDatabase {
   }
 
   @Test
-  public void testEqual2NoKeySecondaryIndex() throws SQLException {
+  public void testEqual2NoKeySecondaryIndex() {
     //test select
     PreparedStatement stmt;
     ResultSet ret;
@@ -3306,7 +3305,7 @@ public class TestDatabase {
   }
 
   @Test
-  public void testUpdate2() throws SQLException, InterruptedException {
+  public void testUpdate2() throws SQLException {
 
     PreparedStatement stmt = conn.prepareStatement("insert into persons (id, id2, socialSecurityNumber, relatives, restricted, gender) VALUES (?, ?, ?, ?, ?, ?)");
     stmt.setLong(1, 100000);
@@ -3338,7 +3337,7 @@ public class TestDatabase {
   }
 
   @Test
-  public void testInsert() throws SQLException, InterruptedException {
+  public void testInsert() throws SQLException {
 
     PreparedStatement stmt = conn.prepareStatement("insert into persons (id, id2, socialSecurityNumber, relatives, restricted, gender) VALUES (?, ?, ?, ?, ?, ?)");
     stmt.setLong(1, 200000);
@@ -3407,338 +3406,6 @@ public class TestDatabase {
       ResultSet ret = stmt.executeQuery();
       assertFalse(ret.next());
     }
-
-  }
-
-
-  @Test(enabled = false)
-  public void testPaging() throws Exception {
-    String configStr = IOUtils.toString(new BufferedInputStream(new FileInputStream("config/config-4-servers-large.json")), "utf-8");
-    ObjectMapper mapper = new ObjectMapper();
-    final ObjectNode config = (ObjectNode) mapper.readTree(configStr);
-
-    FileUtils.deleteDirectory(new File(System.getProperty("user.home"), "db"));
-
-    DatabaseClient.getServers().clear();
-
-    final DatabaseServer[] dbServers = new DatabaseServer[4];
-    ThreadPoolExecutor executor = new ThreadPoolExecutor(32, 32, 10000, TimeUnit.MILLISECONDS, new ArrayBlockingQueue<Runnable>(1000), new ThreadPoolExecutor.CallerRunsPolicy());
-    List<Future> futures = new ArrayList<>();
-    for (int i = 0; i < dbServers.length; i++) {
-      final int shard = i;
-      futures.add(executor.submit(new Callable() {
-        @Override
-        public Object call() throws Exception {
-          String role = "primaryMaster";
-          dbServers[shard] = new DatabaseServer();
-          dbServers[shard].setConfig(config, "test", "localhost", 9010 + (50 * shard), true, new AtomicBoolean(true), new AtomicBoolean(true),null);
-          dbServers[shard].setRole(role);
-          return null;
-        }
-      }));
-    }
-    for (Future future : futures) {
-      future.get();
-    }
-
-
-    DatabaseClient client = new DatabaseClient("localhost", 9010,-1, -1, true);
-
-    Class.forName("com.sonicbase.jdbcdriver.Driver");
-
-    Connection conn = DriverManager.getConnection("jdbc:sonicbase:127.0.0.1:9000", "user", "password");
-
-    PreparedStatement stmt = conn.prepareStatement("create table Persons (id BIGINT, id2 BIGINT, socialSecurityNumber VARCHAR(20), relatives VARCHAR(64000), restricted BOOLEAN, gender VARCHAR(8), PRIMARY KEY (id))");
-    stmt.executeUpdate();
-
-    stmt = conn.prepareStatement("create index socialSecurityNumber on persons(socialSecurityNumber)");
-    stmt.executeUpdate();
-
-    List<Long> ids = new ArrayList<>();
-
-    //test upsert
-    int recordCount = 2000;
-
-    for (int i = 0; i < recordCount; i++) {
-      stmt = conn.prepareStatement("insert into persons (id, socialSecurityNumber, relatives, restricted, gender) VALUES (?, ?, ?, ?, ?)");
-      stmt.setLong(1, i);
-      stmt.setString(2, "933-28-" + i);
-      stmt.setString(3, "12345678901,12345678901|12345678901,12345678901,12345678901,12345678901|12345678901");
-      stmt.setBoolean(4, false);
-      stmt.setString(5, "m");
-      assertEquals(stmt.executeUpdate(), 1);
-      ids.add((long) i);
-    }
-
-    client.beginRebalance("test");
-
-    while (true) {
-      if (client.isRepartitioningComplete("test")) {
-        break;
-      }
-      Thread.sleep(1000);
-    }
-
-    System.out.println(client.getPartitionSize("test", 0, "persons", "_primarykey"));
-    System.out.println(client.getPartitionSize("test", 1, "persons", "_primarykey"));
-//    System.out.println(client.getPartitionSize(2, "persons", "_primarykey"));
-//    System.out.println(client.getPartitionSize(3, "persons", "_primarykey"));
-
-
-//    stmt = conn.prepareStatement("select * from persons where id = 0");
-//    ResultSet ret = stmt.executeQuery();
-
-    //test select returns multiple records with an index using operator '<='
-    stmt = conn.prepareStatement("select * from persons where id>=0");
-    ResultSet ret = stmt.executeQuery();
-
-    for (int i = 0; i < recordCount; i++) {
-      ret.next();
-      try {
-        assertEquals(ret.getLong("id"), i);
-      }
-      catch (Exception e) {
-        System.out.println("currId=" + i);
-        throw e;
-      }
-    }
-
-    executor.shutdownNow();
-  }
-
-  @Test(enabled = false)
-  public void testMultiValue() throws Exception {
-    String configStr = IOUtils.toString(new BufferedInputStream(new FileInputStream("config/config-4-servers-large.json")), "utf-8");
-    ObjectMapper mapper = new ObjectMapper();
-    final ObjectNode config = (ObjectNode) mapper.readTree(configStr);
-
-    FileUtils.deleteDirectory(new File(System.getProperty("user.home"), "db"));
-
-    DatabaseClient.getServers().clear();
-
-    final DatabaseServer[] dbServers = new DatabaseServer[4];
-    ThreadPoolExecutor executor = new ThreadPoolExecutor(32, 32, 10000, TimeUnit.MILLISECONDS, new ArrayBlockingQueue<Runnable>(1000), new ThreadPoolExecutor.CallerRunsPolicy());
-    List<Future> futures = new ArrayList<>();
-    for (int i = 0; i < dbServers.length; i++) {
-      final int shard = i;
-      futures.add(executor.submit(new Callable() {
-        @Override
-        public Object call() throws Exception {
-          String role = "primaryMaster";
-          dbServers[shard] = new DatabaseServer();
-          dbServers[shard].setConfig(config, "test", "localhost", 9010 + (50 * shard), true, new AtomicBoolean(true), new AtomicBoolean(true),null);
-          dbServers[shard].setRole(role);
-          return null;
-        }
-      }));
-    }
-    for (Future future : futures) {
-      future.get();
-    }
-
-
-    DatabaseClient client = new DatabaseClient("localhost", 9010, -1, -1, true);
-
-    Class.forName("com.sonicbase.jdbcdriver.Driver");
-
-    Connection conn = DriverManager.getConnection("jdbc:sonicbase:127.0.0.1:9000", "user", "password");
-
-    PreparedStatement stmt = conn.prepareStatement("create table Persons (id BIGINT, id2 BIGINT, socialSecurityNumber VARCHAR(20), relatives VARCHAR(64000), restricted BOOLEAN, gender VARCHAR(8), PRIMARY KEY (id))");
-    stmt.executeUpdate();
-
-    stmt = conn.prepareStatement("create index socialSecurityNumber on persons(socialSecurityNumber)");
-    stmt.executeUpdate();
-
-    List<Long> ids = new ArrayList<>();
-
-    //test upsert
-    int recordCount = 20000;
-
-    for (int i = 0; i < recordCount; i++) {
-      stmt = conn.prepareStatement("insert into persons (id, socialSecurityNumber, relatives, restricted, gender) VALUES (?, ?, ?, ?, ?)");
-      stmt.setLong(1, i);
-      stmt.setString(2, "933-28-" + (i % 4));
-      stmt.setString(3, "12345678901,12345678901|12345678901,12345678901,12345678901,12345678901|12345678901");
-      stmt.setBoolean(4, false);
-      stmt.setString(5, "m");
-      assertEquals(stmt.executeUpdate(), 1);
-      ids.add((long) i);
-    }
-
-    client.beginRebalance("test");
-
-    while (true) {
-      if (client.isRepartitioningComplete("test")) {
-        break;
-      }
-      Thread.sleep(1000);
-    }
-
-    System.out.println(client.getPartitionSize("test", 0, "persons", "_primarykey"));
-    System.out.println(client.getPartitionSize("test", 1, "persons", "_primarykey"));
-    //    System.out.println(client.getPartitionSize(2, "persons", "_primarykey"));
-    //    System.out.println(client.getPartitionSize(3, "persons", "_primarykey"));
-
-    stmt = conn.prepareStatement("select * from persons where socialsecuritynumber > '933-28-' order by id asc");
-    ResultSet ret = stmt.executeQuery();
-
-    for (int i = 0; i < recordCount; i++) {
-      ret.next();
-      try {
-        assertEquals(ret.getLong("id"), i, "index=" + i);
-      }
-      catch (Exception e) {
-        throw new Exception("index=" + i, e);
-      }
-    }
-
-    executor.shutdownNow();
-  }
-
-  @Test(enabled = false)
-  public void testDescending() throws Exception {
-    String configStr = IOUtils.toString(new BufferedInputStream(new FileInputStream("config/config-4-servers-large.json")), "utf-8");
-    ObjectMapper mapper = new ObjectMapper();
-    final ObjectNode config = (ObjectNode) mapper.readTree(configStr);
-
-    FileUtils.deleteDirectory(new File(System.getProperty("user.home"), "db"));
-
-    DatabaseClient.getServers().clear();
-
-    final DatabaseServer[] dbServers = new DatabaseServer[4];
-    ThreadPoolExecutor executor = new ThreadPoolExecutor(32, 32, 10000, TimeUnit.MILLISECONDS, new ArrayBlockingQueue<Runnable>(1000), new ThreadPoolExecutor.CallerRunsPolicy());
-    List<Future> futures = new ArrayList<>();
-    for (int i = 0; i < dbServers.length; i++) {
-      final int shard = i;
-      futures.add(executor.submit(new Callable() {
-        @Override
-        public Object call() throws Exception {
-          String role = "primaryMaster";
-          dbServers[shard] = new DatabaseServer();
-          dbServers[shard].setConfig(config, "test", "localhost", 9010 + (50 * shard), true, new AtomicBoolean(true), new AtomicBoolean(true),null);
-          dbServers[shard].setRole(role);
-          return null;
-        }
-      }));
-    }
-    for (Future future : futures) {
-      future.get();
-    }
-
-
-    DatabaseClient client = new DatabaseClient("localhost", 9010, -1, -1, true);
-
-    Class.forName("com.sonicbase.jdbcdriver.Driver");
-
-    Connection conn = DriverManager.getConnection("jdbc:sonicbase:127.0.0.1:9000", "user", "password");
-
-    PreparedStatement stmt = conn.prepareStatement("create table Persons (id BIGINT, id2 BIGINT, socialSecurityNumber VARCHAR(20), relatives VARCHAR(64000), restricted BOOLEAN, gender VARCHAR(8), PRIMARY KEY (id))");
-    stmt.executeUpdate();
-
-    stmt = conn.prepareStatement("create index socialSecurityNumber on persons(socialSecurityNumber)");
-    stmt.executeUpdate();
-
-    List<Long> ids = new ArrayList<>();
-
-    //test upsert
-    int recordCount = 20000;
-
-    for (int i = 0; i < recordCount; i++) {
-      stmt = conn.prepareStatement("insert into persons (id, socialSecurityNumber, relatives, restricted, gender) VALUES (?, ?, ?, ?, ?)");
-      stmt.setLong(1, i);
-      stmt.setString(2, "933-28-" + (i % 4));
-      stmt.setString(3, "12345678901,12345678901|12345678901,12345678901,12345678901,12345678901|12345678901");
-      stmt.setBoolean(4, false);
-      stmt.setString(5, "m");
-      assertEquals(stmt.executeUpdate(), 1);
-      ids.add((long) i);
-    }
-
-    client.beginRebalance("test");
-
-    while (true) {
-      if (client.isRepartitioningComplete("test")) {
-        break;
-      }
-      Thread.sleep(1000);
-    }
-
-    System.out.println(client.getPartitionSize("test", 0, "persons", "_primarykey"));
-    System.out.println(client.getPartitionSize("test", 1, "persons", "_primarykey"));
-    //    System.out.println(client.getPartitionSize(2, "persons", "_primarykey"));
-    //    System.out.println(client.getPartitionSize(3, "persons", "_primarykey"));
-
-
-//    stmt = conn.prepareStatement("select * from persons where id = 0");
-//    ResultSet ret = stmt.executeQuery();
-
-    stmt = conn.prepareStatement("select * from persons where id <= 19999 order by id asc");
-    ResultSet ret = stmt.executeQuery();
-
-    for (int i = 0; i < recordCount; i++) {
-      ret.next();
-      try {
-        assertEquals(ret.getLong("id"), i, "index=" + i);
-      }
-      catch (Exception e) {
-        throw new Exception("index=" + i, e);
-      }
-    }
-
-    stmt = conn.prepareStatement("select * from persons where id < 20000 order by id desc");
-    ret = stmt.executeQuery();
-
-    for (int i = recordCount - 1; i >= 1; i--) {
-      ret.next();
-      try {
-        assertEquals(ret.getLong("id"), i, "index=" + i);
-      }
-      catch (Exception e) {
-        throw new Exception("index=" + i, e);
-      }
-    }
-
-
-    stmt = conn.prepareStatement("select * from persons where id < 20000 order by id asc");
-    ret = stmt.executeQuery();
-
-    for (int i = 0; i < recordCount; i++) {
-      ret.next();
-      try {
-        assertEquals(ret.getLong("id"), i, "index=" + i);
-      }
-      catch (Exception e) {
-        throw new Exception("index=" + i, e);
-      }
-    }
-
-    stmt = conn.prepareStatement("select * from persons where id > 0 order by id desc");
-    ret = stmt.executeQuery();
-
-    for (int i = recordCount - 1; i >= 1; i--) {
-      ret.next();
-      try {
-        assertEquals(ret.getLong("id"), i, "index=" + i);
-      }
-      catch (Exception e) {
-        throw new Exception("index=" + i, e);
-      }
-    }
-
-    stmt = conn.prepareStatement("select * from persons where id > 0 order by id asc");
-    ret = stmt.executeQuery();
-
-    for (int i = 1; i < recordCount; i++) {
-      ret.next();
-      try {
-        assertEquals(ret.getLong("id"), i, "index=" + i);
-      }
-      catch (Exception e) {
-        throw new Exception("index=" + i, e);
-      }
-    }
-
-    executor.shutdownNow();
   }
 
   @Test
@@ -3859,7 +3526,7 @@ public class TestDatabase {
 
   static String algorithm = "DESede";
 
-  public static void xmain(String[] args) throws Exception {
+  public static void xmain(String[] args) {
 
 //    SecretKey symKey = KeyGenerator.getInstance(algorithm).generateKey();
 //    symKey = new SecretKeySpec(Base64.getDecoder().decode(DatabaseServer.LICENSE_KEY), algorithm);
@@ -3892,9 +3559,8 @@ public class TestDatabase {
       BadPaddingException, IllegalBlockSizeException {
     c.init(Cipher.DECRYPT_MODE, pkey);
     byte[] decrypt = c.doFinal(encryptionBytes);
-    String decrypted = new String(decrypt);
 
-    return decrypted;
+    return new String(decrypt);
   }
 
 

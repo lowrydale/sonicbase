@@ -22,7 +22,7 @@ public class Explore {
     final AtomicInteger count = new AtomicInteger();
 
     long begin = System.nanoTime();
-    list.stream().forEach((Consumer) o -> {
+    list.forEach((Consumer) o -> {
       count.incrementAndGet();
     });
     long end = System.nanoTime();

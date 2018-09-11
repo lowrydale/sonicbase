@@ -1,6 +1,7 @@
 package com.sonicbase.server;
 
 import com.sonicbase.common.DatabaseCommon;
+import com.sonicbase.common.KeyRecord;
 import com.sonicbase.common.Record;
 import com.sonicbase.query.BinaryExpression;
 import com.sonicbase.query.impl.BinaryExpressionImpl;
@@ -8,6 +9,7 @@ import com.sonicbase.query.impl.ColumnImpl;
 import com.sonicbase.query.impl.ConstantImpl;
 import com.sonicbase.query.impl.Counter;
 import com.sonicbase.schema.DataType;
+import com.sonicbase.schema.IndexSchema;
 import com.sonicbase.schema.TableSchema;
 import com.sonicbase.util.TestUtils;
 import org.mockito.MockitoAnnotations;
@@ -19,6 +21,7 @@ import java.util.*;
 import java.util.concurrent.atomic.AtomicBoolean;
 import java.util.concurrent.atomic.AtomicLong;
 
+import static com.sonicbase.client.DatabaseClient.SERIALIZATION_VERSION;
 import static org.mockito.Mockito.mock;
 import static org.mockito.Mockito.when;
 import static org.testng.Assert.assertEquals;
@@ -138,6 +141,40 @@ public class IndexLookupTest {
     assertEquals(indexLookup.retRecords.get(0), records[0]);
 
   }
+
+  @Test
+  public void testHandleRecordWithKeys() throws UnsupportedEncodingException {
+    DatabaseServer server = mock(DatabaseServer.class);
+    IndexLookupOneKey indexLookup = new IndexLookupOneKey(server);
+
+    AtomicBoolean done = new AtomicBoolean();
+    Object[] key = new Object[]{100L};
+
+    Map<Integer, TableSchema> tables = new HashMap<>();
+    TableSchema tableSchema = TestUtils.createTable();
+    IndexSchema indexSchema = TestUtils.createIndexSchema(tableSchema);
+    DatabaseCommon common = TestUtils.createCommon(tableSchema);
+
+    byte[][] records = TestUtils.createRecords(common, tableSchema, 10);
+    List<Object[]> keys = TestUtils.createKeys(10);
+
+    KeyRecord keyRecord = new KeyRecord();
+    keyRecord.setPrimaryKey(DatabaseCommon.serializeKey(tableSchema, indexSchema.getName(), new Object[]{0L}));
+    byte[][] keyRecorBytes = new byte[][]{keyRecord.serialize(SERIALIZATION_VERSION)};
+    indexLookup.keys = true;
+    indexLookup.currOffset = new AtomicLong();
+    indexLookup.countReturned = new AtomicLong();
+    indexLookup.retRecords = new ArrayList<>();
+    indexLookup.retKeys = new ArrayList<>();
+    indexLookup.retKeyRecords = new ArrayList<>();
+
+    indexLookup.handleRecord(100, key, false,
+        records, keyRecorBytes, done);
+
+    assertEquals(indexLookup.retKeyRecords.get(0), keyRecorBytes[0]);
+
+  }
+
 
   @Test
   public void testHandleRecordEvaluateExpression() throws UnsupportedEncodingException {

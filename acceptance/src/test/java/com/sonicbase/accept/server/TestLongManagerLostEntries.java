@@ -1,9 +1,8 @@
 package com.sonicbase.accept.server;
 
-import com.fasterxml.jackson.databind.ObjectMapper;
-import com.fasterxml.jackson.databind.node.ObjectNode;
 import com.sonicbase.client.DatabaseClient;
 import com.sonicbase.common.ComObject;
+import com.sonicbase.common.Config;
 import com.sonicbase.query.DatabaseException;
 import com.sonicbase.server.DatabaseServer;
 import com.sonicbase.server.LogManager;
@@ -24,8 +23,8 @@ import static org.testng.Assert.assertEquals;
 
 public class TestLongManagerLostEntries {
 
-  ConcurrentHashMap<Long, Long> foundIds = new ConcurrentHashMap<>();
-  AtomicInteger countPlayed = new AtomicInteger();
+  final ConcurrentHashMap<Long, Long> foundIds = new ConcurrentHashMap<>();
+  final AtomicInteger countPlayed = new AtomicInteger();
 
   class MonitorServer extends com.sonicbase.server.DatabaseServer {
     public byte[] invokeMethod(final byte[] body, long logSequence0, long logSequence1,
@@ -75,9 +74,8 @@ public class TestLongManagerLostEntries {
 
   @Test
   public void test() throws IOException, InterruptedException {
-    String configStr = IOUtils.toString(new BufferedInputStream(getClass().getResourceAsStream("/config/config-4-servers.json")), "utf-8");
-    ObjectMapper mapper = new ObjectMapper();
-    final ObjectNode config = (ObjectNode) mapper.readTree(configStr);
+    String configStr = IOUtils.toString(new BufferedInputStream(getClass().getResourceAsStream("/config/config-4-servers.yaml")), "utf-8");
+    Config config = new Config(configStr);
 
     FileUtils.deleteDirectory(new File(System.getProperty("user.home"), "db"));
 
@@ -88,10 +86,9 @@ public class TestLongManagerLostEntries {
     String role = "primaryMaster";
 
     for (int i = 0; i < dbServers.length; i++) {
-      final int shard = i;
-      dbServers[shard] = new MonitorServer();
-      dbServers[shard].setConfig(config, "4-servers", "localhost", 9010 + (50 * shard), true, new AtomicBoolean(true), new AtomicBoolean(true),null);
-      dbServers[shard].setRole(role);
+      dbServers[i] = new MonitorServer();
+      dbServers[i].setConfig(config, "4-servers", "localhost", 9010 + (50 * i), true, new AtomicBoolean(true), new AtomicBoolean(true),null);
+      dbServers[i].setRole(role);
     }
 
     try {

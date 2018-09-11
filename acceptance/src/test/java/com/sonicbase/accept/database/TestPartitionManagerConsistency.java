@@ -1,9 +1,8 @@
 
 package com.sonicbase.accept.database;
 
-import com.fasterxml.jackson.databind.ObjectMapper;
-import com.fasterxml.jackson.databind.node.ObjectNode;
 import com.sonicbase.client.DatabaseClient;
+import com.sonicbase.common.Config;
 import com.sonicbase.common.DatabaseCommon;
 import com.sonicbase.common.Record;
 import com.sonicbase.index.Index;
@@ -43,11 +42,10 @@ public class TestPartitionManagerConsistency {
   final DatabaseServer[] dbServers = new DatabaseServer[4];
 
   @BeforeClass
-  public void beforeClass() throws Exception {
+  public void beforeClass() {
     try {
-      String configStr = IOUtils.toString(new BufferedInputStream(getClass().getResourceAsStream("/config/config-4-servers.json")), "utf-8");
-      ObjectMapper mapper = new ObjectMapper();
-      final ObjectNode config = (ObjectNode) mapper.readTree(configStr);
+      String configStr = IOUtils.toString(new BufferedInputStream(getClass().getResourceAsStream("/config/config-4-servers.yaml")), "utf-8");
+      Config config = new Config(configStr);
 
       FileUtils.deleteDirectory(new File(System.getProperty("user.home"), "db"));
 
@@ -57,10 +55,9 @@ public class TestPartitionManagerConsistency {
       String role = "primaryMaster";
 
       for (int i = 0; i < dbServers.length; i++) {
-        final int shard = i;
-        dbServers[shard] = new DatabaseServer();
-        dbServers[shard].setConfig(config, "4-servers", "localhost", 9010 + (50 * shard), true, new AtomicBoolean(true), new AtomicBoolean(true),null);
-        dbServers[shard].setRole(role);
+        dbServers[i] = new DatabaseServer();
+        dbServers[i].setConfig(config, "4-servers", "localhost", 9010 + (50 * i), true, new AtomicBoolean(true), new AtomicBoolean(true),null);
+        dbServers[i].setRole(role);
       }
 
       dbServers[0].getMasterManager().promoteToMaster(null, false);
@@ -100,145 +97,139 @@ public class TestPartitionManagerConsistency {
     try {
 
       final AtomicLong highestId = new AtomicLong();
-      Thread thread = new Thread(new Runnable(){
-        @Override
-        public void run() {
-          try {
-            for (int i = 0; ; i++) {
-              PreparedStatement stmt = conn.prepareStatement("insert into persons (id, id2) VALUES (?, ?)");
-              stmt.setLong(1, i );
-              stmt.setLong(2, (i + 100) % 2);
-              int count = stmt.executeUpdate();
-              assertEquals(count, 1);
-              highestId.set(i);
+      Thread thread = new Thread(() -> {
+        try {
+          for (int i = 0; ; i++) {
+            PreparedStatement stmt = conn.prepareStatement("insert into persons (id, id2) VALUES (?, ?)");
+            stmt.setLong(1, i );
+            stmt.setLong(2, (i + 100) % 2);
+            int count = stmt.executeUpdate();
+            assertEquals(count, 1);
+            highestId.set(i);
 
-              Thread.sleep(1);
+            Thread.sleep(1);
 
-              if (highestId.get() % 10000 == 0) {
-                System.out.println("upsert progress: count=" + highestId.get());
-              }
+            if (highestId.get() % 10000 == 0) {
+              System.out.println("upsert progress: count=" + highestId.get());
             }
           }
-          catch (Exception e) {
-            e.printStackTrace();
-          }
+        }
+        catch (Exception e) {
+          e.printStackTrace();
         }
       });
       thread.start();
 
-      thread = new Thread(new Runnable(){
-        @Override
-        public void run() {
-          long lastHighest = 0;
-          while (true) {
-            try {
-              PreparedStatement stmt = conn.prepareStatement("select * from persons where id >= 0");
-              ResultSet rs = stmt.executeQuery();
-              while (lastHighest == highestId.get()) {
-                Thread.sleep(500);
-              }
-              Thread.sleep(50);
-              long highest = highestId.get();
-              lastHighest = highest;
-              for (int i = 0; i < highest; i++) {
-                //Thread.sleep(1);
-                long id = -1;
+      thread = new Thread(() -> {
+        long lastHighest = 0;
+        while (true) {
+          try {
+            PreparedStatement stmt = conn.prepareStatement("select * from persons where id >= 0");
+            ResultSet rs = stmt.executeQuery();
+            while (lastHighest == highestId.get()) {
+              Thread.sleep(500);
+            }
+            Thread.sleep(50);
+            long highest = highestId.get();
+            lastHighest = highest;
+            for (int i = 0; i < highest; i++) {
+              //Thread.sleep(1);
+              long id = -1;
 //                rs.next();
-                if (!rs.next()) {
-                  System.out.println("didn't reach end: " + i);
+              if (!rs.next()) {
+                System.out.println("didn't reach end: " + i);
+              }
+              else {
+                id = rs.getLong("id");
+              }
+              if (id != i) {
+                Map<Integer, Index> indices = new HashMap<>();
+                Map<Integer, DatabaseServer> dbServersByShard = new HashMap<>();
+                for (int j = 0; j < dbServers.length; j++) {
+                  if (dbServers[j].getReplica() == 0) {
+                    indices.put(dbServers[j].getShard(), dbServers[j].getIndices().get("test").getIndices().get("persons").get("_primarykey"));
+                    dbServersByShard.put(dbServers[j].getShard(), dbServers[j]);
+                  }
                 }
-                else {
-                  id = rs.getLong("id");
+                IndexSchema schema = dbServers[0].getCommon().getTables("test").get("persons").getIndices().get("_primarykey");
+                Index index0 = dbServers[0].getIndices().get("test").getIndices().get("persons").get("_primarykey");
+                Index index1 = dbServers[2].getIndices().get("test").getIndices().get("persons").get("_primarykey");
+                Index index0_1 = dbServers[1].getIndices().get("test").getIndices().get("persons").get("_primarykey");
+                Index index1_1 = dbServers[3].getIndices().get("test").getIndices().get("persons").get("_primarykey");
+
+                TableSchema.Partition[] partitions = schema.getCurrPartitions();
+                TableSchema.Partition[] lastPartitions = schema.getLastPartitions();
+                StringBuilder last = new StringBuilder();
+                StringBuilder curr = new StringBuilder();
+                for (int j = 0; j < partitions.length; j++) {
+                  appendUpperKey(j, partitions, curr);
                 }
-                if (id != i) {
-                  Map<Integer, Index> indices = new HashMap<>();
-                  Map<Integer, DatabaseServer> dbServersByShard = new HashMap<>();
-                  for (int j = 0; j < dbServers.length; j++) {
-                    if (dbServers[j].getReplica() == 0) {
-                      indices.put(dbServers[j].getShard(), dbServers[j].getIndices().get("test").getIndices().get("persons").get("_1__primarykey"));
-                      dbServersByShard.put(dbServers[j].getShard(), dbServers[j]);
+                synchronized (PartitionManager.getPreviousPartitions()) {
+                  List<PartitionManager.PartitionEntry> list = PartitionManager.getPreviousPartitions().get("persons:_primarykey");
+                  for (int j = Math.min(4, list.size() - 1); j >= 0; j--) {
+                    last.append("last(").append(j).append(")");
+                    PartitionManager.PartitionEntry entry = list.get(j);
+                    if (entry == null || entry.getPartitions() == null) {
+                      last.append("null");
+                    }
+                    else {
+                      for (int k = 0; k < entry.getPartitions().length; k++) {
+                        appendUpperKey(k, entry.getPartitions(), last);
+                      }
                     }
                   }
-                  IndexSchema schema = dbServers[0].getCommon().getTables("test").get("persons").getIndices().get("_1__primarykey");
-                  Index index0 = dbServers[0].getIndices().get("test").getIndices().get("persons").get("_1__primarykey");
-                  Index index1 = dbServers[2].getIndices().get("test").getIndices().get("persons").get("_1__primarykey");
-                  Index index0_1 = dbServers[1].getIndices().get("test").getIndices().get("persons").get("_1__primarykey");
-                  Index index1_1 = dbServers[3].getIndices().get("test").getIndices().get("persons").get("_1__primarykey");
-
-                  TableSchema.Partition[] partitions = schema.getCurrPartitions();
-                  TableSchema.Partition[] lastPartitions = schema.getLastPartitions();
-                  StringBuilder last = new StringBuilder();
-                  StringBuilder curr = new StringBuilder();
-                  for (int j = 0; j < partitions.length; j++) {
-                    appendUpperKey(j, partitions, curr);
-                  }
-                  synchronized (PartitionManager.getPreviousPartitions()) {
-                    List<PartitionManager.PartitionEntry> list = PartitionManager.getPreviousPartitions().get("persons:_1__primarykey");
-                    for (int j = Math.min(4, list.size() - 1); j >= 0; j--) {
-                      last.append("last(" + j + ")");
-                      PartitionManager.PartitionEntry entry = list.get(j);
-                      if (entry == null || entry.getPartitions() == null) {
-                        last.append("null");
-                      }
-                      else {
-                        for (int k = 0; k < entry.getPartitions().length; k++) {
-                          appendUpperKey(k, entry.getPartitions(), last);
-                        }
-                      }
-                    }
-                  }
-
-                  TableSchema tableSchema = dbServers[0].getCommon().getTables("test").get("persons");
-                  IndexSchema indexSchema = tableSchema.getIndices().get("_1__primarykey");
-                  String[] indexFields = indexSchema.getFields();
-                  int[] fieldOffsets = new int[indexFields.length];
-                  for (int k = 0; k < indexFields.length; k++) {
-                    fieldOffsets[k] = tableSchema.getFieldOffset(indexFields[k]);
-                  }
-
-                  int lastShard = ((ResultSetProxy)rs).getLastShard();
-                  boolean isCurrPartitions = ((ResultSetProxy)rs).isCurrPartitions();
-
-                  boolean currPartitions = false;
-                  List<Integer> selectedShards = PartitionUtils.findOrderedPartitionForRecord(false, true, tableSchema,
-                      "_1__primarykey", null, BinaryExpression.Operator.EQUAL, null, new Object[]{i},
-                      null);
-                  if (selectedShards.size() == 0) {
-                    selectedShards = PartitionUtils.findOrderedPartitionForRecord(true, false, tableSchema,
-                        indexSchema.getName(), null, BinaryExpression.Operator.EQUAL, null, new Object[]{i}, null);
-                    currPartitions = true;
-                  }
-                  StringBuilder found = new StringBuilder();
-                  found.append(i).append("=");
-                  for (Map.Entry<Integer, Index> entry : indices.entrySet()) {
-                    found.append(getRecordDebug(i, entry.getValue(), dbServersByShard.get(entry.getKey()))).append(",");
-                  }
-                  long viewVersion = ((ResultSetProxy)rs).getViewVersion();
-                  System.out.println("schemaVersion=" + dbServers[0].getSchemaVersion() + ", viewVersion=" + viewVersion  +
-                      ", currShard(" + (isCurrPartitions ? "curr" : "last") + ")=" + lastShard + //selectedShards.get(0) +
-                      ",currUpperKey=" + curr.toString() +
-                      ", lastUpperKey=" + last.toString() +
-                      ", found=" + found.toString() +
-                    ", last0=" + DatabaseCommon.keyToString(index0.lastEntry().getKey()) + ", shard0=" + dbServers[0].getShard() +
-                      ", last1=" + (index1.lastEntry() == null ? "" : DatabaseCommon.keyToString(index1.lastEntry().getKey())) + ", shard1=" + dbServers[2].getShard() +
-                  ", first0=" + DatabaseCommon.keyToString(index0.firstEntry().getKey()) + ", shard0=" + dbServers[0].getShard() +
-                      ", first1=" + (index1.firstEntry() == null ? "" : DatabaseCommon.keyToString(index1.firstEntry().getKey())) + ", shard1=" + dbServers[2].getShard() +
-                    ", size0=" + index0.size() + ", size1=" + index1.size());
-
-                  throw new Exception(id + " != " + i);
                 }
+
+                TableSchema tableSchema = dbServers[0].getCommon().getTables("test").get("persons");
+                IndexSchema indexSchema = tableSchema.getIndices().get("_primarykey");
+                String[] indexFields = indexSchema.getFields();
+                int[] fieldOffsets = new int[indexFields.length];
+                for (int k = 0; k < indexFields.length; k++) {
+                  fieldOffsets[k] = tableSchema.getFieldOffset(indexFields[k]);
+                }
+
+                int lastShard = ((ResultSetProxy)rs).getLastShard();
+                boolean isCurrPartitions = ((ResultSetProxy)rs).isCurrPartitions();
+
+                boolean currPartitions = false;
+                List<Integer> selectedShards = PartitionUtils.findOrderedPartitionForRecord(false, true, tableSchema,
+                    "_primarykey", null, BinaryExpression.Operator.EQUAL, null, new Object[]{i},
+                    null);
+                if (selectedShards.size() == 0) {
+                  selectedShards = PartitionUtils.findOrderedPartitionForRecord(true, false, tableSchema,
+                      indexSchema.getName(), null, BinaryExpression.Operator.EQUAL, null, new Object[]{i}, null);
+                  currPartitions = true;
+                }
+                StringBuilder found = new StringBuilder();
+                found.append(i).append("=");
+                for (Map.Entry<Integer, Index> entry : indices.entrySet()) {
+                  found.append(getRecordDebug(i, entry.getValue(), dbServersByShard.get(entry.getKey()))).append(",");
+                }
+                long viewVersion = ((ResultSetProxy)rs).getViewVersion();
+                System.out.println("schemaVersion=" + dbServers[0].getSchemaVersion() + ", viewVersion=" + viewVersion  +
+                    ", currShard(" + (isCurrPartitions ? "curr" : "last") + ")=" + lastShard + //selectedShards.get(0) +
+                    ",currUpperKey=" + curr.toString() +
+                    ", lastUpperKey=" + last.toString() +
+                    ", found=" + found.toString() +
+                  ", last0=" + DatabaseCommon.keyToString(index0.lastEntry().getKey()) + ", shard0=" + dbServers[0].getShard() +
+                    ", last1=" + (index1.lastEntry() == null ? "" : DatabaseCommon.keyToString(index1.lastEntry().getKey())) + ", shard1=" + dbServers[2].getShard() +
+                ", first0=" + DatabaseCommon.keyToString(index0.firstEntry().getKey()) + ", shard0=" + dbServers[0].getShard() +
+                    ", first1=" + (index1.firstEntry() == null ? "" : DatabaseCommon.keyToString(index1.firstEntry().getKey())) + ", shard1=" + dbServers[2].getShard() +
+                  ", size0=" + index0.size() + ", size1=" + index1.size());
+
+                throw new Exception(id + " != " + i);
               }
-              System.out.println("finished range: " + lastHighest);
             }
-            catch (Exception e) {
-              try {
-                Thread.sleep(1000);
-              }
-              catch (InterruptedException e1) {
-                e1.printStackTrace();
-              }
-              e.printStackTrace();
+            System.out.println("finished range: " + lastHighest);
+          }
+          catch (Exception e) {
+            try {
+              Thread.sleep(1000);
             }
+            catch (InterruptedException e1) {
+              e1.printStackTrace();
+            }
+            e.printStackTrace();
           }
         }
       });

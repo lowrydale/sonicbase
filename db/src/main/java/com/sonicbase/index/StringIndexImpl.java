@@ -1,5 +1,7 @@
 package com.sonicbase.index;
 
+import org.apache.hadoop.io.WritableComparator;
+
 import java.io.IOException;
 import java.util.ArrayList;
 import java.util.Comparator;
@@ -14,40 +16,17 @@ import java.util.concurrent.ConcurrentSkipListMap;
 public class StringIndexImpl implements IndexImpl {
   private final Index index;
 
-  private ConcurrentSkipListMap<byte[], Object> stringSkipIndex;
-
-  private static Comparator utf8Comparator = (o1, o2) -> {
-    byte[] b1 = (byte[]) o1;
-    byte[] b2 = (byte[]) o2;
-    if (b1 == null && b2 == null) {
-      return 0;
-    }
-    if (b1 == null) {
-      return -1;
-    }
-    if (b2 == null) {
-      return 1;
-    }
-    for (int i = 0; i < Math.min(b1.length, b2.length); i++) {
-      if (b1[i] < b2[i]) {
-        return -1;
-      }
-      if (b1[i] > b2[i]) {
-        return 1;
-      }
-    }
-    if (b1.length < b2.length) {
-      return -1;
-    }
-    if (b1.length > b2.length) {
-      return 1;
-    }
-    return 0;
-  };
+  private final ConcurrentSkipListMap<byte[], Object> stringSkipIndex;
 
   StringIndexImpl(Index index) {
     this.index = index;
-    stringSkipIndex = new ConcurrentSkipListMap<>(utf8Comparator);
+    //don't make this a lambda
+    stringSkipIndex = new ConcurrentSkipListMap<>(new Comparator<byte[]>() {
+      @Override
+      public int compare(byte[] o1, byte[] o2) {
+        return WritableComparator.compareBytes(o1, 0, o1.length, o2, 0, o2.length);
+      }
+    });
   }
 
   public void clear() {

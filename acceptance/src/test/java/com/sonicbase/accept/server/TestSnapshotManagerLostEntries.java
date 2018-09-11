@@ -1,9 +1,8 @@
 package com.sonicbase.accept.server;
 
-import com.fasterxml.jackson.databind.ObjectMapper;
-import com.fasterxml.jackson.databind.node.ObjectNode;
 import com.sonicbase.client.DatabaseClient;
 import com.sonicbase.common.ComObject;
+import com.sonicbase.common.Config;
 import com.sonicbase.jdbcdriver.ConnectionProxy;
 import com.sonicbase.server.DatabaseServer;
 import org.apache.commons.io.IOUtils;
@@ -28,9 +27,9 @@ import static org.testng.Assert.assertEquals;
 
 public class TestSnapshotManagerLostEntries {
 
-  ConcurrentHashMap<Long, Long> foundIds = new ConcurrentHashMap<>();
-  AtomicInteger countPlayed = new AtomicInteger();
-  int recordCount = 10_000;
+  final ConcurrentHashMap<Long, Long> foundIds = new ConcurrentHashMap<>();
+  final AtomicInteger countPlayed = new AtomicInteger();
+  final int recordCount = 10_000;
 
   class MonitorServer extends com.sonicbase.server.DatabaseServer {
     public byte[] invokeMethod(final byte[] body, long logSequence0, long logSequence1,
@@ -54,9 +53,8 @@ public class TestSnapshotManagerLostEntries {
   public void test() throws Exception {
     System.setProperty("log4j.configuration", "test-log4j.xml");
 
-    String configStr = IOUtils.toString(new BufferedInputStream(getClass().getResourceAsStream("/config/config-4-servers.json")), "utf-8");
-    ObjectMapper mapper = new ObjectMapper();
-    ObjectNode config = (ObjectNode) mapper.readTree(configStr);
+    String configStr = IOUtils.toString(new BufferedInputStream(getClass().getResourceAsStream("/config/config-4-servers.yaml")), "utf-8");
+    Config config = new Config(configStr);
 
     FileUtils.deleteDirectory(new File(System.getProperty("user.home"), "db"));
 
@@ -68,10 +66,9 @@ public class TestSnapshotManagerLostEntries {
     String role = "primaryMaster";
 
     for (int i = 0; i < dbServers.length; i++) {
-      final int shard = i;
-      dbServers[shard] = new MonitorServer();
-      dbServers[shard].setConfig(config, "4-servers", "localhost", 9010 + (50 * shard), true, new AtomicBoolean(true), new AtomicBoolean(true),null);
-      dbServers[shard].setRole(role);
+      dbServers[i] = new MonitorServer();
+      dbServers[i].setConfig(config, "4-servers", "localhost", 9010 + (50 * i), true, new AtomicBoolean(true), new AtomicBoolean(true),null);
+      dbServers[i].setRole(role);
     }
 
     Connection conn = null;
@@ -126,19 +123,17 @@ public class TestSnapshotManagerLostEntries {
       dbServers[3].shutdown();
     }
 
-    configStr = IOUtils.toString(new BufferedInputStream(getClass().getResourceAsStream("/config/config-4-servers.json")), "utf-8");
-    mapper = new ObjectMapper();
-    config = (ObjectNode) mapper.readTree(configStr);
+    configStr = IOUtils.toString(new BufferedInputStream(getClass().getResourceAsStream("/config/config-4-servers.yaml")), "utf-8");
+    config = new Config(configStr);
 
     dbServers = new com.sonicbase.server.DatabaseServer[4];
 
     role = "primaryMaster";
 
     for (int i = 0; i < dbServers.length; i++) {
-      final int shard = i;
-      dbServers[shard] = new MonitorServer();
-      dbServers[shard].setConfig(config, "4-servers", "localhost", 9010 + (50 * shard), true, new AtomicBoolean(true), new AtomicBoolean(true),null);
-      dbServers[shard].setRole(role);
+      dbServers[i] = new MonitorServer();
+      dbServers[i].setConfig(config, "4-servers", "localhost", 9010 + (50 * i), true, new AtomicBoolean(true), new AtomicBoolean(true),null);
+      dbServers[i].setRole(role);
     }
 
     try {

@@ -44,24 +44,24 @@ public class DatabaseClient {
 
   public static final int SELECT_PAGE_SIZE = 1000;
   public static final int OPTIMIZED_RANGE_PAGE_SIZE = 4_000;
-  public static final String SHUTTING_DOWN_STR = "Shutting down";
-  public static final String NONE_STR = "__none__";
-  public static final String DATABASE_SERVER_GET_SCHEMA_STR = "DatabaseServer:getSchema";
-  public static final String SCHEMA_OUT_OF_SYNC_EXCEPTION_STR = "SchemaOutOfSyncException";
-  public static final String CURR_VER_STR = "currVer:";
-  public static final String HOST_STR = "Host=";
-  public static final String METHOD_STR = ", method=";
-  public static final String EXPLAIN_STR = "explain";
+  private static final String SHUTTING_DOWN_STR = "Shutting down";
+  private static final String NONE_STR = "__none__";
+  private static final String DATABASE_SERVER_GET_SCHEMA_STR = "DatabaseServer:getSchema";
+  private static final String SCHEMA_OUT_OF_SYNC_EXCEPTION_STR = "SchemaOutOfSyncException";
+  private static final String CURR_VER_STR = "currVer:";
+  private static final String HOST_STR = "Host=";
+  private static final String METHOD_STR = ", method=";
+  private static final String EXPLAIN_STR = "explain";
 
   private final boolean isClient;
   private final int shard;
   private final int replica;
-  private static ConcurrentHashMap<String, Thread> statsRecorderThreads = new ConcurrentHashMap<>();
+  private static final ConcurrentHashMap<String, Thread> statsRecorderThreads = new ConcurrentHashMap<>();
   private final String allocatedStack;
   private final StatementHandlerFactory statementHandlerFactory;
   private Object databaseServer;
   private Server[][] servers;
-  private AtomicBoolean isShutdown = new AtomicBoolean();
+  private final AtomicBoolean isShutdown = new AtomicBoolean();
   public static final AtomicInteger clientRefCount = new AtomicInteger();
   public static final Map<String, DatabaseClient> sharedClients = new ConcurrentHashMap<>();
   public static final Queue<DatabaseClient> allClients = new ConcurrentLinkedQueue<>();
@@ -69,18 +69,17 @@ public class DatabaseClient {
   private DatabaseCommon common = new DatabaseCommon();
   private static ThreadPoolExecutor executor = null;
 
-  private static Logger localLogger = LoggerFactory.getLogger(DatabaseClient.class);
-  private static Logger logger = LoggerFactory.getLogger(DatabaseClient.class);
+  private static final Logger localLogger = LoggerFactory.getLogger(DatabaseClient.class);
+  private static final Logger logger = LoggerFactory.getLogger(DatabaseClient.class);
 
 
   private int pageSize = SELECT_PAGE_SIZE;
 
-  private ThreadLocal<Boolean> isExplicitTrans = new ThreadLocal<>();
-  private ThreadLocal<Boolean> isCommitting = new ThreadLocal<>();
-  private ThreadLocal<Long> transactionId = new ThreadLocal<>();
-  private ThreadLocal<List<TransactionOperation>> transactionOps = new ThreadLocal<>();
+  private final ThreadLocal<Boolean> isExplicitTrans = new ThreadLocal<>();
+  private final ThreadLocal<Boolean> isCommitting = new ThreadLocal<>();
+  private final ThreadLocal<Long> transactionId = new ThreadLocal<>();
   private Timer statsTimer;
-  private ConcurrentHashMap<String, StatementCacheEntry> statementCache = new ConcurrentHashMap<>();
+  private final ConcurrentHashMap<String, StatementCacheEntry> statementCache = new ConcurrentHashMap<>();
 
   public static final Map<Integer, Map<Integer, Object>> dbservers = new ConcurrentHashMap<>();
   public static final Map<Integer, Map<Integer, Object>> dbdebugServers = new ConcurrentHashMap<>();
@@ -90,13 +89,15 @@ public class DatabaseClient {
   private final Object idAllocatorLock = new Object();
   private final AtomicLong nextId = new AtomicLong(-1L);
   private final AtomicLong maxAllocatedId = new AtomicLong(-1L);
-  private DescribeStatementHandler describeHandler = new DescribeStatementHandler(this);
+  private final DescribeStatementHandler describeHandler = new DescribeStatementHandler(this);
+  private static final ConcurrentHashMap<String, String> lowered = new ConcurrentHashMap<>();
 
   public static final com.codahale.metrics.Timer INDEX_LOOKUP_STATS = METRICS.timer("indexLookup");
   public static final com.codahale.metrics.Timer BATCH_INDEX_LOOKUP_STATS = METRICS.timer("batchIndexLookup");
   public static final com.codahale.metrics.Timer JOIN_EVALUATE = METRICS.timer("joinEvaluate");
+  private final Random rand = new Random(System.currentTimeMillis());
 
-  private static String[] writeVerbsArray = new String[]{
+  private static final String[] writeVerbsArray = new String[]{
       "SchemaManager:dropTable",
       "SchemaManager:dropIndex",
       "SchemaManager:dropDatabase",
@@ -152,9 +153,9 @@ public class DatabaseClient {
       "MonitorManager:registerStats"
   };
 
-  private static Set<String> writeVerbs = new HashSet<>();
+  private static final Set<String> writeVerbs = new HashSet<>();
 
-  private static String[] parallelVerbsArray = new String[]{
+  private static final String[] parallelVerbsArray = new String[]{
       "UpdateManager:insertIndexEntryByKey",
       "UpdateManager:insertIndexEntryByKeyWithRecord",
       "PartitionManager:moveIndexEntries",
@@ -165,7 +166,7 @@ public class DatabaseClient {
       "MonitorManager:registerStats",
   };
 
-  private static Set<String> parallelVerbs = new HashSet<>();
+  private static final Set<String> parallelVerbs = new HashSet<>();
   private String cluster;
   private ClientStatsHandler clientStatsHandler = new ClientStatsHandler();
 
@@ -224,7 +225,7 @@ public class DatabaseClient {
 
     if (!isShared) {
       synchronized (DatabaseClient.class) {
-        DatabaseClient sharedClient = sharedClients.get(getCluster());
+          DatabaseClient sharedClient = sharedClients.get(getCluster());
         if (sharedClient == null) {
           sharedClient = new DatabaseClient(hosts, shard, replica, isClient, common, databaseServer, true);
           sharedClients.put(getCluster(), sharedClient);
@@ -260,12 +261,8 @@ public class DatabaseClient {
   }
 
   static {
-    for (String verb : writeVerbsArray) {
-      writeVerbs.add(verb);
-    }
-    for (String verb : parallelVerbsArray) {
-      parallelVerbs.add(verb);
-    }
+    Collections.addAll(writeVerbs, writeVerbsArray);
+    parallelVerbs.addAll(Arrays.asList(parallelVerbsArray));
   }
 
   public int getPageSize() {
@@ -345,7 +342,6 @@ public class DatabaseClient {
     }
 
     isExplicitTrans.set(true);
-    transactionOps.set(null);
     isCommitting.set(false);
     try {
       transactionId.set(allocateId(dbName));
@@ -373,7 +369,6 @@ public class DatabaseClient {
         sendToAllShards("UpdateManager:commit", 0, cobj, DatabaseClient.Replica.DEF);
 
         isExplicitTrans.set(false);
-        transactionOps.set(null);
         isCommitting.set(false);
         transactionId.set(null);
 
@@ -404,7 +399,6 @@ public class DatabaseClient {
     sendToAllShards("UpdateManager:rollback", 0, cobj, DatabaseClient.Replica.DEF);
 
     isExplicitTrans.set(false);
-    transactionOps.set(null);
     isCommitting.set(false);
     transactionId.set(null);
   }
@@ -488,37 +482,31 @@ public class DatabaseClient {
   }
 
   public ReconfigureResults reconfigureCluster() {
-    try {
-      ComObject cobj = new ComObject();
-      cobj.put(ComObject.Tag.DB_NAME, NONE_STR);
-      cobj.put(ComObject.Tag.SCHEMA_VERSION, common.getSchemaVersion());
-      cobj.put(ComObject.Tag.METHOD, "DatabaseServer:healthCheck");
 
-      try {
-        byte[] bytes = sendToMaster(cobj);
-        ComObject retObj = new ComObject(bytes);
-        if (retObj.getString(ComObject.Tag.STATUS).equals("{\"status\" : \"ok\"}")) {
-          ComObject rcobj = new ComObject();
-          rcobj.put(ComObject.Tag.DB_NAME, NONE_STR);
-          rcobj.put(ComObject.Tag.SCHEMA_VERSION, common.getSchemaVersion());
-          rcobj.put(ComObject.Tag.METHOD, "DatabaseServer:reconfigureCluster");
-          bytes = sendToMaster(null);
-          retObj = new ComObject(bytes);
-          int count = retObj.getInt(ComObject.Tag.COUNT);
-          return new ReconfigureResults(true, count);
-        }
+    ComObject cobj = new ComObject();
+    cobj.put(ComObject.Tag.DB_NAME, NONE_STR);
+    cobj.put(ComObject.Tag.SCHEMA_VERSION, common.getSchemaVersion());
+    cobj.put(ComObject.Tag.METHOD, "DatabaseServer:healthCheck");
+
+    try {
+      byte[] bytes = sendToMaster(cobj);
+      ComObject retObj = new ComObject(bytes);
+      if (retObj.getString(ComObject.Tag.STATUS).equals("{\"status\" : \"ok\"}")) {
+        ComObject rcobj = new ComObject();
+        rcobj.put(ComObject.Tag.DB_NAME, NONE_STR);
+        rcobj.put(ComObject.Tag.SCHEMA_VERSION, common.getSchemaVersion());
+        rcobj.put(ComObject.Tag.METHOD, "DatabaseServer:reconfigureCluster");
+        bytes = sendToMaster(null);
+        retObj = new ComObject(bytes);
+        int count = retObj.getInt(ComObject.Tag.COUNT);
+        return new ReconfigureResults(true, count);
       }
-      catch (Exception e) {
-        logger.error("Error reconfiguring cluster. Master server not running", e);
-      }
-      return new ReconfigureResults(false, 0);
     }
     catch (Exception e) {
-      throw new DatabaseException(e);
+      logger.error("Error reconfiguring cluster. Master server not running", e);
     }
+    return new ReconfigureResults(false, 0);
   }
-
-  private static ConcurrentHashMap<String, String> lowered = new ConcurrentHashMap<>();
 
   public static String toLower(String value) {
     String lower = lowered.get(value);
@@ -549,10 +537,6 @@ public class DatabaseClient {
     return statementHandlerFactory;
   }
 
-  public ThreadLocal<List<TransactionOperation>> getTransactionOps() {
-    return transactionOps;
-  }
-
   public ClientStatsHandler getClientStatsHandler() {
     return clientStatsHandler;
   }
@@ -565,7 +549,7 @@ public class DatabaseClient {
     this.isCommitting.set(isCommitting);
   }
 
-  public void setTransactionId(long transactionId) {
+  void setTransactionId(long transactionId) {
     this.transactionId.set(transactionId);
   }
 
@@ -573,15 +557,15 @@ public class DatabaseClient {
     this.servers = servers;
   }
 
-  public void setClientStatsHandler(ClientStatsHandler clientStatsHandler) {
+  void setClientStatsHandler(ClientStatsHandler clientStatsHandler) {
     this.clientStatsHandler = clientStatsHandler;
   }
 
   public static class Server {
     private boolean dead;
-    private String hostPort;
-    private AtomicInteger replicaOffset = new AtomicInteger();
-    private DatabaseSocketClient socketClient = new DatabaseSocketClient();
+    private final String hostPort;
+    private final AtomicInteger replicaOffset = new AtomicInteger();
+    private final DatabaseSocketClient socketClient = new DatabaseSocketClient();
 
     public Server(String host, int port) {
       this.hostPort = host + ":" + port;
@@ -830,7 +814,7 @@ public class DatabaseClient {
     return lastException;
   }
 
-  protected void handleSchemaOutOfSyncException(Exception e) {
+  void handleSchemaOutOfSyncException(Exception e) {
     try {
       boolean schemaOutOfSync = false;
       String msg = null;
@@ -1038,7 +1022,7 @@ public class DatabaseClient {
   }
 
   private byte[] sendReplicaDef(String method, ComObject body, int shard, long authUser, Server[] replicas,
-                                boolean ignoreDeath) throws InterruptedException {
+                                boolean ignoreDeath) {
     byte[] ret = null;
     if (writeVerbs.contains(method)) {
       SendToMasterReplica sendToMasterReplica = new SendToMasterReplica(method, body, shard, replicas, ignoreDeath,
@@ -1159,7 +1143,8 @@ public class DatabaseClient {
     return body;
   }
 
-  private byte[] doSend(Server[] replicas, int shard, long authUser, ComObject body, Replica replica, boolean ignoreDeath, String method) throws Exception {
+  private byte[] doSend(Server[] replicas, int shard, long authUser, ComObject body, Replica replica, boolean ignoreDeath,
+                        String method) {
     if (replica == Replica.ALL) {
       return sendReplicaAll(method, body, shard, replicas);
     }
@@ -1199,11 +1184,9 @@ public class DatabaseClient {
     return dbserver;
   }
 
-  public int selectShard(long objectId) {
+  private int selectShard(long objectId) {
     return (int) Math.abs((objectId % servers.length));
   }
-
-  private Random rand = new Random(System.currentTimeMillis());
 
   public enum Replica {
     PRIMARY,
@@ -1264,7 +1247,7 @@ public class DatabaseClient {
 
 
   private static class StatementCacheEntry {
-    private AtomicLong whenUsed = new AtomicLong();
+    private final AtomicLong whenUsed = new AtomicLong();
     private Statement statement;
 
   }
@@ -1335,12 +1318,10 @@ public class DatabaseClient {
     if (common == null) {
       throw new DatabaseException("null common");
     }
-    if (dbName != null) {
-      if (common.getDatabases() == null || !common.getDatabases().containsKey(dbName)) {
-        syncSchema();
-        if (!common.getDatabases().containsKey(dbName)) {
-          throw new DatabaseException("Database does not exist: dbName=" + dbName);
-        }
+    if (dbName != null && (common.getDatabases() == null || !common.getDatabases().containsKey(dbName))) {
+      syncSchema();
+      if (!common.getDatabases().containsKey(dbName)) {
+        throw new DatabaseException("Database does not exist: dbName=" + dbName);
       }
     }
   }
@@ -1513,16 +1494,6 @@ public class DatabaseClient {
     return 0;
   }
 
-  static class TransactionOperation {
-    private StatementImpl statement;
-    private ParameterHandler parms;
-
-    public TransactionOperation(StatementImpl statement, ParameterHandler parms) {
-      this.statement = statement;
-      this.parms = parms;
-    }
-  }
-
   public long allocateId(String dbName) {
     long id = -1;
     synchronized (idAllocatorLock) {
@@ -1582,17 +1553,17 @@ public class DatabaseClient {
       }
       else {
         if (serverVersion > common.getSchemaVersion()) {
-          doSyncSchema(serverVersion);
+          doSyncSchema();
         }
       }
     }
   }
 
   public void syncSchema() {
-    doSyncSchema(null);
+    doSyncSchema();
   }
 
-  public void doSyncSchema(Integer serverVersion) {
+  void doSyncSchema() {
     ComObject cobj = new ComObject();
     cobj.put(ComObject.Tag.DB_NAME, NONE_STR);
     cobj.put(ComObject.Tag.SCHEMA_VERSION, common.getSchemaVersion());
@@ -1610,17 +1581,6 @@ public class DatabaseClient {
           ComObject retObj = new ComObject(ret);
           common.deserializeSchema(retObj.getByteArray(ComObject.Tag.SCHEMA_BYTES));
 
-//          if ((serverVersion != null && common.getSchemaVersion() < serverVersion)) {
-//            try {
-//              cobj.put(ComObject.Tag.FORCE, true);
-//              ret = sendToMaster(cobj);
-//              retObj = new ComObject(ret);
-//              common.deserializeSchema(retObj.getByteArray(ComObject.Tag.SCHEMA_BYTES));
-//            }
-//            catch (Exception e) {
-//              logger.error("Error getting schema from replica: replica=" + replica, e);
-//            }
-//          }
           ServersConfig serversConfig = common.getServersConfig();
           for (int i = 0; i < serversConfig.getShards().length; i++) {
             for (int j = 0; j < serversConfig.getShards()[0].getReplicas().length; j++) {
@@ -1698,16 +1658,16 @@ public class DatabaseClient {
 
   private class HandleDeadOnWriteVerb {
     private boolean myResult;
-    private String method;
-    private ComObject body;
-    private int shard;
-    private int authUser;
-    private Server[] replicas;
+    private final String method;
+    private final ComObject body;
+    private final int shard;
+    private final int authUser;
+    private final Server[] replicas;
     private int masterReplica;
     private boolean skip;
 
-    public HandleDeadOnWriteVerb(String method, ComObject body, int shard, int authUser, Server[] replicas,
-                                 int masterReplica, boolean skip) {
+    HandleDeadOnWriteVerb(String method, ComObject body, int shard, int authUser, Server[] replicas,
+                          int masterReplica, boolean skip) {
       this.method = method;
       this.body = body;
       this.shard = shard;
@@ -1725,7 +1685,7 @@ public class DatabaseClient {
       return masterReplica;
     }
 
-    public boolean isSkip() {
+    boolean isSkip() {
       return skip;
     }
 
@@ -1771,13 +1731,13 @@ public class DatabaseClient {
 
   private class SendWriteVerbToOtherReplica {
     private boolean myResult;
-    private ComObject body;
-    private int shard;
-    private Server currReplica;
-    private int i;
+    private final ComObject body;
+    private final int shard;
+    private final Server currReplica;
+    private final int i;
     private boolean dead;
 
-    public SendWriteVerbToOtherReplica(ComObject body, int shard, Server currReplica, int i) {
+    SendWriteVerbToOtherReplica(ComObject body, int shard, Server currReplica, int i) {
       this.body = body;
       this.shard = shard;
       this.currReplica = currReplica;
@@ -1827,15 +1787,15 @@ public class DatabaseClient {
   }
 
   private class SendToMasterReplica {
-    private String method;
-    private ComObject body;
-    private int shard;
-    private Server[] replicas;
-    private boolean ignoreDeath;
+    private final String method;
+    private final ComObject body;
+    private final int shard;
+    private final Server[] replicas;
+    private final boolean ignoreDeath;
     private byte[] ret;
     private int masterReplica;
 
-    public SendToMasterReplica(String method, ComObject body, int shard, Server[] replicas, boolean ignoreDeath, byte... ret) {
+    SendToMasterReplica(String method, ComObject body, int shard, Server[] replicas, boolean ignoreDeath, byte... ret) {
       this.method = method;
       this.body = body;
       this.shard = shard;
@@ -1852,7 +1812,7 @@ public class DatabaseClient {
       return masterReplica;
     }
 
-    public SendToMasterReplica invoke() throws InterruptedException {
+    public SendToMasterReplica invoke() {
       masterReplica = -1;
       for (int i = 0; i < 10; i++) {
         if (isShutdown.get()) {
@@ -1886,11 +1846,11 @@ public class DatabaseClient {
       return this;
     }
 
-    private void handleDeadServer() throws InterruptedException {
+    private void handleDeadServer() {
       if (isShutdown.get()) {
         throw new DatabaseException(SHUTTING_DOWN_STR);
       }
-      Thread.sleep(1000);
+      ThreadUtil.sleep(1_000);
       try {
         syncSchema();
       }
@@ -1921,11 +1881,11 @@ public class DatabaseClient {
   }
 
   private class GetConfig {
-    private ComObject cobj;
+    private final ComObject cobj;
     private byte[] ret;
     private int receivedReplica;
 
-    public GetConfig(ComObject cobj, byte[] ret, int receivedReplica) {
+    GetConfig(ComObject cobj, byte[] ret, int receivedReplica) {
       this.cobj = cobj;
       this.ret = ret;
       this.receivedReplica = receivedReplica;
@@ -1935,7 +1895,7 @@ public class DatabaseClient {
       return ret;
     }
 
-    public int getReceivedReplica() {
+    int getReceivedReplica() {
       return receivedReplica;
     }
 
@@ -1967,17 +1927,17 @@ public class DatabaseClient {
   }
 
   private class GetSchemaOutOfSyncCause {
-    private Exception e;
+    private final Exception e;
     private boolean schemaOutOfSync;
     private String msg;
 
-    public GetSchemaOutOfSyncCause(Exception e, boolean schemaOutOfSync, String msg) {
+    GetSchemaOutOfSyncCause(Exception e, boolean schemaOutOfSync, String msg) {
       this.e = e;
       this.schemaOutOfSync = schemaOutOfSync;
       this.msg = msg;
     }
 
-    public boolean isSchemaOutOfSync() {
+    boolean isSchemaOutOfSync() {
       return schemaOutOfSync;
     }
 
@@ -2006,13 +1966,13 @@ public class DatabaseClient {
   }
 
   private class DoSendReplicaAll {
-    private ComObject body;
-    private int shard;
+    private final ComObject body;
+    private final int shard;
     private byte[] ret;
-    private int i;
-    private Server server;
+    private final int i;
+    private final Server server;
 
-    public DoSendReplicaAll(ComObject body, int shard, byte[] ret, int i, Server server) {
+    DoSendReplicaAll(ComObject body, int shard, byte[] ret, int i, Server server) {
       this.body = body;
       this.shard = shard;
       this.ret = ret;
@@ -2044,16 +2004,16 @@ public class DatabaseClient {
 
   private class SendReplicaDefSendToAllReplicas {
     private boolean myResult;
-    private String method;
-    private ComObject body;
-    private int shard;
-    private int authUser;
-    private Server[] replicas;
-    private boolean ignoreDeath;
+    private final String method;
+    private final ComObject body;
+    private final int shard;
+    private final int authUser;
+    private final Server[] replicas;
+    private final boolean ignoreDeath;
     private int masterReplica;
 
-    public SendReplicaDefSendToAllReplicas(String method, ComObject body, int shard, int authUser, Server[] replicas,
-                                           boolean ignoreDeath, int masterReplica) {
+    SendReplicaDefSendToAllReplicas(String method, ComObject body, int shard, int authUser, Server[] replicas,
+                                    boolean ignoreDeath, int masterReplica) {
       this.method = method;
       this.body = body;
       this.shard = shard;
@@ -2071,7 +2031,7 @@ public class DatabaseClient {
       return masterReplica;
     }
 
-    public SendReplicaDefSendToAllReplicas invoke() throws InterruptedException {
+    public SendReplicaDefSendToAllReplicas invoke() {
       Server currReplica = null;
       try {
         for (int i = 0; i < getReplicaCount(); i++) {
@@ -2117,11 +2077,11 @@ public class DatabaseClient {
       return this;
     }
 
-    private void handleDeadServer() throws InterruptedException {
+    private void handleDeadServer() {
       if (isShutdown.get()) {
         throw new DatabaseException(SHUTTING_DOWN_STR);
       }
-      Thread.sleep(1000);
+      ThreadUtil.sleep(1_000);
       try {
         syncSchema();
       }
@@ -2148,9 +2108,7 @@ public class DatabaseClient {
       if (!skip) {
         SendWriteVerbToOtherReplica sendWriteVerbToOtherReplica = new SendWriteVerbToOtherReplica(body, shard,
             currReplica, i).invoke();
-        if (sendWriteVerbToOtherReplica.hadError()) {
-          return true;
-        }
+        return sendWriteVerbToOtherReplica.hadError();
       }
       return false;
     }

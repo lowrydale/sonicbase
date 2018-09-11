@@ -2,7 +2,7 @@ package com.sonicbase.common;
 
 import com.sonicbase.query.DatabaseException;
 import com.sonicbase.schema.*;
-import org.apache.giraph.utils.Varint;
+import com.sonicbase.util.Varint;
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
 
@@ -35,18 +35,18 @@ public class DatabaseCommon {
   private static final String SNAPSHOT_STR = "snapshot";
   private static final String UTF_8_STR = "utf-8";
   private static final String SCHEMA_BIN_STR = "schema.bin";
-  private static Logger logger = LoggerFactory.getLogger(DatabaseCommon.class);
+  private static final Logger logger = LoggerFactory.getLogger(DatabaseCommon.class);
 
   private int shard = -1;
   private int replica = -1;
-  private Map<String, Schema> schema = new ConcurrentHashMap<>();
-  private Map<String, ReadWriteLock> schemaReadWriteLock = new ConcurrentHashMap<>();
-  private Map<String, Lock> schemaReadLock = new ConcurrentHashMap<>();
-  private Map<String, Lock> schemaWriteLock = new ConcurrentHashMap<>();
+  private final Map<String, Schema> schema = new ConcurrentHashMap<>();
+  private final Map<String, ReadWriteLock> schemaReadWriteLock = new ConcurrentHashMap<>();
+  private final Map<String, Lock> schemaReadLock = new ConcurrentHashMap<>();
+  private final Map<String, Lock> schemaWriteLock = new ConcurrentHashMap<>();
   private ServersConfig serversConfig;
-  private ReadWriteLock internalReadWriteLock = new ReentrantReadWriteLock();
-  private Lock internalReadLock = internalReadWriteLock.readLock();
-  private Lock internalWriteLock = internalReadWriteLock.writeLock();
+  private final ReadWriteLock internalReadWriteLock = new ReentrantReadWriteLock();
+  private final Lock internalReadLock = internalReadWriteLock.readLock();
+  private final Lock internalWriteLock = internalReadWriteLock.writeLock();
   private int schemaVersion;
   private boolean haveProLicense;
 
@@ -219,7 +219,7 @@ public class DatabaseCommon {
         return Integer.compare(o1SchemaVersion, o2SchemaVersion);
       }
 
-      public int getSchemaVersion(File file) {
+      int getSchemaVersion(File file) {
         String filename = file.getName();
         int pos1 = filename.indexOf('.');
         int pos2 = filename.indexOf('.', pos1 + 1);
@@ -279,7 +279,7 @@ public class DatabaseCommon {
     return bytesOut.toByteArray();
   }
 
-  public void serializeSchema(DataOutputStream out, short serializationVersionNumber) throws IOException {
+  private void serializeSchema(DataOutputStream out, short serializationVersionNumber) throws IOException {
     Varint.writeSignedVarLong(serializationVersionNumber, out);
     out.writeInt(this.schemaVersion);
     if (serializationVersionNumber >= SERIALIZATION_VERSION_21) {
@@ -337,7 +337,7 @@ public class DatabaseCommon {
     }
   }
 
-  public void serializeSchema(String dbName, DataOutputStream out) {
+  private void serializeSchema(String dbName, DataOutputStream out) {
     schema.get(dbName).serialize(out);
   }
 
@@ -1217,7 +1217,7 @@ public class DatabaseCommon {
     deserializeConfig(new DataInputStream(new ByteArrayInputStream(bytes)));
   }
 
-  public void deserializeConfig(DataInputStream in) throws IOException {
+  private void deserializeConfig(DataInputStream in) throws IOException {
     short serializationVersion = (short)Varint.readSignedVarLong(in);
     serversConfig = new ServersConfig(in, serializationVersion);
   }

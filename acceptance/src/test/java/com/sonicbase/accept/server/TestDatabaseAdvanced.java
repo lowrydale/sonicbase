@@ -1,13 +1,7 @@
 package com.sonicbase.accept.server;
 
-import com.fasterxml.jackson.databind.ObjectMapper;
-import com.fasterxml.jackson.databind.node.ArrayNode;
-import com.fasterxml.jackson.databind.node.JsonNodeFactory;
-import com.fasterxml.jackson.databind.node.ObjectNode;
 import com.sonicbase.client.DatabaseClient;
-import com.sonicbase.common.DatabaseCommon;
-import com.sonicbase.common.KeyRecord;
-import com.sonicbase.common.UniqueConstraintViolationException;
+import com.sonicbase.common.*;
 import com.sonicbase.index.Index;
 import com.sonicbase.jdbcdriver.ConnectionProxy;
 import com.sonicbase.schema.TableSchema;
@@ -37,8 +31,8 @@ import static org.testng.Assert.*;
 public class TestDatabaseAdvanced {
 
   private Connection conn;
-  private int recordCount = 10;
-  List<Long> ids = new ArrayList<>();
+  private final int recordCount = 10;
+  final List<Long> ids = new ArrayList<>();
   DatabaseServer[] dbServers;
 
   @AfterClass(alwaysRun = true)
@@ -57,9 +51,8 @@ public class TestDatabaseAdvanced {
   public void beforeClass() throws Exception {
     System.setProperty("log4j.configuration", "test-log4j.xml");
 
-    String configStr = IOUtils.toString(new BufferedInputStream(getClass().getResourceAsStream("/config/config-4-servers.json")), "utf-8");
-    ObjectMapper mapper = new ObjectMapper();
-    final ObjectNode config = (ObjectNode) mapper.readTree(configStr);
+    String configStr = IOUtils.toString(new BufferedInputStream(getClass().getResourceAsStream("/config/config-4-servers.yaml")), "utf-8");
+    Config config = new Config(configStr);
 
     FileUtils.deleteDirectory(new File(System.getProperty("user.home"), "db"));
 
@@ -73,11 +66,10 @@ public class TestDatabaseAdvanced {
 
     List<Future> futures = new ArrayList<>();
     for (int i = 0; i < dbServers.length; i++) {
-      final int shard = i;
 
-      dbServers[shard] = new DatabaseServer();
-      dbServers[shard].setConfig(config, "4-servers", "localhost", 9010 + (50 * shard), true, new AtomicBoolean(true), new AtomicBoolean(true),null);
-      dbServers[shard].setRole(role);
+      dbServers[i] = new DatabaseServer();
+      dbServers[i].setConfig(config, "4-servers", "localhost", 9010 + (50 * i), true, new AtomicBoolean(true), new AtomicBoolean(true),null);
+      dbServers[i].setRole(role);
     }
     for (Future future : futures) {
       future.get();
@@ -255,6 +247,23 @@ public class TestDatabaseAdvanced {
       server.shutdownRepartitioner();
     }
 
+    dbServers[3].enableSnapshot(false);
+
+    File snapshotDir = new File(System.getProperty("user.home"), "db/snapshot/1/1");
+    FileUtils.deleteDirectory(snapshotDir);
+
+    ComObject cobj = new ComObject();
+    client.send("DatabaseServer:disableServer", 1, 1, cobj, DatabaseClient.Replica.SPECIFIED);
+    client.send("DatabaseServer:reloadServer", 1, 1, cobj, DatabaseClient.Replica.SPECIFIED);
+
+    boolean complete = false;
+    while (!complete) {
+      byte[] bytes = client.send("DatabaseServer:isServerReloadFinished", 1, 1, cobj, DatabaseClient.Replica.SPECIFIED);
+      ComObject retObj = new ComObject(bytes);
+      complete = retObj.getBoolean(ComObject.Tag.IS_COMPLETE);
+      Thread.sleep(200);
+    }
+
     File tableDir = dbServers[2].getSnapshotManager().getTableSchemaDir("test", "persons");
 
     File[] tableFiles = tableDir.listFiles();
@@ -327,6 +336,17 @@ public class TestDatabaseAdvanced {
       stmt = conn.prepareStatement("delete from persons where id2=1000");
       stmt.executeUpdate();
     }
+  }
+
+  @Test
+  public void testNoKeyIndexLookup() throws SQLException {
+    PreparedStatement stmt = conn.prepareStatement("select * from nokey where  id=0");
+    ResultSet rs = stmt.executeQuery();
+    assertTrue(rs.next());
+    assertEquals(rs.getLong("id"), 0);
+    assertTrue(rs.next());
+    assertEquals(rs.getLong("id"), 0);
+    assertFalse(rs.next());
   }
 
   @Test
@@ -2080,7 +2100,7 @@ public class TestDatabaseAdvanced {
     assertFalse(rs.next());
 
     Index index = ((DatabaseServer)DatabaseClient.getServers().get(0).get(0)).getIndices().get("test").getIndices().get("secondary_update").get("make_model");
-    Object value = index.get(new Object[]{"make-0".getBytes("utf-8")});
+    Object value = index.get(new Object[]{"make-0".getBytes("utf-8"), "model-0".getBytes("utf-8")});
     assertEquals(value, null);
 
     stmt = conn.prepareStatement("select * from secondary_update where make=?");
@@ -2107,7 +2127,7 @@ public class TestDatabaseAdvanced {
     }
 
     Index index = ((DatabaseServer)DatabaseClient.getServers().get(0).get(0)).getIndices().get("test").getIndices().get("secondary_delete").get("make_model");
-    Object value = index.get(new Object[]{"make-0".getBytes("utf-8")});
+    Object value = index.get(new Object[]{"make-0".getBytes("utf-8"), "model-0".getBytes("utf-8")});
     byte[][] keys = ((DatabaseServer)DatabaseClient.getServers().get(0).get(0)).getAddressMap().fromUnsafeToKeys(value);
 
     index = ((DatabaseServer)DatabaseClient.getServers().get(0).get(0)).getIndices().get("test").getIndices().get("secondary_delete").get("_primarykey");

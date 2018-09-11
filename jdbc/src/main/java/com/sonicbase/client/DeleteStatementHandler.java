@@ -9,7 +9,6 @@ import net.sf.jsqlparser.expression.Expression;
 import net.sf.jsqlparser.statement.Statement;
 import net.sf.jsqlparser.statement.delete.Delete;
 
-import java.sql.SQLException;
 import java.util.concurrent.atomic.AtomicInteger;
 
 @SuppressWarnings({"squid:S1168", "squid:S00107"})
@@ -26,7 +25,7 @@ public class DeleteStatementHandler implements StatementHandler {
   public Object execute(String dbName, ParameterHandler parms, String sqlToUse, Statement statement,
                         SelectStatementImpl.Explain explain, Long sequence0, Long sequence1, Short sequence2,
                         boolean restrictToThisServer, StoredProcedureContextImpl procedureContext,
-                        int schemaRetryCount) throws SQLException {
+                        int schemaRetryCount) {
     Delete delete = (Delete) statement;
     DeleteStatementImpl deleteStatement = new DeleteStatementImpl(client);
     deleteStatement.setTableName(delete.getTable().getName());

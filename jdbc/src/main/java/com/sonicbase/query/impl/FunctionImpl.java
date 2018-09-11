@@ -23,7 +23,7 @@ import java.util.concurrent.atomic.AtomicLong;
 // I prefer to return null instead of an empty array
 // I don't know a good way to reduce the parameter count
 public class FunctionImpl extends ExpressionImpl {
-  public static final String UTF_8_STR = "utf-8";
+  private static final String UTF_8_STR = "utf-8";
   private String name;
   private List<ExpressionImpl> parms;
 
@@ -32,12 +32,12 @@ public class FunctionImpl extends ExpressionImpl {
     this.parms = parameters;
   }
 
-  public FunctionImpl() {
+  FunctionImpl() {
 
   }
 
 
-  private static Map<String, Function> functionsByName = new HashMap<>();
+  private static final Map<String, Function> functionsByName = new HashMap<>();
 
   private static Function getFunction(String name) {
     return functionsByName.get(name);
@@ -118,17 +118,17 @@ public class FunctionImpl extends ExpressionImpl {
   }
 
   static class MethodObject {
-    Method method;
-    Object obj;
+    final Method method;
+    final Object obj;
 
-    public MethodObject(Method method, Object obj) {
+    MethodObject(Method method, Object obj) {
       this.method = method;
       this.obj = obj;
     }
   }
   static class CustomFunction implements FunctionBase {
 
-    private Map<String, MethodObject> methods = new ConcurrentHashMap<>();
+    private final Map<String, MethodObject> methods = new ConcurrentHashMap<>();
     @Override
     public Object evaluate(TableSchema[] tableSchemas, Record[] records, ParameterHandler parms, List<ExpressionImpl> funcParms) {
       try {

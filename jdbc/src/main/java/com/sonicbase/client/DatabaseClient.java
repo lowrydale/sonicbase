@@ -227,13 +227,18 @@ public class DatabaseClient {
       synchronized (DatabaseClient.class) {
           DatabaseClient sharedClient = sharedClients.get(getCluster());
         if (sharedClient == null) {
+          logger.info("Initializing sharedClient: cluster=" + getCluster());
+
           sharedClient = new DatabaseClient(hosts, shard, replica, isClient, common, databaseServer, true);
           sharedClients.put(getCluster(), sharedClient);
 
           Thread statsRecorderThread = ThreadUtil.createThread(new ClientStatsHandler.QueryStatsRecorder(
-              this, getCluster()), "SonicBase Stats Recorder - cluster=" + getCluster());
+              sharedClient, getCluster()), "SonicBase Stats Recorder - cluster=" + getCluster());
           statsRecorderThread.start();
           statsRecorderThreads.put(getCluster(), statsRecorderThread);
+        }
+        else {
+          logger.info("Initializing sharedClient - already initialized: cluster=" + getCluster());
         }
       }
     }
@@ -447,6 +452,7 @@ public class DatabaseClient {
       }
     }
     if (shouldShutdown) {
+      logger.info("Shutting down shared client");
       for (Thread thread : statsRecorderThreads.values()) {
         thread.interrupt();
         try {
@@ -457,6 +463,9 @@ public class DatabaseClient {
           throw new DatabaseException(e);
         }
       }
+
+      statsRecorderThreads.clear();
+
       for (DatabaseClient client : toShutdown) {
         client.shutdown();
       }
@@ -1543,7 +1552,8 @@ public class DatabaseClient {
     cobj.put(ComObject.Tag.INDEX_NAME, indexName);
     byte[] bytes = send("PartitionManager:getPartitionSize", shard, replica, cobj, DatabaseClient.Replica.SPECIFIED);
     ComObject retObj = new ComObject(bytes);
-    return retObj.getLong(ComObject.Tag.SIZE);
+    ComArray array = retObj.getArray(ComObject.Tag.SIZES);
+    return ((ComObject)array.getArray().get(shard)).getLong(ComObject.Tag.SIZE);
   }
 
   public void syncSchema(Integer serverVersion) {

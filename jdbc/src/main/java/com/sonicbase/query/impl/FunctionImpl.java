@@ -17,6 +17,7 @@ import java.math.BigDecimal;
 import java.sql.Timestamp;
 import java.util.*;
 import java.util.concurrent.ConcurrentHashMap;
+import java.util.concurrent.atomic.AtomicBoolean;
 import java.util.concurrent.atomic.AtomicLong;
 
 @SuppressWarnings({"squid:S1168", "squid:S00107"})
@@ -43,6 +44,18 @@ public class FunctionImpl extends ExpressionImpl {
     return functionsByName.get(name);
   }
 
+  public String toString() {
+    StringBuilder builder = new StringBuilder();
+    builder.append(name).append("(");
+    for (int i = 0; i < parms.size(); i++) {
+      if (i != 0) {
+        builder.append(", ");
+      }
+      builder.append(parms.get(i).toString());
+    }
+    builder.append(")");
+    return builder.toString();
+  }
 
   public enum Function {
     CEILING("ceiling", new CeilingFunction()),
@@ -930,13 +943,13 @@ public class FunctionImpl extends ExpressionImpl {
 
   @Override
   public NextReturn next(SelectStatementImpl select, int count, SelectStatementImpl.Explain explain, AtomicLong currOffset, AtomicLong countReturned,
-                         Limit limit, Offset offset, int schemaRetryCount) {
+                         Limit limit, Offset offset, int schemaRetryCount, AtomicBoolean didTableScan) {
     return null;
   }
 
   @Override
   public NextReturn next(SelectStatementImpl select, int count, SelectStatementImpl.Explain explain, AtomicLong currOffset, AtomicLong countReturned,
-                         Limit limit, Offset offset, boolean evaluateExpression, boolean analyze, int schemaRetryCount) {
+                         Limit limit, Offset offset, boolean evaluateExpression, boolean analyze, int schemaRetryCount, AtomicBoolean didTableScan) {
     return null;
   }
 

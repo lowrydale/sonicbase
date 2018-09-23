@@ -15,10 +15,12 @@ import com.sonicbase.schema.TableSchema;
 import com.sonicbase.util.PartitionUtils;
 import net.sf.jsqlparser.statement.select.Limit;
 import net.sf.jsqlparser.statement.select.Offset;
+import sun.nio.ch.ThreadPool;
 
 import java.io.*;
 import java.util.*;
 import java.util.concurrent.*;
+import java.util.concurrent.atomic.AtomicBoolean;
 import java.util.concurrent.atomic.AtomicLong;
 import java.util.concurrent.atomic.AtomicReference;
 
@@ -532,13 +534,13 @@ public class ExpressionImpl implements Expression {
 
 
   public NextReturn next(SelectStatementImpl select, int count, SelectStatementImpl.Explain explain, AtomicLong currOffset, AtomicLong countReturned,
-                         Limit limit, Offset offset, int schemaRetryCount) {
+                         Limit limit, Offset offset, int schemaRetryCount, AtomicBoolean didTableScan) {
     return null;
   }
 
   public NextReturn next(SelectStatementImpl select, int count, SelectStatementImpl.Explain explain, AtomicLong currOffset,
                          AtomicLong countReturned, Limit limit,
-                         Offset offset, boolean evaluateExpression, boolean analyze, int schemaRetryCount) {
+                         Offset offset, boolean evaluateExpression, boolean analyze, int schemaRetryCount, AtomicBoolean didTableScan) {
     return null;
   }
 
@@ -793,7 +795,6 @@ public class ExpressionImpl implements Expression {
       final TableSchema tableSchema, List<IdEntry> keysToRead, String[] columns, final List<ColumnImpl> selectColumns,
       final RecordCache recordCache, final int viewVersion, final boolean restrictToThisServer,
       final StoredProcedureContextImpl procedureContext, final int schemaRetryCount) {
-    //ThreadPoolExecutor executor = new ThreadPoolExecutor(client.getShardCount(), client.getShardCount(), 10_000, TimeUnit.MILLISECONDS, new ArrayBlockingQueue<>(1000), new ThreadPoolExecutor.CallerRunsPolicy());
     try {
       final AtomicReference<Map.Entry<String, IndexSchema>> indexSchema = new AtomicReference<>();
 
@@ -832,9 +833,6 @@ public class ExpressionImpl implements Expression {
     }
     catch (ExecutionException e) {
       throw new DatabaseException(e);
-    }
-    finally {
-      //executor.shutdownNow();
     }
   }
 
@@ -1086,6 +1084,7 @@ public class ExpressionImpl implements Expression {
   }
 
   public static class NextReturn {
+    private boolean doTableScan;
     private Object[][][] ids;
     private String[] tableNames;
     private Map<String, String[]> fields = new ConcurrentHashMap<>();

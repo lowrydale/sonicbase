@@ -7,14 +7,17 @@ import com.sonicbase.index.AddressMap;
 import com.sonicbase.index.Index;
 import com.sonicbase.index.Indices;
 import com.sonicbase.index.MemoryOps;
+import com.sonicbase.jdbcdriver.ParameterHandler;
 import com.sonicbase.query.DatabaseException;
 import com.sonicbase.query.ResultSet;
 import com.sonicbase.query.impl.ColumnImpl;
+import com.sonicbase.query.impl.ExpressionImpl;
 import com.sonicbase.query.impl.SelectStatementImpl;
 import com.sonicbase.schema.DataType;
 import com.sonicbase.schema.FieldSchema;
 import com.sonicbase.schema.IndexSchema;
 import com.sonicbase.schema.TableSchema;
+import net.sf.jsqlparser.schema.Database;
 import org.apache.commons.lang.exception.ExceptionUtils;
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
@@ -60,10 +63,13 @@ public class UpdateManager {
   private final AtomicLong insertCount = new AtomicLong();
   private final AtomicLong lastReset = new AtomicLong(System.currentTimeMillis());
   private final ThreadLocal<Boolean> threadLocalIsBatchRequest = new ThreadLocal<>();
-
+  private Object[] updateMutexes = new Object[10_000];
 
   UpdateManager(DatabaseServer databaseServer) {
     this.server = databaseServer;
+    for (int i = 0; i < updateMutexes.length; i++) {
+      updateMutexes[i] = new Object();
+    }
   }
 
   void initStreamManager() {
@@ -1043,6 +1049,10 @@ public class UpdateManager {
     return ret;
   }
 
+  public Object getUpdateMutex(Object[] key) {
+    return updateMutexes[Index.hashCode(key) % updateMutexes.length];
+  }
+
   public ComObject doUpdateRecord(ComObject cobj, boolean replayedCommand,
                                   AtomicBoolean isExplicitTransRet, AtomicLong transactionIdRet, boolean isCommitting) {
     try {
@@ -1056,46 +1066,76 @@ public class UpdateManager {
       boolean isExplicitTrans = cobj.getBoolean(ComObject.Tag.IS_EXCPLICITE_TRANS);
       long transactionId = cobj.getLong(ComObject.Tag.TRANSACTION_ID);
 
+      TableSchema tableSchema = server.getCommon().getTableSchema(dbName, tableName, server.getDataDir());
+      byte[] primaryKeyBytes = cobj.getByteArray(ComObject.Tag.PRIMARY_KEY_BYTES);
+      Object[] primaryKey = DatabaseCommon.deserializeKey(tableSchema, primaryKeyBytes);
+      byte[] prevKeyBytes = cobj.getByteArray(ComObject.Tag.PREV_KEY_BYTES);
+      Object[] prevPrimaryKey = DatabaseCommon.deserializeKey(tableSchema, prevKeyBytes);
+      byte[] bytes = cobj.getByteArray(ComObject.Tag.BYTES);
+      byte[] prevBytes = cobj.getByteArray(ComObject.Tag.PREV_BYTES);
+
       if (isExplicitTrans && isExplicitTransRet != null) {
         isExplicitTransRet.set(true);
         transactionIdRet.set(transactionId);
       }
 
-      TableSchema tableSchema = server.getCommon().getTableSchema(dbName, tableName, server.getDataDir());
-      byte[] primaryKeyBytes = cobj.getByteArray(ComObject.Tag.PRIMARY_KEY_BYTES);
-      Object[] primaryKey = DatabaseCommon.deserializeKey(tableSchema, primaryKeyBytes);
-      byte[] bytes = cobj.getByteArray(ComObject.Tag.BYTES);
-      byte[] prevBytes = cobj.getByteArray(ComObject.Tag.PREV_BYTES);
-
       AtomicBoolean shouldExecute = new AtomicBoolean();
       AtomicBoolean shouldDeleteLock = new AtomicBoolean();
 
-      server.getTransactionManager().preHandleTransaction(dbName, tableName, indexName, isExplicitTrans, isCommitting,
-          transactionId, primaryKey, shouldExecute, shouldDeleteLock);
-
       Record record = new Record(dbName, server.getCommon(), bytes);
-      Record prevRecord = null;
-      if (prevBytes != null) {
-        prevRecord = new Record(dbName, server.getCommon(), prevBytes);
+
+      byte[] parmsBytes = cobj.getByteArray(ComObject.Tag.PARMS);
+      ParameterHandler parms = null;
+      if (parmsBytes != null) {
+        parms = new ParameterHandler();
+        parms.deserialize(parmsBytes);
       }
 
-      Boolean ignore = shouldIgnore(cobj);
-      if (!ignore) {
-        checkForUniqueConstraintViolationOnUpdate(dbName, tableName, indexName, record, prevRecord);
-      }
+      byte[] expressionBytes = cobj.getByteArray(ComObject.Tag.LEGACY_EXPRESSION);
 
-      setSequenceNumbersOnUpdate(cobj, primaryKey, record);
+      ExpressionImpl expression = ExpressionImpl.deserializeExpression(expressionBytes);
 
-      bytes = record.serialize(server.getCommon(), DatabaseClient.SERIALIZATION_VERSION);
+      Index index = server.getIndex(dbName, tableName, indexName);
+      synchronized (getUpdateMutex(prevPrimaryKey)) {
+        synchronized (index.getMutex(prevPrimaryKey)) {
+          Object value = index.get(prevPrimaryKey);
+          if (value != null) {
+            // would be null if record moved to a different shard
+            byte[][] content = server.getAddressMap().fromUnsafeToRecords(value);
+            prevBytes = content[0];
+          }
+        }
 
-      if (shouldExecute.get()) {
-        doUpdateRecord(cobj, dbName, tableName, indexName, primaryKey, bytes);
-      }
-      else {
-        if (transactionId != 0) {
-          TransactionManager.Transaction trans = server.getTransactionManager().getTransaction(transactionId);
-          List<Record> records = trans.getRecords().computeIfAbsent(tableName, k -> new ArrayList<>());
-          records.add(record);
+        server.getTransactionManager().preHandleTransaction(dbName, tableName, indexName, isExplicitTrans, isCommitting,
+            transactionId, primaryKey, shouldExecute, shouldDeleteLock);
+
+        Record prevRecord = null;
+        if (prevBytes != null) {
+          prevRecord = new Record(dbName, server.getCommon(), prevBytes);
+        }
+
+        if (!(Boolean)expression.evaluateSingleRecord(new TableSchema[]{tableSchema}, new Record[]{prevRecord}, parms)) {
+          throw new NotFoundException();
+        }
+
+        Boolean ignore = shouldIgnore(cobj);
+        if (!ignore) {
+          checkForUniqueConstraintViolationOnUpdate(dbName, tableName, indexName, record, prevRecord);
+        }
+
+        setSequenceNumbersOnUpdate(cobj, primaryKey, record);
+
+        bytes = record.serialize(server.getCommon(), DatabaseClient.SERIALIZATION_VERSION);
+
+        if (shouldExecute.get()) {
+          doUpdateRecord(cobj, dbName, tableName, indexName, primaryKey, bytes);
+        }
+        else {
+          if (transactionId != 0) {
+            TransactionManager.Transaction trans = server.getTransactionManager().getTransaction(transactionId);
+            List<Record> records = trans.getRecords().computeIfAbsent(tableName, k -> new ArrayList<>());
+            records.add(record);
+          }
         }
       }
 

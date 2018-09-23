@@ -15,6 +15,7 @@ import java.io.IOException;
 import java.io.UnsupportedEncodingException;
 import java.math.BigDecimal;
 import java.sql.Types;
+import java.util.concurrent.atomic.AtomicBoolean;
 import java.util.concurrent.atomic.AtomicLong;
 
 
@@ -106,6 +107,8 @@ public class ConstantImpl extends ExpressionImpl {
         case Types.DOUBLE:
           value = Parameter.Double.deserialize(in).getValue();
           break;
+        case Types.NULL:
+          break;
       }
     }
     catch (IOException e) {
@@ -179,6 +182,8 @@ public class ConstantImpl extends ExpressionImpl {
         case Types.DOUBLE:
           new Parameter.Double((Double) value).serialize(out, false);
           break;
+        case Types.NULL:
+          break;
       }
     }
     catch (IOException e) {
@@ -193,13 +198,13 @@ public class ConstantImpl extends ExpressionImpl {
 
   @Override
   public NextReturn next(SelectStatementImpl select, int count, SelectStatementImpl.Explain explain, AtomicLong currOffset, AtomicLong countReturned,
-                         Limit limit, Offset offset, int schemaRetryCount) {
+                         Limit limit, Offset offset, int schemaRetryCount, AtomicBoolean didTableScan) {
     return null;
   }
 
   @Override
   public NextReturn next(SelectStatementImpl select, int count, SelectStatementImpl.Explain explain, AtomicLong currOffset, AtomicLong countReturned,
-                         Limit limit, Offset offset, boolean b, boolean analyze, int schemaRetryCount) {
+                         Limit limit, Offset offset, boolean b, boolean analyze, int schemaRetryCount, AtomicBoolean didTableScan) {
     return null;
   }
 

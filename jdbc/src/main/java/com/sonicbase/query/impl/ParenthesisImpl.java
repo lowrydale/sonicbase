@@ -17,6 +17,7 @@ import java.io.IOException;
 import java.util.List;
 import java.util.Map;
 import java.util.Set;
+import java.util.concurrent.atomic.AtomicBoolean;
 import java.util.concurrent.atomic.AtomicLong;
 import java.util.concurrent.atomic.AtomicReference;
 
@@ -42,6 +43,18 @@ public class ParenthesisImpl extends ExpressionImpl {
   public void setNot(boolean not) {
     isNot = not;
   }
+
+  public String toString() {
+    StringBuilder builder = new StringBuilder();
+    if (isNot) {
+      builder.append("not ");
+    }
+    builder.append("(");
+    builder.append(expression.toString());
+    builder.append(")");
+    return builder.toString();
+  }
+
 
   @Override
   public void serialize(short serializationVersion, DataOutputStream out) {
@@ -83,11 +96,11 @@ public class ParenthesisImpl extends ExpressionImpl {
 
   @Override
   public NextReturn next(SelectStatementImpl select, int count, SelectStatementImpl.Explain explain, AtomicLong currOffset, AtomicLong countReturned,
-                         Limit limit, Offset offset, boolean b, boolean analyze, int schemaRetryCount) {
-    return doNext(count, currOffset, countReturned, limit, offset, schemaRetryCount);
+                         Limit limit, Offset offset, boolean b, boolean analyze, int schemaRetryCount, AtomicBoolean didTableScan) {
+    return doNext(explain, count, currOffset, countReturned, limit, offset, schemaRetryCount);
   }
 
-  private NextReturn doNext(int count, AtomicLong currOffset,
+  private NextReturn doNext(SelectStatementImpl.Explain explain, int count, AtomicLong currOffset,
                             AtomicLong countReturned, Limit limit, Offset offset, int schemaRetryCount) {
     if (isNot) {
       TableSchema tableSchema = getClient().getCommon().getTables(dbName).get(getTableName());
@@ -106,6 +119,11 @@ public class ParenthesisImpl extends ExpressionImpl {
         OrderByExpressionImpl localExpression = orderByExpressions.get(0);
         ascending = localExpression.isAscending();
       }
+
+      if (explain != null) {
+        explain.getBuilder().append("Index lookup for not relational op: table=").append(getTableName()).append(", idx=").append(indexSchema.getName()).append(", ").append(toString()).append("\n");
+      }
+
       BinaryExpression.Operator op = ascending ? BinaryExpression.Operator.GREATER : BinaryExpression.Operator.LESS;
       AtomicReference<String> usedIndex = new AtomicReference<>();
 
@@ -138,8 +156,9 @@ public class ParenthesisImpl extends ExpressionImpl {
   }
 
   @Override
-  public NextReturn next(SelectStatementImpl select, int count, SelectStatementImpl.Explain explainBuilder, AtomicLong currOffset, AtomicLong countReturned, Limit limit, Offset offset, int schemaRetryCount) {
-    return doNext(1000, currOffset, countReturned, limit, offset, schemaRetryCount);
+  public NextReturn next(SelectStatementImpl select, int count, SelectStatementImpl.Explain explain, AtomicLong currOffset,
+                         AtomicLong countReturned, Limit limit, Offset offset, int schemaRetryCount, AtomicBoolean didTableScan) {
+    return doNext(explain, 1000, currOffset, countReturned, limit, offset, schemaRetryCount);
   }
 
   @Override

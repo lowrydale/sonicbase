@@ -179,7 +179,7 @@ public class BInaryExpressionImplTest {
     ret = expression.evaluateAndExpression(null,100, usedIndex, explain, currOffset, countReturned,
         limit, offset, false, false, 0);
 
-    assertEquals(explain.getBuilder().toString(), "Two-sided index lookup: index=_primarykey, field1 <= null and field1 >= null\n");
+    assertEquals(explain.getBuilder().toString(), "Two key index lookup: table=table1, idx=_primarykey, field1 <= 500 and field1 >= 200\n");
   }
 
   @Test
@@ -375,7 +375,7 @@ public class BInaryExpressionImplTest {
     ret = expression.evaluateOrExpression(null,100, explain, currOffset,
         countReturned, limit, offset, false, 0);
 
-    assertEquals(explain.getBuilder().toString(), "batch index lookup: keyCount=2");
+    assertEquals(explain.getBuilder().toString(), "Batch index lookup: table=table1, idx=_primarykey, keyCount=2\n");
   }
 
   @Test
@@ -433,18 +433,19 @@ public class BInaryExpressionImplTest {
     Limit limit = null;
     Offset offset = null;
     SelectStatementImpl.Explain explain = null;
+    AtomicBoolean didTableScan = new AtomicBoolean();
     ExpressionImpl.NextReturn ret = expression.next(null,100, explain, currOffset,
-        countReturned, limit, offset, false, false, 0);
+        countReturned, limit, offset, false, false, 0, didTableScan);
 
     assertEquals(ret.getKeys()[0][0][0], 200);
     assertEquals(ret.getKeys().length, 1);
 
     explain = new SelectStatementImpl.Explain();
     ret = expression.next(null,100, explain, currOffset,
-        countReturned, limit, offset, false, false, 0);
+        countReturned, limit, offset, false, false, 0, didTableScan);
 
-    assertEquals(explain.getBuilder().toString(), "Index lookup for relational op: _primarykey, table1.field1 = 200\n" +
-      "single key index lookup\n");
+    assertEquals(explain.getBuilder().toString(), "Index lookup for relational op: table=table1, idx=_primarykey, table1.field1 = 200\n" +
+        "single key index lookup\n");
 
 
     column = new ColumnImpl();
@@ -467,16 +468,16 @@ public class BInaryExpressionImplTest {
 
     explain = null;
     ret = expression.next(null,100, explain, currOffset,
-        countReturned, limit, offset, false, false, 0);
+        countReturned, limit, offset, false, false, 0, didTableScan);
 
     assertEquals(ret.getKeys()[0][0][0], 200);
     assertEquals(ret.getKeys().length, 1);
 
     explain = new SelectStatementImpl.Explain();
     ret = expression.next(null,100, explain, currOffset,
-        countReturned, limit, offset, false, false, 0);
+        countReturned, limit, offset, false, false, 0, didTableScan);
 
-    assertEquals(explain.getBuilder().toString(), "Index lookup for relational op: _primarykey, 200 = table1.field1\n" +
+    assertEquals(explain.getBuilder().toString(), "Index lookup for relational op: table=table1, idx=_primarykey, 200 = table1.field1\n" +
         "single key index lookup\n");
   }
 

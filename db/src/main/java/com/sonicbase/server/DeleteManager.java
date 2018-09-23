@@ -114,24 +114,25 @@ public class DeleteManager {
     }
   }
 
-  private void doDeletes(boolean ignoreVersion, File file) {
+  private boolean doDeletes(boolean ignoreVersion, File file) {
     try {
       File dir = getReplicaRoot();
       if (dir.exists()) {
-        logger.info("DeleteManager deleting file - begin: file={}", file.getAbsolutePath());
+        logger.debug("DeleteManager deleting file - begin: file={}", file.getAbsolutePath());
         List<Future> futures = new ArrayList<>();
         if (doDeletesForStream(ignoreVersion, file, futures)) {
-          return;
+          return true;
         }
         if (file.exists()) {
           Files.delete(file.toPath());
         }
-        logger.info("DeleteManager deleting file - end: file={}", file.getAbsolutePath());
+        logger.debug("DeleteManager deleting file - end: file={}", file.getAbsolutePath());
       }
     }
     catch (Exception e) {
       logger.error(ERROR_PERFORMING_DELETES_STR, e);
     }
+    return false;
   }
 
   private boolean doDeletesForStream(boolean ignoreVersion, File file, List<Future> futures) throws FileNotFoundException, InterruptedException, ExecutionException {
@@ -166,7 +167,7 @@ public class DeleteManager {
     }
 
     long schemaVersionToDeleteAt = in.readInt();
-    if (!ignoreVersion && schemaVersionToDeleteAt <= databaseServer.getCommon().getSchemaVersion()) {
+    if (!ignoreVersion && schemaVersionToDeleteAt > databaseServer.getCommon().getSchemaVersion()) {
       return true;
     }
     final Index index = databaseServer.getIndices().get(dbName).getIndices().get(tableName).get(indexName);
@@ -283,23 +284,28 @@ public class DeleteManager {
           doDeletes(false, files[0]);
         }
         else {
+          long begin = System.currentTimeMillis();
           List<Future> futures = new ArrayList<>();
           for (int i = 0; i < files.length; i++) {
             final int offset = i;
             futures.add(fileExecutor.submit((Callable) () -> {
-              doDeletes(false, files[offset]);
-              return null;
+              return doDeletes(false, files[offset]);
             }));
           }
+          int countSkipped = 0;
           for (int i = 0; i < futures.size(); i++) {
             Future future = futures.get(i);
             try {
-              future.get();
+              if (true == (Boolean)future.get()) {
+                countSkipped++;
+              }
             }
             catch (Exception e) {
               logger.error("Error deleting file: name={}", files[i].getAbsolutePath());
             }
           }
+          logger.info("deleted files: countDeleted={}, countSkipped={}, duration={}",
+              files.length - countSkipped, countSkipped, files.length, System.currentTimeMillis() - begin);
         }
       }
     }

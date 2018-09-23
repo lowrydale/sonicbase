@@ -3,13 +3,13 @@
   <parent>
     <artifactId>sonicbase-root</artifactId>
     <groupId>com.sonicbase</groupId>
-    <version>1.2.15</version>
+    <version>1.2.16</version>
   </parent>
   <modelVersion>4.0.0</modelVersion>
   <groupId>com.sonicbase</groupId>
   <artifactId>sonicbase-cli</artifactId>
   <name>sonicbase-cli</name>
-  <version>1.2.15</version>
+  <version>1.2.16</version>
   <url>http://maven.apache.org</url>
   <build>
     <pluginManagement>
@@ -682,16 +682,12 @@
     <dependency>
       <groupId>com.sonicbase</groupId>
       <artifactId>sonicbase-jdbc</artifactId>
-      <version>1.2.15</version>
+      <version>1.2.16</version>
       <scope>provided</scope>
       <exclusions>
         <exclusion>
           <artifactId>snakeyaml</artifactId>
           <groupId>org.yaml</groupId>
-        </exclusion>
-        <exclusion>
-          <artifactId>guava</artifactId>
-          <groupId>com.google.guava</groupId>
         </exclusion>
         <exclusion>
           <artifactId>commons-lang</artifactId>
@@ -722,7 +718,7 @@
     <dependency>
       <groupId>com.sonicbase</groupId>
       <artifactId>sonicbase-server</artifactId>
-      <version>1.2.15</version>
+      <version>1.2.16</version>
       <scope>provided</scope>
       <exclusions>
         <exclusion>

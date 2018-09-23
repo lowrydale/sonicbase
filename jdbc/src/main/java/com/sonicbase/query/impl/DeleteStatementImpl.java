@@ -20,6 +20,7 @@ import java.util.List;
 import java.util.Map;
 import java.util.Random;
 import java.util.concurrent.ThreadLocalRandom;
+import java.util.concurrent.atomic.AtomicBoolean;
 import java.util.concurrent.atomic.AtomicLong;
 
 @SuppressWarnings({"squid:S1168", "squid:S00107"})
@@ -164,8 +165,9 @@ public class DeleteStatementImpl extends StatementImpl implements DeleteStatemen
       SelectStatementImpl select = new SelectStatementImpl(client);
       select.setExpression(expression);
 
+      AtomicBoolean didTableScan = new AtomicBoolean();
       ExpressionImpl.NextReturn ids = expression.next(select, DatabaseClient.SELECT_PAGE_SIZE, explain, new AtomicLong(), new AtomicLong(),
-          null, null, schemaRetryCount);
+          null, null, schemaRetryCount, didTableScan);
       if (ids == null || ids.getIds() == null) {
         myResult = true;
         return this;

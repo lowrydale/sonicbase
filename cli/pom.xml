@@ -4,14 +4,14 @@
     <groupId>com.sonicbase</groupId>
     <artifactId>sonicbase-cli</artifactId>
     <packaging>jar</packaging>
-    <version>1.2.15</version>
+    <version>1.2.16</version>
     <name>sonicbase-cli</name>
     <url>http://maven.apache.org</url>
 
     <parent>
         <groupId>com.sonicbase</groupId>
         <artifactId>sonicbase-root</artifactId>
-        <version>1.2.15</version>
+        <version>1.2.16</version>
     </parent>
 
     <build>
@@ -99,6 +99,12 @@
     </distributionManagement>
 
     <dependencies>
+        <dependency>
+            <groupId>com.google.guava</groupId>
+            <artifactId>guava</artifactId>
+            <version>26.0-jre</version>
+        </dependency>
+
         <dependency>
             <groupId>javax.servlet</groupId>
             <artifactId>javax.servlet-api</artifactId>

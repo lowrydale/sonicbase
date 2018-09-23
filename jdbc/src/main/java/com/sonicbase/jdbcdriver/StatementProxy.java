@@ -742,8 +742,8 @@ public class StatementProxy extends ParameterHandler implements java.sql.Stateme
     this.parms = parms;
   }
 
-  public void disableStats() {
-    this.disableStats = true;
+  public void disableStats(boolean disable) {
+    this.disableStats = disable;
   }
 
   public String getSql() {

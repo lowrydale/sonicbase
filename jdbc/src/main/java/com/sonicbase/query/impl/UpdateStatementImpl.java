@@ -3,6 +3,7 @@ package com.sonicbase.query.impl;
 import com.sonicbase.client.DatabaseClient;
 import com.sonicbase.client.InsertStatementHandler;
 import com.sonicbase.common.*;
+import com.sonicbase.jdbcdriver.ParameterHandler;
 import com.sonicbase.procedure.StoredProcedureContextImpl;
 import com.sonicbase.query.BinaryExpression;
 import com.sonicbase.query.DatabaseException;
@@ -12,6 +13,7 @@ import com.sonicbase.schema.FieldSchema;
 import com.sonicbase.schema.IndexSchema;
 import com.sonicbase.schema.TableSchema;
 import com.sonicbase.util.PartitionUtils;
+import org.apache.commons.lang.exception.ExceptionUtils;
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
 
@@ -20,6 +22,7 @@ import java.sql.SQLException;
 import java.util.*;
 import java.util.concurrent.ConcurrentSkipListMap;
 import java.util.concurrent.ThreadLocalRandom;
+import java.util.concurrent.atomic.AtomicBoolean;
 import java.util.concurrent.atomic.AtomicLong;
 
 import static com.sonicbase.client.DatabaseClient.SERIALIZATION_VERSION;
@@ -213,8 +216,9 @@ public class UpdateStatementImpl extends StatementImpl implements UpdateStatemen
     public DoExecute invoke() throws UnsupportedEncodingException, SQLException {
       ExpressionImpl expr = getWhereClause();
 
+      AtomicBoolean didTableScan = new AtomicBoolean();
       ExpressionImpl.NextReturn ret = expr.next(select, DatabaseClient.SELECT_PAGE_SIZE, explain,
-          new AtomicLong(), new AtomicLong(), null, null, schemaRetryCount);
+          new AtomicLong(), new AtomicLong(), null, null, schemaRetryCount, didTableScan);
       if (ret == null || ret.getIds() == null || ret.getIds().length == 0) {
         myResult = true;
         return this;
@@ -238,10 +242,22 @@ public class UpdateStatementImpl extends StatementImpl implements UpdateStatemen
       }
 
       for (Object[][] entry : ret.getKeys()) {
-        processRecord(dbName, sequence0, sequence1, sequence2, restrictToThisServer, procedureContext, schemaRetryCount,
-            rand, tableSchema, indexSchema, fieldOffsets, entry);
+        try {
+          processRecord(dbName, select, sequence0, sequence1, sequence2, restrictToThisServer, procedureContext, schemaRetryCount,
+              rand, tableSchema, indexSchema, fieldOffsets, entry);
 
-        countUpdated++;
+          countUpdated++;
+        }
+        catch (Exception e) {
+          int index = ExceptionUtils.indexOfThrowable(e, NotFoundException.class);
+          if (-1 != index) {
+            continue;
+          }
+          else if (e.getMessage() != null && e.getMessage().contains("NotFoundException")) {
+            continue;
+          }
+          throw new DatabaseException(e);
+        }
       }
       myResult = false;
       return this;
@@ -287,25 +303,29 @@ public class UpdateStatementImpl extends StatementImpl implements UpdateStatemen
           case LONGNVARCHAR:
           case CLOB:
           case NCLOB:
-            String str = new String((byte[])value, UTF_8_STR);
-            if (str.length() > fieldSchema.getWidth()) {
-              throw new SQLException("value too long: field=" + fieldSchema.getName() + ", width=" + fieldSchema.getWidth());
+            if (value != null) {
+              String str = new String((byte[]) value, UTF_8_STR);
+              if (str.length() > fieldSchema.getWidth()) {
+                throw new SQLException("value too long: field=" + fieldSchema.getName() + ", width=" + fieldSchema.getWidth());
+              }
             }
             break;
           case VARBINARY:
           case LONGVARBINARY:
           case BLOB:
-            if (((byte[])value).length > fieldSchema.getWidth()) {
-              throw new SQLException("value too long: field=" + fieldSchema.getName() + ", width=" + fieldSchema.getWidth());
+            if (value != null) {
+              if (((byte[]) value).length > fieldSchema.getWidth()) {
+                throw new SQLException("value too long: field=" + fieldSchema.getName() + ", width=" + fieldSchema.getWidth());
+              }
             }
             break;
         }
       }
     }
 
-    private void doUpdateRecord(String dbName, Long sequence0, Long sequence1, Short sequence2, int schemaRetryCount,
+    private void doUpdateRecord(SelectStatementImpl select, String dbName, Long sequence0, Long sequence1, Short sequence2, int schemaRetryCount,
                                 Random rand, TableSchema tableSchema, IndexSchema indexSchema, Record record,
-                                Record oldRecord, Object[] newPrimaryKey, List<Integer> selectedShards) {
+                                Record oldRecord, Object[] newPrimaryKey, Object[] oldPrimaryKey, List<Integer> selectedShards) {
       ComObject cobj = new ComObject();
       cobj.put(ComObject.Tag.DB_NAME, dbName);
       if (schemaRetryCount < 2) {
@@ -317,10 +337,24 @@ public class UpdateStatementImpl extends StatementImpl implements UpdateStatemen
       cobj.put(ComObject.Tag.IS_COMMITTING, client.isCommitting());
       cobj.put(ComObject.Tag.TRANSACTION_ID, client.getTransactionId());
       cobj.put(ComObject.Tag.PRIMARY_KEY_BYTES, DatabaseCommon.serializeKey(tableSchema, indexSchema.getName(), newPrimaryKey));
+      cobj.put(ComObject.Tag.PREV_KEY_BYTES, DatabaseCommon.serializeKey(tableSchema, indexSchema.getName(), oldPrimaryKey));
       cobj.put(ComObject.Tag.BYTES, record.serialize(client.getCommon(), SERIALIZATION_VERSION));
       if (oldRecord != null) {
         cobj.put(ComObject.Tag.PREV_BYTES, oldRecord.serialize(client.getCommon(), SERIALIZATION_VERSION));
       }
+      try {
+        ParameterHandler parms = ((ExpressionImpl) select.getWhereClause()).getParms();
+        if (parms != null) {
+          byte[] bytes = parms.serialize();
+          cobj.put(ComObject.Tag.PARMS, bytes);
+        }
+      }
+      catch (Exception e) {
+        throw new DatabaseException(e);
+      }
+      byte[] bytes = ExpressionImpl.serializeExpression((ExpressionImpl) select.getWhereClause());
+      cobj.put(ComObject.Tag.LEGACY_EXPRESSION, bytes);
+
       if (sequence0 != null && sequence1 != null && sequence2 != null) {
         cobj.put(ComObject.Tag.SEQUENCE_0_OVERRIDE, sequence0);
         cobj.put(ComObject.Tag.SEQUENCE_1_OVERRIDE, sequence1);
@@ -330,7 +364,7 @@ public class UpdateStatementImpl extends StatementImpl implements UpdateStatemen
       client.send("UpdateManager:updateRecord", selectedShards.get(0), rand.nextLong(), cobj, DatabaseClient.Replica.DEF);
     }
 
-    private void processRecord(String dbName, Long sequence0, Long sequence1, Short sequence2, boolean restrictToThisServer,
+    private void processRecord(String dbName, SelectStatementImpl select, Long sequence0, Long sequence1, Short sequence2, boolean restrictToThisServer,
                                StoredProcedureContextImpl procedureContext, int schemaRetryCount, Random rand, TableSchema tableSchema,
                                IndexSchema indexSchema, int[] fieldOffsets, Object[][] entry) throws UnsupportedEncodingException, SQLException {
       ExpressionImpl.CachedRecord cachedRecord = recordCache.get(tableName, entry[0]);
@@ -397,8 +431,8 @@ public class UpdateStatementImpl extends StatementImpl implements UpdateStatemen
         List<InsertStatementHandler.KeyInfo> deleted = new ArrayList<>();
         boolean updated = false;
         try {
-          doUpdateRecord(dbName, sequence0, sequence1, sequence2, schemaRetryCount, rand, tableSchema, indexSchema,
-              record, oldRecord, newPrimaryKey, selectedShards);
+          doUpdateRecord(select, dbName, sequence0, sequence1, sequence2, schemaRetryCount, rand, tableSchema, indexSchema,
+              record, oldRecord, newPrimaryKey, entry[0], selectedShards);
           updated = true;
           //update keys
 
@@ -420,8 +454,8 @@ public class UpdateStatementImpl extends StatementImpl implements UpdateStatemen
           }
           logger.error("Error updating record", e);
           if (updated) {
-            doUpdateRecord(dbName, sequence0, sequence1, sequence2, schemaRetryCount, rand, tableSchema, indexSchema,
-                oldRecord, null, newPrimaryKey, selectedShards);
+            doUpdateRecord(select, dbName, sequence0, sequence1, sequence2, schemaRetryCount, rand, tableSchema, indexSchema,
+                oldRecord, null, newPrimaryKey, entry[0], selectedShards);
           }
 
           rollbackInserts(tableName, indexSchema.getName(), entry, inserted);

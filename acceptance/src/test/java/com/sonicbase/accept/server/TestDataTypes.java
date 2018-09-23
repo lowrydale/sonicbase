@@ -227,8 +227,8 @@ public class TestDataTypes {
     }
 
 
-    assertEquals(client.getPartitionSize("test", 0, "persons", "_primarykey"), 9);
-    assertEquals(client.getPartitionSize("test", 1, "persons", "_primarykey"), 11);
+    assertEquals(client.getPartitionSize("test", 0, "persons", "_primarykey"), 10);
+    assertEquals(client.getPartitionSize("test", 1, "persons", "_primarykey"), 10);
 //    assertEquals(client.getPartitionSize(2, "persons", "_1__primarykey"), 9);
 //    assertEquals(client.getPartitionSize(3, "persons", "_1__primarykey"), 8);
 

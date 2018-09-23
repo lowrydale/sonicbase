@@ -349,6 +349,9 @@ public class SelectStatementHandler implements StatementHandler {
     else if (whereExpression instanceof LongValue) {
       retExpression = getLongValueExpression((LongValue) whereExpression);
     }
+    else if (whereExpression instanceof NullValue) {
+      retExpression = getNullValueExpression((NullValue) whereExpression);
+    }
     else if (whereExpression instanceof JdbcNamedParameter) {
       ParameterImpl parameter = new ParameterImpl();
       parameter.setParmName(((JdbcNamedParameter) whereExpression).getName());
@@ -402,6 +405,15 @@ public class SelectStatementHandler implements StatementHandler {
     ConstantImpl constant = new ConstantImpl();
     constant.setSqlType(Types.BIGINT);
     constant.setValue(whereExpression.getValue());
+    retExpression = constant;
+    return retExpression;
+  }
+
+  private static ExpressionImpl getNullValueExpression(NullValue whereExpression) {
+    ExpressionImpl retExpression;
+    ConstantImpl constant = new ConstantImpl();
+    constant.setSqlType(Types.NULL);
+    constant.setValue(null);
     retExpression = constant;
     return retExpression;
   }

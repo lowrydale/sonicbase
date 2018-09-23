@@ -124,7 +124,9 @@ public class InExpressionImplTest {
       retInExpression.setViewVersion(10);
 
 
-      ExpressionImpl.NextReturn ret = retInExpression.next(null, 10, null, new AtomicLong(), new AtomicLong(), null, null, false, false, 0);
+      AtomicBoolean didTableScan = new AtomicBoolean();
+      ExpressionImpl.NextReturn ret = retInExpression.next(null, 10, null, new AtomicLong(),
+          new AtomicLong(), null, null, false, false, 0, didTableScan);
 
       Record[] recs = new Record[]{new Record("test", common, records[0])};
       assertFalse((Boolean) retInExpression.evaluateSingleRecord(new TableSchema[]{tableSchema}, recs, null));

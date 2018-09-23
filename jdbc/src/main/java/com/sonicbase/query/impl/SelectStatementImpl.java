@@ -559,6 +559,9 @@ public class SelectStatementImpl extends StatementImpl implements SelectStatemen
       if (!haveCounters) {
         needToEvaluate = true;
       }
+      else if (explain != null) {
+        explain.getBuilder().append("Evaluate counters\n");
+      }
 
       if (!countersList.isEmpty()) {
         Counter[] localCounters = countersList.toArray(new Counter[countersList.size()]);
@@ -575,11 +578,11 @@ public class SelectStatementImpl extends StatementImpl implements SelectStatemen
       boolean countDistinct = checkIfCountDistinct();
 
       if (!countDistinct && this.isCountFunction && expression instanceof AllRecordsExpressionImpl) {
-        return countRecords(dbName, tableNames, restrictToThisServer, procedureContext, schemaRetryCount);
+        return countRecords(dbName, explain, tableNames, restrictToThisServer, procedureContext, schemaRetryCount);
       }
       else {
         return executeNonCountSelectStatement(dbName, sqlToUse, explain, restrictToThisServer, procedureContext,
-            schemaRetryCount, needToEvaluate, sortWithIndex, countDistinct);
+            schemaRetryCount, needToEvaluate, sortWithIndex, countDistinct, haveCounters);
       }
     }
     catch (Exception e) {
@@ -590,7 +593,7 @@ public class SelectStatementImpl extends StatementImpl implements SelectStatemen
   private Object executeNonCountSelectStatement(String dbName, String sqlToUse, Explain explain,
                                                 boolean restrictToThisServer, StoredProcedureContextImpl procedureContext,
                                                 int schemaRetryCount, boolean needToEvaluate, boolean sortWithIndex,
-                                                boolean countDistinct) {
+                                                boolean countDistinct, boolean haveCounters) {
     Set<ColumnImpl> localColumns = prepareColumns(dbName);
 
     if (orderByExpressions != null) {
@@ -615,15 +618,20 @@ public class SelectStatementImpl extends StatementImpl implements SelectStatemen
     serverSelect = false;
 
     if (serverSort) {
+      if (!isOnServer) {
+        if (explain != null) {
+          explain.getBuilder().append("Server select due to server sort\n");
+        }
+      }
       serverSelect = true;
       serverSelectResultSetId = -1;
     }
 
     Set<DistinctRecord> uniqueRecords = new HashSet<>();
     ExpressionImpl.NextReturn ids = null;
-    if (needToEvaluate) {
+    if (needToEvaluate || (haveCounters && explain != null)) {
       ids = next(dbName, explain, restrictToThisServer, procedureContext, schemaRetryCount);
-      if (!serverSelect) {
+      if (!serverSelect && explain == null) {
         applyDistinct(dbName, tableNames, ids, uniqueRecords);
       }
     }
@@ -872,10 +880,15 @@ public class SelectStatementImpl extends StatementImpl implements SelectStatemen
     return groupContext;
   }
 
-  public ExpressionImpl.NextReturn serverSelect(String dbName, String[] tableNames,
+  public ExpressionImpl.NextReturn serverSelect(String dbName, Explain explain, String[] tableNames,
                                                 boolean restrictToThisServer, StoredProcedureContextImpl procedureContext) {
     while (true) {
       try {
+        if (explain != null) {
+          if (!explain.getBuilder().toString().contains("Server select")) {
+            explain.getBuilder().append("Server select\n");
+          }
+        }
         ComObject cobj = new ComObject();
         cobj.put(ComObject.Tag.LEGACY_SELECT_STATEMENT, serialize());
         cobj.put(ComObject.Tag.SCHEMA_VERSION, client.getCommon().getSchemaVersion());
@@ -883,6 +896,7 @@ public class SelectStatementImpl extends StatementImpl implements SelectStatemen
         cobj.put(ComObject.Tag.DB_NAME, dbName);
         cobj.put(ComObject.Tag.CURR_OFFSET, currOffset.get());
         cobj.put(ComObject.Tag.COUNT_RETURNED, countReturned.get());
+        cobj.put(ComObject.Tag.SHOULD_EXPLAIN, explain != null);
 
         ComObject retObj = null;
         if (restrictToThisServer) {
@@ -893,6 +907,10 @@ public class SelectStatementImpl extends StatementImpl implements SelectStatemen
               Math.abs(ThreadLocalRandom.current().nextInt() % client.getShardCount()),
               Math.abs(ThreadLocalRandom.current().nextLong()), cobj, DatabaseClient.Replica.DEF);
           retObj = new ComObject(recordRet);
+        }
+
+        if (explain != null) {
+          explain.getBuilder().append(retObj.getString(ComObject.Tag.EXPLAIN));
         }
 
         return processResponseForServerSelect(dbName, tableNames, retObj);
@@ -1023,7 +1041,7 @@ public class SelectStatementImpl extends StatementImpl implements SelectStatemen
     return actualIds;
   }
 
-  private ResultSet countRecords(final String dbName, String[] tableNames, boolean restrictToThisServer,
+  private ResultSet countRecords(final String dbName, Explain explain, String[] tableNames, boolean restrictToThisServer,
                                  StoredProcedureContextImpl procedureContext, int schemaRetryCount) {
     int tableIndex = 0;
     if (this.countTable != null) {
@@ -1037,13 +1055,20 @@ public class SelectStatementImpl extends StatementImpl implements SelectStatemen
     else {
       this.countTable = tableNames[0];
     }
+
+    if (explain != null) {
+      explain.getBuilder().append("Count records, all shards: table=" + countTable + ", column=" + countColumn +
+          ", expression=" + expression.toString());
+      return new ResultSetImpl(explain.getBuilder().toString().split("\\n"));
+    }
+
     int columnIndex = getColumnIndex(dbName);
     if (!joins.isEmpty()) {
-      return doCountRecordsForJoins(dbName, restrictToThisServer, procedureContext, schemaRetryCount, tableIndex, columnIndex);
+      return doCountRecordsForJoins(dbName, explain, restrictToThisServer, procedureContext, schemaRetryCount, tableIndex, columnIndex);
     }
     else {
       while (true) {
-        ResultSet count = doCountRecords(dbName, restrictToThisServer, procedureContext);
+        ResultSet count = doCountRecords(dbName, explain, restrictToThisServer, procedureContext);
         if (count != null) {
           return count;
         }
@@ -1065,7 +1090,7 @@ public class SelectStatementImpl extends StatementImpl implements SelectStatemen
     return columnIndex;
   }
 
-  private ResultSet doCountRecordsForJoins(String dbName, boolean restrictToThisServer,
+  private ResultSet doCountRecordsForJoins(String dbName, Explain explain, boolean restrictToThisServer,
                                            StoredProcedureContextImpl procedureContext, int schemaRetryCount, int tableIndex,
                                            int columnIndex) {
     long count = 0;
@@ -1089,7 +1114,7 @@ public class SelectStatementImpl extends StatementImpl implements SelectStatemen
     return new ResultSetImpl(dbName, client, this, count, restrictToThisServer, procedureContext);
   }
 
-  private ResultSet doCountRecords(String dbName, boolean restrictToThisServer, StoredProcedureContextImpl procedureContext) {
+  private ResultSet doCountRecords(String dbName, Explain explain, boolean restrictToThisServer, StoredProcedureContextImpl procedureContext) {
     long count = 0;
     try {
       int shardCount = client.getShardCount();
@@ -1156,7 +1181,8 @@ public class SelectStatementImpl extends StatementImpl implements SelectStatemen
                                         StoredProcedureContextImpl procedureContext, int schemaRetryCount) {
     while (true) {
       try {
-        return doNext(dbName, explain, restrictToThisServer, procedureContext, schemaRetryCount);
+        AtomicBoolean didTableScan = new AtomicBoolean();
+        return doNext(dbName, explain, restrictToThisServer, procedureContext, schemaRetryCount, didTableScan);
       }
       catch (SchemaOutOfSyncException e) {
         handleSchemaOutOfSyncException();
@@ -1169,7 +1195,7 @@ public class SelectStatementImpl extends StatementImpl implements SelectStatemen
   }
 
   private ExpressionImpl.NextReturn doNext(String dbName, Explain explain, boolean restrictToThisServer,
-                                           StoredProcedureContextImpl procedureContext, int schemaRetryCount) {
+                                           StoredProcedureContextImpl procedureContext, int schemaRetryCount, AtomicBoolean didTableScan) {
     ExpressionImpl localExpression = getExpression();
 
     int count = prepareNext(localExpression);
@@ -1183,7 +1209,7 @@ public class SelectStatementImpl extends StatementImpl implements SelectStatemen
       if (currOffset.get() != 0 && countReturned.get() < count) {
         return null;
       }
-      ret = serverSelect(dbName, tableNames, restrictToThisServer, procedureContext);
+      ret = serverSelect(dbName, explain, tableNames, restrictToThisServer, procedureContext);
     }
     else {
       localExpression.forceSelectOnServer(forceSelectOnServer);
@@ -1191,7 +1217,7 @@ public class SelectStatementImpl extends StatementImpl implements SelectStatemen
       localExpression.setRestrictToThisServer(restrictToThisServer);
       localExpression.setProcedureContext(procedureContext);
       ret = localExpression.next(this, count, explain, currOffset, countReturned, limit, offset,
-          false, false, schemaRetryCount);
+          false, false, schemaRetryCount, didTableScan);
     }
     if (ret == null) {
       return null;
@@ -1660,8 +1686,9 @@ public class SelectStatementImpl extends StatementImpl implements SelectStatemen
         explain.getBuilder().append("inner join based on expression: table=").append(fromTable).append(", expression=").append(expression.toString()).append("\n");
       }
       long begin = System.nanoTime();
+      AtomicBoolean didTableScan = new AtomicBoolean();
       ExpressionImpl.NextReturn ids = expression.next(this, pageSize / threadCount, explain,
-          currOffset, countReturned, limit, offset, false, false, schemaRetryCount);
+          currOffset, countReturned, limit, offset, false, false, schemaRetryCount, didTableScan);
       if (ids != null && ids.getIds() != null && ids.getIds().length != 0) {
         hadSelectRet.set(true);
       }
@@ -1694,8 +1721,9 @@ public class SelectStatementImpl extends StatementImpl implements SelectStatemen
       allExpression.setDbName(dbName);
       allExpression.setColumns(getSelectColumns());
       allExpression.setOrderByExpressions(expression.getOrderByExpressions());
+      AtomicBoolean didTableScan = new AtomicBoolean();
       ids = allExpression.next(this, pageSize / threadCount, explain, currOffset, countReturned, limit,
-          offset, false, false, schemaRetryCount);
+          offset, false, false, schemaRetryCount, didTableScan);
       if (ids != null && ids.getIds() != null && ids.getIds().length != 0) {
         hadSelectRet.set(true);
       }
@@ -1734,8 +1762,9 @@ public class SelectStatementImpl extends StatementImpl implements SelectStatemen
       allExpression.setDbName(dbName);
       allExpression.setColumns(getSelectColumns());
       allExpression.setOrderByExpressions(expression.getOrderByExpressions());
+      AtomicBoolean didTableScan = new AtomicBoolean();
       ids = allExpression.next(this, pageSize / threadCount, explain, currOffset, countReturned, limit,
-          offset, false, false, schemaRetryCount);
+          offset, false, false, schemaRetryCount, didTableScan);
       if (ids != null && ids.getIds() != null && ids.getIds().length != 0) {
         hadSelectRet.set(true);
       }

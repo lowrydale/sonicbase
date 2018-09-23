@@ -16,6 +16,7 @@ import java.io.DataOutputStream;
 import java.io.IOException;
 import java.util.List;
 import java.util.Map;
+import java.util.concurrent.atomic.AtomicBoolean;
 import java.util.concurrent.atomic.AtomicLong;
 import java.util.concurrent.atomic.AtomicReference;
 
@@ -65,10 +66,10 @@ public class AllRecordsExpressionImpl extends ExpressionImpl {
       TableSchema[] tableSchemas, Record[] records, ParameterHandler parms) {
     for (int i = 0; i < tableSchemas.length; i++) {
       if (tableSchemas[i].getName().equals(fromTable)) {
-        return records[i];
+        return true;
       }
     }
-    return null;
+    return false;
   }
 
   private String getFromTable() {
@@ -78,7 +79,7 @@ public class AllRecordsExpressionImpl extends ExpressionImpl {
   @Override
   public NextReturn next(SelectStatementImpl select, int count, SelectStatementImpl.Explain explain, AtomicLong currOffset, AtomicLong countReturned,
                          Limit limit, Offset offset,
-                         boolean b, boolean analyze, int schemaRetryCount) {
+                         boolean b, boolean analyze, int schemaRetryCount, AtomicBoolean didTableScan) {
     List<OrderByExpressionImpl> orderByExpressions = getOrderByExpressions();
     String orderByColumn = null;
     if (orderByExpressions != null && !orderByExpressions.isEmpty()) {
@@ -101,6 +102,11 @@ public class AllRecordsExpressionImpl extends ExpressionImpl {
       return null;
     }
     else {
+
+      if (explain != null) {
+        explain.getBuilder().append("Index lookup for all records: table=").append(getFromTable()).append(", idx=");
+        explain.getBuilder().append(indexSchema.getName()).append("\n").append("single key index lookup\n");
+      }
 
       setTableName(getFromTable());
 
@@ -135,9 +141,9 @@ public class AllRecordsExpressionImpl extends ExpressionImpl {
 
   @Override
   public NextReturn next(SelectStatementImpl select, int count, SelectStatementImpl.Explain explain, AtomicLong currOffset, AtomicLong countReturned,
-                         Limit limit, Offset offset, int schemaRetryCount) {
+                         Limit limit, Offset offset, int schemaRetryCount, AtomicBoolean didTableScan) {
     return next(select, DatabaseClient.SELECT_PAGE_SIZE, explain, currOffset, countReturned, limit, offset,
-        false, false, schemaRetryCount);
+        false, false, schemaRetryCount, didTableScan);
   }
 
   @Override

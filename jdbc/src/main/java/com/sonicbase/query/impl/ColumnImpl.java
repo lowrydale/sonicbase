@@ -15,6 +15,7 @@ import java.io.DataOutputStream;
 import java.io.IOException;
 import java.util.List;
 import java.util.Set;
+import java.util.concurrent.atomic.AtomicBoolean;
 import java.util.concurrent.atomic.AtomicLong;
 
 @SuppressWarnings({"squid:S1168", "squid:S00107"})
@@ -195,13 +196,13 @@ public class ColumnImpl extends ExpressionImpl {
 
   @Override
   public NextReturn next(SelectStatementImpl select, int count, SelectStatementImpl.Explain explainBuilder, AtomicLong currOffset, AtomicLong countReturned,
-                         Limit limit, Offset offset, int schemaRetryCount) {
+                         Limit limit, Offset offset, int schemaRetryCount, AtomicBoolean didTableScan) {
     return null;
   }
 
   @Override
   public NextReturn next(SelectStatementImpl select, int count, SelectStatementImpl.Explain explain, AtomicLong currOffset, AtomicLong countReturned,
-                         Limit limit, Offset offset, boolean b, boolean analyze, int schemaRetryCount) {
+                         Limit limit, Offset offset, boolean b, boolean analyze, int schemaRetryCount, AtomicBoolean didTableScan) {
     return null;
   }
 

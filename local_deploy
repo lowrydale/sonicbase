@@ -47,6 +47,7 @@ rsync -vlLt --exclude original*sonicbase-*.jar --exclude sonicbase-*tests.jar cl
 
 rsync -rvlLt dependencies/kafka-clients-0.11.0.1.jar $HOME/sonicbase/lib
 rsync -rvlLt db/target/classes/config/config-1-local.yaml $HOME/sonicbase/config
+rsync -rvlLt db/target/classes/config/default-cluster $HOME/sonicbase/config
 rsync -rvlLt cli/src/main/resources/init-tables.command $HOME/sonicbase/scripts
 rsync -rvlLt $HOME/Dropbox/sonicbase-config/* $HOME/sonicbase/config
 rsync -rvlLt db/src/main/resources/log4j.xml $HOME/sonicbase/config

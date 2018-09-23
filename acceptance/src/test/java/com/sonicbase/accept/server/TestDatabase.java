@@ -561,7 +561,22 @@ public class TestDatabase {
   }
 
   @Test
+  public void testSecondaryIndexWithNoKeyExplain() throws SQLException {
+    try (PreparedStatement stmt = conn.prepareStatement(
+        "explain select * from children where socialsecuritynumber = '933-28-4'")) {
+      try (ResultSet rs = stmt.executeQuery()) {
+        StringBuilder builder = new StringBuilder();
+        while (rs.next()) {
+          builder.append(rs.getString(1)).append("\n");
+        }
+        assertEquals(builder.toString(), "Table scan: table=children children.socialsecuritynumber = 933-28-4\n");
+      }
+    }
+  }
+
+  @Test
   public void testSecondaryIndexWithNoKey() throws SQLException {
+
     PreparedStatement stmt = conn.prepareStatement("select * from children where socialsecuritynumber = '933-28-4'");
     ResultSet ret = stmt.executeQuery();
     assertTrue(ret.next());
@@ -611,30 +626,6 @@ public class TestDatabase {
     assertEquals(ret.getString("socialSecurityNumber"), "933-28-9");
     assertFalse(ret.next());
 
-  }
-
-  @Test(enabled = false)
-  public void testMulti() throws SQLException {
-    PreparedStatement stmt = conn.prepareStatement("create table Persons2 (id BIGINT, id2 BIGINT, socialSecurityNumber VARCHAR(20), relatives VARCHAR(64000), restricted BOOLEAN, gender VARCHAR(8), PRIMARY KEY (id))");
-    stmt.executeUpdate();
-
-    for (int i = 0; i < 100000; i++) {
-      stmt = conn.prepareStatement("insert into persons2 (id, socialSecurityNumber, relatives, restricted, gender) VALUES (?, ?, ?, ?, ?)");
-      stmt.setLong(1, i);
-      stmt.setString(2, "933-28-" + i);
-      stmt.setString(3, "12345678901,12345678901|12345678901,12345678901,12345678901,12345678901|12345678901");
-      stmt.setBoolean(4, false);
-      stmt.setString(5, "m");
-      assertEquals(stmt.executeUpdate(), 1);
-      ids.add((long) i);
-
-      stmt = conn.prepareStatement("select * from persons2 where id=" + i + " order by id asc");
-      ResultSet ret = stmt.executeQuery();
-
-      ret.next();
-      assertEquals(ret.getLong("id"), i);
-    }
-    System.out.println("complete");
   }
 
   @Test
@@ -790,6 +781,21 @@ public class TestDatabase {
   }
 
   @Test
+  public void testAddColumnExplain() throws SQLException {
+    try (PreparedStatement stmt2 = conn.prepareStatement(
+        "explain select id, id2, id3 from addColumn where id >= 0")) {
+      try (ResultSet rs = stmt2.executeQuery()) {
+        StringBuilder builder = new StringBuilder();
+        while (rs.next()) {
+          builder.append(rs.getString(1)).append("\n");
+        }
+        assertEquals(builder.toString(), "Index lookup for relational op: table=addcolumn, idx=_primarykey, addcolumn.id >= 0\n" +
+            "single key index lookup\n");
+      }
+    }
+  }
+
+  @Test
   public void testAddColumn() throws SQLException {
 
     PreparedStatement stmt = conn.prepareStatement("create table addColumn (id BIGINT, id2 BIGINT, PRIMARY KEY (id))");
@@ -861,6 +867,20 @@ public class TestDatabase {
 
   public void testMath() throws Exception {
 
+    try (PreparedStatement stmt2 = conn.prepareStatement(
+        "explain select * from persons where id3 = id + 1000")) {
+      try (ResultSet rs = stmt2.executeQuery()) {
+        StringBuilder builder = new StringBuilder();
+        while (rs.next()) {
+          builder.append(rs.getString(1)).append("\n");
+        }
+        assertEquals(builder.toString(), "Index lookup for relational op: _primarykey, persons.id < 5\n" +
+            "single key index lookup\n" +
+            " AND \n" +
+            "Read record evaluation: persons.gender != null\n");
+      }
+    }
+
     PreparedStatement stmt = conn.prepareStatement("select * from persons where id3 = id + 1000");
     ResultSet ret = stmt.executeQuery();
     assertTrue(ret.next());
@@ -869,8 +889,22 @@ public class TestDatabase {
   }
 
   @Test
-  public void testLess() throws Exception {
+  public void testLessExplain() throws SQLException {
+    try (PreparedStatement stmt2 = conn.prepareStatement(
+        "explain select * from persons where id<106 and id>100 order by id2 asc, id desc")) {
+      try (ResultSet rs = stmt2.executeQuery()) {
+        StringBuilder builder = new StringBuilder();
+        while (rs.next()) {
+          builder.append(rs.getString(1)).append("\n");
+        }
+        assertEquals(builder.toString(), "Server select due to server sort\n" +
+            "Two key index lookup: table=persons, idx=_primarykey, id > 100 and id < 106\n");
+      }
+    }
+  }
 
+  @Test
+  public void testLess() throws Exception {
     PreparedStatement stmt = conn.prepareStatement("select * from persons where id<106 and id>100 order by id2 asc, id desc");
     ResultSet ret = stmt.executeQuery();
     assertTrue(ret.next());
@@ -891,6 +925,21 @@ public class TestDatabase {
   }
 
   @Test
+  public void testLessNoKeySecondaryIndexExplain() throws SQLException {
+    try (PreparedStatement stmt2 = conn.prepareStatement(
+        "explain select * from nokeysecondaryindex where id<10 and id>7 order by id2 asc, id desc")) {
+      try (ResultSet rs = stmt2.executeQuery()) {
+        StringBuilder builder = new StringBuilder();
+        while (rs.next()) {
+          builder.append(rs.getString(1)).append("\n");
+        }
+        assertEquals(builder.toString(), "Server select due to server sort\n" +
+            "Two key index lookup: table=nokeysecondaryindex, idx=id, id > 7 and id < 10\n");
+      }
+    }
+  }
+
+  @Test
   public void testLessNoKeySecondaryIndex() throws Exception {
 
     PreparedStatement stmt = conn.prepareStatement("select * from nokeysecondaryindex where id<10 and id>7 order by id2 asc, id desc");
@@ -905,8 +954,22 @@ public class TestDatabase {
   }
 
   @Test
-  public void testLessNoKey() throws Exception {
+  public void testLessNoKeyExplain() throws SQLException {
+    try (PreparedStatement stmt2 = conn.prepareStatement(
+        "explain select * from nokey where id<10 and id>7 order by id2 asc, id desc")) {
+      try (ResultSet rs = stmt2.executeQuery()) {
+        StringBuilder builder = new StringBuilder();
+        while (rs.next()) {
+          builder.append(rs.getString(1)).append("\n");
+        }
+        assertEquals(builder.toString(), "Server select due to server sort\n" +
+            "Table scan: table=nokey nokey.id < 10 and nokey.id > 7\n");
+      }
+    }
+  }
 
+  @Test
+  public void testLessNoKey() throws Exception {
     PreparedStatement stmt = conn.prepareStatement("select * from nokey where id<10 and id>7 order by id2 asc, id desc");
     ResultSet ret = stmt.executeQuery();
     assertTrue(ret.next());
@@ -925,8 +988,22 @@ public class TestDatabase {
   }
 
   @Test
-  public void testBasicsNoKeySecondaryIndex() throws Exception {
+  public void testBasicsNoKeySecondaryIndexExplain() throws SQLException {
+    try (PreparedStatement stmt2 = conn.prepareStatement(
+        "explain select id, id2 from nokeysecondaryIndex where id<5 order by id desc")) {
+      try (ResultSet rs = stmt2.executeQuery()) {
+        StringBuilder builder = new StringBuilder();
+        while (rs.next()) {
+          builder.append(rs.getString(1)).append("\n");
+        }
+        assertEquals(builder.toString(), "Index lookup for relational op: table=nokeysecondaryindex, idx=id, nokeysecondaryindex.id < 5\n" +
+            "single key index lookup\n");
+      }
+    }
+  }
 
+  @Test
+  public void testBasicsNoKeySecondaryIndex() throws Exception {
     //test select returns multiple records with an index using operator '<'
     PreparedStatement stmt = conn.prepareStatement("select id, id2 from nokeysecondaryIndex where id<5 order by id desc");
     ResultSet ret = stmt.executeQuery();
@@ -951,8 +1028,22 @@ public class TestDatabase {
   }
 
   @Test
-  public void testBasicsNoKey() throws Exception {
+  public void testBasicsNoKeyExplain() throws SQLException {
+    try (PreparedStatement stmt2 = conn.prepareStatement(
+        "explain select id, id2 from nokey where id<5 order by id desc")) {
+      try (ResultSet rs = stmt2.executeQuery()) {
+        StringBuilder builder = new StringBuilder();
+        while (rs.next()) {
+          builder.append(rs.getString(1)).append("\n");
+        }
+        assertEquals(builder.toString(), "Server select due to server sort\n" +
+            "Table scan: table=nokey nokey.id < 5\n");
+      }
+    }
+  }
 
+  @Test
+  public void testBasicsNoKey() throws Exception {
     //test select returns multiple records with an index using operator '<'
     PreparedStatement stmt = conn.prepareStatement("select id, id2 from nokey where id<5 order by id desc");
     ResultSet ret = stmt.executeQuery();
@@ -989,6 +1080,21 @@ public class TestDatabase {
     assertEquals(ret.getLong("id"), 0);
     assertEquals(ret.getLong("id2"), 0);
     assertFalse(ret.next());
+  }
+
+  @Test
+  public void testBasicsExplain() throws SQLException {
+    try (PreparedStatement stmt2 = conn.prepareStatement(
+        "explain select id, id2 from persons where id<5 order by id desc")) {
+      try (ResultSet rs = stmt2.executeQuery()) {
+        StringBuilder builder = new StringBuilder();
+        while (rs.next()) {
+          builder.append(rs.getString(1)).append("\n");
+        }
+        assertEquals(builder.toString(), "Index lookup for relational op: table=persons, idx=_primarykey, persons.id < 5\n" +
+            "single key index lookup\n");
+      }
+    }
   }
 
   @Test
@@ -1088,6 +1194,20 @@ public class TestDatabase {
   }
 
   @Test
+  public void testNotInNoKeySecondaryIndexExplain() throws SQLException {
+    try (PreparedStatement stmt2 = conn.prepareStatement(
+        "explain select * from nokeysecondaryIndex where id not in (3, 4, 5, 6, 7, 8, 9, 100, 101, 102, 103, 104, 105, 106, 107, 108, 109) order by id asc")) {
+      try (ResultSet rs = stmt2.executeQuery()) {
+        StringBuilder builder = new StringBuilder();
+        while (rs.next()) {
+          builder.append(rs.getString(1)).append("\n");
+        }
+        assertEquals(builder.toString(), "Table scan: table=nokeysecondaryindex nokeysecondaryindex.id not in (3, 4, 5, 6, 7, 8, 9, 100, 101, 102, 103, 104, 105, 106, 107, 108, 109)\n");
+      }
+    }
+  }
+
+  @Test
   public void testNotInNoKeySecondaryIndex() throws SQLException {
     //test select with not in expression
     PreparedStatement stmt = conn.prepareStatement("select * from nokeysecondaryIndex where id not in (3, 4, 5, 6, 7, 8, 9, 100, 101, 102, 103, 104, 105, 106, 107, 108, 109) order by id asc");
@@ -1103,6 +1223,21 @@ public class TestDatabase {
     assertEquals(ret.getLong("id"), 2);
     assertEquals(ret.getLong("id2"), 4);
     assertFalse(ret.next());
+  }
+
+  @Test
+  public void testNotInNoKeyExplain() throws SQLException {
+    try (PreparedStatement stmt2 = conn.prepareStatement(
+        "explain select * from nokey where id not in (3, 4, 5, 6, 7, 8, 9, 100, 101, 102, 103, 104, 105, 106, 107, 108, 109) order by id asc")) {
+      try (ResultSet rs = stmt2.executeQuery()) {
+        StringBuilder builder = new StringBuilder();
+        while (rs.next()) {
+          builder.append(rs.getString(1)).append("\n");
+        }
+        assertEquals(builder.toString(), "Server select due to server sort\n" +
+            "Table scan: table=nokey nokey.id not in (3, 4, 5, 6, 7, 8, 9, 100, 101, 102, 103, 104, 105, 106, 107, 108, 109)\n");
+      }
+    }
   }
 
   @Test
@@ -1133,6 +1268,20 @@ public class TestDatabase {
   }
 
   @Test
+  public void testNotInExplain() throws SQLException {
+    try (PreparedStatement stmt2 = conn.prepareStatement(
+        "explain select * from persons where id not in (5, 6, 7, 8, 9, 100, 101, 102, 103, 104, 105, 106, 107, 108, 109) order by id asc")) {
+      try (ResultSet rs = stmt2.executeQuery()) {
+        StringBuilder builder = new StringBuilder();
+        while (rs.next()) {
+          builder.append(rs.getString(1)).append("\n");
+        }
+        assertEquals(builder.toString(), "Table scan: table=persons persons.id not in (5, 6, 7, 8, 9, 100, 101, 102, 103, 104, 105, 106, 107, 108, 109)\n");
+      }
+    }
+  }
+
+  @Test
   public void testNotIn() throws SQLException {
     //test select with not in expression
     PreparedStatement stmt = conn.prepareStatement("select * from persons where id not in (5, 6, 7, 8, 9, 100, 101, 102, 103, 104, 105, 106, 107, 108, 109) order by id asc");
@@ -1152,6 +1301,21 @@ public class TestDatabase {
   }
 
   @Test
+  public void testIdentityNoKeySecondaryIndexExplain() throws SQLException {
+    try (PreparedStatement stmt2 = conn.prepareStatement(
+        "explain select * from nokeysecondaryindex where id = 5")) {
+      try (ResultSet rs = stmt2.executeQuery()) {
+        StringBuilder builder = new StringBuilder();
+        while (rs.next()) {
+          builder.append(rs.getString(1)).append("\n");
+        }
+        assertEquals(builder.toString(), "Index lookup for relational op: table=nokeysecondaryindex, idx=id, nokeysecondaryindex.id = 5\n" +
+            "single key index lookup\n");
+      }
+    }
+  }
+
+  @Test
   public void testIdentityNoKeySecondaryIndex() throws SQLException {
     //test select with not in expression
     PreparedStatement stmt = conn.prepareStatement("select * from nokeysecondaryindex where id = 5");
@@ -1164,7 +1328,22 @@ public class TestDatabase {
   }
 
   @Test
+  public void testIdentityNoKeyExplain() throws SQLException {
+    try (PreparedStatement stmt2 = conn.prepareStatement(
+        "explain select * from nokey where id = 5")) {
+      try (ResultSet rs = stmt2.executeQuery()) {
+        StringBuilder builder = new StringBuilder();
+        while (rs.next()) {
+          builder.append(rs.getString(1)).append("\n");
+        }
+        assertEquals(builder.toString(), "Table scan: table=nokey nokey.id = 5\n");
+      }
+    }
+  }
+
+  @Test
   public void testIdentityNoKey() throws SQLException {
+
     //test select with not in expression
     PreparedStatement stmt = conn.prepareStatement("select * from nokey where id = 5");
     ResultSet ret = stmt.executeQuery();
@@ -1176,6 +1355,21 @@ public class TestDatabase {
     assertEquals(ret.getLong("id"), 5);
     assertEquals(ret.getLong("id2"), 10);
     assertFalse(ret.next());
+  }
+
+  @Test
+  public void testIdentityExplain() throws SQLException {
+    try (PreparedStatement stmt2 = conn.prepareStatement(
+        "explain select * from persons where id = 5")) {
+      try (ResultSet rs = stmt2.executeQuery()) {
+        StringBuilder builder = new StringBuilder();
+        while (rs.next()) {
+          builder.append(rs.getString(1)).append("\n");
+        }
+        assertEquals(builder.toString(), "Index lookup for relational op: table=persons, idx=_primarykey, persons.id = 5\n" +
+            "single key index lookup\n");
+      }
+    }
   }
 
   @Test
@@ -1197,6 +1391,21 @@ public class TestDatabase {
   }
 
   @Test
+  public void testNoKeySecondaryIndexExplain() throws SQLException {
+    try (PreparedStatement stmt2 = conn.prepareStatement(
+        "explain select * from nokeysecondaryIndex where id < 5 order by id asc")) {
+      try (ResultSet rs = stmt2.executeQuery()) {
+        StringBuilder builder = new StringBuilder();
+        while (rs.next()) {
+          builder.append(rs.getString(1)).append("\n");
+        }
+        assertEquals(builder.toString(), "Index lookup for relational op: table=nokeysecondaryindex, idx=id, nokeysecondaryindex.id < 5\n" +
+            "single key index lookup\n");
+      }
+    }
+  }
+
+  @Test
   public void testNoKeySecondaryIndex() throws SQLException {
     //test select with not in expression
     PreparedStatement stmt = conn.prepareStatement("select * from nokeysecondaryIndex where id < 5 order by id asc");
@@ -1211,6 +1420,21 @@ public class TestDatabase {
     ret.next();
     assertEquals(ret.getLong("id"), 2);
     assertEquals(ret.getLong("id2"), 4);
+  }
+
+  @Test
+  public void testNoKeyExplain() throws SQLException {
+    try (PreparedStatement stmt2 = conn.prepareStatement(
+        "explain select * from nokey where id < 5 order by id asc")) {
+      try (ResultSet rs = stmt2.executeQuery()) {
+        StringBuilder builder = new StringBuilder();
+        while (rs.next()) {
+          builder.append(rs.getString(1)).append("\n");
+        }
+        assertEquals(builder.toString(), "Server select due to server sort\n" +
+            "Table scan: table=nokey nokey.id < 5\n");
+      }
+    }
   }
 
   @Test
@@ -1237,6 +1461,23 @@ public class TestDatabase {
   }
 
   @Test
+  public void testNoKeySecondaryIndex2Explain() throws SQLException {
+    try (PreparedStatement stmt2 = conn.prepareStatement(
+        "explain select * from nokeysecondaryindex where id <= 2 and id2 = 4 order by id asc")) {
+      try (ResultSet rs = stmt2.executeQuery()) {
+        StringBuilder builder = new StringBuilder();
+        while (rs.next()) {
+          builder.append(rs.getString(1)).append("\n");
+        }
+        assertEquals(builder.toString(), "Index lookup for relational op: table=nokeysecondaryindex, idx=id, nokeysecondaryindex.id <= 2\n" +
+            "single key index lookup\n" +
+            " AND \n" +
+            "Read record from index and evaluate: nokeysecondaryindex.id2 = 4\n");
+      }
+    }
+  }
+
+  @Test
   public void testNoKeySecondaryIndex2() throws SQLException {
     PreparedStatement stmt = conn.prepareStatement("select * from nokeysecondaryindex where id <= 2 and id2 = 4 order by id asc");
     ResultSet ret = stmt.executeQuery();
@@ -1245,6 +1486,21 @@ public class TestDatabase {
     assertEquals(ret.getLong("id"), 2);
     assertEquals(ret.getLong("id2"), 4);
     assertFalse(ret.next());
+  }
+
+  @Test
+  public void testNoKey2Explain() throws SQLException {
+    try (PreparedStatement stmt2 = conn.prepareStatement(
+        "explain select * from nokey where id <= 2 and id2 = 4 order by id asc")) {
+      try (ResultSet rs = stmt2.executeQuery()) {
+        StringBuilder builder = new StringBuilder();
+        while (rs.next()) {
+          builder.append(rs.getString(1)).append("\n");
+        }
+        assertEquals(builder.toString(), "Server select due to server sort\n" +
+            "Table scan: table=nokey nokey.id <= 2 and nokey.id2 = 4\n");
+      }
+    }
   }
 
   @Test
@@ -1263,6 +1519,22 @@ public class TestDatabase {
 
 
   @Test
+  public void testNotInAndNoKeySecondaryIndexExplain() throws SQLException {
+    try (PreparedStatement stmt2 = conn.prepareStatement(
+        "explain select * from nokeysecondaryindex where id < 4 and id > 1 and id not in (5, 6, 7, 8, 9, 100, 101, 102, 103, 104, 105, 106, 107, 108, 109) order by id desc")) {
+      try (ResultSet rs = stmt2.executeQuery()) {
+        StringBuilder builder = new StringBuilder();
+        while (rs.next()) {
+          builder.append(rs.getString(1)).append("\n");
+        }
+        assertEquals(builder.toString(), "Two key index lookup: table=nokeysecondaryindex, idx=id, id > 1 and id < 4\n" +
+            " AND \n" +
+            "Read record from index and evaluate: nokeysecondaryindex.id not in (5, 6, 7, 8, 9, 100, 101, 102, 103, 104, 105, 106, 107, 108, 109)\n");
+      }
+    }
+  }
+
+  @Test
   public void testNotInAndNoKeySecondaryIndex() throws SQLException {
     //test select with not in expression
     PreparedStatement stmt = conn.prepareStatement("select * from nokeysecondaryindex where id < 4 and id > 1 and id not in (5, 6, 7, 8, 9, 100, 101, 102, 103, 104, 105, 106, 107, 108, 109) order by id desc");
@@ -1275,6 +1547,21 @@ public class TestDatabase {
     assertEquals(ret.getLong("id"), 2);
     assertEquals(ret.getLong("id2"), 4);
     assertFalse(ret.next());
+  }
+
+  @Test
+  public void testNotInAndNoKeyExplain() throws SQLException {
+    try (PreparedStatement stmt2 = conn.prepareStatement(
+        "explain select * from nokey where id < 4 and id > 1 and id not in (5, 6, 7, 8, 9, 100, 101, 102, 103, 104, 105, 106, 107, 108, 109) order by id desc")) {
+      try (ResultSet rs = stmt2.executeQuery()) {
+        StringBuilder builder = new StringBuilder();
+        while (rs.next()) {
+          builder.append(rs.getString(1)).append("\n");
+        }
+        assertEquals(builder.toString(), "Server select due to server sort\n" +
+            "Table scan: table=nokey nokey.id < 4 and nokey.id > 1 and nokey.id not in (5, 6, 7, 8, 9, 100, 101, 102, 103, 104, 105, 106, 107, 108, 109)\n");
+      }
+    }
   }
 
   @Test
@@ -1299,6 +1586,22 @@ public class TestDatabase {
   }
 
   @Test
+  public void testNotInAndExplain() throws SQLException {
+    try (PreparedStatement stmt2 = conn.prepareStatement(
+        "explain select * from persons where id < 4 and id > 1 and id not in (5, 6, 7, 8, 9, 100, 101, 102, 103, 104, 105, 106, 107, 108, 109) order by id desc")) {
+      try (ResultSet rs = stmt2.executeQuery()) {
+        StringBuilder builder = new StringBuilder();
+        while (rs.next()) {
+          builder.append(rs.getString(1)).append("\n");
+        }
+        assertEquals(builder.toString(), "Two key index lookup: table=persons, idx=_primarykey, id > 1 and id < 4\n" +
+            " AND \n" +
+            "Read record from index and evaluate: persons.id not in (5, 6, 7, 8, 9, 100, 101, 102, 103, 104, 105, 106, 107, 108, 109)\n");
+      }
+    }
+  }
+
+  @Test
   public void testNotInAnd() throws SQLException {
     //test select with not in expression
     PreparedStatement stmt = conn.prepareStatement("select * from persons where id < 4 and id > 1 and id not in (5, 6, 7, 8, 9, 100, 101, 102, 103, 104, 105, 106, 107, 108, 109) order by id desc");
@@ -1313,6 +1616,17 @@ public class TestDatabase {
 
   @Test
   public void testAllNoKeySecondaryIndex() throws SQLException {
+    try (PreparedStatement stmt2 = conn.prepareStatement(
+        "explain select * from nokeysecondaryIndex")) {
+      try (ResultSet rs = stmt2.executeQuery()) {
+        StringBuilder builder = new StringBuilder();
+        while (rs.next()) {
+          builder.append(rs.getString(1)).append("\n");
+        }
+        assertEquals(builder.toString(), "Index lookup for all records: table=nokeysecondaryindex, idx=_primarykey\n" +
+            "single key index lookup\n");
+      }
+    }
     PreparedStatement stmt = conn.prepareStatement("select * from nokeysecondaryIndex");
     ResultSet ret = stmt.executeQuery();
 
@@ -1326,6 +1640,17 @@ public class TestDatabase {
 
   @Test
   public void testAllNoKey() throws SQLException {
+    try (PreparedStatement stmt2 = conn.prepareStatement(
+        "explain select * from nokey")) {
+      try (ResultSet rs = stmt2.executeQuery()) {
+        StringBuilder builder = new StringBuilder();
+        while (rs.next()) {
+          builder.append(rs.getString(1)).append("\n");
+        }
+        assertEquals(builder.toString(), "Index lookup for all records: table=nokey, idx=_primarykey\n" +
+            "single key index lookup\n");
+      }
+    }
     PreparedStatement stmt = conn.prepareStatement("select * from nokey");
     ResultSet ret = stmt.executeQuery();
 
@@ -1338,6 +1663,21 @@ public class TestDatabase {
       assertEquals(ret.getLong("id2"), i * 2);
     }
     assertFalse(ret.next());
+  }
+
+  @Test
+  public void testAllExplain() throws SQLException {
+    try (PreparedStatement stmt2 = conn.prepareStatement(
+        "explain select * from persons")) {
+      try (ResultSet rs = stmt2.executeQuery()) {
+        StringBuilder builder = new StringBuilder();
+        while (rs.next()) {
+          builder.append(rs.getString(1)).append("\n");
+        }
+        assertEquals(builder.toString(), "Index lookup for all records: table=persons, idx=_primarykey\n" +
+            "single key index lookup\n");
+      }
+    }
   }
 
   @Test
@@ -1389,6 +1729,22 @@ public class TestDatabase {
   }
 
   @Test
+  public void testParametersNoKeySecondaryIndexExplain() throws SQLException {
+    try (PreparedStatement stmt2 = conn.prepareStatement(
+        "explain select * from nokeysecondaryIndex where id < ? and id > ?")) {
+      stmt2.setLong(1, 5);
+      stmt2.setLong(2, 2);
+      try (ResultSet rs = stmt2.executeQuery()) {
+        StringBuilder builder = new StringBuilder();
+        while (rs.next()) {
+          builder.append(rs.getString(1)).append("\n");
+        }
+        assertEquals(builder.toString(), "Two key index lookup: table=nokeysecondaryindex, idx=id, id > 2 and id < 5\n");
+      }
+    }
+  }
+
+  @Test
   public void testParametersNoKeySecondaryIndex() throws SQLException {
     PreparedStatement stmt = conn.prepareStatement("select * from nokeysecondaryIndex where id < ? and id > ?");
     stmt.setLong(1, 5);
@@ -1402,6 +1758,22 @@ public class TestDatabase {
     assertEquals(ret.getLong("id"), 4);
     assertEquals(ret.getLong("id2"), 8);
     assertFalse(ret.next());
+  }
+
+  @Test
+  public void testParametersNoKeyExplain() throws SQLException {
+    try (PreparedStatement stmt2 = conn.prepareStatement(
+        "explain select * from nokey where id < ? and id > ?")) {
+      stmt2.setLong(1, 5);
+      stmt2.setLong(2, 2);
+      try (ResultSet rs = stmt2.executeQuery()) {
+        StringBuilder builder = new StringBuilder();
+        while (rs.next()) {
+          builder.append(rs.getString(1)).append("\n");
+        }
+        assertEquals(builder.toString(), "Table scan: table=nokey nokey.id < 5 and nokey.id > 2\n");
+      }
+    }
   }
 
   @Test
@@ -1427,6 +1799,22 @@ public class TestDatabase {
   }
 
   @Test
+  public void testParametersExplain() throws SQLException {
+    try (PreparedStatement stmt2 = conn.prepareStatement(
+        "explain select * from persons where id < ? and id > ?")) {
+      stmt2.setLong(1, 5);
+      stmt2.setLong(2, 2);
+      try (ResultSet rs = stmt2.executeQuery()) {
+        StringBuilder builder = new StringBuilder();
+        while (rs.next()) {
+          builder.append(rs.getString(1)).append("\n");
+        }
+        assertEquals(builder.toString(), "Two key index lookup: table=persons, idx=_primarykey, id > 2 and id < 5\n");
+      }
+    }
+  }
+
+  @Test
   public void testParameters() throws SQLException {
     PreparedStatement stmt = conn.prepareStatement("select * from persons where id < ? and id > ?");
     stmt.setLong(1, 5);
@@ -1442,6 +1830,22 @@ public class TestDatabase {
 
 
   @Test
+  public void test2FieldKeyExplain() throws SQLException {
+    try (PreparedStatement stmt2 = conn.prepareStatement(
+        "explain select * from memberships where personId=? and membershipName=?")) {
+      stmt2.setLong(1, 0);
+      stmt2.setString(2, "membership-0");
+      try (ResultSet rs = stmt2.executeQuery()) {
+        StringBuilder builder = new StringBuilder();
+        while (rs.next()) {
+          builder.append(rs.getString(1)).append("\n");
+        }
+        assertEquals(builder.toString(), "Merged composite key index lookup: table=memberships, idx=_primarykey, ,personid,membershipname=[,0,membership-0]\n");
+      }
+    }
+  }
+
+  @Test
   public void test2FieldKey() throws SQLException {
     PreparedStatement stmt = conn.prepareStatement("select * from memberships where personId=? and membershipName=?");
     stmt.setLong(1, 0);
@@ -1455,6 +1859,22 @@ public class TestDatabase {
   }
 
   @Test
+  public void testMaxNoKeySecondaryIndexExplain() throws SQLException {
+    try (PreparedStatement stmt2 = conn.prepareStatement(
+        "explain select max(id) as maxValue from nokeysecondaryindex")) {
+      try (ResultSet rs = stmt2.executeQuery()) {
+        StringBuilder builder = new StringBuilder();
+        while (rs.next()) {
+          builder.append(rs.getString(1)).append("\n");
+        }
+        assertEquals(builder.toString(), "Evaluate counters\n" +
+            "Index lookup for all records: table=nokeysecondaryindex, idx=_primarykey\n" +
+            "single key index lookup\n");
+      }
+    }
+  }
+
+  @Test
   public void testMaxNoKeySecondaryIndex() throws SQLException {
     PreparedStatement stmt = conn.prepareStatement("select max(id) as maxValue from nokeysecondaryindex");
     ResultSet ret = stmt.executeQuery();
@@ -1462,6 +1882,22 @@ public class TestDatabase {
     assertTrue(ret.next());
     assertEquals(ret.getLong("maxValue"), 9);
     assertFalse(ret.next());
+  }
+
+  @Test
+  public void testMaxNoKeyExplain() throws SQLException {
+    try (PreparedStatement stmt2 = conn.prepareStatement(
+        "explain select max(id) as maxValue from nokey")) {
+      try (ResultSet rs = stmt2.executeQuery()) {
+        StringBuilder builder = new StringBuilder();
+        while (rs.next()) {
+          builder.append(rs.getString(1)).append("\n");
+        }
+        assertEquals(builder.toString(), "Evaluate counters\n" +
+            "Index lookup for all records: table=nokey, idx=_primarykey\n" +
+            "single key index lookup\n");
+      }
+    }
   }
 
   @Test
@@ -1475,6 +1911,22 @@ public class TestDatabase {
   }
 
   @Test
+  public void testMaxExplain() throws SQLException {
+    try (PreparedStatement stmt2 = conn.prepareStatement(
+        "explain select max(id) as maxValue from persons")) {
+      try (ResultSet rs = stmt2.executeQuery()) {
+        StringBuilder builder = new StringBuilder();
+        while (rs.next()) {
+          builder.append(rs.getString(1)).append("\n");
+        }
+        assertEquals(builder.toString(), "Evaluate counters\n" +
+            "Index lookup for all records: table=persons, idx=_primarykey\n" +
+            "single key index lookup\n");
+      }
+    }
+  }
+
+  @Test
   public void testMax() throws SQLException {
     PreparedStatement stmt = conn.prepareStatement("select max(id) as maxValue from persons");
     ResultSet ret = stmt.executeQuery();
@@ -1482,6 +1934,22 @@ public class TestDatabase {
     assertTrue(ret.next());
     assertEquals(ret.getLong("maxValue"), 109);
     assertFalse(ret.next());
+  }
+
+  @Test
+  public void testMinNoKeySecondaryIndexExplain() throws SQLException {
+    try (PreparedStatement stmt2 = conn.prepareStatement(
+        "explain select min(id) as minValue from nokeysecondaryindex")) {
+      try (ResultSet rs = stmt2.executeQuery()) {
+        StringBuilder builder = new StringBuilder();
+        while (rs.next()) {
+          builder.append(rs.getString(1)).append("\n");
+        }
+        assertEquals(builder.toString(), "Evaluate counters\n" +
+            "Index lookup for all records: table=nokeysecondaryindex, idx=_primarykey\n" +
+            "single key index lookup\n");
+      }
+    }
   }
 
   @Test
@@ -1495,6 +1963,22 @@ public class TestDatabase {
   }
 
   @Test
+  public void testMinNoKeyExplain() throws SQLException {
+    try (PreparedStatement stmt2 = conn.prepareStatement(
+        "explain select min(id) as minValue from nokey")) {
+      try (ResultSet rs = stmt2.executeQuery()) {
+        StringBuilder builder = new StringBuilder();
+        while (rs.next()) {
+          builder.append(rs.getString(1)).append("\n");
+        }
+        assertEquals(builder.toString(), "Evaluate counters\n" +
+            "Index lookup for all records: table=nokey, idx=_primarykey\n" +
+            "single key index lookup\n");
+      }
+    }
+  }
+
+  @Test
   public void testMinNoKey() throws SQLException {
     PreparedStatement stmt = conn.prepareStatement("select min(id) as minValue from nokey");
     ResultSet ret = stmt.executeQuery();
@@ -1502,6 +1986,22 @@ public class TestDatabase {
     assertTrue(ret.next());
     assertEquals(ret.getLong("minValue"), 0);
     assertFalse(ret.next());
+  }
+
+  @Test
+  public void testMinExplain() throws SQLException {
+    try (PreparedStatement stmt2 = conn.prepareStatement(
+        "explain select min(id) as minValue from persons")) {
+      try (ResultSet rs = stmt2.executeQuery()) {
+        StringBuilder builder = new StringBuilder();
+        while (rs.next()) {
+          builder.append(rs.getString(1)).append("\n");
+        }
+        assertEquals(builder.toString(), "Evaluate counters\n" +
+            "Index lookup for all records: table=persons, idx=_primarykey\n" +
+            "single key index lookup\n");
+      }
+    }
   }
 
   @Test
@@ -1524,6 +2024,21 @@ public class TestDatabase {
   }
 
   @Test
+  public void testMaxTableScanNoKeySecondaryIndexExplain() throws SQLException {
+    try (PreparedStatement stmt2 = conn.prepareStatement(
+        "explain select max(id) as maxValue from nokeysecondaryindex where id2 < 1")) {
+      try (ResultSet rs = stmt2.executeQuery()) {
+        StringBuilder builder = new StringBuilder();
+        while (rs.next()) {
+          builder.append(rs.getString(1)).append("\n");
+        }
+        assertEquals(builder.toString(), "Evaluate counters\n" +
+            "Table scan: table=nokeysecondaryindex nokeysecondaryindex.id2 < 1\n");
+      }
+    }
+  }
+
+  @Test
   public void testMaxTableScanNoKeySecondaryIndex() throws SQLException {
     PreparedStatement stmt = conn.prepareStatement("select max(id) as maxValue from nokeysecondaryindex where id2 < 1");
     ResultSet ret = stmt.executeQuery();
@@ -1531,6 +2046,21 @@ public class TestDatabase {
     assertTrue(ret.next());
     assertEquals(ret.getLong("maxValue"), 0);
     assertFalse(ret.next());
+  }
+
+  @Test
+  public void testMaxTableScanExplain() throws SQLException {
+    try (PreparedStatement stmt2 = conn.prepareStatement(
+        "explain select max(id) as maxValue from persons where id2 < 1")) {
+      try (ResultSet rs = stmt2.executeQuery()) {
+        StringBuilder builder = new StringBuilder();
+        while (rs.next()) {
+          builder.append(rs.getString(1)).append("\n");
+        }
+        assertEquals(builder.toString(), "Evaluate counters\n" +
+            "Table scan: table=persons persons.id2 < 1\n");
+      }
+    }
   }
 
   @Test
@@ -1544,6 +2074,21 @@ public class TestDatabase {
   }
 
   @Test
+  public void testMaxWhereNoKeySecondaryIndexExplain() throws SQLException {
+    try (PreparedStatement stmt2 = conn.prepareStatement(
+        "explain select max(id) as maxValue from nokeysecondaryindex where id < 4")) {
+      try (ResultSet rs = stmt2.executeQuery()) {
+        StringBuilder builder = new StringBuilder();
+        while (rs.next()) {
+          builder.append(rs.getString(1)).append("\n");
+        }
+        assertEquals(builder.toString(), "Evaluate counters\n" +
+            "Table scan: table=nokeysecondaryindex nokeysecondaryindex.id < 4\n");
+      }
+    }
+  }
+
+  @Test
   public void testMaxWhereNoKeySecondaryIndex() throws SQLException {
     PreparedStatement stmt = conn.prepareStatement("select max(id) as maxValue from nokeysecondaryindex where id < 4");
     ResultSet ret = stmt.executeQuery();
@@ -1551,6 +2096,21 @@ public class TestDatabase {
     assertTrue(ret.next());
     assertEquals(ret.getLong("maxValue"), 3);
     assertFalse(ret.next());
+  }
+
+  @Test
+  public void testMaxWhereNoKeyExplain() throws SQLException {
+    try (PreparedStatement stmt2 = conn.prepareStatement(
+        "explain select max(id) as maxValue from nokey where id < 4")) {
+      try (ResultSet rs = stmt2.executeQuery()) {
+        StringBuilder builder = new StringBuilder();
+        while (rs.next()) {
+          builder.append(rs.getString(1)).append("\n");
+        }
+        assertEquals(builder.toString(), "Evaluate counters\n" +
+            "Table scan: table=nokey nokey.id < 4\n");
+      }
+    }
   }
 
   @Test
@@ -1564,6 +2124,22 @@ public class TestDatabase {
   }
 
   @Test
+  public void testMaxWhereExplain() throws SQLException {
+    try (PreparedStatement stmt2 = conn.prepareStatement(
+        "explain select max(id) as maxValue from persons where id < 100")) {
+      try (ResultSet rs = stmt2.executeQuery()) {
+        StringBuilder builder = new StringBuilder();
+        while (rs.next()) {
+          builder.append(rs.getString(1)).append("\n");
+        }
+        assertEquals(builder.toString(), "Evaluate counters\n" +
+            "Index lookup for relational op: table=persons, idx=_primarykey, persons.id < 100\n" +
+            "single key index lookup\n");
+      }
+    }
+  }
+
+  @Test
   public void testMaxWhere() throws SQLException {
     PreparedStatement stmt = conn.prepareStatement("select max(id) as maxValue from persons where id < 100");
     ResultSet ret = stmt.executeQuery();
@@ -1571,6 +2147,22 @@ public class TestDatabase {
     assertTrue(ret.next());
     assertEquals(ret.getLong("maxValue"), 9);
     assertFalse(ret.next());
+  }
+
+  @Test
+  public void testSumNoKeySecondaryIndexExplain() throws SQLException {
+    try (PreparedStatement stmt2 = conn.prepareStatement(
+        "explain select sum(id) as sumValue from nokeysecondaryindex")) {
+      try (ResultSet rs = stmt2.executeQuery()) {
+        StringBuilder builder = new StringBuilder();
+        while (rs.next()) {
+          builder.append(rs.getString(1)).append("\n");
+        }
+        assertEquals(builder.toString(), "Evaluate counters\n" +
+            "Index lookup for all records: table=nokeysecondaryindex, idx=_primarykey\n" +
+            "single key index lookup\n");
+      }
+    }
   }
 
   @Test
@@ -1584,6 +2176,22 @@ public class TestDatabase {
   }
 
   @Test
+  public void testSumNoKeyExplain() throws SQLException {
+    try (PreparedStatement stmt2 = conn.prepareStatement(
+        "explain select sum(id) as sumValue from nokey")) {
+      try (ResultSet rs = stmt2.executeQuery()) {
+        StringBuilder builder = new StringBuilder();
+        while (rs.next()) {
+          builder.append(rs.getString(1)).append("\n");
+        }
+        assertEquals(builder.toString(), "Evaluate counters\n" +
+            "Index lookup for all records: table=nokey, idx=_primarykey\n" +
+            "single key index lookup\n");
+      }
+    }
+  }
+
+  @Test
   public void testSumNoKey() throws SQLException {
     PreparedStatement stmt = conn.prepareStatement("select sum(id) as sumValue from nokey");
     ResultSet ret = stmt.executeQuery();
@@ -1594,6 +2202,22 @@ public class TestDatabase {
   }
 
   @Test
+  public void testSumExplain() throws SQLException {
+    try (PreparedStatement stmt2 = conn.prepareStatement(
+        "explain select sum(id) as sumValue from persons")) {
+      try (ResultSet rs = stmt2.executeQuery()) {
+        StringBuilder builder = new StringBuilder();
+        while (rs.next()) {
+          builder.append(rs.getString(1)).append("\n");
+        }
+        assertEquals(builder.toString(), "Evaluate counters\n" +
+            "Index lookup for all records: table=persons, idx=_primarykey\n" +
+            "single key index lookup\n");
+      }
+    }
+  }
+
+  @Test
   public void testSum() throws SQLException {
     PreparedStatement stmt = conn.prepareStatement("select sum(id) as sumValue from persons");
     ResultSet ret = stmt.executeQuery();
@@ -1601,6 +2225,22 @@ public class TestDatabase {
     assertTrue(ret.next());
     assertEquals(ret.getLong("sumValue"), 1090);
     assertFalse(ret.next());
+  }
+
+  @Test
+  public void testLimitNoKeySecondaryIndexExplain() throws SQLException {
+    try (PreparedStatement stmt2 = conn.prepareStatement(
+        "explain select * from nokeysecondaryindex where id < ? and id > ? limit 3")) {
+      stmt2.setLong(1, 9);
+      stmt2.setLong(2, 2);
+      try (ResultSet rs = stmt2.executeQuery()) {
+        StringBuilder builder = new StringBuilder();
+        while (rs.next()) {
+          builder.append(rs.getString(1)).append("\n");
+        }
+        assertEquals(builder.toString(), "Two key index lookup: table=nokeysecondaryindex, idx=id, id > 2 and id < 9\n");
+      }
+    }
   }
 
   @Test
@@ -1623,6 +2263,22 @@ public class TestDatabase {
   }
 
   @Test
+  public void testLimitNoKeyExplain() throws SQLException {
+    try (PreparedStatement stmt2 = conn.prepareStatement(
+        "explain select * from nokey where id < ? and id > ? limit 3")) {
+      stmt2.setLong(1, 9);
+      stmt2.setLong(2, 2);
+      try (ResultSet rs = stmt2.executeQuery()) {
+        StringBuilder builder = new StringBuilder();
+        while (rs.next()) {
+          builder.append(rs.getString(1)).append("\n");
+        }
+        assertEquals(builder.toString(), "Table scan: table=nokey nokey.id < 9 and nokey.id > 2\n");
+      }
+    }
+  }
+
+  @Test
   public void testLimitNoKey() throws SQLException {
     PreparedStatement stmt = conn.prepareStatement("select * from nokey where id < ? and id > ? limit 3");
     stmt.setLong(1, 9);
@@ -1642,6 +2298,22 @@ public class TestDatabase {
   }
 
   @Test
+  public void testLimitExplain() throws SQLException {
+    try (PreparedStatement stmt2 = conn.prepareStatement(
+        "explain select * from persons where id < ? and id > ? limit 3")) {
+      stmt2.setLong(1, 100);
+      stmt2.setLong(2, 2);
+      try (ResultSet rs = stmt2.executeQuery()) {
+        StringBuilder builder = new StringBuilder();
+        while (rs.next()) {
+          builder.append(rs.getString(1)).append("\n");
+        }
+        assertEquals(builder.toString(), "Two key index lookup: table=persons, idx=_primarykey, id > 2 and id < 100\n");
+      }
+    }
+  }
+
+  @Test
   public void testLimit() throws SQLException {
     PreparedStatement stmt = conn.prepareStatement("select * from persons where id < ? and id > ? limit 3");
     stmt.setLong(1, 100);
@@ -1657,6 +2329,21 @@ public class TestDatabase {
     assertFalse(ret.next());
   }
 
+  @Test
+  public void testLimitOffsetNoKeySecondaryIndexExplain() throws SQLException {
+    try (PreparedStatement stmt2 = conn.prepareStatement(
+        "explain select * from nokeysecondaryindex where id < ? and id > ? limit 3 offset 2")) {
+      stmt2.setLong(1, 9);
+      stmt2.setLong(2, 2);
+      try (ResultSet rs = stmt2.executeQuery()) {
+        StringBuilder builder = new StringBuilder();
+        while (rs.next()) {
+          builder.append(rs.getString(1)).append("\n");
+        }
+        assertEquals(builder.toString(), "Two key index lookup: table=nokeysecondaryindex, idx=id, id > 2 and id < 9\n");
+      }
+    }
+  }
 
   @Test
   public void testLimitOffsetNoKeySecondaryIndex() throws SQLException {
@@ -1675,6 +2362,22 @@ public class TestDatabase {
     assertEquals(ret.getLong("id"), 6);
     assertEquals(ret.getLong("id2"), 12);
     assertFalse(ret.next());
+  }
+
+  @Test
+  public void testLimitOffsetNoKeyExplain() throws SQLException {
+    try (PreparedStatement stmt2 = conn.prepareStatement(
+        "explain select * from nokey where id < ? and id > ? limit 3 offset 2")) {
+      stmt2.setLong(1, 9);
+      stmt2.setLong(2, 2);
+      try (ResultSet rs = stmt2.executeQuery()) {
+        StringBuilder builder = new StringBuilder();
+        while (rs.next()) {
+          builder.append(rs.getString(1)).append("\n");
+        }
+        assertEquals(builder.toString(), "Table scan: table=nokey nokey.id < 9 and nokey.id > 2\n");
+      }
+    }
   }
 
   @Test
@@ -1697,6 +2400,22 @@ public class TestDatabase {
   }
 
   @Test
+  public void testLimitOffsetExplain() throws SQLException {
+    try (PreparedStatement stmt2 = conn.prepareStatement(
+        "explain select * from persons where id < ? and id > ? limit 3 offset 2")) {
+      stmt2.setLong(1, 100);
+      stmt2.setLong(2, 2);
+      try (ResultSet rs = stmt2.executeQuery()) {
+        StringBuilder builder = new StringBuilder();
+        while (rs.next()) {
+          builder.append(rs.getString(1)).append("\n");
+        }
+        assertEquals(builder.toString(), "Two key index lookup: table=persons, idx=_primarykey, id > 2 and id < 100\n");
+      }
+    }
+  }
+
+  @Test
   public void testLimitOffset() throws SQLException {
     PreparedStatement stmt = conn.prepareStatement("select * from persons where id < ? and id > ? limit 3 offset 2");
     stmt.setLong(1, 100);
@@ -1710,6 +2429,22 @@ public class TestDatabase {
     assertTrue(ret.next());
     assertEquals(ret.getLong("id"), 6);
     assertFalse(ret.next());
+  }
+
+  @Test
+  public void testLimitOffsetOneKeyExplain() throws SQLException {
+    try (PreparedStatement stmt2 = conn.prepareStatement(
+        "explain select * from persons where id > ? limit 3 offset 2")) {
+      stmt2.setLong(1, 2);
+      try (ResultSet rs = stmt2.executeQuery()) {
+        StringBuilder builder = new StringBuilder();
+        while (rs.next()) {
+          builder.append(rs.getString(1)).append("\n");
+        }
+        assertEquals(builder.toString(), "Index lookup for relational op: table=persons, idx=_primarykey, persons.id > 2\n" +
+            "single key index lookup\n");
+      }
+    }
   }
 
   @Test
@@ -1727,6 +2462,21 @@ public class TestDatabase {
     assertFalse(ret.next());
   }
 
+  @Test
+  public void testSort2NoKeySecondaryIndexExplain() throws SQLException {
+    try (PreparedStatement stmt2 = conn.prepareStatement(
+        "explain select id, id2 from nokeysecondaryindex order by id2 asc, id asc")) {
+      try (ResultSet rs = stmt2.executeQuery()) {
+        StringBuilder builder = new StringBuilder();
+        while (rs.next()) {
+          builder.append(rs.getString(1)).append("\n");
+        }
+        assertEquals(builder.toString(), "Server select due to server sort\n" +
+            "Index lookup for all records: table=nokeysecondaryindex, idx=_primarykey\n" +
+            "single key index lookup\n");
+      }
+    }
+  }
 
   @Test
   public void testSort2NoKeySecondaryIndex() throws SQLException {
@@ -1737,6 +2487,22 @@ public class TestDatabase {
       assertTrue(ret.next());
       assertEquals(ret.getLong("id2"), i * 2);
       assertEquals(ret.getLong("id"), i);
+    }
+  }
+
+  @Test
+  public void testSort2NoKeyExplain() throws SQLException {
+    try (PreparedStatement stmt2 = conn.prepareStatement(
+        "explain select id, id2 from nokey order by id2 asc, id asc")) {
+      try (ResultSet rs = stmt2.executeQuery()) {
+        StringBuilder builder = new StringBuilder();
+        while (rs.next()) {
+          builder.append(rs.getString(1)).append("\n");
+        }
+        assertEquals(builder.toString(), "Server select due to server sort\n" +
+            "Index lookup for all records: table=nokey, idx=_primarykey\n" +
+            "single key index lookup\n");
+      }
     }
   }
 
@@ -1754,6 +2520,22 @@ public class TestDatabase {
       assertEquals(ret.getLong("id"), i);
     }
 
+  }
+
+  @Test
+  public void testSort2Explain() throws SQLException {
+    try (PreparedStatement stmt2 = conn.prepareStatement(
+        "explain select id, id2 from persons order by id2 asc, id asc")) {
+      try (ResultSet rs = stmt2.executeQuery()) {
+        StringBuilder builder = new StringBuilder();
+        while (rs.next()) {
+          builder.append(rs.getString(1)).append("\n");
+        }
+        assertEquals(builder.toString(), "Server select due to server sort\n" +
+            "Index lookup for all records: table=persons, idx=_primarykey\n" +
+            "single key index lookup\n");
+      }
+    }
   }
 
   @Test
@@ -1834,6 +2616,23 @@ public class TestDatabase {
     assertFalse(ret.next());
   }
 
+  @Test
+  public void testAllSortAndNoKeySecondaryIndexExplain() throws SQLException {
+    try (PreparedStatement stmt2 = conn.prepareStatement(
+        "explain select * from nokeysecondaryindex where id < 2 and id2 = 0 order by id2 asc, id desc")) {
+      try (ResultSet rs = stmt2.executeQuery()) {
+        StringBuilder builder = new StringBuilder();
+        while (rs.next()) {
+          builder.append(rs.getString(1)).append("\n");
+        }
+        assertEquals(builder.toString(), "Server select due to server sort\n" +
+            "Index lookup for relational op: table=nokeysecondaryindex, idx=id, nokeysecondaryindex.id < 2\n" +
+            "single key index lookup\n" +
+            " AND \n" +
+            "Read record from index and evaluate: nokeysecondaryindex.id2 = 0\n");
+      }
+    }
+  }
 
   @Test
   public void testAllSortAndNoKeySecondaryIndex() throws SQLException {
@@ -1844,6 +2643,21 @@ public class TestDatabase {
     assertEquals(ret.getLong("id2"), 0);
     assertEquals(ret.getLong("id"), 0);
     assertFalse(ret.next());
+  }
+
+  @Test
+  public void testAllSortAndNoKeyExplain() throws SQLException {
+    try (PreparedStatement stmt2 = conn.prepareStatement(
+        "explain select * from nokey where id < 2 and id2 = 0 order by id2 asc, id desc")) {
+      try (ResultSet rs = stmt2.executeQuery()) {
+        StringBuilder builder = new StringBuilder();
+        while (rs.next()) {
+          builder.append(rs.getString(1)).append("\n");
+        }
+        assertEquals(builder.toString(), "Server select due to server sort\n" +
+            "Table scan: table=nokey nokey.id < 2 and nokey.id2 = 0\n");
+      }
+    }
   }
 
   @Test
@@ -1858,6 +2672,24 @@ public class TestDatabase {
     assertEquals(ret.getLong("id2"), 0);
     assertEquals(ret.getLong("id"), 0);
     assertFalse(ret.next());
+  }
+
+  @Test
+  public void testAllSortAndExplain() throws SQLException {
+    try (PreparedStatement stmt2 = conn.prepareStatement(
+        "explain select * from persons where id > 100 and id2 = 0 order by id2 asc, id desc")) {
+      try (ResultSet rs = stmt2.executeQuery()) {
+        StringBuilder builder = new StringBuilder();
+        while (rs.next()) {
+          builder.append(rs.getString(1)).append("\n");
+        }
+        assertEquals(builder.toString(), "Server select due to server sort\n" +
+            "Index lookup for relational op: table=persons, idx=_primarykey, persons.id > 100\n" +
+            "single key index lookup\n" +
+            " AND \n" +
+            "Read record from index and evaluate: persons.id2 = 0\n");
+      }
+    }
   }
 
   @Test
@@ -1880,6 +2712,25 @@ public class TestDatabase {
     assertFalse(ret.next());
   }
 
+  @Test
+  public void testComplexNoKeySecondaryIndexExplain() throws SQLException {
+    try (PreparedStatement stmt2 = conn.prepareStatement(
+        "explain select nokeysecondaryindex.id  " +
+            "from nokeysecondaryindex where nokeysecondaryindex.id>=1 AND id < 3 AND ID2=2 OR id> 2 AND ID < 4")) {
+      try (ResultSet rs = stmt2.executeQuery()) {
+        StringBuilder builder = new StringBuilder();
+        while (rs.next()) {
+          builder.append(rs.getString(1)).append("\n");
+        }
+        assertEquals(builder.toString(), "Server select due to 'or' expression\n" +
+            "Two key index lookup: table=nokeysecondaryindex, idx=id, id < 3 and id >= 1\n" +
+            " AND \n" +
+            "Read record from index and evaluate: nokeysecondaryindex.id2 = 2\n" +
+            " OR \n" +
+            "Two key index lookup: table=nokeysecondaryindex, idx=id, id < 4 and id > 2\n");
+      }
+    }
+  }
 
   @Test
   public void testComplexNoKeySecondaryIndex() throws SQLException {
@@ -1897,6 +2748,21 @@ public class TestDatabase {
     assertEquals(ret.getLong("id"), 3);
 
     assertFalse(ret.next());
+  }
+
+  @Test
+  public void testComplexNoKeyExplain() throws SQLException {
+    try (PreparedStatement stmt2 = conn.prepareStatement(
+        "explain select nokey.id  " +
+            "from nokey where nokey.id>=1 AND id < 3 AND ID2=2 OR id> 2 AND ID < 4")) {
+      try (ResultSet rs = stmt2.executeQuery()) {
+        StringBuilder builder = new StringBuilder();
+        while (rs.next()) {
+          builder.append(rs.getString(1)).append("\n");
+        }
+        assertEquals(builder.toString(), "Table scan: table=nokey nokey.id >= 1 and nokey.id < 3 and nokey.id2 = 2 or nokey.id > 2 and nokey.id < 4\n");
+      }
+    }
   }
 
   @Test
@@ -1919,6 +2785,26 @@ public class TestDatabase {
     assertEquals(ret.getLong("id"), 3);
 
     assertFalse(ret.next());
+  }
+
+  @Test
+  public void testComplexExplain() throws SQLException {
+    try (PreparedStatement stmt2 = conn.prepareStatement(
+        "explain select persons.id  " +
+            "from persons where persons.id>=100 AND id < 105 AND ID2=0 OR id> 6 AND ID < 10")) {
+      try (ResultSet rs = stmt2.executeQuery()) {
+        StringBuilder builder = new StringBuilder();
+        while (rs.next()) {
+          builder.append(rs.getString(1)).append("\n");
+        }
+        assertEquals(builder.toString(), "Server select due to 'or' expression\n" +
+            "Two key index lookup: table=persons, idx=_primarykey, id < 105 and id >= 100\n" +
+            " AND \n" +
+            "Read record from index and evaluate: persons.id2 = 0\n" +
+            " OR \n" +
+            "Two key index lookup: table=persons, idx=_primarykey, id < 10 and id > 6\n");
+      }
+    }
   }
 
   @Test
@@ -1948,6 +2834,30 @@ public class TestDatabase {
   }
 
   @Test
+  public void testParensNoKeySecondaryIndexExplain() throws SQLException {
+    try (PreparedStatement stmt2 = conn.prepareStatement(
+        "explain select nokeysecondaryindex.id  " +
+            "from nokeysecondaryindex where nokeysecondaryindex.id<=5 AND (id < 2 OR id> 4)")) {
+      try (ResultSet rs = stmt2.executeQuery()) {
+        StringBuilder builder = new StringBuilder();
+        while (rs.next()) {
+          builder.append(rs.getString(1)).append("\n");
+        }
+        assertEquals(builder.toString(), "Server select due to 'or' expression\n" +
+            "Index lookup for relational op: table=nokeysecondaryindex, idx=id, nokeysecondaryindex.id < 2\n" +
+            "single key index lookup\n" +
+            " OR \n" +
+            "Index lookup for relational op: table=nokeysecondaryindex, idx=id, nokeysecondaryindex.id > 4\n" +
+            "single key index lookup\n" +
+            " AND \n" +
+            "Read record from index and evaluate: nokeysecondaryindex.id <= 5\n" +
+            " AND \n" +
+            "Read record from index and evaluate: nokeysecondaryindex.id <= 5\n");
+      }
+    }
+  }
+
+  @Test
   public void testParensNoKeySecondaryIndex() throws SQLException {
     //fails
 
@@ -1964,6 +2874,21 @@ public class TestDatabase {
     assertEquals(ret.getLong("id"), 5);
 
     assertFalse(ret.next());
+  }
+
+  @Test
+  public void testParensNoKeyExplain() throws SQLException {
+    try (PreparedStatement stmt2 = conn.prepareStatement(
+        "explain select nokey.id  " +
+            "from nokey where nokey.id<=5 AND (id < 2 OR id> 4)")) {
+      try (ResultSet rs = stmt2.executeQuery()) {
+        StringBuilder builder = new StringBuilder();
+        while (rs.next()) {
+          builder.append(rs.getString(1)).append("\n");
+        }
+        assertEquals(builder.toString(), "Table scan: table=nokey nokey.id <= 5 and nokey.id < 2 or nokey.id > 4\n");
+      }
+    }
   }
 
   @Test
@@ -1989,6 +2914,30 @@ public class TestDatabase {
     assertEquals(ret.getLong("id"), 5);
 
     assertFalse(ret.next());
+  }
+
+  @Test
+  public void testParensExplain() throws SQLException {
+    try (PreparedStatement stmt2 = conn.prepareStatement(
+        "explain select persons.id  " +
+            "from persons where persons.id<=100 AND (id < 6 OR id> 8)")) {
+      try (ResultSet rs = stmt2.executeQuery()) {
+        StringBuilder builder = new StringBuilder();
+        while (rs.next()) {
+          builder.append(rs.getString(1)).append("\n");
+        }
+        assertEquals(builder.toString(), "Server select due to 'or' expression\n" +
+            "Index lookup for relational op: table=persons, idx=_primarykey, persons.id < 6\n" +
+            "single key index lookup\n" +
+            " OR \n" +
+            "Index lookup for relational op: table=persons, idx=_primarykey, persons.id > 8\n" +
+            "single key index lookup\n" +
+            " AND \n" +
+            "Read record from index and evaluate: persons.id <= 100\n" +
+            " AND \n" +
+            "Read record from index and evaluate: persons.id <= 100\n");
+      }
+    }
   }
 
   @Test
@@ -2021,6 +2970,25 @@ public class TestDatabase {
   }
 
   @Test
+  public void testPrecedenceNoKeySecondaryIndexExplain() throws SQLException {
+    try (PreparedStatement stmt2 = conn.prepareStatement(
+        "explain select nokeysecondaryindex.id  " +
+            "from nokeysecondaryindex where nokeysecondaryindex.id<=7 AND id > 4 OR id> 8")) {
+      try (ResultSet rs = stmt2.executeQuery()) {
+        StringBuilder builder = new StringBuilder();
+        while (rs.next()) {
+          builder.append(rs.getString(1)).append("\n");
+        }
+        assertEquals(builder.toString(), "Server select due to 'or' expression\n" +
+            "Two key index lookup: table=nokeysecondaryindex, idx=id, id > 4 and id <= 7\n" +
+            " OR \n" +
+            "Index lookup for relational op: table=nokeysecondaryindex, idx=id, nokeysecondaryindex.id > 8\n" +
+            "single key index lookup\n");
+      }
+    }
+  }
+
+  @Test
   public void testPrecedenceNoKeySecondaryIndex() throws SQLException {
     //fails
 
@@ -2039,6 +3007,21 @@ public class TestDatabase {
     assertEquals(ret.getLong("id"), 9);
 
     assertFalse(ret.next());
+  }
+
+  @Test
+  public void testPrecedenceNoKeyExplain() throws SQLException {
+    try (PreparedStatement stmt2 = conn.prepareStatement(
+        "explain select nokey.id  " +
+            "from nokey where nokey.id<=7 AND id > 4 OR id> 8")) {
+      try (ResultSet rs = stmt2.executeQuery()) {
+        StringBuilder builder = new StringBuilder();
+        while (rs.next()) {
+          builder.append(rs.getString(1)).append("\n");
+        }
+        assertEquals(builder.toString(), "Table scan: table=nokey nokey.id <= 7 and nokey.id > 4 or nokey.id > 8\n");
+      }
+    }
   }
 
   @Test
@@ -2068,6 +3051,25 @@ public class TestDatabase {
     assertEquals(ret.getLong("id"), 9);
 
     assertFalse(ret.next());
+  }
+
+  @Test
+  public void testPrecedenceExplain() throws SQLException {
+    try (PreparedStatement stmt2 = conn.prepareStatement(
+        "explain select persons.id  " +
+            "from persons where persons.id<=100 AND id > 4 OR id> 103")) {
+      try (ResultSet rs = stmt2.executeQuery()) {
+        StringBuilder builder = new StringBuilder();
+        while (rs.next()) {
+          builder.append(rs.getString(1)).append("\n");
+        }
+        assertEquals(builder.toString(), "Server select due to 'or' expression\n" +
+            "Two key index lookup: table=persons, idx=_primarykey, id > 4 and id <= 100\n" +
+            " OR \n" +
+            "Index lookup for relational op: table=persons, idx=_primarykey, persons.id > 103\n" +
+            "single key index lookup\n");
+      }
+    }
   }
 
   @Test
@@ -2108,6 +3110,21 @@ public class TestDatabase {
   }
 
   @Test
+  public void testTwoKeyLessEqualExplain() throws SQLException {
+    try (PreparedStatement stmt2 = conn.prepareStatement(
+        "explain select persons.id  " +
+            "from persons where persons.id<=100 AND id > 4")) {
+      try (ResultSet rs = stmt2.executeQuery()) {
+        StringBuilder builder = new StringBuilder();
+        while (rs.next()) {
+          builder.append(rs.getString(1)).append("\n");
+        }
+        assertEquals(builder.toString(), "Two key index lookup: table=persons, idx=_primarykey, id > 4 and id <= 100\n");
+      }
+    }
+  }
+
+  @Test
   public void testTwoKeyLessEqual() throws SQLException {
     //fails
 
@@ -2131,6 +3148,27 @@ public class TestDatabase {
     assertFalse(ret.next());
   }
 
+  @Test
+  public void testOverlapPrecedenceNoKeySecondaryIndexExplain() throws SQLException {
+    try (PreparedStatement stmt2 = conn.prepareStatement(
+        "explain select nokeysecondaryindex.id  " +
+            "from nokeysecondaryindex where nokeysecondaryindex.id<=8 AND id < 2 OR id> 8")) {
+      try (ResultSet rs = stmt2.executeQuery()) {
+        StringBuilder builder = new StringBuilder();
+        while (rs.next()) {
+          builder.append(rs.getString(1)).append("\n");
+        }
+        assertEquals(builder.toString(), "Server select due to 'or' expression\n" +
+            "Index lookup for relational op: table=nokeysecondaryindex, idx=id, nokeysecondaryindex.id < 2\n" +
+            "single key index lookup\n" +
+            " AND \n" +
+            "Read record from index and evaluate: nokeysecondaryindex.id <= 8\n" +
+            " OR \n" +
+            "Index lookup for relational op: table=nokeysecondaryindex, idx=id, nokeysecondaryindex.id > 8\n" +
+            "single key index lookup\n");
+      }
+    }
+  }
 
   @Test
   public void testOverlapPrecedenceNoKeySecondaryIndex() throws SQLException {
@@ -2149,6 +3187,21 @@ public class TestDatabase {
     assertEquals(ret.getLong("id"), 9);
 
     assertFalse(ret.next());
+  }
+
+  @Test
+  public void testOverlapPrecedenceNoKeyExplain() throws SQLException {
+    try (PreparedStatement stmt2 = conn.prepareStatement(
+        "explain select nokey.id  " +
+            "from nokey where nokey.id<=8 AND id < 2 OR id> 8")) {
+      try (ResultSet rs = stmt2.executeQuery()) {
+        StringBuilder builder = new StringBuilder();
+        while (rs.next()) {
+          builder.append(rs.getString(1)).append("\n");
+        }
+        assertEquals(builder.toString(), "Table scan: table=nokey nokey.id <= 8 and nokey.id < 2 or nokey.id > 8\n");
+      }
+    }
   }
 
   @Test
@@ -2174,6 +3227,28 @@ public class TestDatabase {
     assertEquals(ret.getLong("id"), 9);
 
     assertFalse(ret.next());
+  }
+
+  @Test
+  public void testOverlapPrecedenceExplain() throws SQLException {
+    try (PreparedStatement stmt2 = conn.prepareStatement(
+        "explain select persons.id  " +
+            "from persons where persons.id<=100 AND id < 4 OR id> 103")) {
+      try (ResultSet rs = stmt2.executeQuery()) {
+        StringBuilder builder = new StringBuilder();
+        while (rs.next()) {
+          builder.append(rs.getString(1)).append("\n");
+        }
+        assertEquals(builder.toString(), "Server select due to 'or' expression\n" +
+            "Index lookup for relational op: table=persons, idx=_primarykey, persons.id < 4\n" +
+            "single key index lookup\n" +
+            " AND \n" +
+            "Read record from index and evaluate: persons.id <= 100\n" +
+            " OR \n" +
+            "Index lookup for relational op: table=persons, idx=_primarykey, persons.id > 103\n" +
+            "single key index lookup\n");
+      }
+    }
   }
 
   @Test
@@ -2210,6 +3285,28 @@ public class TestDatabase {
   }
 
   @Test
+  public void testOverlapPrecedence2NoKeySecondaryIndexeExplain() throws SQLException {
+    try (PreparedStatement stmt2 = conn.prepareStatement(
+        "explain select nokeysecondaryindex.id  " +
+            "from nokeysecondaryindex where nokeysecondaryindex.id<=7 AND id = 4 OR id> 8")) {
+      try (ResultSet rs = stmt2.executeQuery()) {
+        StringBuilder builder = new StringBuilder();
+        while (rs.next()) {
+          builder.append(rs.getString(1)).append("\n");
+        }
+        assertEquals(builder.toString(), "Server select due to 'or' expression\n" +
+            "Index lookup for relational op: table=nokeysecondaryindex, idx=id, nokeysecondaryindex.id = 4\n" +
+            "single key index lookup\n" +
+            " AND \n" +
+            "Read record from index and evaluate: nokeysecondaryindex.id <= 7\n" +
+            " OR \n" +
+            "Index lookup for relational op: table=nokeysecondaryindex, idx=id, nokeysecondaryindex.id > 8\n" +
+            "single key index lookup\n");
+      }
+    }
+  }
+
+  @Test
   public void testOverlapPrecedence2NoKeySecondaryIndex() throws SQLException {
     //fails
 
@@ -2224,6 +3321,21 @@ public class TestDatabase {
     assertEquals(ret.getLong("id"), 9);
 
     assertFalse(ret.next());
+  }
+
+  @Test
+  public void testOverlapPrecedence2NoKeyExplain() throws SQLException {
+    try (PreparedStatement stmt2 = conn.prepareStatement(
+        "explain select nokey.id  " +
+            "from nokey where nokey.id<=7 AND id = 4 OR id> 8")) {
+      try (ResultSet rs = stmt2.executeQuery()) {
+        StringBuilder builder = new StringBuilder();
+        while (rs.next()) {
+          builder.append(rs.getString(1)).append("\n");
+        }
+        assertEquals(builder.toString(), "Table scan: table=nokey nokey.id <= 7 and nokey.id = 4 or nokey.id > 8\n");
+      }
+    }
   }
 
   @Test
@@ -2244,6 +3356,28 @@ public class TestDatabase {
     ret.next();
     assertEquals(ret.getLong("id"), 9);
     assertFalse(ret.next());
+  }
+
+  @Test
+  public void testOverlapPrecedence2Explain() throws SQLException {
+    try (PreparedStatement stmt2 = conn.prepareStatement(
+        "explain select persons.id  " +
+            "from persons where persons.id<=100 AND id = 4 OR id> 103")) {
+      try (ResultSet rs = stmt2.executeQuery()) {
+        StringBuilder builder = new StringBuilder();
+        while (rs.next()) {
+          builder.append(rs.getString(1)).append("\n");
+        }
+        assertEquals(builder.toString(), "Server select due to 'or' expression\n" +
+            "Index lookup for relational op: table=persons, idx=_primarykey, persons.id = 4\n" +
+            "single key index lookup\n" +
+            " AND \n" +
+            "Read record from index and evaluate: persons.id <= 100\n" +
+            " OR \n" +
+            "Index lookup for relational op: table=persons, idx=_primarykey, persons.id > 103\n" +
+            "single key index lookup\n");
+      }
+    }
   }
 
   @Test
@@ -2274,6 +3408,22 @@ public class TestDatabase {
   }
 
   @Test
+  public void testAvgNoKeySecondaryIndexExplain() throws SQLException {
+    try (PreparedStatement stmt2 = conn.prepareStatement(
+        "explain select avg(nokeysecondaryindex.id) as avgValue from nokeysecondaryindex")) {
+      try (ResultSet rs = stmt2.executeQuery()) {
+        StringBuilder builder = new StringBuilder();
+        while (rs.next()) {
+          builder.append(rs.getString(1)).append("\n");
+        }
+        assertEquals(builder.toString(), "Evaluate counters\n" +
+            "Index lookup for all records: table=nokeysecondaryindex, idx=_primarykey\n" +
+            "single key index lookup\n");
+      }
+    }
+  }
+
+  @Test
   public void testAvgNoKeySecondaryIndex() throws SQLException {
     //fails
 
@@ -2287,6 +3437,22 @@ public class TestDatabase {
   }
 
   @Test
+  public void testAvgNoKeyExplain() throws SQLException {
+    try (PreparedStatement stmt2 = conn.prepareStatement(
+        "explain select avg(nokey.id) as avgValue from nokey")) {
+      try (ResultSet rs = stmt2.executeQuery()) {
+        StringBuilder builder = new StringBuilder();
+        while (rs.next()) {
+          builder.append(rs.getString(1)).append("\n");
+        }
+        assertEquals(builder.toString(), "Evaluate counters\n" +
+            "Index lookup for all records: table=nokey, idx=_primarykey\n" +
+            "single key index lookup\n");
+      }
+    }
+  }
+
+  @Test
   public void testAvgNoKey() throws SQLException {
     //fails
 
@@ -2297,6 +3463,22 @@ public class TestDatabase {
     ret.next();
     assertEquals(ret.getDouble("avgValue"), 4.5d);
     assertFalse(ret.next());
+  }
+
+  @Test
+  public void testAvgExplain() throws SQLException {
+    try (PreparedStatement stmt2 = conn.prepareStatement(
+        "explain select avg(persons.id) as avgValue from persons")) {
+      try (ResultSet rs = stmt2.executeQuery()) {
+        StringBuilder builder = new StringBuilder();
+        while (rs.next()) {
+          builder.append(rs.getString(1)).append("\n");
+        }
+        assertEquals(builder.toString(), "Evaluate counters\n" +
+            "Index lookup for all records: table=persons, idx=_primarykey\n" +
+            "single key index lookup\n");
+      }
+    }
   }
 
   @Test
@@ -2338,6 +3520,29 @@ public class TestDatabase {
   }
 
   @Test
+  public void testOrNoKeySecondaryIndexExplain() throws SQLException {
+    try (PreparedStatement stmt2 = conn.prepareStatement(
+        "explain select * from nokeysecondaryindex where id>8 and id2=18 or id<6 and id2=2 order by id desc")) {
+      try (ResultSet rs = stmt2.executeQuery()) {
+        StringBuilder builder = new StringBuilder();
+        while (rs.next()) {
+          builder.append(rs.getString(1)).append("\n");
+        }
+        assertEquals(builder.toString(), "Server select due to 'or' expression\n" +
+            "Index lookup for relational op: table=nokeysecondaryindex, idx=id, nokeysecondaryindex.id > 8\n" +
+            "single key index lookup\n" +
+            " AND \n" +
+            "Read record from index and evaluate: nokeysecondaryindex.id2 = 18\n" +
+            " OR \n" +
+            "Index lookup for relational op: table=nokeysecondaryindex, idx=id, nokeysecondaryindex.id < 6\n" +
+            "single key index lookup\n" +
+            " AND \n" +
+            "Read record from index and evaluate: nokeysecondaryindex.id2 = 2\n");
+      }
+    }
+  }
+
+  @Test
   public void testOrNoKeySecondaryIndex() throws SQLException {
     //fails
 
@@ -2350,6 +3555,21 @@ public class TestDatabase {
     ret.next();
     assertEquals(ret.getLong("id"), 1);
     assertFalse(ret.next());
+  }
+
+  @Test
+  public void testOrNoKeyExplain() throws SQLException {
+    try (PreparedStatement stmt2 = conn.prepareStatement(
+        "explain select * from nokey where id>8 and id2=18 or id<6 and id2=2 order by id desc")) {
+      try (ResultSet rs = stmt2.executeQuery()) {
+        StringBuilder builder = new StringBuilder();
+        while (rs.next()) {
+          builder.append(rs.getString(1)).append("\n");
+        }
+        assertEquals(builder.toString(), "Server select due to server sort\n" +
+            "Table scan: table=nokey nokey.id > 8 and nokey.id2 = 18 or nokey.id < 6 and nokey.id2 = 2\n");
+      }
+    }
   }
 
   @Test
@@ -2371,6 +3591,28 @@ public class TestDatabase {
     assertFalse(ret.next());
   }
 
+  @Test
+  public void testOrExplain() throws SQLException {
+    try (PreparedStatement stmt2 = conn.prepareStatement(
+        "explain select * from persons where id>105 and id2=0 or id<105 and id2=1 order by id desc")) {
+      try (ResultSet rs = stmt2.executeQuery()) {
+        StringBuilder builder = new StringBuilder();
+        while (rs.next()) {
+          builder.append(rs.getString(1)).append("\n");
+        }
+        assertEquals(builder.toString(), "Server select due to 'or' expression\n" +
+            "Index lookup for relational op: table=persons, idx=_primarykey, persons.id > 105\n" +
+            "single key index lookup\n" +
+            " AND \n" +
+            "Read record from index and evaluate: persons.id2 = 0\n" +
+            " OR \n" +
+            "Index lookup for relational op: table=persons, idx=_primarykey, persons.id < 105\n" +
+            "single key index lookup\n" +
+            " AND \n" +
+            "Read record from index and evaluate: persons.id2 = 1\n");
+      }
+    }
+  }
 
   @Test
   public void testOr() throws SQLException {
@@ -2434,6 +3676,24 @@ public class TestDatabase {
   }
 
   @Test
+  public void testMixedExplain() throws SQLException {
+    try (PreparedStatement stmt2 = conn.prepareStatement(
+        "explain select persons.id, socialsecuritynumber as s " +
+            "from persons where socialsecuritynumber > '933-28-6' AND persons.id>5 AND id < 10")) {
+      try (ResultSet rs = stmt2.executeQuery()) {
+        StringBuilder builder = new StringBuilder();
+        while (rs.next()) {
+          builder.append(rs.getString(1)).append("\n");
+        }
+        assertEquals(builder.toString(), "Index lookup for relational op: table=persons, idx=socialsecuritynumber, persons.socialsecuritynumber > 933-28-6\n" +
+            "single key index lookup\n" +
+            " AND \n" +
+            "Read record from index and evaluate: persons.id < 10 and persons.id > 5\n");
+      }
+    }
+  }
+
+  @Test
   public void testMixed() throws SQLException {
     PreparedStatement stmt = conn.prepareStatement("select persons.id, socialsecuritynumber as s " +
         "from persons where socialsecuritynumber > '933-28-6' AND persons.id>5 AND id < 10");                                              //
@@ -2452,6 +3712,24 @@ public class TestDatabase {
   }
 
   @Test
+  public void testOrAndExplain() throws SQLException {
+    try (PreparedStatement stmt2 = conn.prepareStatement(
+        "explain select persons.id  " +
+            "from persons where persons.id>2 AND id < 4 OR id> 6 AND ID < 8")) {
+      try (ResultSet rs = stmt2.executeQuery()) {
+        StringBuilder builder = new StringBuilder();
+        while (rs.next()) {
+          builder.append(rs.getString(1)).append("\n");
+        }
+        assertEquals(builder.toString(), "Server select due to 'or' expression\n" +
+            "Two key index lookup: table=persons, idx=_primarykey, id < 4 and id > 2\n" +
+            " OR \n" +
+            "Two key index lookup: table=persons, idx=_primarykey, id < 8 and id > 6\n");
+      }
+    }
+  }
+
+  @Test
   public void testOrAnd() throws SQLException {
     PreparedStatement stmt = conn.prepareStatement("select persons.id  " +
         "from persons where persons.id>2 AND id < 4 OR id> 6 AND ID < 8");                                              //
@@ -2463,6 +3741,21 @@ public class TestDatabase {
     assertEquals(ret.getLong("id"), 7);
     ret.next();
     assertFalse(ret.next());
+  }
+
+  @Test
+  public void testEqualNonIndexExplain() throws SQLException {
+    try (PreparedStatement stmt2 = conn.prepareStatement(
+        "explain select * from persons where id2=1 order by id desc")) {
+      try (ResultSet rs = stmt2.executeQuery()) {
+        StringBuilder builder = new StringBuilder();
+        while (rs.next()) {
+          builder.append(rs.getString(1)).append("\n");
+        }
+        assertEquals(builder.toString(), "Server select due to server sort\n" +
+            "Table scan: table=persons persons.id2 = 1\n");
+      }
+    }
   }
 
   @Test
@@ -2485,6 +3778,21 @@ public class TestDatabase {
   }
 
   @Test
+  public void testEqualIndexExplain() throws SQLException {
+    try (PreparedStatement stmt2 = conn.prepareStatement(
+        "explain select * from persons where id=1 order by id desc")) {
+      try (ResultSet rs = stmt2.executeQuery()) {
+        StringBuilder builder = new StringBuilder();
+        while (rs.next()) {
+          builder.append(rs.getString(1)).append("\n");
+        }
+        assertEquals(builder.toString(), "Index lookup for relational op: table=persons, idx=_primarykey, persons.id = 1\n" +
+            "single key index lookup\n");
+      }
+    }
+  }
+
+  @Test
   public void testEqualIndex() throws SQLException {
     //test select returns multiple records with a table scan
     PreparedStatement stmt = conn.prepareStatement("select * from persons where id=1 order by id desc");
@@ -2493,6 +3801,20 @@ public class TestDatabase {
     ret.next();
     assertEquals(ret.getLong("id"), 1);
     assertFalse(ret.next());
+  }
+
+  @Test
+  public void testInNoKeySecondaryIndexExplain() throws SQLException {
+    try (PreparedStatement stmt2 = conn.prepareStatement(
+        "explain select * from nokeysecondaryindex where id in (0, 1, 2)")) {
+      try (ResultSet rs = stmt2.executeQuery()) {
+        StringBuilder builder = new StringBuilder();
+        while (rs.next()) {
+          builder.append(rs.getString(1)).append("\n");
+        }
+        assertEquals(builder.toString(), "In expression read each expression from index: table=nokeysecondaryindex, idx=id\n");
+      }
+    }
   }
 
   @Test
@@ -2509,6 +3831,20 @@ public class TestDatabase {
     ret.next();
     assertEquals(ret.getLong("id"), 2);
     assertFalse(ret.next());
+  }
+
+  @Test
+  public void testInNoKeyExplain() throws SQLException {
+    try (PreparedStatement stmt2 = conn.prepareStatement(
+        "explain select * from nokey where id in (0, 1, 2)")) {
+      try (ResultSet rs = stmt2.executeQuery()) {
+        StringBuilder builder = new StringBuilder();
+        while (rs.next()) {
+          builder.append(rs.getString(1)).append("\n");
+        }
+        assertEquals(builder.toString(), "Table scan: table=nokey nokey.id in (0, 1, 2)\n");
+      }
+    }
   }
 
   @Test
@@ -2531,6 +3867,23 @@ public class TestDatabase {
     ret.next();
     assertEquals(ret.getLong("id"), 2);
     assertFalse(ret.next());
+  }
+
+  @Test
+  public void testSecondaryIndexExplain() throws SQLException {
+    try (PreparedStatement stmt2 = conn.prepareStatement(
+        "explain select * from persons where socialSecurityNumber=? order by id")) {
+      stmt2.setString(1, "933-28-" + 0);
+      try (ResultSet rs = stmt2.executeQuery()) {
+        StringBuilder builder = new StringBuilder();
+        while (rs.next()) {
+          builder.append(rs.getString(1)).append("\n");
+        }
+        assertEquals(builder.toString(), "Server select due to server sort\n" +
+            "Index lookup for relational op: table=persons, idx=socialsecuritynumber, persons.socialsecuritynumber = 933-28-0\n" +
+            "single key index lookup\n");
+      }
+    }
   }
 
   @Test(invocationCount = 1)
@@ -2562,6 +3915,23 @@ public class TestDatabase {
       assertNotNull(gender);
       assertNotEquals(gender.length(), 0);
       assertEquals(gender.charAt(0), 'm');
+    }
+  }
+
+  @Test
+  public void testMultipleFieldsExplain() throws SQLException {
+    try (PreparedStatement stmt2 = conn.prepareStatement(
+        "explain select * from persons where id=" + (0 + 100) + " AND id2=" + ((0 + 100) % 2))) {
+      try (ResultSet rs = stmt2.executeQuery()) {
+        StringBuilder builder = new StringBuilder();
+        while (rs.next()) {
+          builder.append(rs.getString(1)).append("\n");
+        }
+        assertEquals(builder.toString(), "Index lookup for relational op: table=persons, idx=_primarykey, persons.id = 100\n" +
+            "single key index lookup\n" +
+            " AND \n" +
+            "Read record from index and evaluate: persons.id2 = 0\n");
+      }
     }
   }
 
@@ -2598,6 +3968,20 @@ public class TestDatabase {
   }
 
   @Test
+  public void testAndNoKeySecondaryIndexExplain() throws SQLException {
+    try (PreparedStatement stmt2 = conn.prepareStatement(
+        "explain select * from nokeysecondaryindex where id!=0 AND id!=1 AND id!=2 AND id!=3 AND id!=4 order by id asc")) {
+      try (ResultSet rs = stmt2.executeQuery()) {
+        StringBuilder builder = new StringBuilder();
+        while (rs.next()) {
+          builder.append(rs.getString(1)).append("\n");
+        }
+        assertEquals(builder.toString(), "Table scan: table=nokeysecondaryindex nokeysecondaryindex.id != 0 and nokeysecondaryindex.id != 1 and nokeysecondaryindex.id != 2 and nokeysecondaryindex.id != 3 and nokeysecondaryindex.id != 4\n");
+      }
+    }
+  }
+
+  @Test
   public void testAndNoKeySecondaryIndex() throws SQLException {
     PreparedStatement stmt = conn.prepareStatement("select * from nokeysecondaryindex where id!=0 AND id!=1 AND id!=2 AND id!=3 AND id!=4 order by id asc");
     ResultSet ret = stmt.executeQuery();
@@ -2613,6 +3997,21 @@ public class TestDatabase {
     ret.next();
     assertEquals(ret.getLong("id"), 9);
     assertFalse(ret.next());
+  }
+
+  @Test
+  public void testAndNoKeyExplain() throws SQLException {
+    try (PreparedStatement stmt2 = conn.prepareStatement(
+        "explain select * from nokey where id!=0 AND id!=1 AND id!=2 AND id!=3 AND id!=4 order by id asc")) {
+      try (ResultSet rs = stmt2.executeQuery()) {
+        StringBuilder builder = new StringBuilder();
+        while (rs.next()) {
+          builder.append(rs.getString(1)).append("\n");
+        }
+        assertEquals(builder.toString(), "Server select due to server sort\n" +
+            "Table scan: table=nokey nokey.id != 0 and nokey.id != 1 and nokey.id != 2 and nokey.id != 3 and nokey.id != 4\n");
+      }
+    }
   }
 
   @Test
@@ -2641,6 +4040,20 @@ public class TestDatabase {
     ret.next();
     assertEquals(ret.getLong("id"), 9);
     assertFalse(ret.next());
+  }
+
+  @Test
+  public void testAndExplain() throws SQLException {
+    try (PreparedStatement stmt2 = conn.prepareStatement(
+        "explain select * from persons where id!=0 AND id!=1 AND id!=2 AND id!=3 AND id!=4 order by id asc")) {
+      try (ResultSet rs = stmt2.executeQuery()) {
+        StringBuilder builder = new StringBuilder();
+        while (rs.next()) {
+          builder.append(rs.getString(1)).append("\n");
+        }
+        assertEquals(builder.toString(), "Table scan: table=persons persons.id != 0 and persons.id != 1 and persons.id != 2 and persons.id != 3 and persons.id != 4\n");
+      }
+    }
   }
 
   @Test
@@ -2682,6 +4095,21 @@ public class TestDatabase {
   }
 
   @Test
+  public void testOrTableScanNoKeySecondaryIndexExplain() throws SQLException {
+    try (PreparedStatement stmt2 = conn.prepareStatement(
+        "explain select * from nokeysecondaryindex where id2=2 or id2=0 order by id2 asc, id desc")) {
+      try (ResultSet rs = stmt2.executeQuery()) {
+        StringBuilder builder = new StringBuilder();
+        while (rs.next()) {
+          builder.append(rs.getString(1)).append("\n");
+        }
+        assertEquals(builder.toString(), "Server select due to server sort\n" +
+            "Table scan: table=nokeysecondaryindex nokeysecondaryindex.id2 = 2 or nokeysecondaryindex.id2 = 0\n");
+      }
+    }
+  }
+
+  @Test
   public void testOrTableScanNoKeySecondaryIndex() throws SQLException {
     //test select returns multiple records with a table scan
     PreparedStatement stmt = conn.prepareStatement("select * from nokeysecondaryindex where id2=2 or id2=0 order by id2 asc, id desc");
@@ -2705,6 +4133,21 @@ public class TestDatabase {
 //    assertTrue(found.contains(105L));
 //    assertTrue(found.contains(107L));
 //    assertTrue(found.contains(109L));
+  }
+
+  @Test
+  public void testOrTableScanExplain() throws SQLException {
+    try (PreparedStatement stmt2 = conn.prepareStatement(
+        "explain select * from persons where id2=1 or id2=0 order by id2 asc, id desc")) {
+      try (ResultSet rs = stmt2.executeQuery()) {
+        StringBuilder builder = new StringBuilder();
+        while (rs.next()) {
+          builder.append(rs.getString(1)).append("\n");
+        }
+        assertEquals(builder.toString(), "Server select due to server sort\n" +
+            "Table scan: table=persons persons.id2 = 1 or persons.id2 = 0\n");
+      }
+    }
   }
 
   @Test
@@ -2750,6 +4193,20 @@ public class TestDatabase {
   }
 
   @Test
+  public void testOrIndexNoKeySecondaryIndexExplain() throws SQLException {
+    try (PreparedStatement stmt2 = conn.prepareStatement(
+        "explain select * from nokeysecondaryindex where id=0 OR id=1 OR id=2 OR id=3 OR id=4")) {
+      try (ResultSet rs = stmt2.executeQuery()) {
+        StringBuilder builder = new StringBuilder();
+        while (rs.next()) {
+          builder.append(rs.getString(1)).append("\n");
+        }
+        assertEquals(builder.toString(), "Batch index lookup: table=nokeysecondaryindex, idx=id, keyCount=5\n");
+      }
+    }
+  }
+
+  @Test
   public void testOrIndexNoKeySecondaryIndex() throws SQLException {
     //test select returns multiple records with an index
     PreparedStatement stmt = conn.prepareStatement("select * from nokeysecondaryindex where id=0 OR id=1 OR id=2 OR id=3 OR id=4");
@@ -2766,6 +4223,20 @@ public class TestDatabase {
     ret.next();
     assertEquals(ret.getLong("id"), 4);
     assertFalse(ret.next());
+  }
+
+  @Test
+  public void testOrIndexExplain() throws SQLException {
+    try (PreparedStatement stmt2 = conn.prepareStatement(
+        "explain select * from persons where id=0 OR id=1 OR id=2 OR id=3 OR id=4")) {
+      try (ResultSet rs = stmt2.executeQuery()) {
+        StringBuilder builder = new StringBuilder();
+        while (rs.next()) {
+          builder.append(rs.getString(1)).append("\n");
+        }
+        assertEquals(builder.toString(), "Batch index lookup: table=persons, idx=_primarykey, keyCount=5\n");
+      }
+    }
   }
 
   @Test
@@ -2788,6 +4259,21 @@ public class TestDatabase {
   }
 
   @Test
+  public void testLessEqualNoKeySecondaryIndexExplain() throws SQLException {
+    try (PreparedStatement stmt2 = conn.prepareStatement(
+        "explain select * from nokeysecondaryindex where id<=3 order by id desc")) {
+      try (ResultSet rs = stmt2.executeQuery()) {
+        StringBuilder builder = new StringBuilder();
+        while (rs.next()) {
+          builder.append(rs.getString(1)).append("\n");
+        }
+        assertEquals(builder.toString(), "Index lookup for relational op: table=nokeysecondaryindex, idx=id, nokeysecondaryindex.id <= 3\n" +
+            "single key index lookup\n");
+      }
+    }
+  }
+
+  @Test
   public void testLessEqualNoKeySecondaryIndex() throws SQLException {
 
     //test select returns multiple records with an index using operator '<='
@@ -2803,6 +4289,21 @@ public class TestDatabase {
     ret.next();
     assertEquals(ret.getLong("id"), 0);
     assertFalse(ret.next());
+  }
+
+  @Test
+  public void testLessEqualNoKeyExplain() throws SQLException {
+    try (PreparedStatement stmt2 = conn.prepareStatement(
+        "explain select * from nokey where id<=3 order by id desc")) {
+      try (ResultSet rs = stmt2.executeQuery()) {
+        StringBuilder builder = new StringBuilder();
+        while (rs.next()) {
+          builder.append(rs.getString(1)).append("\n");
+        }
+        assertEquals(builder.toString(), "Server select due to server sort\n" +
+            "Table scan: table=nokey nokey.id <= 3\n");
+      }
+    }
   }
 
   @Test
@@ -2832,6 +4333,21 @@ public class TestDatabase {
   }
 
   @Test
+  public void testLessEqualExplain() throws SQLException {
+    try (PreparedStatement stmt2 = conn.prepareStatement(
+        "explain select * from persons where id<=5 order by id desc")) {
+      try (ResultSet rs = stmt2.executeQuery()) {
+        StringBuilder builder = new StringBuilder();
+        while (rs.next()) {
+          builder.append(rs.getString(1)).append("\n");
+        }
+        assertEquals(builder.toString(), "Index lookup for relational op: table=persons, idx=_primarykey, persons.id <= 5\n" +
+            "single key index lookup\n");
+      }
+    }
+  }
+
+  @Test
   public void testLessEqual() throws SQLException {
 
     //test select returns multiple records with an index using operator '<='
@@ -2851,6 +4367,20 @@ public class TestDatabase {
     ret.next();
     assertEquals(ret.getLong("id"), 0);
     assertFalse(ret.next());
+  }
+
+  @Test
+  public void testLessEqualGreaterEqualExplain() throws SQLException {
+    try (PreparedStatement stmt2 = conn.prepareStatement(
+        "explain select * from persons where id >= 1 and id<=5 order by id asc")) {
+      try (ResultSet rs = stmt2.executeQuery()) {
+        StringBuilder builder = new StringBuilder();
+        while (rs.next()) {
+          builder.append(rs.getString(1)).append("\n");
+        }
+        assertEquals(builder.toString(), "Two key index lookup: table=persons, idx=_primarykey, id <= 5 and id >= 1\n");
+      }
+    }
   }
 
   @Test
@@ -2874,6 +4404,20 @@ public class TestDatabase {
   }
 
   @Test
+  public void testLessEqualGreaterEqualDescExplain() throws SQLException {
+    try (PreparedStatement stmt2 = conn.prepareStatement(
+        "explain select * from persons where id >= 1 and id<=5 order by id desc")) {
+      try (ResultSet rs = stmt2.executeQuery()) {
+        StringBuilder builder = new StringBuilder();
+        while (rs.next()) {
+          builder.append(rs.getString(1)).append("\n");
+        }
+        assertEquals(builder.toString(), "Two key index lookup: table=persons, idx=_primarykey, id <= 5 and id >= 1\n");
+      }
+    }
+  }
+
+  @Test
   public void testLessEqualGreaterEqualDesc() throws SQLException {
 
     //test select returns multiple records with an index using operator '<='
@@ -2894,6 +4438,20 @@ public class TestDatabase {
   }
 
   @Test
+  public void testLessEqualAndGreaterEqualNoKeySecondaryIndexExplain() throws SQLException {
+    try (PreparedStatement stmt2 = conn.prepareStatement(
+        "explain select * from nokeysecondaryindex where id<=5 and id>=1 order by id desc")) {
+      try (ResultSet rs = stmt2.executeQuery()) {
+        StringBuilder builder = new StringBuilder();
+        while (rs.next()) {
+          builder.append(rs.getString(1)).append("\n");
+        }
+        assertEquals(builder.toString(), "Two key index lookup: table=nokeysecondaryindex, idx=id, id >= 1 and id <= 5\n");
+      }
+    }
+  }
+
+  @Test
   public void testLessEqualAndGreaterEqualNoKeySecondaryIndex() throws SQLException {
 
     //test select returns multiple records with an index using operator '<='
@@ -2911,6 +4469,21 @@ public class TestDatabase {
     ret.next();
     assertEquals(ret.getLong("id"), 1);
     assertFalse(ret.next());
+  }
+
+  @Test
+  public void testLessEqualAndGreaterEqualNoKeyExplain() throws SQLException {
+    try (PreparedStatement stmt2 = conn.prepareStatement(
+        "explain select * from nokey where id<=5 and id>=1 order by id desc")) {
+      try (ResultSet rs = stmt2.executeQuery()) {
+        StringBuilder builder = new StringBuilder();
+        while (rs.next()) {
+          builder.append(rs.getString(1)).append("\n");
+        }
+        assertEquals(builder.toString(), "Server select due to server sort\n" +
+            "Table scan: table=nokey nokey.id <= 5 and nokey.id >= 1\n");
+      }
+    }
   }
 
   @Test
@@ -2944,7 +4517,21 @@ public class TestDatabase {
   }
 
   @Test
-  public void    testLessEqualAndGreaterEqual() throws SQLException {
+  public void testLessEqualAndGreaterEqualExplain() throws SQLException {
+    try (PreparedStatement stmt2 = conn.prepareStatement(
+        "explain select * from persons where id<=5 and id>=1 order by id desc")) {
+      try (ResultSet rs = stmt2.executeQuery()) {
+        StringBuilder builder = new StringBuilder();
+        while (rs.next()) {
+          builder.append(rs.getString(1)).append("\n");
+        }
+        assertEquals(builder.toString(), "Two key index lookup: table=persons, idx=_primarykey, id >= 1 and id <= 5\n");
+      }
+    }
+  }
+
+  @Test
+  public void testLessEqualAndGreaterEqual() throws SQLException {
 
     //test select returns multiple records with an index using operator '<='
     PreparedStatement stmt = conn.prepareStatement("select * from persons where id<=5 and id>=1 order by id desc");
@@ -2964,6 +4551,21 @@ public class TestDatabase {
   }
 
   @Test
+  public void testGreaterNoKeySecondaryIndexExplain() throws SQLException {
+    try (PreparedStatement stmt2 = conn.prepareStatement(
+        "explain select * from nokeysecondaryindex where id>5")) {
+      try (ResultSet rs = stmt2.executeQuery()) {
+        StringBuilder builder = new StringBuilder();
+        while (rs.next()) {
+          builder.append(rs.getString(1)).append("\n");
+        }
+        assertEquals(builder.toString(), "Index lookup for relational op: table=nokeysecondaryindex, idx=id, nokeysecondaryindex.id > 5\n" +
+            "single key index lookup\n");
+      }
+    }
+  }
+
+  @Test
   public void testGreaterNoKeySecondaryIndex() throws SQLException {
     //test select returns multiple records with an index using operator '>'
     PreparedStatement stmt = conn.prepareStatement("select * from nokeysecondaryindex where id>5");
@@ -2978,6 +4580,21 @@ public class TestDatabase {
     ret.next();
     assertEquals(ret.getLong("id"), 9);
     assertFalse(ret.next());
+  }
+
+  @Test
+  public void testGreaterNoKeyExplain() throws SQLException {
+    try (PreparedStatement stmt2 = conn.prepareStatement(
+        "explain select * from nokey where id>5 order by id asc")) {
+      try (ResultSet rs = stmt2.executeQuery()) {
+        StringBuilder builder = new StringBuilder();
+        while (rs.next()) {
+          builder.append(rs.getString(1)).append("\n");
+        }
+        assertEquals(builder.toString(), "Server select due to server sort\n" +
+            "Table scan: table=nokey nokey.id > 5\n");
+      }
+    }
   }
 
   @Test
@@ -3003,6 +4620,21 @@ public class TestDatabase {
     ret.next();
     assertEquals(ret.getLong("id"), 9);
     assertFalse(ret.next());
+  }
+
+  @Test
+  public void testGreaterExplain() throws SQLException {
+    try (PreparedStatement stmt2 = conn.prepareStatement(
+        "explain select * from persons where id>5")) {
+      try (ResultSet rs = stmt2.executeQuery()) {
+        StringBuilder builder = new StringBuilder();
+        while (rs.next()) {
+          builder.append(rs.getString(1)).append("\n");
+        }
+        assertEquals(builder.toString(), "Index lookup for relational op: table=persons, idx=_primarykey, persons.id > 5\n" +
+            "single key index lookup\n");
+      }
+    }
   }
 
   @Test
@@ -3047,6 +4679,21 @@ public class TestDatabase {
   }
 
   @Test
+  public void testGreaterEqualNoKeySecondaryIndexExplain() throws SQLException {
+    try (PreparedStatement stmt2 = conn.prepareStatement(
+        "explain select * from nokeysecondaryindex where id>=5")) {
+      try (ResultSet rs = stmt2.executeQuery()) {
+        StringBuilder builder = new StringBuilder();
+        while (rs.next()) {
+          builder.append(rs.getString(1)).append("\n");
+        }
+        assertEquals(builder.toString(), "Index lookup for relational op: table=nokeysecondaryindex, idx=id, nokeysecondaryindex.id >= 5\n" +
+            "single key index lookup\n");
+      }
+    }
+  }
+
+  @Test
   public void testGreaterEqualNoKeySecondaryIndex() throws SQLException {
     //test select returns multiple records with an index using operator '<='
     PreparedStatement stmt = conn.prepareStatement("select * from nokeysecondaryindex where id>=5");
@@ -3063,6 +4710,20 @@ public class TestDatabase {
     ret.next();
     assertEquals(ret.getLong("id"), 9);
     assertFalse(ret.next());
+  }
+
+  @Test
+  public void testGreaterEqualNoKeyExplain() throws SQLException {
+    try (PreparedStatement stmt2 = conn.prepareStatement(
+        "explain select * from nokey where id>=5")) {
+      try (ResultSet rs = stmt2.executeQuery()) {
+        StringBuilder builder = new StringBuilder();
+        while (rs.next()) {
+          builder.append(rs.getString(1)).append("\n");
+        }
+        assertEquals(builder.toString(), "Table scan: table=nokey nokey.id >= 5\n");
+      }
+    }
   }
 
   @Test
@@ -3092,6 +4753,21 @@ public class TestDatabase {
     ret.next();
     assertEquals(ret.getLong("id"), 9);
     assertFalse(ret.next());
+  }
+
+  @Test
+  public void testGreaterEqualExplain() throws SQLException {
+    try (PreparedStatement stmt2 = conn.prepareStatement(
+        "explain select * from persons where id>=5")) {
+      try (ResultSet rs = stmt2.executeQuery()) {
+        StringBuilder builder = new StringBuilder();
+        while (rs.next()) {
+          builder.append(rs.getString(1)).append("\n");
+        }
+        assertEquals(builder.toString(), "Index lookup for relational op: table=persons, idx=_primarykey, persons.id >= 5\n" +
+            "single key index lookup\n");
+      }
+    }
   }
 
   @Test
@@ -3134,6 +4810,21 @@ public class TestDatabase {
   }
 
   @Test
+  public void testEqual2Explain() throws SQLException {
+    try (PreparedStatement stmt2 = conn.prepareStatement(
+        "explain select * from persons where id=0")) {
+      try (ResultSet rs = stmt2.executeQuery()) {
+        StringBuilder builder = new StringBuilder();
+        while (rs.next()) {
+          builder.append(rs.getString(1)).append("\n");
+        }
+        assertEquals(builder.toString(), "Index lookup for relational op: table=persons, idx=_primarykey, persons.id = 0\n" +
+            "single key index lookup\n");
+      }
+    }
+  }
+
+  @Test
   public void testEqual2() throws SQLException {
     //test select
     PreparedStatement stmt;
@@ -3164,6 +4855,21 @@ public class TestDatabase {
   }
 
   @Test
+  public void testEqual2NoKeySecondaryIndexExplain() throws SQLException {
+    try (PreparedStatement stmt2 = conn.prepareStatement(
+        "explain select * from nokeysecondaryindex where id=0")) {
+      try (ResultSet rs = stmt2.executeQuery()) {
+        StringBuilder builder = new StringBuilder();
+        while (rs.next()) {
+          builder.append(rs.getString(1)).append("\n");
+        }
+        assertEquals(builder.toString(), "Index lookup for relational op: table=nokeysecondaryindex, idx=id, nokeysecondaryindex.id = 0\n" +
+            "single key index lookup\n");
+      }
+    }
+  }
+
+  @Test
   public void testEqual2NoKeySecondaryIndex() {
     //test select
     PreparedStatement stmt;
@@ -3181,6 +4887,20 @@ public class TestDatabase {
       }
       catch (Exception e) {
         fail("i=" + i);
+      }
+    }
+  }
+
+  @Test
+  public void testEqual2NoKeyExplain() throws SQLException {
+    try (PreparedStatement stmt2 = conn.prepareStatement(
+        "explain select * from nokey where id=0")) {
+      try (ResultSet rs = stmt2.executeQuery()) {
+        StringBuilder builder = new StringBuilder();
+        while (rs.next()) {
+          builder.append(rs.getString(1)).append("\n");
+        }
+        assertEquals(builder.toString(), "Table scan: table=nokey nokey.id = 0\n");
       }
     }
   }
@@ -3409,6 +5129,23 @@ public class TestDatabase {
   }
 
   @Test
+  public void testOverlappingExplain() throws SQLException {
+    try (PreparedStatement stmt2 = conn.prepareStatement(
+        "explain select * from persons where id>4 and id < 10 and id > 2")) {
+      try (ResultSet rs = stmt2.executeQuery()) {
+        StringBuilder builder = new StringBuilder();
+        while (rs.next()) {
+          builder.append(rs.getString(1)).append("\n");
+        }
+        assertEquals(builder.toString(), "Index lookup for relational op: table=persons, idx=_primarykey, persons.id > 2\n" +
+            "single key index lookup\n" +
+            " AND \n" +
+            "Read record from index and evaluate: persons.id > 4 and persons.id < 10\n");
+      }
+    }
+  }
+
+  @Test
   public void testOverlapping() throws SQLException {
     PreparedStatement stmt = conn.prepareStatement("select * from persons where id>4 and id < 10 and id > 2");
     ResultSet rs = stmt.executeQuery();
@@ -3563,248 +5300,5 @@ public class TestDatabase {
     return new String(decrypt);
   }
 
-
-  @Test
-   public void testExplain() throws SQLException {
-     //client.setPageSize(100);
-     PreparedStatement stmt = conn.prepareStatement("explain select * from persons where id < 100");
-     ResultSet ret = stmt.executeQuery();
-
-     while (ret.next()) {
-       System.out.println(ret.getString(1));
-     }
-     System.out.println();
-
-    stmt = conn.prepareStatement(
-         "select persons.id, persons.socialsecuritynumber, memberships.personId, memberships.membershipname from persons " +
-             "right outer join Memberships on persons.id = Memberships.PersonId where persons.id<1000 order by persons.id desc");
-     ret = stmt.executeQuery();
-     while (ret.next()) {
-       System.out.println(ret.getString(1));
-     }
-
-     stmt = conn.prepareStatement("explain select * from persons where id < 100 and id > 10");
-     ret = stmt.executeQuery();
-
-     while (ret.next()) {
-       System.out.println(ret.getString(1));
-     }
-     System.out.println();
-
-     stmt = conn.prepareStatement("explain select * from persons where id < 100 or id > 10");
-     ret = stmt.executeQuery();
-
-     while (ret.next()) {
-       System.out.println(ret.getString(1));
-     }
-     System.out.println();
-
-     stmt = conn.prepareStatement("explain select * from persons where id < 100 and id > 10 and id2 > 10");
-     ret = stmt.executeQuery();
-
-     while (ret.next()) {
-       System.out.println(ret.getString(1));
-     }
-     System.out.println();
-
-     stmt = conn.prepareStatement("explain select * from persons where id < 100 and id > 10 and id2 > 10 and id2 < 1");
-     ret = stmt.executeQuery();
-
-     while (ret.next()) {
-       System.out.println(ret.getString(1));
-     }
-     System.out.println();
-
-     stmt = conn.prepareStatement("explain select * from persons where id < 100 and id > 10 and id > 10 and id < 1");
-     ret = stmt.executeQuery();
-
-     while (ret.next()) {
-       System.out.println(ret.getString(1));
-     }
-     System.out.println();
-
-     stmt = conn.prepareStatement("explain select * from persons where id2 < 100");
-     ret = stmt.executeQuery();
-
-     while (ret.next()) {
-       System.out.println(ret.getString(1));
-     }
-     System.out.println();
-
-     stmt = conn.prepareStatement("explain select personId, membershipname from memberships where personid=1 and membershipname='name'");
-     ret = stmt.executeQuery();
-
-     while (ret.next()) {
-       System.out.println(ret.getString(1));
-     }
-     System.out.println();
-
-
-     stmt = conn.prepareStatement("explain select max(id) as maxValue from persons");
-     ret = stmt.executeQuery();
-
-     while (ret.next()) {
-       System.out.println(ret.getString(1));
-     }
-     System.out.println();
-
-     stmt = conn.prepareStatement("explain select max(id) as maxValue from persons where id2 < 1");
-     ret = stmt.executeQuery();
-
-     while (ret.next()) {
-       System.out.println(ret.getString(1));
-     }
-     System.out.println();
-
-     stmt = conn.prepareStatement("explain select max(id) as maxValue from persons where id < 100");
-     ret = stmt.executeQuery();
-
-     while (ret.next()) {
-       System.out.println(ret.getString(1));
-     }
-     System.out.println();
-
-     stmt = conn.prepareStatement("explain select sum(id) as sumValue from persons");
-     ret = stmt.executeQuery();
-
-     while (ret.next()) {
-       System.out.println(ret.getString(1));
-     }
-     System.out.println();
-
-     stmt = conn.prepareStatement("explain select * from persons where id < 100 and id > 200 limit 3");
-     ret = stmt.executeQuery();
-
-     while (ret.next()) {
-       System.out.println(ret.getString(1));
-     }
-     System.out.println();
-
-     stmt = conn.prepareStatement("explain select * from persons where id < 100 and id > 200 limit 3 offset 2");
-     ret = stmt.executeQuery();
-
-     while (ret.next()) {
-       System.out.println(ret.getString(1));
-     }
-     System.out.println();
-
-     stmt = conn.prepareStatement("explain select * from persons order by id2 asc, id desc");
-     ret = stmt.executeQuery();
-
-     while (ret.next()) {
-       System.out.println(ret.getString(1));
-     }
-     System.out.println();
-
-     stmt = conn.prepareStatement("explain select persons.id  from persons where persons.id>=100 AND id < 100AND ID2=0 OR id> 6 AND ID < 100");
-     ret = stmt.executeQuery();
-
-     while (ret.next()) {
-       System.out.println(ret.getString(1));
-     }
-     System.out.println();
-
-     stmt = conn.prepareStatement("explain select * from persons where id>105 and id2=0 or id<105 and id2=1 order by id desc");
-     ret = stmt.executeQuery();
-
-     while (ret.next()) {
-       System.out.println(ret.getString(1));
-     }
-     System.out.println();
-
-     stmt = conn.prepareStatement("explain select persons.id from persons where persons.id>2 AND id < 100 OR id> 6 AND ID < 200");
-     ret = stmt.executeQuery();
-
-     while (ret.next()) {
-       System.out.println(ret.getString(1));
-     }
-     System.out.println();
-
-     stmt = conn.prepareStatement("explain select * from persons where id2=1 order by id desc");
-     ret = stmt.executeQuery();
-
-     while (ret.next()) {
-       System.out.println(ret.getString(1));
-     }
-     System.out.println();
-
-     stmt = conn.prepareStatement("explain select * from persons where id in (0, 1, 2, 3, 4)");
-     ret = stmt.executeQuery();
-
-     while (ret.next()) {
-       System.out.println(ret.getString(1));
-     }
-     System.out.println();
-
-     stmt = conn.prepareStatement("explain select * from persons where socialSecurityNumber='555'");
-     ret = stmt.executeQuery();
-
-     while (ret.next()) {
-       System.out.println(ret.getString(1));
-     }
-     System.out.println();
-
-     stmt = conn.prepareStatement("explain select * from persons where id2=1 or id2=0 order by id2 asc, id desc");
-     ret = stmt.executeQuery();
-
-     while (ret.next()) {
-       System.out.println(ret.getString(1));
-     }
-     System.out.println();
-
-     stmt = conn.prepareStatement("explain select * from persons where id=0 OR id=1 OR id=2 OR id=3 OR id=4");
-     ret = stmt.executeQuery();
-
-     while (ret.next()) {
-       System.out.println(ret.getString(1));
-     }
-     System.out.println();
-
-
-     stmt = conn.prepareStatement("explain select persons.id, socialsecuritynumber, memberships.personid  " +
-         "from persons inner join Memberships on persons.id = Memberships.personId inner join resorts on memberships.resortid = resorts.resortid" +
-         " where persons.id<1000");
-     ret = stmt.executeQuery();
-     while (ret.next()) {
-       System.out.println(ret.getString(1));
-     }
-     System.out.println();
-
-     stmt = conn.prepareStatement(
-         "explain select persons.id, persons.id2, persons.socialsecuritynumber, memberships.personId, memberships.personid, memberships.membershipname from persons " +
-             " inner join Memberships on persons.id = Memberships.PersonId and memberships.personid = persons.id2  where persons.id > 0 order by persons.id desc");
-     ret = stmt.executeQuery();
-     while (ret.next()) {
-       System.out.println(ret.getString(1));
-     }
-     System.out.println();
-
-     stmt = conn.prepareStatement(
-         "explain select persons.id, persons.socialsecuritynumber, memberships.membershipname, memberships.personid from memberships " +
-             "left outer join persons on persons.id = Memberships.PersonId where memberships.personid<1000 order by memberships.personid desc");
-     ret = stmt.executeQuery();
-     while (ret.next()) {
-       System.out.println(ret.getString(1));
-     }
-     System.out.println();
-
-     stmt = conn.prepareStatement(
-         "explain select persons.id, persons.socialsecuritynumber, memberships.membershipname from persons " +
-             " inner join Memberships on Memberships.PersonId = persons.id and memberships.personid < 1000 where persons.id > 0 order by persons.id desc");
-     ret = stmt.executeQuery();
-     while (ret.next()) {
-       System.out.println(ret.getString(1));
-     }
-     System.out.println();
-
-     stmt = conn.prepareStatement(
-         "select persons.id, persons.socialsecuritynumber, memberships.personId, memberships.membershipname from persons " +
-             "right outer join Memberships on persons.id = Memberships.PersonId where persons.id<1000 order by persons.id desc");
-     ret = stmt.executeQuery();
-     while (ret.next()) {
-       System.out.println(ret.getString(1));
-     }
-     System.out.println();
-   }
 }
 

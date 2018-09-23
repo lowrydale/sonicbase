@@ -17,6 +17,7 @@ import java.io.DataOutputStream;
 import java.io.IOException;
 import java.io.UnsupportedEncodingException;
 import java.util.*;
+import java.util.concurrent.atomic.AtomicBoolean;
 import java.util.concurrent.atomic.AtomicLong;
 
 @SuppressWarnings({"squid:S1168", "squid:S00107"})
@@ -179,11 +180,15 @@ public class InExpressionImpl extends ExpressionImpl implements InExpression {
 
   @Override
   public NextReturn next(SelectStatementImpl select, int count, SelectStatementImpl.Explain explain, AtomicLong currOffset, AtomicLong countReturned,
-                         Limit limit, Offset offset, boolean b, boolean analyze, int schemaRetryCount) {
+                         Limit limit, Offset offset, boolean b, boolean analyze, int schemaRetryCount, AtomicBoolean didTableScan) {
     if (getNextShard() == -2) {
       return new NextReturn(new String[]{getTableName()}, null);
     }
     if (isNot()) {
+      if (explain != null) {
+        explain.getBuilder().append("Table scan: ").append("table=").append(getTableName()).append(" ").append(getTopLevelExpression().toString()).append("\n");
+      }
+
       SelectContextImpl context = tableScan(dbName, getViewVersion(), getClient(), count,
           getClient().getCommon().getTables(dbName).get(getTableName()),
            getOrderByExpressions(), this, getParms(), getColumns(), getNextShard(), getNextKey(),
@@ -211,6 +216,10 @@ public class InExpressionImpl extends ExpressionImpl implements InExpression {
     }
 
     if (indexSchema == null) {
+      if (explain != null) {
+        explain.getBuilder().append("Table scan: ").append("table=").append(getTableName()).append(" ").append(getTopLevelExpression().toString()).append("\n");
+      }
+
       SelectContextImpl context = tableScan(dbName, getViewVersion(), getClient(), count,
           getClient().getCommon().getTables(dbName).get(getTableName()),
           getOrderByExpressions(), this, getParms(), getColumns(), getNextShard(), getNextKey(),
@@ -232,8 +241,11 @@ public class InExpressionImpl extends ExpressionImpl implements InExpression {
       keys.add(entry);
     }
 
+    if (explain != null) {
+      explain.getBuilder().append("In expression read each expression from index: table=" + tableName + ", idx=" + indexSchema.getName());
+    }
 
-    TableSchema tableSchema = getClient().getCommon().getTables(dbName).get(getTableName());
+     TableSchema tableSchema = getClient().getCommon().getTables(dbName).get(getTableName());
     Map<Integer, Object[][]> readResults = ExpressionImpl.readRecords(
         dbName, getClient(), localExpressionList.size() * 2, false, tableSchema,
         keys, indexSchema.getFields(), getColumns(), getRecordCache(),
@@ -252,9 +264,9 @@ public class InExpressionImpl extends ExpressionImpl implements InExpression {
 
   @Override
   public NextReturn next(SelectStatementImpl select, int count, SelectStatementImpl.Explain explain, AtomicLong currOffset, AtomicLong countReturned,
-                         Limit limit, Offset offset, int schemaRetryCount) {
+                         Limit limit, Offset offset, int schemaRetryCount, AtomicBoolean didTableScan) {
     return next(select, count, explain, currOffset, countReturned, limit, offset,
-        false, false, schemaRetryCount);
+        false, false, schemaRetryCount, didTableScan);
   }
 
   @Override

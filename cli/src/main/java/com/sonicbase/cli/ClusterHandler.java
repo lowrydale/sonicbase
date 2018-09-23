@@ -1,7 +1,6 @@
 /* © 2018 by Intellectual Reserve, Inc. All rights reserved. */
 package com.sonicbase.cli;
 
-import com.sonicbase.client.DatabaseClient;
 import com.sonicbase.client.ReconfigureResults;
 import com.sonicbase.common.ComObject;
 import com.sonicbase.common.Config;
@@ -13,7 +12,6 @@ import org.slf4j.LoggerFactory;
 
 import java.io.*;
 import java.sql.SQLException;
-import java.text.DateFormat;
 import java.util.ArrayList;
 import java.util.HashSet;
 import java.util.List;
@@ -452,6 +450,13 @@ public class ClusterHandler {
         }
       }
     }
+    ComObject cobj = new ComObject();
+    for (int shard = 0; shard < cli.getConn().getShardCount(); shard++) {
+      cli.getConn().send("MonitorManager:initConnection", shard, replica, cobj, ConnectionProxy.Replica.SPECIFIED);
+      cli.getConn().send("OSStatsManager:initConnection", shard, replica, cobj, ConnectionProxy.Replica.SPECIFIED);
+      cli.getConn().send("StreamManager:initConnection", shard, replica, cobj, ConnectionProxy.Replica.SPECIFIED);
+    }
+
   }
 
   private void reloadServerStatus(String command) throws SQLException, ClassNotFoundException {
@@ -485,7 +490,7 @@ public class ClusterHandler {
     return retObj.getBoolean(ComObject.Tag.IS_COMPLETE);
   }
 
-  void reloadServer(String command) throws SQLException, ClassNotFoundException {
+  void reloadServer(String command) throws SQLException, ClassNotFoundException, InterruptedException {
     String cluster = cli.getCurrCluster();
     if (cluster == null) {
       cli.println(ERROR_NOT_USING_A_CLUSTER_STR);
@@ -504,7 +509,14 @@ public class ClusterHandler {
     final int shard = Integer.parseInt(parts[2]);
     final int replica = Integer.parseInt(parts[3]);
 
-    reloadServer(cli.getConn(), shard, replica);
+    reloadServer(cli, cluster, cli.getConn(), shard, replica);
+
+    Config config = cli.getConfig(cluster);
+    List<Config.Shard> shards = config.getShards();
+    final List<Config.Replica> masterReplica = shards.get(shard).getReplicas();
+    final Config.Replica currReplica = masterReplica.get(replica);
+
+    monitorServerStartupProgress(cli, shard, replica, currReplica);
   }
 
   void reloadReplica(String command) throws SQLException, ClassNotFoundException, ExecutionException, InterruptedException {
@@ -531,12 +543,20 @@ public class ClusterHandler {
       for (int shard = 0; shard < cli.getConn().getShardCount(); shard++) {
         final int finalShard = shard;
         futures.add(executor.submit((Callable) () -> {
-          reloadServer(cli.getConn(), finalShard, replica);
+          reloadServer(cli, cluster, cli.getConn(), finalShard, replica);
           return null;
         }));
       }
       for (Future future : futures) {
         future.get();
+      }
+      for (int shard = 0; shard < cli.getConn().getShardCount(); shard++) {
+        Config config = cli.getConfig(cluster);
+        List<Config.Shard> shards = config.getShards();
+        final List<Config.Replica> masterReplica = shards.get(shard).getReplicas();
+        final Config.Replica currReplica = masterReplica.get(replica);
+
+        monitorServerStartupProgress(cli, shard, replica, currReplica);
       }
     }
     finally {
@@ -567,7 +587,7 @@ public class ClusterHandler {
   }
 
 
-  private static void reloadServer(ConnectionProxy conn, int shard, int replica) {
+  private static void reloadServer(Cli cli, String cluster, ConnectionProxy conn, int shard, int replica) throws InterruptedException {
     ComObject cobj = new ComObject();
     cobj.put(ComObject.Tag.DB_NAME, NONE_STR);
     cobj.put(ComObject.Tag.SCHEMA_VERSION, conn.getSchemaVersion());
@@ -925,6 +945,16 @@ public class ClusterHandler {
 
     startServer(config, currReplica.getString(PUBLIC_ADDRESS_STR), currReplica.getString(PRIVATE_ADDRESS_STR),
         String.valueOf(currReplica.getInt("port")), installDir, cluster, disable, new AtomicReference<Double>(0d));
+
+    monitorServerStartupProgress(cli, shard, replica, currReplica);
+
+    ComObject cobj = new ComObject();
+    cli.getConn().send("MonitorManager:initConnection", shard, replica, cobj, ConnectionProxy.Replica.SPECIFIED);
+    cli.getConn().send("OSStatsManager:initConnection", shard, replica, cobj, ConnectionProxy.Replica.SPECIFIED);
+    cli.getConn().send("StreamManager:initConnection", shard, replica, cobj, ConnectionProxy.Replica.SPECIFIED);
+  }
+
+  private static void monitorServerStartupProgress(Cli cli, int shard, int replica, Config.Replica currReplica) throws InterruptedException {
     final AtomicBoolean ok = new AtomicBoolean();
     while (!ok.get()) {
       final ComObject cobj = new ComObject();

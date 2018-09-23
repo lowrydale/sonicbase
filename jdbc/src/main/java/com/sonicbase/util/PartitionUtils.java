@@ -494,6 +494,9 @@ public class PartitionUtils {
 
       compareValue = doSelectFirstPartitionForEquals(partitions, comparators, key, selectedPartitions, i, compareValue);
 
+      if (!selectedPartitions.isEmpty()) {
+        break;
+      }
       int compareValue2 = 0;
       if (partitions[i + 1].getUpperKey() == null) {
         if (compareValue == 1 || compareValue == 0) {
@@ -503,8 +506,10 @@ public class PartitionUtils {
       else {
         doSelectSecondPartitionForEquals(partitions, comparators, key, selectedPartitions, i, compareValue, compareValue2);
       }
+      if (!selectedPartitions.isEmpty()) {
+        break;
+      }
     }
-    return;
   }
 
   private static int doSelectFirstPartitionForEquals(TableSchema.Partition[] partitions, Comparator[] comparators,

@@ -23,7 +23,6 @@ import org.testng.annotations.Test;
 
 import java.io.IOException;
 import java.io.StringReader;
-import java.sql.PreparedStatement;
 import java.util.HashSet;
 import java.util.Set;
 import java.util.concurrent.atomic.AtomicInteger;
@@ -443,7 +442,7 @@ public class SelectStatementHandlerTest {
     cobj.put(ComObject.Tag.COUNT_RETURNED, 0L);
 
     Set<SelectStatementImpl.DistinctRecord> uniqueRecords = new HashSet<SelectStatementImpl.DistinctRecord>();
-    ExpressionImpl.NextReturn ids = selectStatement.serverSelect("test",  new String[]{"table2"}, false, null);
+    ExpressionImpl.NextReturn ids = selectStatement.serverSelect("test", null, new String[]{"table2"}, false, null);
     selectStatement.applyDistinct("test", new String[]{"table2"}, ids, uniqueRecords);
     ResultSet ret = new ResultSetImpl("test", sql, client, selectStatement, new ParameterHandler(), uniqueRecords,
         new SelectContextImpl(ids, false, new String[]{"table2"}, 0, null,

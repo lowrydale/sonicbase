@@ -5,6 +5,7 @@ import com.codahale.metrics.Snapshot;
 import com.codahale.metrics.Timer;
 import com.fasterxml.jackson.databind.node.JsonNodeFactory;
 import com.fasterxml.jackson.databind.node.ObjectNode;
+import com.google.common.util.concurrent.RateLimiter;
 import com.mchange.v2.c3p0.ComboPooledDataSource;
 import com.sonicbase.query.DatabaseException;
 import org.slf4j.Logger;
@@ -195,6 +196,8 @@ public class BenchmarkInsert {
 
         final boolean batch = offset != 1;
 
+        RateLimiter limiter = RateLimiter.create(125_000);
+
         //test insert
         final AtomicLong countFinished = new AtomicLong();
 
@@ -262,6 +265,7 @@ public class BenchmarkInsert {
                                 long currBegin = System.nanoTime();
                                 stmt.addBatch();
                                 thisDuration += System.nanoTime() - currBegin;
+                                //limiter.acquire();
                               }
                               long currBegin = System.nanoTime();
                               stmt.executeBatch();
@@ -338,6 +342,7 @@ public class BenchmarkInsert {
                                   currBegin = System.nanoTime();
                                   stmt.addBatch();
                                   thisDuration += System.nanoTime() - currBegin;
+                                //  limiter.acquire();
                                 }
                               }
                               currBegin = System.nanoTime();

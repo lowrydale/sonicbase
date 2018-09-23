@@ -9,7 +9,7 @@
   <groupId>com.sonicbase</groupId>
   <artifactId>sonicbase-jdbc</artifactId>
   <name>SonicBase</name>
-  <version>1.2.15</version>
+  <version>1.2.16</version>
   <description>JDBC Driver for SonicBase, an in-memory distributed relational database</description>
   <url>https://sourceforge.net/projects/sonicbase/</url>
   <developers>
@@ -120,6 +120,19 @@
                 </excludes>
               </artifactSet>
             </configuration>
+          </execution>
+        </executions>
+      </plugin>
+      <plugin>
+        <artifactId>maven-gpg-plugin</artifactId>
+        <version>1.5</version>
+        <executions>
+          <execution>
+            <id>sign-artifacts</id>
+            <phase>verify</phase>
+            <goals>
+              <goal>sign</goal>
+            </goals>
           </execution>
         </executions>
       </plugin>

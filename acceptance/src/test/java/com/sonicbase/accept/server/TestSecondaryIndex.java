@@ -160,13 +160,13 @@ public class TestSecondaryIndex {
       //Thread.sleep(60000);
 
       long count = client.getPartitionSize("test", 0, "nokeysecondaryindex", "_primarykey");
-      assertEquals(count, 4);
+      assertEquals(count, 5);
       count = client.getPartitionSize("test", 1, "nokeysecondaryindex", "_primarykey");
-      assertEquals(count, 6);
+      assertEquals(count, 5);
       count = client.getPartitionSize("test", 0, "nokeysecondaryindex", "id");
-      assertEquals(count, 4);
+      assertEquals(count, 5);
       count = client.getPartitionSize("test", 1, "nokeysecondaryindex", "id");
-      assertEquals(count, 6);
+      assertEquals(count, 5);
 
 //      long commandCount = dbServers[1].getCommandCount();
 //      dbServers[2].unsafePurgeMemoryForTests();

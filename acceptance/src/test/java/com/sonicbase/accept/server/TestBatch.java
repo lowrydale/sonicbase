@@ -1,4 +1,3 @@
-/* © 2018 by Intellectual Reserve, Inc. All rights reserved. */
 package com.sonicbase.accept.server;
 
 import com.sonicbase.client.DatabaseClient;
@@ -42,7 +41,7 @@ public class TestBatch {
     for (DatabaseServer server : dbServers) {
       server.shutdown();
     }
-    System.out.println("client refCount=" + DatabaseClient.clientRefCount.get() + ", sharedClients=" + DatabaseClient.sharedClients.size() + ", class=TestDatabaseAdvanced");
+    System.out.println("client refCount=" + DatabaseClient.clientRefCount.get() + ", sharedClients=" + DatabaseClient.sharedClients.size() + ", class=TestBatch");
     for (DatabaseClient client : DatabaseClient.allClients) {
       System.out.println("Stack:\n" + client.getAllocatedStack());
     }
@@ -330,7 +329,7 @@ public class TestBatch {
       try (ResultSet rs = stmt.executeQuery()) {
         rs.next();
         String value = rs.getString(1);
-        assertEquals(value, "batch index lookup: keyCount=4");
+        assertEquals(value, "Batch index lookup: table=persons, idx=_primarykey, keyCount=4");
       }
     }
 
@@ -367,7 +366,7 @@ public class TestBatch {
       try (ResultSet rs = stmt.executeQuery()) {
         rs.next();
         String value = rs.getString(1);
-        assertEquals(value, "batch index lookup: keyCount=5");
+        assertEquals(value, "Batch index lookup: table=memberships, idx=_primarykey, keyCount=5");
       }
     }
 
@@ -417,7 +416,7 @@ public class TestBatch {
       try (ResultSet rs = stmt.executeQuery()) {
         rs.next();
         String value = rs.getString(1);
-        assertEquals(value, "batch index lookup: keyCount=4");
+        assertEquals(value, "Batch index lookup: table=trikey, idx=_primarykey, keyCount=4");
       }
     }
 

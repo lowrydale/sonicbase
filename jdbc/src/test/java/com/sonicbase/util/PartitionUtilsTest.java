@@ -36,7 +36,7 @@ public class PartitionUtilsTest {
         indexSchema.getName(), null, BinaryExpression.Operator.EQUAL, null, new Object[]{5},
         null);
 
-    assertEquals(selectedShards.size(), 2);
+    assertEquals(selectedShards.size(), 1);
     assertEquals((int)selectedShards.get(0), 0);
     selectedShards = PartitionUtils.findOrderedPartitionForRecord(false, true, tableSchema,
         indexSchema.getName(), null, BinaryExpression.Operator.EQUAL, null, new Object[]{5}, null);

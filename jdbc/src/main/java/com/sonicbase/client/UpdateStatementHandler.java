@@ -2,6 +2,7 @@ package com.sonicbase.client;
 
 import com.sonicbase.jdbcdriver.ParameterHandler;
 import com.sonicbase.procedure.StoredProcedureContextImpl;
+import com.sonicbase.query.impl.AllRecordsExpressionImpl;
 import com.sonicbase.query.impl.ExpressionImpl;
 import com.sonicbase.query.impl.SelectStatementImpl;
 import com.sonicbase.query.impl.UpdateStatementImpl;
@@ -55,6 +56,10 @@ public class UpdateStatementHandler implements StatementHandler {
 
     ExpressionImpl whereExpression = SelectStatementHandler.getExpression(client, currParmNum, update.getWhere(),
         updateStatement.getTableName(), parms);
+    if (whereExpression == null) {
+      whereExpression = new AllRecordsExpressionImpl();
+      ((AllRecordsExpressionImpl) whereExpression).setFromTable(updateStatement.getTableName());
+    }
     updateStatement.setWhereClause(whereExpression);
 
     updateStatement.setParms(parms);

@@ -660,6 +660,12 @@ public class ReadManager {
         ThreadUtil.sleep(10);
       }
 
+      SelectStatementImpl.Explain explain = null;
+      Boolean shouldExplain = cobj.getBoolean(ComObject.Tag.SHOULD_EXPLAIN);
+      if (shouldExplain != null && shouldExplain) {
+        explain = new SelectStatementImpl.Explain();
+      }
+
       String dbName = cobj.getString(ComObject.Tag.DB_NAME);
       Integer schemaVersion = cobj.getInt(ComObject.Tag.SCHEMA_VERSION);
       if (schemaVersion != null && schemaVersion < server.getSchemaVersion()) {
@@ -682,7 +688,7 @@ public class ReadManager {
       select.setLimit(null);
       DiskBasedResultSet diskResults = null;
       if (select.getServerSelectPageNumber() == 0) {
-        ResultSetImpl resultSet = (ResultSetImpl) select.execute(dbName, null, null,
+        ResultSetImpl resultSet = (ResultSetImpl) select.execute(dbName, null, explain,
             null, null,
             null, restrictToThisServer, procedureContext, schemaRetryCount);
 
@@ -706,14 +712,14 @@ public class ReadManager {
       select.setServerSelectResultSetId(diskResults.getResultSetId());
       byte[][][] records = diskResults.nextPage(select.getServerSelectPageNumber());
 
-      return serverSelectProcessResponse(cobj, select, offset, limit, records);
+      return serverSelectProcessResponse(cobj, explain, select, offset, limit, records);
     }
     catch (Exception e) {
       throw new DatabaseException(e);
     }
   }
 
-  private ComObject serverSelectProcessResponse(ComObject cobj, SelectStatementImpl select, Offset offset, Limit limit,
+  private ComObject serverSelectProcessResponse(ComObject cobj, SelectStatementImpl.Explain explain, SelectStatementImpl select, Offset offset, Limit limit,
                                                 byte[][][] records) {
     ComObject retObj = new ComObject();
     select.setIsOnServer(false);
@@ -733,6 +739,9 @@ public class ReadManager {
           offset, limit, records, currOffset, countReturned, tableArray).invoke();
       currOffset = serverSelectProcessRecordsForResponse.getCurrOffset();
       countReturned = serverSelectProcessRecordsForResponse.getCountReturned();
+    }
+    if (explain != null) {
+      retObj.put(ComObject.Tag.EXPLAIN, explain.getBuilder().toString());
     }
     retObj.put(ComObject.Tag.CURR_OFFSET, currOffset);
     retObj.put(ComObject.Tag.COUNT_RETURNED, countReturned);

@@ -219,7 +219,9 @@ public class Index {
     }
 
     for (int i = ret.size(); i < offsets.size(); i++) {
-      ret.add(lastEntry().getKey());
+      if (lastEntry() != null) {
+        ret.add(lastEntry().getKey());
+      }
     }
 
     StringBuilder builder = new StringBuilder();
@@ -227,8 +229,8 @@ public class Index {
       builder.append(",").append(DatabaseCommon.keyToString(key));
     }
     logger.info("getKeyAtOffset - scanForKey: offsetInPartition={}, duration={}, startKey={}, endKey={}, foundKeys={}, countSkipped={}",
-        currOffset.get(), (System.currentTimeMillis() - begin), DatabaseCommon.keyToString(firstEntry().getKey()),
-        DatabaseCommon.keyToString(lastEntry().getKey()), builder.toString(), countSkipped.get());
+        currOffset.get(), (System.currentTimeMillis() - begin), firstEntry() == null ? null : DatabaseCommon.keyToString(firstEntry().getKey()),
+        lastEntry() == null ? null : DatabaseCommon.keyToString(lastEntry().getKey()), builder.toString(), countSkipped.get());
     return ret;
   }
 

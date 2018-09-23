@@ -116,8 +116,6 @@ public class Cli {
       // not cygwin
     }
 
-    detectJsonFiles();
-
     executor = new ThreadPoolExecutor(128, 128, 10000, TimeUnit.MILLISECONDS,
         new ArrayBlockingQueue<Runnable>(1000), new ThreadPoolExecutor.CallerRunsPolicy());
     try {
@@ -152,6 +150,10 @@ public class Cli {
           runCommand(commandLine.getOptionValue(COMMAND_STR));
           System.exit(0);
         }
+      }
+
+      if (currCluster == null) {
+        useDefaultCluser();
       }
 
       disable();
@@ -204,6 +206,26 @@ public class Cli {
     }
   }
 
+  private void useDefaultCluser() throws IOException, SQLException, InterruptedException {
+    InputStream in = Cli.class.getResourceAsStream("default-cluster");
+    if (in == null) {
+      File file = new File(System.getProperty(USER_DIR_STR), "../config/default-cluster");
+      if (file.exists()) {
+        in = new FileInputStream(file);
+      }
+      else {
+        file = new File(System.getProperty(USER_DIR_STR), "config/default-cluster");
+        if (file.exists()) {
+          in = new FileInputStream(file);
+        }
+      }
+    }
+    if (in != null) {
+      String cluster = IOUtils.toString(in);
+      useCluster(cluster);
+    }
+  }
+
 
   private void detectJsonFiles() {
     File dir = new File(System.getProperty(USER_DIR_STR), "config");
@@ -213,7 +235,7 @@ public class Cli {
     }
     for (File file : files) {
       if (file.getName().endsWith(".json")) {
-        println("It appears you have old json-based config files. If you want to convert them to the new yaml format, type toyaml.");
+        println("It appears you have old json-based config files. If you want to convert them to the new yaml format, type \"toyaml\" in the admin client.");
         return;
       }
     }
@@ -1403,6 +1425,16 @@ public class Cli {
   }
 
   private void useCluster(String cluster) throws SQLException, IOException, InterruptedException {
+
+    Timer timer = new Timer("detect json files", true);
+    timer.schedule(new TimerTask(){
+      @Override
+      public void run() {
+        detectJsonFiles();
+      }
+    }, 3_000);
+
+
     cluster = cluster.trim();
 
     currCluster = cluster;

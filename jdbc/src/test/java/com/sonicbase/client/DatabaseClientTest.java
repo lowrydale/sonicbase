@@ -4,10 +4,7 @@ import com.fasterxml.jackson.databind.JsonNode;
 import com.fasterxml.jackson.databind.ObjectMapper;
 import com.fasterxml.jackson.databind.node.ArrayNode;
 import com.fasterxml.jackson.databind.node.ObjectNode;
-import com.sonicbase.common.ComObject;
-import com.sonicbase.common.DatabaseCommon;
-import com.sonicbase.common.SchemaOutOfSyncException;
-import com.sonicbase.common.ServersConfig;
+import com.sonicbase.common.*;
 import com.sonicbase.jdbcdriver.ParameterHandler;
 import com.sonicbase.procedure.StoredProcedureContextImpl;
 import com.sonicbase.query.DatabaseException;
@@ -126,9 +123,15 @@ public class DatabaseClientTest {
     DatabaseClient client = new DatabaseClient("localhost", 9010, 0, 0, false, common, null) {
       public byte[] send(String verb, int shard, long partition, ComObject cobj, Replica replica) {
 
-          ComObject ret = new ComObject();
-          ret.put(ComObject.Tag.SIZE, 1001L);
-          return ret.serialize();
+        cobj = new ComObject();
+        ComArray array = cobj.putArray(ComObject.Tag.SIZES, ComObject.Type.OBJECT_TYPE);
+        ComObject size0Obj = new ComObject();
+        size0Obj.put(ComObject.Tag.SHARD, 0);
+        size0Obj.put(ComObject.Tag.SIZE, (long)1001);
+        size0Obj.put(ComObject.Tag.RAW_SIZE, (long)1001);
+        array.add(size0Obj);
+
+        return cobj.serialize();
       }
       public String getCluster() {
         return "test";

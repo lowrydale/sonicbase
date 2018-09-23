@@ -3,18 +3,17 @@ package com.sonicbase.bench;
 import com.codahale.metrics.MetricRegistry;
 import com.codahale.metrics.Snapshot;
 import com.codahale.metrics.Timer;
-import com.fasterxml.jackson.databind.ObjectMapper;
-import com.fasterxml.jackson.databind.node.ArrayNode;
 import com.fasterxml.jackson.databind.node.JsonNodeFactory;
 import com.fasterxml.jackson.databind.node.ObjectNode;
+import com.sonicbase.client.DatabaseClient;
 import com.sonicbase.common.AssertUtils;
-import org.apache.commons.io.IOUtils;
+import com.sonicbase.jdbcdriver.ConnectionProxy;
+import com.sonicbase.schema.IndexSchema;
+import com.sonicbase.schema.TableSchema;
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
 
-import java.io.BufferedInputStream;
 import java.io.File;
-import java.io.FileInputStream;
 import java.sql.DriverManager;
 import java.sql.PreparedStatement;
 import java.sql.ResultSet;
@@ -73,12 +72,14 @@ public class BenchmarkIdentityQuery {
 
         final java.sql.Connection conn = DriverManager.getConnection("jdbc:sonicbase:" + address + ":9010/db", "user", "password");
 
+        DatabaseClient client = ((ConnectionProxy)conn).getDatabaseClient();
+
         //test insert
 
         final AtomicInteger logMod = new AtomicInteger(10000);
         int threadCount = 32;
         if (queryType.equals("batch") || queryType.equals("cbatch")) {
-          threadCount = 32;
+          threadCount = 8;
         }
         if (queryType.equals("limitOffset") || queryType.equals("sort")) {
           threadCount = 4;
@@ -128,7 +129,7 @@ public class BenchmarkIdentityQuery {
                       }
                     }
                     else   if (queryType.equals("batch")) {
-                      int batchSize = 1600;
+                      int batchSize = 3200;
                       int innerBatchSize = batchSize / lessShardCount;
                       long startOffset = offset;
                       StringBuilder builder = new StringBuilder("select id1 from persons where id1 in (");
@@ -143,21 +144,6 @@ public class BenchmarkIdentityQuery {
                       builder.append(")");
                       PreparedStatement stmt = conn.prepareStatement(builder.toString());
 
-                      //spread the ids across all shards for fairness
-//                      for (int i1 = 0; i1 < batchSize;) {
-//                        for (int j = 0; j < shardCount; j++) {
-//                          long shardedOffset = currOffset.get() + (j * count);
-//                          stmt.setLong(i1 + 1, shardedOffset);
-//                          i1++;
-//                          if (i1 >= batchSize) {
-//                            break;
-//                          }
-//                        }
-//                        offset++;
-//
-//                      }
-//
-
                       int parm = 0;
                       for (int j = 0; j < lessShardCount; j++) {
                         for (int k = 0; k < innerBatchSize; k++) {
@@ -166,46 +152,143 @@ public class BenchmarkIdentityQuery {
                         }
                       }
                       currOffset.addAndGet(innerBatchSize);
-                      if (currOffset.get() > 100_000) {
+                      if (currOffset.get() > 1_000_000) {
                         currOffset.set(0);
                       }
-//                      offset += shardCount * innerBatchSize;
-//                      for (int i1 = 0; i1 < batchSize; ) {
-//                        for (int j = 0; j < shardCount; j++) {
-//                           long shardedOffset = offset + j * count;
-//                           stmt.setLong(i1 + 1, shardedOffset);
-//                           i1++;
-//                           if (i1 >= batchSize) {
-//                             break;
-//                           }
-//                        }
-//                        offset++;
-//
-//                      }
                       ResultSet rs = stmt.executeQuery();
                       boolean found = rs.next();
                       if (!found) {
                         logger.info("lastId={}", lastId);
                         offset = firstId.get();
+                        currOffset.set(0);
                         break;
                       }
                       else {
+                        int countFound = 0;
                         boolean hadSome = false;
-                        for (long i1 = startOffset + 1; i1 < startOffset + batchSize; i1++) {
-                          if (rs.next()) {
-                            hadSome = true;
-                            selectOffset.incrementAndGet();
-                            lastId = rs.getLong("id1");
-                          }
+                        while (rs.next()) {
+                          countFound++;
+                          hadSome = true;
+                          selectOffset.incrementAndGet();
+                          lastId = rs.getLong("id1");
+                        }
+                        if (batchSize * 0.8 > countFound) {
+                          logger.warn("Returned much fewer than expected: expected={}, actual={}", batchSize, countFound);
                         }
                         if (!hadSome) {
                           offset = firstId.get();
+                          currOffset.set(0);
+                        }
+                      }
+                    }
+                    else if (queryType.equals("xxxbatch")) {
+                      IndexSchema indexSchema = client.getCommon().getTables("db").get("persons").getIndices().get("_primarykey");
+                      TableSchema.Partition[] partitions = indexSchema.getCurrPartitions();
+
+                      int batchSize = 6400;
+                      int innerBatchSize = batchSize / client.getShardCount();
+                      long startOffset = offset;
+                      StringBuilder builder = new StringBuilder("select id1 from persons where id1 in (");
+                      for (int i1 = 0 ; i1 < innerBatchSize * client.getShardCount(); i1++) {
+                        if (i1 == 0) {
+                          builder.append("?");
+                        }
+                        else {
+                          builder.append(", ?");
+                        }
+                      }
+                      builder.append(")");
+                      PreparedStatement stmt = conn.prepareStatement(builder.toString());
+
+                      int parm = 0;
+                      for (int j = 0; j < client.getShardCount(); j++) {
+                        for (int k = 0; k < innerBatchSize; k++) {
+                          long shardLowerKey = 0;
+                          if (j != 0) {
+                            shardLowerKey = (Long)partitions[j - 1].getUpperKey()[0] + 1_000_000;
+                          }
+                          long shardedOffset = shardLowerKey + currOffset.get() + k;
+                          stmt.setLong(parm++ + 1, shardedOffset);
+                        }
+                      }
+                      currOffset.addAndGet(innerBatchSize);
+                      if (currOffset.get() > 1_000_000) {
+                        currOffset.set(0);
+                      }
+                      ResultSet rs = stmt.executeQuery();
+                      boolean found = rs.next();
+                      if (!found) {
+                        logger.info("lastId={}", lastId);
+                        offset = firstId.get();
+                        currOffset.set(0);
+                        break;
+                      }
+                      else {
+                        int countFound = 0;
+                        boolean hadSome = false;
+                        while (rs.next()) {
+                          countFound++;
+                          hadSome = true;
+                          selectOffset.incrementAndGet();
+                          lastId = rs.getLong("id1");
+                        }
+                        if (batchSize * 0.8 > countFound) {
+                          logger.warn("Returned much fewer than expected: expected={}, actual={}", batchSize, countFound);
+                        }
+                        if (!hadSome) {
+                          offset = firstId.get();
+                          currOffset.set(0);
                         }
                       }
                     }
                     else if (queryType.equals("cbatch")) {
                       long startOffset = offset;
-                      int batchSize = 1600;
+                      int batchSize = 12000;
+                      int innerBatchSize = batchSize / lessShardCount;
+                      StringBuilder builder = new StringBuilder("select id1 from persons where id1=? ");
+                      for (int i1 = 0; i1 < batchSize - 1; i1++) {
+                        builder.append(" or id1=? ");
+                      }
+                      PreparedStatement stmt = conn.prepareStatement(builder.toString());
+
+                      //spread the ids across all shards for fairness
+                      int parm = 0;
+                      for (int j = 0; j < lessShardCount; j++) {
+                        for (int k = 0; k < innerBatchSize; k++) {
+                          long shardedOffset = (j * count) + currOffset.get() + k;
+                          stmt.setLong(parm++ + 1, shardedOffset);
+                        }
+                      }
+                      currOffset.addAndGet(innerBatchSize);
+                      if (currOffset.get() > 1_000_000) {
+                        currOffset.set(0);
+                      }
+                      ResultSet rs = stmt.executeQuery();
+                      boolean found = rs.next();
+                      if (!found) {
+                        logger.info("lastId={}", lastId);
+                        offset = firstId.get();
+                        currOffset.set(0);
+                        break;
+                      }
+                      else {
+                        boolean hadSome = false;
+                        while (rs.next()) {
+                          hadSome = true;
+                          selectOffset.incrementAndGet();
+                          lastId = rs.getLong("id1");
+
+                        }
+                        if (!hadSome) {
+                          offset = firstId.get();
+                          currOffset.set(0);
+                        }
+                      }
+                    }
+                    else if (queryType.equals("xxxcbatch")) {
+                      long startOffset = offset;
+                      int batchSize = 6400;
+                      int innerBatchSize = batchSize / lessShardCount;
                       StringBuilder builder = new StringBuilder("select personId from memberships where personId=? and personId2=0 ");
                       for (int i1 = 0; i1 < batchSize - 1; i1++) {
                         builder.append(" or personId=? and personId2=0 ");
@@ -213,23 +296,23 @@ public class BenchmarkIdentityQuery {
                       PreparedStatement stmt = conn.prepareStatement(builder.toString());
 
                       //spread the ids across all shards for fairness
-                      for (int i1 = 0; i1 < batchSize;) {
-                        for (int j = 0; j < shardCount; j++) {
-                          long shardedOffset = offset + j * count;
-                          stmt.setLong(i1 + 1, shardedOffset);
-                          i1++;
-                          if (i1 >= batchSize) {
-                            break;
-                          }
+                      int parm = 0;
+                      for (int j = 0; j < lessShardCount; j++) {
+                        for (int k = 0; k < innerBatchSize; k++) {
+                          long shardedOffset = (j * count) + currOffset.get() + k;
+                          stmt.setLong(parm++ + 1, shardedOffset);
                         }
-                        offset++;
-
                       }
+                      currOffset.addAndGet(innerBatchSize);
+//                      if (currOffset.get() > 1_000_000) {
+//                        currOffset.set(0);
+//                      }
                       ResultSet rs = stmt.executeQuery();
                       boolean found = rs.next();
                       if (!found) {
                         logger.info("lastId={}", lastId);
                         offset = firstId.get();
+                        currOffset.set(0);
                         break;
                       }
                       else {
@@ -243,6 +326,7 @@ public class BenchmarkIdentityQuery {
                         }
                         if (!hadSome) {
                           offset = firstId.get();
+                          currOffset.set(0);
                         }
                       }
                     }

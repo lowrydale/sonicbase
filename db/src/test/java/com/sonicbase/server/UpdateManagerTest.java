@@ -13,6 +13,8 @@ import com.sonicbase.index.Index;
 import com.sonicbase.index.Indices;
 import com.sonicbase.jdbcdriver.ParameterHandler;
 import com.sonicbase.query.DatabaseException;
+import com.sonicbase.query.impl.AllRecordsExpressionImpl;
+import com.sonicbase.query.impl.ExpressionImpl;
 import com.sonicbase.query.impl.InsertStatementImpl;
 import com.sonicbase.query.impl.SelectStatementImpl;
 import com.sonicbase.schema.IndexSchema;
@@ -720,10 +722,15 @@ public class UpdateManagerTest {
     cobj.put(ComObject.Tag.TRANSACTION_ID, 0L);
     Object[] newPrimaryKey = keys.get(0);
     cobj.put(ComObject.Tag.PRIMARY_KEY_BYTES, DatabaseCommon.serializeKey(tableSchema, indexSchema.getName(), newPrimaryKey));
+    cobj.put(ComObject.Tag.PREV_KEY_BYTES, DatabaseCommon.serializeKey(tableSchema, indexSchema.getName(), newPrimaryKey));
     Record record = createNewRecord(common, tableSchema);
     cobj.put(ComObject.Tag.BYTES, record.serialize(client.getCommon(), SERIALIZATION_VERSION));
+    cobj.put(ComObject.Tag.PREV_BYTES, record.serialize(client.getCommon(), SERIALIZATION_VERSION));
     cobj.put(ComObject.Tag.SEQUENCE_0, 1000L);
     cobj.put(ComObject.Tag.SEQUENCE_1, 1000L);
+    AllRecordsExpressionImpl expression = new AllRecordsExpressionImpl();
+    expression.setFromTable("table1");
+    cobj.put(ComObject.Tag.LEGACY_EXPRESSION, ExpressionImpl.serializeExpression(expression));
 
     updateManager.updateRecord(cobj, false);
 

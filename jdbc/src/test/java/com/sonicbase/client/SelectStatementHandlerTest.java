@@ -93,7 +93,7 @@ public class SelectStatementHandlerTest {
     common.setServersConfig(serversConfig);
 
     final AtomicInteger callCount = new AtomicInteger();
-    client = new DatabaseClient("localhost", 9010, 0, 0, false, common, null) {
+    client = new DatabaseClient(null, "localhost", 9010, 0, 0, false, common, null) {
 
       public byte[] sendToMaster(ComObject body) {
         return null;

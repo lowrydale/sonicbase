@@ -1027,7 +1027,7 @@ public class DatabaseServer {
       if (this.client.get() != null) {
         return this.client.get();
       }
-      DatabaseClient localClient = new DatabaseClient(masterAddress, masterPort, common.getShard(), common.getReplica(),
+      DatabaseClient localClient = new DatabaseClient(cluster, masterAddress, masterPort, common.getShard(), common.getReplica(),
           false, common, this);
       this.client.set(localClient);
       return this.client.get();

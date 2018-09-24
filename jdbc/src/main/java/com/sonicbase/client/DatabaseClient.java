@@ -175,20 +175,21 @@ public class DatabaseClient {
   }
 
   public DatabaseClient(String host, int port, int shard, int replica, boolean isClient) {
-    this(new String[]{host + ":" + port}, shard, replica, isClient, null, null, false);
+    this(null, new String[]{host + ":" + port}, shard, replica, isClient, null, null, false);
   }
 
   public DatabaseClient(String[] hosts, int shard, int replica, boolean isClient) {
-    this(hosts, shard, replica, isClient, null, null, false);
+    this(null, hosts, shard, replica, isClient, null, null, false);
   }
 
-  public DatabaseClient(String host, int port, int shard, int replica, boolean isClient,
+  public DatabaseClient(String cluster, String host, int port, int shard, int replica, boolean isClient,
                         DatabaseCommon common, Object databaseServer) {
-    this(new String[]{host + ":" + port}, shard, replica, isClient, common, databaseServer, false);
+    this(cluster, new String[]{host + ":" + port}, shard, replica, isClient, common, databaseServer, false);
   }
 
-  public DatabaseClient(String[] hosts, int shard, int replica, boolean isClient, DatabaseCommon common,
+  public DatabaseClient(String cluster, String[] hosts, int shard, int replica, boolean isClient, DatabaseCommon common,
                         Object databaseServer, boolean isShared) {
+    this.cluster = cluster;
     synchronized (DatabaseClient.class) {
       if (executor == null) {
         executor = ThreadUtil.createExecutor(128, "SonicBase Client Thread");
@@ -224,21 +225,22 @@ public class DatabaseClient {
     statsTimer = new java.util.Timer();
 
     if (!isShared) {
+      cluster = getCluster();
       synchronized (DatabaseClient.class) {
-          DatabaseClient sharedClient = sharedClients.get(getCluster());
+          DatabaseClient sharedClient = sharedClients.get(cluster);
         if (sharedClient == null) {
-          logger.info("Initializing sharedClient: cluster=" + getCluster());
+          logger.info("Initializing sharedClient: cluster=" + cluster);
 
-          sharedClient = new DatabaseClient(hosts, shard, replica, isClient, common, databaseServer, true);
-          sharedClients.put(getCluster(), sharedClient);
+          sharedClient = new DatabaseClient(cluster, hosts, shard, replica, isClient, common, databaseServer, true);
+          sharedClients.put(cluster, sharedClient);
 
           Thread statsRecorderThread = ThreadUtil.createThread(new ClientStatsHandler.QueryStatsRecorder(
-              sharedClient, getCluster()), "SonicBase Stats Recorder - cluster=" + getCluster());
+              sharedClient, cluster), "SonicBase Stats Recorder - cluster=" + cluster);
           statsRecorderThread.start();
           statsRecorderThreads.put(getCluster(), statsRecorderThread);
         }
         else {
-          logger.info("Initializing sharedClient - already initialized: cluster=" + getCluster());
+          logger.info("Initializing sharedClient - already initialized: cluster=" + cluster);
         }
       }
     }

@@ -17,13 +17,10 @@ import com.sonicbase.util.ClientTestUtils;
 import net.sf.jsqlparser.statement.Statement;
 import net.sf.jsqlparser.statement.select.Limit;
 import net.sf.jsqlparser.statement.select.Offset;
-import org.mockito.invocation.InvocationOnMock;
-import org.mockito.stubbing.Answer;
 import org.testng.annotations.BeforeMethod;
 import org.testng.annotations.Test;
 
 import java.io.IOException;
-import java.sql.PreparedStatement;
 import java.sql.SQLException;
 import java.util.HashSet;
 import java.util.List;
@@ -31,11 +28,8 @@ import java.util.Set;
 import java.util.concurrent.atomic.AtomicBoolean;
 import java.util.concurrent.atomic.AtomicInteger;
 
-import static org.mockito.Matchers.anyInt;
-import static org.mockito.Matchers.anyObject;
 import static org.mockito.Matchers.eq;
 import static org.mockito.Mockito.mock;
-import static org.mockito.Mockito.when;
 import static org.testng.Assert.*;
 
 public class DatabaseClientTest {
@@ -98,7 +92,7 @@ public class DatabaseClientTest {
   @Test
   public void testCreateDatabase() {
 
-    DatabaseClient client = new DatabaseClient("localhost", 9010, 0, 0, false, common, null) {
+    DatabaseClient client = new DatabaseClient(null, "localhost", 9010, 0, 0, false, common, null) {
       public byte[] sendToMaster(ComObject cobj) {
         assertEquals(cobj.getString(ComObject.Tag.DB_NAME), "test");
         assertEquals(cobj.getString(ComObject.Tag.MASTER_SLAVE), "master");
@@ -120,7 +114,7 @@ public class DatabaseClientTest {
 
   @Test
   public void testGetPartitionSize() {
-    DatabaseClient client = new DatabaseClient("localhost", 9010, 0, 0, false, common, null) {
+    DatabaseClient client = new DatabaseClient(null, "localhost", 9010, 0, 0, false, common, null) {
       public byte[] send(String verb, int shard, long partition, ComObject cobj, Replica replica) {
 
         cobj = new ComObject();
@@ -147,7 +141,7 @@ public class DatabaseClientTest {
 
   @Test
   public void testIsRepartitioningComplete() {
-    DatabaseClient client = new DatabaseClient("localhost", 9010, 0, 0, false, common, null) {
+    DatabaseClient client = new DatabaseClient(null, "localhost", 9010, 0, 0, false, common, null) {
       public byte[] sendToMaster(String verb, ComObject cobj) {
 
         if (verb.equals("PartitionManager:isRepartitioningComplete")) {
@@ -173,7 +167,7 @@ public class DatabaseClientTest {
   public void testTransFlags() {
     final AtomicBoolean committing = new AtomicBoolean();
     final AtomicBoolean called = new AtomicBoolean();
-    DatabaseClient client = new DatabaseClient("localhost", 9010, 0, 0, false, common, null) {
+    DatabaseClient client = new DatabaseClient(null, "localhost", 9010, 0, 0, false, common, null) {
       public byte[][] sendToAllShards(
           final String method,
           final long authUser, final ComObject body, final Replica replica) {
@@ -224,7 +218,7 @@ public class DatabaseClientTest {
 
   @Test
   public void testAllocateId() {
-    DatabaseClient client = new DatabaseClient("localhost", 9010, 0, 0, false, common, null) {
+    DatabaseClient client = new DatabaseClient(null, "localhost", 9010, 0, 0, false, common, null) {
       public byte[] sendToMaster(String method, ComObject cobj) {
         ComObject retObj = new ComObject();
         retObj.put(ComObject.Tag.NEXT_ID, 1001L);
@@ -275,7 +269,7 @@ public class DatabaseClientTest {
     config.setCluster("test");
     common.setServersConfig(config);
 
-    DatabaseClient client = new DatabaseClient("localhost", 9010, 0, 0, false, common, null) {
+    DatabaseClient client = new DatabaseClient(null, "localhost", 9010, 0, 0, false, common, null) {
       public byte[] sendToMaster(String method, ComObject cobj) {
         ComObject retObj = new ComObject();
         retObj.put(ComObject.Tag.NEXT_ID, 1001L);
@@ -336,7 +330,7 @@ public class DatabaseClientTest {
   @Test
   public void testSyncSchema() {
 
-    DatabaseClient client = new DatabaseClient("localhost", 9010, 0, 0, false, common, null) {
+    DatabaseClient client = new DatabaseClient(null, "localhost", 9010, 0, 0, false, common, null) {
       public byte[] sendToMaster(ComObject body) {
         return null;
       }
@@ -406,7 +400,7 @@ public class DatabaseClientTest {
   @Test
   public void testExecuteQuery() throws SQLException {
     final AtomicBoolean handled = new AtomicBoolean();
-    DatabaseClient client = new DatabaseClient("localhost", 9010, 0, 0, false, common, null) {
+    DatabaseClient client = new DatabaseClient(null, "localhost", 9010, 0, 0, false, common, null) {
       public StatementHandler getHandler(Statement statement) {
         return new StatementHandler() {
           @Override
@@ -440,7 +434,7 @@ public class DatabaseClientTest {
   @Test
   public void testExecuteQueryExplain() throws SQLException {
     final AtomicBoolean handled = new AtomicBoolean();
-    DatabaseClient client = new DatabaseClient("localhost", 9010, 0, 0, false, common, null) {
+    DatabaseClient client = new DatabaseClient(null, "localhost", 9010, 0, 0, false, common, null) {
       public StatementHandler getHandler(Statement statement) {
         return new StatementHandler() {
           @Override
@@ -479,7 +473,7 @@ public class DatabaseClientTest {
     final AtomicBoolean calledSync = new AtomicBoolean();
     final Set<String> called = new HashSet<>();
     ServersConfig.Shard[] shards = serversConfig.getShards();
-    DatabaseClient client = new DatabaseClient("localhost", 9010, 0, 0, false, common, null) {
+    DatabaseClient client = new DatabaseClient(null, "localhost", 9010, 0, 0, false, common, null) {
       public String getCluster() {
         return "test";
       }
@@ -596,7 +590,7 @@ public class DatabaseClientTest {
     final AtomicBoolean calledSync = new AtomicBoolean();
     final Set<String> called = new HashSet<>();
     ServersConfig.Shard[] shards = serversConfig.getShards();
-    DatabaseClient client = new DatabaseClient("localhost", 9010, 0, 0, false, common, null) {
+    DatabaseClient client = new DatabaseClient(null, "localhost", 9010, 0, 0, false, common, null) {
       public String getCluster() {
         return "test";
       }
@@ -659,7 +653,7 @@ public class DatabaseClientTest {
   public void testSendToMaster() {
     AtomicBoolean calledGetSchema = new AtomicBoolean();
     final AtomicInteger callCount = new AtomicInteger();
-    DatabaseClient client = new DatabaseClient("localhost", 9010, 0, 0, false, common, null) {
+    DatabaseClient client = new DatabaseClient(null, "localhost", 9010, 0, 0, false, common, null) {
 
       public byte[] send(String method,
                          int shard, long authUser, ComObject body, Replica replica) {
@@ -693,7 +687,7 @@ public class DatabaseClientTest {
   @Test
   public void testSendToAllShards() {
     final AtomicInteger callCount = new AtomicInteger();
-    DatabaseClient client = new DatabaseClient("localhost", 9010, 0, 0, false, common, null) {
+    DatabaseClient client = new DatabaseClient(null, "localhost", 9010, 0, 0, false, common, null) {
 
       public byte[] send(String method,
                          int shard, long authUser, ComObject body, Replica replica, boolean ignoreDeath) {
@@ -716,7 +710,7 @@ public class DatabaseClientTest {
   @Test
   public void testSyncConfig() {
     final AtomicInteger callCount = new AtomicInteger();
-    DatabaseClient client = new DatabaseClient("localhost", 9010, 0, 0, false, common, null) {
+    DatabaseClient client = new DatabaseClient(null, "localhost", 9010, 0, 0, false, common, null) {
 
       public byte[] send(String method,
                          int shard, long authUser, ComObject body, Replica replica) {

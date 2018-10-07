@@ -422,12 +422,14 @@ public class SchemaManagerTest {
     FileUtils.deleteDirectory(new File("/tmp/database"));
     when(server.getShardCount()).thenReturn(1);
     when(server.getReplicationFactor()).thenReturn(2);
+    when(server.isDurable()).thenReturn(true);
 
     SnapshotManager snapshotManager = new SnapshotManager(server);
     when(server.getSnapshotManager()).thenReturn(snapshotManager);
     final SchemaManager schemaManager = new SchemaManager(server);
 
     DatabaseCommon common = new DatabaseCommon();
+    common.setIsDurable(true);
     when(server.getCommon()).thenReturn(common);
     DatabaseClient client = mock(DatabaseClient.class);
     when(client.getCommon()).thenReturn(common);

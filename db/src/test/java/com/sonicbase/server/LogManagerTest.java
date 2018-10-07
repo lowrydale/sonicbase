@@ -35,6 +35,7 @@ public class LogManagerTest {
   @BeforeClass
   public void beforeClass() throws IOException {
     server = mock(DatabaseServer.class);
+    when(server.isDurable()).thenReturn(true);
     when(server.getDataDir()).thenReturn("/tmp/database");
 
     FileUtils.deleteDirectory(new File("/tmp/database"));

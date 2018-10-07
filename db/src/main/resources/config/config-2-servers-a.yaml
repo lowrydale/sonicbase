@@ -1,5 +1,5 @@
 replicationFactor: 1
-dataDirectory: $HOME/db/a
+dataDirectory: $HOME/db-data/a
 installDirectory: $WORKING_DIR
 compressRecords: false
 useUnsafe: true

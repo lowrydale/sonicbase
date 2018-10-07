@@ -103,7 +103,7 @@ class MiscHandler {
     Config config = getLicenseServerConfig();
     String dir = config.getString(INSTALL_DIRECTORY_STR);
     final String installDir = cli.resolvePath(dir);
-    String address = config.getString(PUBLIC_ADDRESS_STR);
+    String address = config.getString("address");
     String user = config.getString("user");
 
     cli.println("Deploying to a server: address=" + address + ", userDir=" + System.getProperty(USER_DIR_STR) +
@@ -539,7 +539,7 @@ class MiscHandler {
     }
   }
 
-  private void startLicenseServer(Config config, String externalAddress, String privateAddress, String port,
+  private void startLicenseServer(Config config, String address, String port,
                                          String installDir) throws IOException, InterruptedException {
     if (cli.isWindows()) {
       cli.getCredentials("license-server");
@@ -550,7 +550,7 @@ class MiscHandler {
       port = "8443";
     }
     String searchHome = installDir;
-    if (externalAddress.equals(LOCALHOST_NUMS_STR) || externalAddress.equals(LOCALHOST_STR)) {
+    if (address.equals(LOCALHOST_NUMS_STR) || address.equals(LOCALHOST_STR)) {
 
       if (!searchHome.startsWith("/")) {
         File file = new File(System.getProperty("user.home"), searchHome);
@@ -567,10 +567,10 @@ class MiscHandler {
         p.waitFor();
       }
       else {
-        builder = new ProcessBuilder().command("bash", "bin/start-license-server", privateAddress, port, searchHome);
+        builder = new ProcessBuilder().command("bash", "bin/start-license-server", address, port, searchHome);
         builder.start();
       }
-      cli.println("Started server: address=" + externalAddress + PORT_STR + port);
+      cli.println("Started server: address=" + address + PORT_STR + port);
       return;
     }
 
@@ -583,10 +583,10 @@ class MiscHandler {
       String str = IOUtils.toString(new FileInputStream(file), UTF_8_STR);
       str = str.replaceAll("\\$1", new File(System.getProperty(USER_DIR_STR), "credentials/license-server-" + cli.getUsername()).getAbsolutePath().replaceAll("\\\\", "/"));
       str = str.replaceAll("\\$2", cli.getUsername());
-      str = str.replaceAll("\\$3", externalAddress);
+      str = str.replaceAll("\\$3", address);
       str = str.replaceAll("\\$4", installDir);
       str = str.replaceAll("\\$5", port);
-      File outFile = new File("tmp/" + externalAddress + "-" + port + "-remote-start-license-server.ps1");
+      File outFile = new File("tmp/" + address + "-" + port + "-remote-start-license-server.ps1");
       outFile.getParentFile().mkdirs();
       FileUtils.forceDelete(outFile);
       try (BufferedWriter writer = new BufferedWriter(new OutputStreamWriter(new FileOutputStream(outFile)))) {
@@ -597,8 +597,8 @@ class MiscHandler {
       builder.start();
     }
     else {
-      ProcessBuilder builder = new ProcessBuilder().command("bash", "bin/do-start-license-server", deployUser + "@" + externalAddress,
-          installDir, privateAddress, port, searchHome);
+      ProcessBuilder builder = new ProcessBuilder().command("bash", "bin/do-start-license-server", deployUser + "@" + address,
+          installDir, address, port, searchHome);
       Process p = builder.start();
       StringBuilder sbuilder = new StringBuilder();
       InputStream in = p.getInputStream();
@@ -612,10 +612,10 @@ class MiscHandler {
       cli.println(sbuilder.toString());
       int ret = p.waitFor();
       if (0 == ret) {
-        cli.println("Started license server: address=" + privateAddress + PORT_STR + port);
+        cli.println("Started license server: address=" + address + PORT_STR + port);
       }
       else {
-        cli.println("Failed to start license server: address=" + privateAddress + PORT_STR + port);
+        cli.println("Failed to start license server: address=" + address + PORT_STR + port);
       }
     }
   }
@@ -629,16 +629,15 @@ class MiscHandler {
 
     stopLicenseServer();
 
-    startLicenseServer(config, config.getString(PUBLIC_ADDRESS_STR), config.getString(PRIVATE_ADDRESS_STR),
-        String.valueOf(config.getInt("port")), installDir);
+    startLicenseServer(config, config.getString("address"), String.valueOf(config.getInt("port")), installDir);
     cli.println("Finished starting license server");
   }
 
 
 
-  private void stopLicenseServer(Config config, String externalAddress, String privateAddress, String port, String installDir) throws IOException, InterruptedException {
+  private void stopLicenseServer(Config config, String address, String port, String installDir) throws IOException, InterruptedException {
     String deployUser = config.getString("user");
-    if (externalAddress.equals(LOCALHOST_NUMS_STR) || externalAddress.equals(LOCALHOST_STR)) {
+    if (address.equals(LOCALHOST_NUMS_STR) || address.equals(LOCALHOST_STR)) {
       ProcessBuilder builder = null;
       if (cli.isCygwin() || cli.isWindows()) {
         builder = new ProcessBuilder().command("bin/kill-server.bat", port);
@@ -657,10 +656,10 @@ class MiscHandler {
         String str = IOUtils.toString(new FileInputStream(file), UTF_8_STR);
         str = str.replaceAll("\\$1", new File(System.getProperty(USER_DIR_STR), "credentials/" + cli.getCurrCluster() + "-" + cli.getUsername()).getAbsolutePath().replaceAll("\\\\", "/"));
         str = str.replaceAll("\\$2", cli.getUsername());
-        str = str.replaceAll("\\$3", externalAddress);
+        str = str.replaceAll("\\$3", address);
         str = str.replaceAll("\\$4", installDir);
         str = str.replaceAll("\\$5", port);
-        File outFile = new File("tmp/" + externalAddress + "-" + port + "-remote-kill-server.ps1");
+        File outFile = new File("tmp/" + address + "-" + port + "-remote-kill-server.ps1");
         outFile.getParentFile().mkdirs();
         FileUtils.forceDelete(outFile);
         try (BufferedWriter writer = new BufferedWriter(new OutputStreamWriter(new FileOutputStream(outFile)))) {
@@ -672,7 +671,7 @@ class MiscHandler {
       else {
         builder = new ProcessBuilder().command("ssh", "-n", "-f", "-o",
             USER_KNOWN_HOSTS_FILE_DEV_NULL_STR, "-o", STRICT_HOST_KEY_CHECKING_NO_STR, deployUser + "@" +
-                externalAddress, installDir + "/bin/kill-server", "LicenseServer", port, port, port, port);
+                address, installDir + "/bin/kill-server", "LicenseServer", port, port, port, port);
         p = builder.start();
       }
       p.waitFor();
@@ -684,8 +683,7 @@ class MiscHandler {
     Config config = getLicenseServerConfig();
     final String installDir = cli.resolvePath(config.getString(INSTALL_DIRECTORY_STR));
 
-    stopLicenseServer(config, config.getString(PUBLIC_ADDRESS_STR), config.getString(PRIVATE_ADDRESS_STR),
-        String.valueOf(config.getInt("port")), installDir);
+    stopLicenseServer(config, config.getString("address"), String.valueOf(config.getInt("port")), installDir);
 
     cli.println("Stopped license server");
   }

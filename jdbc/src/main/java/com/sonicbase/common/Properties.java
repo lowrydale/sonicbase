@@ -56,6 +56,10 @@ public class Properties {
     yamlConfig.put(tag, value);
   }
 
+  public void put(String tag, boolean value) {
+    yamlConfig.put(tag, value);
+  }
+
   public Long getLong(String tag) {
     return (Long) yamlConfig.get(tag);
   }

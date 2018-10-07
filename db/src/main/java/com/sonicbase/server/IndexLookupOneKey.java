@@ -1,6 +1,5 @@
 package com.sonicbase.server;
 
-import com.amazonaws.transform.MapEntry;
 import com.sonicbase.client.DatabaseClient;
 import com.sonicbase.common.DatabaseCommon;
 import com.sonicbase.query.BinaryExpression;
@@ -610,6 +609,33 @@ public class IndexLookupOneKey extends IndexLookup {
       }
     }
   }
+
+  public class MapEntry<K, V> implements Map.Entry<K, V> {
+    private K key;
+    private V value;
+
+    public MapEntry() {
+    }
+
+    public K getKey() {
+      return this.key;
+    }
+
+    public V getValue() {
+      return this.value;
+    }
+
+    public V setValue(V value) {
+      this.value = value;
+      return this.value;
+    }
+
+    public K setKey(K key) {
+      this.key = key;
+      return this.key;
+    }
+  }
+
 
   private class GetNextEntries {
     private final Map.Entry<Object[], Object> entry;

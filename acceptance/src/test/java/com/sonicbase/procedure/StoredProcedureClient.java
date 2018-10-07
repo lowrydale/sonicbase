@@ -10,7 +10,7 @@ public class StoredProcedureClient {
 
   public static void main(String[] args) throws SQLException, ClassNotFoundException {
     Class.forName("com.sonicbase.jdbcdriver.Driver");
-    try (Connection conn = DriverManager.getConnection("jdbc:sonicbase:127.0.0.1:9010/db", "user", "password")) {
+    try (Connection conn = DriverManager.getConnection("jdbc:sonicbase:localhost:9010/db", "user", "password")) {
       if (args[0].equals("1")) {
         String query = "call procedure 'com.sonicbase.procedure.MyStoredProcedure1'";
         try (PreparedStatement procedureStmt = conn.prepareStatement(query);

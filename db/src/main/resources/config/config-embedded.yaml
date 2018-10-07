@@ -6,7 +6,7 @@ useUnsafe: true
 maxJavaHeap: 20%
 user: ubuntu
 clientIsPrivate: false
-defaultPort: 9010
+defaultPort: 8999
 defaultHttpPort: 8080
 backup:
   bucket: sonicbase-test-backup
@@ -20,4 +20,6 @@ servers:
     address: localhost
 clients:
 - client:
-    address: localhost
+    publicAddress: localhost
+    privateAddress: localhost
+    port: 8090

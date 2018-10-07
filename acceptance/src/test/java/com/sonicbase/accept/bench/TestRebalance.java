@@ -27,7 +27,7 @@ public class TestRebalance {
     String configStr = IOUtils.toString(new BufferedInputStream(getClass().getResourceAsStream("/config/config-4-servers.yaml")), "utf-8");
     Config config = new Config(configStr);
 
-    FileUtils.deleteDirectory(new File(System.getProperty("user.home"), "db"));
+    FileUtils.deleteDirectory(new File(System.getProperty("user.home"), "db-data"));
 
     final DatabaseServer[] dbServers = new DatabaseServer[8];
 
@@ -63,7 +63,7 @@ public class TestRebalance {
 
     Class.forName("com.sonicbase.jdbcdriver.Driver");
 
-    Connection conn = DriverManager.getConnection("jdbc:sonicbase:127.0.0.1:9000", "user", "password");
+    Connection conn = DriverManager.getConnection("jdbc:sonicbase:localhost:9010", "user", "password");
 
     //test upsert
     int recordCount = dbServers.length * 50;

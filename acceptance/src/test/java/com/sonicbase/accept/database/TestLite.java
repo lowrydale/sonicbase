@@ -280,7 +280,7 @@ public class TestLite {
     try {
       Socket client = new Socket();
       client.setSoTimeout(20_000);
-      client.connect(new InetSocketAddress("127.0.0.1", 9010), 5000);
+      client.connect(new InetSocketAddress("localhost", 9010), 5000);
       client.setKeepAlive(true);
     }
     catch (Exception e) {

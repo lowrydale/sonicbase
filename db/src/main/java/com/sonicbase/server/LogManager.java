@@ -70,13 +70,15 @@ public class LogManager {
         throw new DatabaseException(e);
       }
     }
-    int logThreadCount = 4;
-    for (int i = 0; i < logThreadCount; i++) {
-      LogWriter logWriter = new LogWriter(i, -1, logRequests);
-      logWriters.add(logWriter);
-      Thread thread = ThreadUtil.createThread(logWriter, "SonicBase Log Writer Thread");
-      logwWriterThreads.add(thread);
-      thread.start();
+    if (server.isDurable()) {
+      int logThreadCount = 4;
+      for (int i = 0; i < logThreadCount; i++) {
+        LogWriter logWriter = new LogWriter(i, -1, logRequests);
+        logWriters.add(logWriter);
+        Thread thread = ThreadUtil.createThread(logWriter, "SonicBase Log Writer Thread");
+        logwWriterThreads.add(thread);
+        thread.start();
+      }
     }
   }
 
@@ -171,34 +173,47 @@ public class LogManager {
   }
 
   void skipToMaxSequenceNumber() throws IOException {
-    File file = new File(rootDir, "logSequenceNum" + File.separator + databaseServer.getShard() + File.separator +
-        databaseServer.getReplica() + File.separator + "logSequenceNum.txt");
-    file.getParentFile().mkdirs();
-    if (!file.exists() || file.length() == 0) {
-      logSequenceNumber.set(0);
-      maxAllocatedLogSequenceNumber.set(SEQUENCE_NUM_ALLOC_COUNT);
-      try (BufferedWriter writer = new BufferedWriter(new OutputStreamWriter(new FileOutputStream(file)))) {
-        writer.write(String.valueOf(maxAllocatedLogSequenceNumber.get()));
+    if (!server.isDurable()) {
+      if (maxAllocatedLogSequenceNumber.get() == 0) {
+        logSequenceNumber.set(0);
+        maxAllocatedLogSequenceNumber.set(SEQUENCE_NUM_ALLOC_COUNT);
+      }
+      else {
+        logSequenceNumber.set(maxAllocatedLogSequenceNumber.get());
+        maxAllocatedLogSequenceNumber.set(logSequenceNumber.get() + SEQUENCE_NUM_ALLOC_COUNT);
+        pushMaxSequenceNum(null, false);
       }
     }
     else {
-      try (BufferedReader reader = new BufferedReader(new InputStreamReader(new FileInputStream(file)))) {
-        String seq = null;
-        try {
-          seq = IOUtils.toString(reader);
-          seq = seq.trim();
-          logSequenceNumber.set(Long.valueOf(seq));
-        }
-        catch (Exception e) {
-          logSequenceNumber.set(0);
-          logger.error("Error reading log sequence number: value=" + seq, e);
-        }
-        maxAllocatedLogSequenceNumber.set(logSequenceNumber.get() + SEQUENCE_NUM_ALLOC_COUNT);
+      File file = new File(rootDir, "logSequenceNum" + File.separator + databaseServer.getShard() + File.separator +
+          databaseServer.getReplica() + File.separator + "logSequenceNum.txt");
+      file.getParentFile().mkdirs();
+      if (!file.exists() || file.length() == 0) {
+        logSequenceNumber.set(0);
+        maxAllocatedLogSequenceNumber.set(SEQUENCE_NUM_ALLOC_COUNT);
         try (BufferedWriter writer = new BufferedWriter(new OutputStreamWriter(new FileOutputStream(file)))) {
           writer.write(String.valueOf(maxAllocatedLogSequenceNumber.get()));
         }
       }
-      pushMaxSequenceNum(null, false);
+      else {
+        try (BufferedReader reader = new BufferedReader(new InputStreamReader(new FileInputStream(file)))) {
+          String seq = null;
+          try {
+            seq = IOUtils.toString(reader);
+            seq = seq.trim();
+            logSequenceNumber.set(Long.valueOf(seq));
+          }
+          catch (Exception e) {
+            logSequenceNumber.set(0);
+            logger.error("Error reading log sequence number: value=" + seq, e);
+          }
+          maxAllocatedLogSequenceNumber.set(logSequenceNumber.get() + SEQUENCE_NUM_ALLOC_COUNT);
+          try (BufferedWriter writer = new BufferedWriter(new OutputStreamWriter(new FileOutputStream(file)))) {
+            writer.write(String.valueOf(maxAllocatedLogSequenceNumber.get()));
+          }
+        }
+        pushMaxSequenceNum(null, false);
+      }
     }
   }
 
@@ -207,11 +222,13 @@ public class LogManager {
       long sequenceNum = cobj.getLong(ComObject.Tag.SEQUENCE_NUMBER);
 
       maxAllocatedLogSequenceNumber.set(sequenceNum);
-      File file = new File(rootDir, "logSequenceNum" + File.separator + databaseServer.getShard() + File.separator +
-          databaseServer.getReplica() + File.separator + "logSequenceNum.txt");
-      file.getParentFile().mkdirs();
-      try (BufferedWriter writer = new BufferedWriter(new OutputStreamWriter(new FileOutputStream(file)))) {
-        writer.write(String.valueOf(maxAllocatedLogSequenceNumber.get()));
+      if (server.isDurable()) {
+        File file = new File(rootDir, "logSequenceNum" + File.separator + databaseServer.getShard() + File.separator +
+            databaseServer.getReplica() + File.separator + "logSequenceNum.txt");
+        file.getParentFile().mkdirs();
+        try (BufferedWriter writer = new BufferedWriter(new OutputStreamWriter(new FileOutputStream(file)))) {
+          writer.write(String.valueOf(maxAllocatedLogSequenceNumber.get()));
+        }
       }
       return null;
     }
@@ -366,6 +383,9 @@ public class LogManager {
   }
 
   void logRequestForPeer(byte[] request, String methodStr, long sequence0, long sequence1, int deadReplica) {
+    if (!server.isDurable()) {
+      return;
+    }
     startLoggingForPeer(deadReplica);
 
     try {
@@ -928,6 +948,9 @@ public class LogManager {
 
   public LogRequest logRequest(byte[] body, boolean enableQueuing, String methodStr,
                                Long existingSequence0, Long existingSequence1, AtomicLong timeLogging) {
+    if (!server.isDurable()) {
+      return null;
+    }
     LogRequest request = null;
     try {
       if (enableQueuing && DatabaseClient.getWriteVerbs().contains(methodStr)) {

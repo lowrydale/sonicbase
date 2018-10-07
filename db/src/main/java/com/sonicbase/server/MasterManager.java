@@ -71,7 +71,7 @@ public class MasterManager {
     }
   }
 
-  void startMasterMonitor() {
+  public void startMasterMonitor() {
     startMasterMonitor(null);
   }
 

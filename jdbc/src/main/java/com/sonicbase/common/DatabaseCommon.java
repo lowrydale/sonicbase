@@ -49,6 +49,7 @@ public class DatabaseCommon {
   private final Lock internalWriteLock = internalReadWriteLock.writeLock();
   private int schemaVersion;
   private boolean haveProLicense;
+  private boolean durable;
 
   public Lock getSchemaReadLock(String dbName) {
     return schemaReadLock.computeIfAbsent(dbName, k -> {
@@ -84,6 +85,10 @@ public class DatabaseCommon {
   }
 
   public TableSchema getTableSchema(String dbName, String tableName, String dataDir) {
+    if (durable) {
+      return getTables(dbName).get(tableName);
+    }
+
     Schema dbSchema = schema.get(dbName);
     if (dbSchema == null) {
       Schema prevSchema = schema.put(dbName, new Schema());
@@ -109,6 +114,9 @@ public class DatabaseCommon {
   }
 
   public void loadSchema(String dataDir) {
+    if (!durable) {
+      return;
+    }
     try {
       internalWriteLock.lock();
       try {
@@ -241,6 +249,9 @@ public class DatabaseCommon {
   }
 
   public void saveSchema(String dataDir) {
+    if (!durable) {
+      return;
+    }
     try {
       internalWriteLock.lock();
       String dataRoot = new File(dataDir, SNAPSHOT_STR + File.separator + shard + File.separator +
@@ -1223,6 +1234,9 @@ public class DatabaseCommon {
   }
 
   public void saveServersConfig(String dataDir) throws IOException {
+    if (!durable) {
+      return;
+    }
     try {
       internalWriteLock.lock();
       String dataRoot = dataRoot = new File(dataDir, SNAPSHOT_STR + File.separator + shard + File.separator +
@@ -1292,6 +1306,9 @@ public class DatabaseCommon {
   }
 
   public List<String> getDbNames(String dataDir) {
+    if (!durable) {
+      return new ArrayList<>(getDatabases().keySet());
+    }
     File file = new File(dataDir, SNAPSHOT_STR + File.separator + shard + File.separator + replica);
     Set<String> dbs = new HashSet<>();
     String[] dirs = file.list();
@@ -1316,5 +1333,9 @@ public class DatabaseCommon {
     synchronized (this) {
       schema.remove(dbName);
     }
+  }
+
+  public void setIsDurable(boolean durable) {
+    this.durable = durable;
   }
 }

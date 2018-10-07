@@ -1,3 +1,8 @@
+1.2.17
+Added support for embedded databases
+Simplified configuration of servers
+Fixed scalability of the batch identity benchmark
+
 1.2.16
 optimized partitioner
 fixed deletes that weren't happening during repartitioning

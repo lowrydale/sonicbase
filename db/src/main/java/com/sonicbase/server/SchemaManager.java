@@ -138,17 +138,19 @@ public class SchemaManager {
         throw new DatabaseException("Database already exists: name=" + dbName);
       }
       logger.info("Create database: shard={}, replica={}, name={}", server.getShard(), server.getReplica(), dbName);
-      File dir = null;
-      if (com.sonicbase.server.DatabaseServer.USE_SNAPSHOT_MGR_OLD) {
-        dir = new File(server.getDataDir(), "snapshot" + File.separator + server.getShard() + File.separator +
-            server.getReplica() + File.separator + dbName);
-      }
-      else {
-        dir = new File(server.getDataDir(), "delta" + File.separator + server.getShard() + File.separator +
-            server.getReplica() + File.separator + dbName);
-      }
-      if (!dir.exists() && !dir.mkdirs()) {
-        throw new DatabaseException("Error creating database directory: dir=" + dir.getAbsolutePath());
+      if (server.isDurable()) {
+        File dir = null;
+        if (com.sonicbase.server.DatabaseServer.USE_SNAPSHOT_MGR_OLD) {
+          dir = new File(server.getDataDir(), "snapshot" + File.separator + server.getShard() + File.separator +
+              server.getReplica() + File.separator + dbName);
+        }
+        else {
+          dir = new File(server.getDataDir(), "delta" + File.separator + server.getShard() + File.separator +
+              server.getReplica() + File.separator + dbName);
+        }
+        if (!dir.exists() && !dir.mkdirs()) {
+          throw new DatabaseException("Error creating database directory: dir=" + dir.getAbsolutePath());
+        }
       }
 
       server.getIndices().put(dbName, new Indices());
@@ -182,17 +184,19 @@ public class SchemaManager {
     synchronized (this) {
       if (server.getCommon().getDatabases().get(dbName) == null) {
         logger.info("Create database: shard={}, replica={}, name={}", server.getShard(), server.getReplica(), dbName);
-        File dir;
-        if (DatabaseServer.USE_SNAPSHOT_MGR_OLD) {
-          dir = new File(server.getDataDir(), "snapshot" + File.separator + server.getShard() + File.separator +
-              server.getReplica() + File.separator + dbName);
-        }
-        else {
-          dir = new File(server.getDataDir(), "delta" + File.separator + server.getShard() + File.separator +
-              server.getReplica() + File.separator + dbName);
-        }
-        if (!dir.exists() && !dir.mkdirs()) {
-          throw new DatabaseException("Error creating database directory: dir=" + dir.getAbsolutePath());
+        if (server.isDurable()) {
+          File dir;
+          if (DatabaseServer.USE_SNAPSHOT_MGR_OLD) {
+            dir = new File(server.getDataDir(), "snapshot" + File.separator + server.getShard() + File.separator +
+                server.getReplica() + File.separator + dbName);
+          }
+          else {
+            dir = new File(server.getDataDir(), "delta" + File.separator + server.getShard() + File.separator +
+                server.getReplica() + File.separator + dbName);
+          }
+          if (!dir.exists() && !dir.mkdirs()) {
+            throw new DatabaseException("Error creating database directory: dir=" + dir.getAbsolutePath());
+          }
         }
 
         server.getIndices().put(dbName, new Indices());

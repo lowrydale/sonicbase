@@ -89,6 +89,25 @@ public class DeleteManager {
 
   private void saveDeletes(String dbName, String tableName, String indexName,
                            List<DeleteRequest> deleteRequests) {
+    if (!databaseServer.isDurable()) {
+      final Index index = databaseServer.getIndices().get(dbName).getIndices().get(tableName).get(indexName);
+
+      IndexSchema indexSchema = databaseServer.getCommon().getTables(dbName).get(tableName).getIndices().get(indexName);
+      for (DeleteRequest request : deleteRequests) {
+        Object obj = index.get(request.getKey());
+        if (obj != null) {
+          try {
+            byte[][] content = databaseServer.getAddressMap().fromUnsafeToRecords(obj);
+            processRecords(indexSchema, index, request.getKey(), content);
+          }
+          catch (Exception e) {
+            logger.error("Error deleting record: db={}, table={}, index={}, key={}", dbName, tableName, indexName, DatabaseCommon.keyToString(request.getKey()));
+          }
+        }
+      }
+      return;
+    }
+
     try {
       String dateStr = DateUtils.toString(new Date(System.currentTimeMillis()));
       Random rand = new Random(System.currentTimeMillis());

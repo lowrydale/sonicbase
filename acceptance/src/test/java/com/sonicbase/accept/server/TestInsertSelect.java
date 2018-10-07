@@ -53,7 +53,7 @@ public class TestInsertSelect {
     String configStr = IOUtils.toString(new BufferedInputStream(getClass().getResourceAsStream("/config/config-4-servers.yaml")), "utf-8");
     Config config = new Config(configStr);
 
-    FileUtils.deleteDirectory(new File(System.getProperty("user.home"), "db"));
+    FileUtils.deleteDirectory(new File(System.getProperty("user.home"), "db-data"));
 
     DatabaseClient.getServers().clear();
 
@@ -82,16 +82,16 @@ public class TestInsertSelect {
 
     boolean sonicbase = true;
     if (!sonicbase) {
-      conn = DriverManager.getConnection("jdbc:mysql://127.0.0.1:3306/db", "root", "pass");
+      conn = DriverManager.getConnection("jdbc:mysql://localhost:3306/db", "root", "pass");
     }
     else {
-      conn = DriverManager.getConnection("jdbc:sonicbase:127.0.0.1:9000", "user", "password");
+      conn = DriverManager.getConnection("jdbc:sonicbase:localhost:9010", "user", "password");
 
       ((ConnectionProxy) conn).getDatabaseClient().createDatabase("test");
 
       conn.close();
 
-      conn = DriverManager.getConnection("jdbc:sonicbase:127.0.0.1:9000/test", "user", "password");
+      conn = DriverManager.getConnection("jdbc:sonicbase:localhost:9010/test", "user", "password");
     }
 
 

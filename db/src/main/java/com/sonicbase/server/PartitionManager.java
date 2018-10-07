@@ -2293,7 +2293,7 @@ public class PartitionManager extends Thread {
         Record.setDbViewNumber(newBytes, common.getSchemaVersion());
         newContent[i] = newBytes;
       }
-      databaseServer.getAddressMap().writeRecordstoExistingAddress((long)entry.value, newContent);
+      databaseServer.getAddressMap().writeRecordstoExistingAddress(entry.value, newContent);
     }
   }
 

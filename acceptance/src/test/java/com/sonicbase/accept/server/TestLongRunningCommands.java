@@ -26,7 +26,7 @@ public class TestLongRunningCommands {
     String configStr = IOUtils.toString(new BufferedInputStream(getClass().getResourceAsStream("/config/config-4-servers.yaml")), "utf-8");
     Config config = new Config(configStr);
 
-    FileUtils.deleteDirectory(new File(System.getProperty("user.home"), "db"));
+    FileUtils.deleteDirectory(new File(System.getProperty("user.home"), "db-data"));
 
     DatabaseClient.getServers().clear();
 

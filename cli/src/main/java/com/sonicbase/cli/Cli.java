@@ -50,14 +50,14 @@ public class Cli {
   private static final String INSTALL_DIRECTORY_STR = "installDirectory";
   private static final String SHARDS_STR = "shards";
   private static final String REPLICAS_STR = "replicas";
-  public static final String PRIVATE_ADDRESS_STR = "privateAddress";
-  public static final String ERROR_NOT_USING_A_DATABASE_STR = "Error, not using a database";
-  public static final String LOCALHOST_STR = "localhost";
-  public static final String PUBLIC_ADDRESS_STR = "publicAddress";
-  public static final String LOCAL_HOST_NUMS_STR = "127.0.0.1";
-  public static final String USER_DIR_STR = "user.dir";
-  public static final String GETTING_FILE_STR = "getting file: ";
-  public static final String CONFIG_STR = "/config-";
+  private static final String PRIVATE_ADDRESS_STR = "privateAddress";
+  private static final String ERROR_NOT_USING_A_DATABASE_STR = "Error, not using a database";
+  private static final String LOCALHOST_STR = "localhost";
+  private static final String PUBLIC_ADDRESS_STR = "publicAddress";
+  private static final String LOCAL_HOST_NUMS_STR = "127.0.0.1";
+  private static final String USER_DIR_STR = "user.dir";
+  private static final String GETTING_FILE_STR = "getting file: ";
+  private static final String CONFIG_STR = "/config-";
 
 
   private String[] args;

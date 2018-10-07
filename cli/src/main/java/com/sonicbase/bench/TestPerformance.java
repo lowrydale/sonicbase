@@ -181,7 +181,7 @@ public class TestPerformance {
     try {
       int outerCount = (int) (outerFactor * 5_000);
 
-      FileUtils.deleteDirectory(new File(System.getProperty("user.home"), "db"));
+      FileUtils.deleteDirectory(new File(System.getProperty("user.home"), "db-data"));
 
       DatabaseClient.getServers().clear();
 
@@ -243,16 +243,16 @@ public class TestPerformance {
       boolean sonicbase = true;
       if (!sonicbase) {
         Class.forName("com.mysql.jdbc.Driver");
-        conn = DriverManager.getConnection("jdbc:mysql://127.0.0.1:3306/db", "root", "pass");
+        conn = DriverManager.getConnection("jdbc:mysql://localhost:3306/db", "root", "pass");
       }
       else {
         if (server) {
-          conn = DriverManager.getConnection("jdbc:sonicbase:127.0.0.1:9010", "user", "password");
+          conn = DriverManager.getConnection("jdbc:sonicbase:localhost:9010", "user", "password");
           ((ConnectionProxy) conn).getDatabaseClient().createDatabase("test");
           conn.close();
         }
 
-        conn = DriverManager.getConnection("jdbc:sonicbase:127.0.0.1:9010/test", "user", "password");
+        conn = DriverManager.getConnection("jdbc:sonicbase:localhost:9010/test", "user", "password");
         client = ((ConnectionProxy) conn).getDatabaseClient();
         client.syncSchema();
       }

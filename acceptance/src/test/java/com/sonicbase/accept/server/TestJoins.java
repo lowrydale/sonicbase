@@ -59,7 +59,7 @@ public class TestJoins {
     String configStr = IOUtils.toString(new BufferedInputStream(getClass().getResourceAsStream("/config/config-4-servers.yaml")), "utf-8");
     Config config = new Config(configStr);
 
-    FileUtils.deleteDirectory(new File(System.getProperty("user.home"), "db"));
+    FileUtils.deleteDirectory(new File(System.getProperty("user.home"), "db-data"));
 
     DatabaseClient.getServers().clear();
 
@@ -93,13 +93,13 @@ public class TestJoins {
 
     Class.forName("com.sonicbase.jdbcdriver.Driver");
 
-    conn = DriverManager.getConnection("jdbc:sonicbase:127.0.0.1:9000", "user", "password");
+    conn = DriverManager.getConnection("jdbc:sonicbase:localhost:9010", "user", "password");
 
     ((ConnectionProxy)conn).getDatabaseClient().createDatabase("test");
 
     conn.close();
 
-    conn = DriverManager.getConnection("jdbc:sonicbase:127.0.0.1:9000/test", "user", "password");
+    conn = DriverManager.getConnection("jdbc:sonicbase:localhost:9010/test", "user", "password");
 
     client = ((ConnectionProxy)conn).getDatabaseClient();
 
@@ -473,7 +473,7 @@ public class TestJoins {
 //      Thread.sleep(1000);
 //    }
 
-    com.sonicbase.server.DatabaseServer server = (com.sonicbase.server.DatabaseServer) DatabaseClient.getServers().get(0).get(0);
+    com.sonicbase.server.DatabaseServer server = dbServers[0];
     Index index = server.getIndices().get("test").getIndices().get("membershipsdouble").get("_primarykey");
 
     Map.Entry<Object[], Object> entry = index.firstEntry();
@@ -483,7 +483,7 @@ public class TestJoins {
     }
 
     System.out.println("memberships shard 1");
-    server = (com.sonicbase.server.DatabaseServer) DatabaseClient.getServers().get(1).get(0);
+    server = dbServers[2];
     index = server.getIndices().get("test").getIndices().get("membershipsdouble").get("_primarykey");
 
     entry = index.firstEntry();
@@ -501,7 +501,7 @@ public class TestJoins {
       entry = index.higherEntry(entry.getKey());
     }
 
-    server = (DatabaseServer) DatabaseClient.getServers().get(1).get(0);
+    server = dbServers[2];
     index = server.getIndices().get("test").getIndices().get("persons").get("_primarykey");
 
     System.out.println("Persons - replica 1");

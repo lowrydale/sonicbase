@@ -57,7 +57,7 @@ public class TestTransactions {
     String configStr = IOUtils.toString(new BufferedInputStream(getClass().getResourceAsStream("/config/config-4-servers.yaml")), "utf-8");
     Config config = new Config(configStr);
 
-    FileUtils.deleteDirectory(new File(System.getProperty("user.home"), "db"));
+    FileUtils.deleteDirectory(new File(System.getProperty("user.home"), "db-data"));
 
     DatabaseClient.getServers().clear();
 
@@ -82,18 +82,18 @@ public class TestTransactions {
 
     Class.forName("com.sonicbase.jdbcdriver.Driver");
 
-    conn = DriverManager.getConnection("jdbc:sonicbase:127.0.0.1:9000", "user", "password");
+    conn = DriverManager.getConnection("jdbc:sonicbase:localhost:9010", "user", "password");
 
     ((ConnectionProxy)conn).getDatabaseClient().createDatabase("test");
 
     conn.close();
 
-    conn = DriverManager.getConnection("jdbc:sonicbase:127.0.0.1:9000/test", "user", "password");
+    conn = DriverManager.getConnection("jdbc:sonicbase:localhost:9010/test", "user", "password");
 
     DatabaseClient client = ((ConnectionProxy)conn).getDatabaseClient();
 
 
-    conn2 = DriverManager.getConnection("jdbc:sonicbase:127.0.0.1:9000/test", "user", "password");
+    conn2 = DriverManager.getConnection("jdbc:sonicbase:localhost:9010/test", "user", "password");
 
     PreparedStatement stmt = conn.prepareStatement("create table Persons (id BIGINT, id2 BIGINT, socialSecurityNumber VARCHAR(20), relatives VARCHAR(64000), restricted BOOLEAN, gender VARCHAR(8), PRIMARY KEY (id))");
     stmt.executeUpdate();
@@ -143,12 +143,12 @@ public class TestTransactions {
 
     conn.setAutoCommit(false);
 
-    Index index = ((com.sonicbase.server.DatabaseServer)DatabaseClient.getServers().get(0).get(0)).getIndices().get("test").getIndices().get("secondary_delete").get("make_model");
+    Index index = dbServers[0].getIndices().get("test").getIndices().get("secondary_delete").get("make_model");
     Object value = index.get(new Object[]{"make-0".getBytes("utf-8")});
-    byte[][] keys = ((com.sonicbase.server.DatabaseServer)DatabaseClient.getServers().get(0).get(0)).getAddressMap().fromUnsafeToKeys(value);
+    byte[][] keys = dbServers[0].getAddressMap().fromUnsafeToKeys(value);
 
-    index = ((com.sonicbase.server.DatabaseServer)DatabaseClient.getServers().get(0).get(0)).getIndices().get("test").getIndices().get("secondary_delete").get("_primarykey");
-    TableSchema tableSchema = ((com.sonicbase.server.DatabaseServer)DatabaseClient.getServers().get(0).get(0)).getCommon().getTables("test").get("secondary_delete");
+    index = dbServers[0].getIndices().get("test").getIndices().get("secondary_delete").get("_primarykey");
+    TableSchema tableSchema = dbServers[0].getCommon().getTables("test").get("secondary_delete");
     KeyRecord keyRecord = new KeyRecord(keys[0]);
     Object[] primaryKey = DatabaseCommon.deserializeKey(tableSchema, keyRecord.getPrimaryKey());
     value = index.get(primaryKey);
@@ -179,11 +179,11 @@ public class TestTransactions {
 
     conn.commit();
 
-    index = ((com.sonicbase.server.DatabaseServer)DatabaseClient.getServers().get(0).get(0)).getIndices().get("test").getIndices().get("secondary_delete").get("make_model");
+    index = dbServers[0].getIndices().get("test").getIndices().get("secondary_delete").get("make_model");
     value = index.get(new Object[]{"make-0".getBytes("utf-8")});
     assertEquals(value, null);
 
-    index = ((DatabaseServer)DatabaseClient.getServers().get(0).get(0)).getIndices().get("test").getIndices().get("secondary_delete").get("_primarykey");
+    index = dbServers[0].getIndices().get("test").getIndices().get("secondary_delete").get("_primarykey");
     primaryKey = DatabaseCommon.deserializeKey(tableSchema, keyRecord.getPrimaryKey());
     value = index.get(primaryKey);
     assertNull(value);

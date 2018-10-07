@@ -61,6 +61,7 @@ public class PartitionManagerTest {
     when(server.getSnapshotManager()).thenReturn(mock(SnapshotManager.class));
 
     DatabaseCommon common = TestUtils.createCommon(tableSchema);
+    common.setIsDurable(true);
     JsonNode node = new ObjectMapper().readTree(" { \"shards\" : [\n" +
         "    {\n" +
         "      \"replicas\": [\n" +
@@ -78,6 +79,7 @@ public class PartitionManagerTest {
     common.setServersConfig(serversConfig);
     when(server.getCommon()).thenReturn(common);
     when(server.useUnsafe()).thenReturn(true);
+    when(server.isDurable()).thenReturn(true);
 
     Indices indices = new Indices();
     indices.addIndex(tableSchema, indexSchema.getName(), indexSchema.getComparators());
@@ -105,6 +107,7 @@ public class PartitionManagerTest {
     when(client.getShardCount()).thenReturn(2);
     when(server.getClient()).thenReturn(client);
     when(server.getDatabaseClient()).thenReturn(client);
+    when(server.isDurable()).thenReturn(true);
 
     final PartitionManager partitionManager = new PartitionManager(server, common);
 
@@ -245,8 +248,10 @@ public class PartitionManagerTest {
     when(server.getReplicationFactor()).thenReturn(1);
     when(server.getShard()).thenReturn(1);
     when(server.useUnsafe()).thenReturn(true);
+    when(server.isDurable()).thenReturn(true);
 
     DatabaseCommon common = TestUtils.createCommon(tableSchema);
+    common.setIsDurable(true);
     JsonNode node = new ObjectMapper().readTree(" { \"shards\" : [\n" +
         "    {\n" +
         "      \"replicas\": [\n" +
@@ -576,6 +581,7 @@ public class PartitionManagerTest {
 
       when(server.getCommon()).thenReturn(common);
       when(server.useUnsafe()).thenReturn(true);
+      when(server.isDurable()).thenReturn(true);
 
       Indices indices = new Indices();
       indices.addIndex(tableSchema, indexSchema.getName(), indexSchema.getComparators());

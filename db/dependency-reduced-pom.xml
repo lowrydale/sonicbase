@@ -1,22 +1,41 @@
 <?xml version="1.0" encoding="UTF-8"?>
 <project xmlns="http://maven.apache.org/POM/4.0.0" xmlns:xsi="http://www.w3.org/2001/XMLSchema-instance" xsi:schemaLocation="http://maven.apache.org/POM/4.0.0 http://maven.apache.org/maven-v4_0_0.xsd">
   <parent>
-    <artifactId>sonicbase-root</artifactId>
-    <groupId>com.sonicbase</groupId>
-    <version>1.2.16</version>
+    <artifactId>oss-parent</artifactId>
+    <groupId>org.sonatype.oss</groupId>
+    <version>9</version>
   </parent>
   <modelVersion>4.0.0</modelVersion>
   <groupId>com.sonicbase</groupId>
   <artifactId>sonicbase-server</artifactId>
-  <name>sonicbase-server</name>
-  <version>1.2.16</version>
-  <url>http://maven.apache.org</url>
+  <name>SonicBase - Server</name>
+  <version>1.2.17</version>
+  <description>Server for SonicBase, an in-memory distributed relational database</description>
+  <url>https://sourceforge.net/projects/sonicbase/</url>
+  <developers>
+    <developer>
+      <name>Dale Lowry</name>
+      <email>lowrydale@gmail.com</email>
+      <organization>SonicBase Inc.</organization>
+      <organizationUrl>http://sonicbase.com</organizationUrl>
+    </developer>
+  </developers>
+  <licenses>
+    <license>
+      <name>The Apache Software License, Version 2.0</name>
+      <url>http://www.apache.org/licenses/LICENSE-2.0.txt</url>
+      <distribution>repo</distribution>
+    </license>
+  </licenses>
+  <scm>
+    <url>https://lowrydale@git.code.sf.net/p/sonicbase/code sonicbase-code</url>
+  </scm>
   <build>
     <pluginManagement>
       <plugins>
         <plugin>
           <artifactId>maven-compiler-plugin</artifactId>
-          <version>2.3.2</version>
+          <version>3.1</version>
           <configuration>
             <source>1.8</source>
             <target>1.8</target>
@@ -48,9 +67,44 @@
             <destFile>${sonar.jacoco.reportPath}</destFile>
           </configuration>
         </plugin>
+        <plugin>
+          <groupId>org.eclipse.m2e</groupId>
+          <artifactId>lifecycle-mapping</artifactId>
+          <version>1.0.0</version>
+          <configuration>
+            <lifecycleMappingMetadata>
+              <pluginExecutions>
+                <pluginExecution>
+                  <pluginExecutionFilter>
+                    <groupId>org.apache.maven.plugins</groupId>
+                    <artifactId>maven-enforcer-plugin</artifactId>
+                    <versionRange>[1.0.0,)</versionRange>
+                    <goals>
+                      <goal>enforce</goal>
+                    </goals>
+                  </pluginExecutionFilter>
+                  <action>
+                    <ignore />
+                  </action>
+                </pluginExecution>
+              </pluginExecutions>
+            </lifecycleMappingMetadata>
+          </configuration>
+        </plugin>
       </plugins>
     </pluginManagement>
     <plugins>
+      <plugin>
+        <artifactId>maven-source-plugin</artifactId>
+        <executions>
+          <execution>
+            <id>attach-sources</id>
+            <goals>
+              <goal>jar-no-fork</goal>
+            </goals>
+          </execution>
+        </executions>
+      </plugin>
       <plugin>
         <artifactId>maven-shade-plugin</artifactId>
         <version>3.1.1</version>
@@ -74,6 +128,34 @@
           </execution>
         </executions>
       </plugin>
+      <plugin>
+        <artifactId>maven-gpg-plugin</artifactId>
+        <version>1.5</version>
+        <executions>
+          <execution>
+            <id>sign-artifacts</id>
+            <phase>verify</phase>
+            <goals>
+              <goal>sign</goal>
+            </goals>
+          </execution>
+        </executions>
+      </plugin>
+      <plugin>
+        <artifactId>maven-release-plugin</artifactId>
+        <version>2.4.2</version>
+      </plugin>
+      <plugin>
+        <groupId>org.sonatype.plugins</groupId>
+        <artifactId>nexus-staging-maven-plugin</artifactId>
+        <version>1.6.7</version>
+        <extensions>true</extensions>
+        <configuration>
+          <serverId>ossrh</serverId>
+          <nexusUrl>https://oss.sonatype.org/</nexusUrl>
+          <autoReleaseAfterClose>false</autoReleaseAfterClose>
+        </configuration>
+      </plugin>
     </plugins>
   </build>
   <dependencies>
@@ -82,17 +164,11 @@
       <artifactId>metrics-core</artifactId>
       <version>4.0.2</version>
       <scope>provided</scope>
-      <exclusions>
-        <exclusion>
-          <artifactId>slf4j-api</artifactId>
-          <groupId>org.slf4j</groupId>
-        </exclusion>
-      </exclusions>
     </dependency>
     <dependency>
       <groupId>com.sonicbase</groupId>
       <artifactId>sonicbase-jdbc</artifactId>
-      <version>1.2.16</version>
+      <version>1.2.17</version>
       <scope>provided</scope>
       <exclusions>
         <exclusion>
@@ -104,10 +180,6 @@
           <groupId>com.google.guava</groupId>
         </exclusion>
         <exclusion>
-          <artifactId>commons-lang</artifactId>
-          <groupId>commons-lang</groupId>
-        </exclusion>
-        <exclusion>
           <artifactId>slf4j-log4j12</artifactId>
           <groupId>org.slf4j</groupId>
         </exclusion>
@@ -116,16 +188,8 @@
           <groupId>com.google.code.gson</groupId>
         </exclusion>
         <exclusion>
-          <artifactId>hadoop-core</artifactId>
-          <groupId>org.apache.hadoop</groupId>
-        </exclusion>
-        <exclusion>
           <artifactId>lzo-core</artifactId>
           <groupId>org.anarres.lzo</groupId>
-        </exclusion>
-        <exclusion>
-          <artifactId>commons-cli</artifactId>
-          <groupId>commons-cli</groupId>
         </exclusion>
       </exclusions>
     </dependency>
@@ -190,10 +254,6 @@
       <scope>test</scope>
       <exclusions>
         <exclusion>
-          <artifactId>junit</artifactId>
-          <groupId>junit</groupId>
-        </exclusion>
-        <exclusion>
           <artifactId>bsh</artifactId>
           <groupId>org.beanshell</groupId>
         </exclusion>
@@ -211,28 +271,6 @@
       <groupId>com.github.jsqlparser</groupId>
       <artifactId>jsqlparser</artifactId>
       <version>0.9.5</version>
-      <scope>provided</scope>
-    </dependency>
-    <dependency>
-      <groupId>org.quartz-scheduler</groupId>
-      <artifactId>quartz</artifactId>
-      <version>2.2.1</version>
-      <scope>provided</scope>
-      <exclusions>
-        <exclusion>
-          <artifactId>c3p0</artifactId>
-          <groupId>c3p0</groupId>
-        </exclusion>
-        <exclusion>
-          <artifactId>slf4j-api</artifactId>
-          <groupId>org.slf4j</groupId>
-        </exclusion>
-      </exclusions>
-    </dependency>
-    <dependency>
-      <groupId>it.unimi.dsi</groupId>
-      <artifactId>fastutil</artifactId>
-      <version>7.0.2</version>
       <scope>provided</scope>
     </dependency>
     <dependency>
@@ -254,10 +292,6 @@
           <groupId>com.google.code.findbugs</groupId>
         </exclusion>
         <exclusion>
-          <artifactId>hadoop-core</artifactId>
-          <groupId>org.apache.hadoop</groupId>
-        </exclusion>
-        <exclusion>
           <artifactId>lzo-core</artifactId>
           <groupId>org.anarres.lzo</groupId>
         </exclusion>
@@ -272,26 +306,58 @@
   </dependencies>
   <distributionManagement>
     <repository>
-      <id>project.local</id>
-      <name>project</name>
-      <url>file:${project.basedir}/repo</url>
+      <id>ossrh</id>
+      <url>https://oss.sonatype.org/service/local/staging/deploy/maven2</url>
     </repository>
-    <site>
-      <id>maven-repository</id>
-      <name>http://repo2.maven.org/maven2/</name>
-      <url>http://repo2.maven.org/maven2/</url>
-    </site>
+    <snapshotRepository>
+      <id>ossrh</id>
+      <url>https://oss.sonatype.org/content/repositories/snapshots</url>
+    </snapshotRepository>
   </distributionManagement>
   <properties>
-    <sonar.dynamicAnalysis>reuseReports</sonar.dynamicAnalysis>
-    <sonar.sources>${project.basedir}/src/main/java</sonar.sources>
-    <maven-release-plugin.version>2.1</maven-release-plugin.version>
-    <sonar.core.codeCoveragePlugin>jacoco</sonar.core.codeCoveragePlugin>
-    <sonar.junit.reportsPath>${project.basedir}/target/test-reports</sonar.junit.reportsPath>
-    <sonar.jacoco.reportPath>${project.basedir}/target/jacoco.exec</sonar.jacoco.reportPath>
-    <sonar.binaries>${project.basedir}/target/classes</sonar.binaries>
-    <versions-maven-plugin.version>1.2</versions-maven-plugin.version>
+    <maven-plugin-annotations.version>3.2</maven-plugin-annotations.version>
+    <quartz.version>2.2.1</quartz.version>
+    <jackson-core.version>2.9.6</jackson-core.version>
+    <commons-configuration.version>1.6</commons-configuration.version>
+    <jsqlparser.version>0.9.5</jsqlparser.version>
     <sonar.tests>${project.basedir}/src/test/java</sonar.tests>
+    <sonar.dynamicAnalysis>reuseReports</sonar.dynamicAnalysis>
+    <jersey-json.version>1.19.4</jersey-json.version>
+    <gson.version>2.2.3</gson.version>
+    <lzo-hadoop.version>1.0.5</lzo-hadoop.version>
+    <hadoop-core.version>1.2.1</hadoop-core.version>
+    <lz4.version>1.3.0</lz4.version>
+    <jackson-databind.version>2.9.6</jackson-databind.version>
+    <versions-maven-plugin.version>1.2</versions-maven-plugin.version>
+    <sonar.binaries>${project.basedir}/target/classes</sonar.binaries>
+    <slf4j-log4j12.version>1.7.25</slf4j-log4j12.version>
+    <sonar.junit.reportsPath>${project.basedir}/target/test-reports</sonar.junit.reportsPath>
+    <snakeyaml.version>1.21</snakeyaml.version>
+    <testng.version>6.8</testng.version>
+    <commons-cli.version>1.3.1</commons-cli.version>
+    <aws-java-sdk.version>1.11.400</aws-java-sdk.version>
+    <quartz-jobs.version>2.2.1</quartz-jobs.version>
+    <mockito.version>2.8.47</mockito.version>
+    <google-http-client.version>1.17.0-rc</google-http-client.version>
+    <sonar.sources>${project.basedir}/src/main/java</sonar.sources>
+    <kafka-clients.version>0.11.0.1</kafka-clients.version>
+    <fastutil.version>7.0.2</fastutil.version>
+    <commons-io.version>2.5</commons-io.version>
     <sonar.java.coveragePlugin>jacoco</sonar.java.coveragePlugin>
+    <mockito-all.version>1.10.19</mockito-all.version>
+    <maven-release-plugin.version>2.1</maven-release-plugin.version>
+    <unirest-java.version>1.4.9</unirest-java.version>
+    <netty-all.version>4.1.13.Final</netty-all.version>
+    <metrics-core.version>4.0.2</metrics-core.version>
+    <jline.version>2.14.6</jline.version>
+    <commons-crypto.version>1.0.0</commons-crypto.version>
+    <commons-lang3.version>3.3.2</commons-lang3.version>
+    <commons-lang.version>2.6</commons-lang.version>
+    <sonar.jacoco.reportPath>${project.basedir}/target/jacoco.exec</sonar.jacoco.reportPath>
+    <lzo-core.version>1.0.5</lzo-core.version>
+    <guava.version>24.0-jre</guava.version>
+    <mysql-connector-java.version>6.0.6</mysql-connector-java.version>
+    <log4j.version>1.2.17</log4j.version>
+    <sonar.core.codeCoveragePlugin>jacoco</sonar.core.codeCoveragePlugin>
   </properties>
 </project>

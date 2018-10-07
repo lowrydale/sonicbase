@@ -33,7 +33,7 @@ public class TestMisc {
     String configStr = IOUtils.toString(new BufferedInputStream(getClass().getResourceAsStream("/config/config-4-servers.yaml")), "utf-8");
     Config config = new Config(configStr);
 
-    FileUtils.deleteDirectory(new File(System.getProperty("user.home"), "db"));
+    FileUtils.deleteDirectory(new File(System.getProperty("user.home"), "db-data"));
 
     DatabaseClient.getServers().clear();
 
@@ -67,13 +67,13 @@ public class TestMisc {
 
     Class.forName("com.sonicbase.jdbcdriver.Driver");
 
-    conn = DriverManager.getConnection("jdbc:sonicbase:127.0.0.1:9000", "user", "password");
+    conn = DriverManager.getConnection("jdbc:sonicbase:localhost:9010", "user", "password");
 
     ((ConnectionProxy) conn).getDatabaseClient().createDatabase("test");
 
     conn.close();
 
-    conn = DriverManager.getConnection("jdbc:sonicbase:127.0.0.1:9000/test", "user", "password");
+    conn = DriverManager.getConnection("jdbc:sonicbase:localhost:9010/test", "user", "password");
 
     PreparedStatement stmt = conn.prepareStatement("create table Persons (id BIGINT, id2 BIGINT, socialSecurityNumber VARCHAR(20), relatives VARCHAR(64000), restricted BOOLEAN, gender VARCHAR(8), PRIMARY KEY (id))");
     stmt.executeUpdate();

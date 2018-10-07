@@ -64,7 +64,7 @@ public class TestBulkImport {
       String configStr = IOUtils.toString(new BufferedInputStream(getClass().getResourceAsStream("/config/config-2-servers-a.yaml")), "utf-8");
       Config config = new Config(configStr);
 
-      FileUtils.deleteDirectory(new File(System.getProperty("user.home"), "db"));
+      FileUtils.deleteDirectory(new File(System.getProperty("user.home"), "db-data"));
 
       DatabaseClient.getServers().clear();
 
@@ -148,23 +148,23 @@ public class TestBulkImport {
 //
       Class.forName("com.sonicbase.jdbcdriver.Driver");
 
-      connA = DriverManager.getConnection("jdbc:sonicbase:127.0.0.1:9010", "user", "password");
+      connA = DriverManager.getConnection("jdbc:sonicbase:localhost:9010", "user", "password");
 
       ((ConnectionProxy) connA).getDatabaseClient().createDatabase("test");
 
       connA.close();
 
-      connA = DriverManager.getConnection("jdbc:sonicbase:127.0.0.1:9010/test", "user", "password");
+      connA = DriverManager.getConnection("jdbc:sonicbase:localhost:9010/test", "user", "password");
       clientA = ((ConnectionProxy)connA).getDatabaseClient();
       clientA.syncSchema();
 
-      connB = DriverManager.getConnection("jdbc:sonicbase:127.0.0.1:9110", "user", "password");
+      connB = DriverManager.getConnection("jdbc:sonicbase:localhost:9110", "user", "password");
 
       ((ConnectionProxy) connB).getDatabaseClient().createDatabase("test");
 
       connB.close();
 
-      connB = DriverManager.getConnection("jdbc:sonicbase:127.0.0.1:9110/test", "user", "password");
+      connB = DriverManager.getConnection("jdbc:sonicbase:localhost:9110/test", "user", "password");
       clientB = ((ConnectionProxy)connB).getDatabaseClient();
       clientB.syncSchema();
 
@@ -297,7 +297,7 @@ public class TestBulkImport {
 
 
 
-    startBulkImport((ConnectionProxy) connB, "start bulk import from persons(com.sonicbase.jdbcdriver.Driver, jdbc:sonicbase:127.0.0.1:9010/test)");
+    startBulkImport((ConnectionProxy) connB, "start bulk import from persons(com.sonicbase.jdbcdriver.Driver, jdbc:sonicbase:localhost:9010/test)");
 
     while (true) {
       String ret = bulkImportStatus((ConnectionProxy) connB);
@@ -340,7 +340,7 @@ public class TestBulkImport {
     }
     assertFalse(rs.next());
 
-    startBulkImport((ConnectionProxy) connB, "start bulk import from persons(com.sonicbase.jdbcdriver.Driver, jdbc:sonicbase:127.0.0.1:9010/test) where id > 1000");
+    startBulkImport((ConnectionProxy) connB, "start bulk import from persons(com.sonicbase.jdbcdriver.Driver, jdbc:sonicbase:localhost:9010/test) where id > 1000");
 
     while (true) {
       String ret = bulkImportStatus((ConnectionProxy) connB);

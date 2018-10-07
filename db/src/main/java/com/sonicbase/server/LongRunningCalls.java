@@ -24,6 +24,7 @@ public class LongRunningCalls {
 
   private final com.sonicbase.server.DatabaseServer server;
   private final ConcurrentLinkedQueue<Thread> executionThreads = new ConcurrentLinkedQueue<>();
+  private byte[] bytesForEmbedded;
 
   LongRunningCalls(DatabaseServer server) {
     this.server = server;
@@ -44,16 +45,26 @@ public class LongRunningCalls {
   public void load() {
     try {
       synchronized (this) {
-        File file = getReplicaRoot();
-        file.mkdirs();
-        int version = getHighestSafeSnapshotVersion(file);
-        if (version == -1) {
-          return;
+        if (!server.isDurable()) {
+          if (bytesForEmbedded == null) {
+            return;
+          }
+          try (DataInputStream in = new DataInputStream(new ByteArrayInputStream(bytesForEmbedded))) {
+            deserialize(in);
+          }
         }
-        file = new File(file, String.valueOf(version));
+        else {
+          File file = getReplicaRoot();
+          file.mkdirs();
+          int version = getHighestSafeSnapshotVersion(file);
+          if (version == -1) {
+            return;
+          }
+          file = new File(file, String.valueOf(version));
 
-        try (DataInputStream in = new DataInputStream(new BufferedInputStream(new FileInputStream(file)))) {
-          deserialize(in);
+          try (DataInputStream in = new DataInputStream(new BufferedInputStream(new FileInputStream(file)))) {
+            deserialize(in);
+          }
         }
       }
     }
@@ -75,26 +86,35 @@ public class LongRunningCalls {
   public void save() {
     try {
       synchronized (this) {
-        File file = getReplicaRoot();
-        file.mkdirs();
-        int version = getHighestSafeSnapshotVersion(file);
-        version++;
-        file = new File(file, String.valueOf(version) + ".in-process");
-        if (file.exists()) {
-          deleteFile(file);
+        if (!server.isDurable()) {
+          ByteArrayOutputStream bytesOut = new ByteArrayOutputStream();
+          try (DataOutputStream out = new DataOutputStream(bytesOut)) {
+            serialize(out);
+          }
+          bytesForEmbedded = bytesOut.toByteArray();
         }
+        else {
+          File file = getReplicaRoot();
+          file.mkdirs();
+          int version = getHighestSafeSnapshotVersion(file);
+          version++;
+          file = new File(file, String.valueOf(version) + ".in-process");
+          if (file.exists()) {
+            deleteFile(file);
+          }
 
-        try (DataOutputStream out = new DataOutputStream(new BufferedOutputStream(new FileOutputStream(file)))) {
-          serialize(out);
+          try (DataOutputStream out = new DataOutputStream(new BufferedOutputStream(new FileOutputStream(file)))) {
+            serialize(out);
+          }
+
+          File newFile = new File(server.getDataDir(), "lrc" + File.separator + server.getShard() + File.separator +
+              server.getReplica() + File.separator + version);
+          if (!file.renameTo(newFile)) {
+            logger.error("Error renaming file: oldPath={}, newPath={}", file.getAbsolutePath(), newFile.getAbsolutePath());
+          }
+
+          deleteOldFiles();
         }
-
-        File newFile = new File(server.getDataDir(), "lrc" + File.separator + server.getShard() + File.separator +
-            server.getReplica() + File.separator + version);
-        if (!file.renameTo(newFile)) {
-          logger.error("Error renaming file: oldPath={}, newPath={}", file.getAbsolutePath(), newFile.getAbsolutePath());
-        }
-
-        deleteOldFiles();
       }
     }
     catch (Exception e) {
@@ -103,6 +123,9 @@ public class LongRunningCalls {
   }
 
   private void deleteFile(File file) {
+    if (!server.isDurable()) {
+      return;
+    }
     try {
       Files.delete(file.toPath());
     }
@@ -112,6 +135,9 @@ public class LongRunningCalls {
   }
 
   private void deleteOldFiles() {
+    if (!server.isDurable()) {
+      return;
+    }
     File dataRootDir = getReplicaRoot();
     dataRootDir.mkdirs();
     int highestSnapshot = getHighestSafeSnapshotVersion(dataRootDir);

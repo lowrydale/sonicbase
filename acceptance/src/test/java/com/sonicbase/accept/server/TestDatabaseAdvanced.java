@@ -54,7 +54,7 @@ public class TestDatabaseAdvanced {
     String configStr = IOUtils.toString(new BufferedInputStream(getClass().getResourceAsStream("/config/config-4-servers.yaml")), "utf-8");
     Config config = new Config(configStr);
 
-    FileUtils.deleteDirectory(new File(System.getProperty("user.home"), "db"));
+    FileUtils.deleteDirectory(new File(System.getProperty("user.home"), "db-data"));
 
     //DatabaseServer.getAddressMap().clear();
     DatabaseClient.getServers().clear();
@@ -81,13 +81,13 @@ public class TestDatabaseAdvanced {
 
     Class.forName("com.sonicbase.jdbcdriver.Driver");
 
-    conn = DriverManager.getConnection("jdbc:sonicbase:127.0.0.1:9000", "user", "password");
+    conn = DriverManager.getConnection("jdbc:sonicbase:localhost:9010", "user", "password");
 
     ((ConnectionProxy)conn).getDatabaseClient().createDatabase("test");
 
     conn.close();
 
-    conn = DriverManager.getConnection("jdbc:sonicbase:127.0.0.1:9000/test", "user", "password");
+    conn = DriverManager.getConnection("jdbc:sonicbase:localhost:9010/test", "user", "password");
 
     DatabaseClient client = ((ConnectionProxy)conn).getDatabaseClient();
 
@@ -3406,7 +3406,7 @@ public class TestDatabaseAdvanced {
     assertEquals(rs.getString("model"), "my-model");
     assertFalse(rs.next());
 
-    Index index = ((DatabaseServer)DatabaseClient.getServers().get(0).get(0)).getIndices().get("test").getIndices().get("secondary_update").get("make_model");
+    Index index = dbServers[0].getIndices().get("test").getIndices().get("secondary_update").get("make_model");
     Object value = index.get(new Object[]{"make-0".getBytes("utf-8"), "model-0".getBytes("utf-8")});
     assertEquals(value, null);
 
@@ -3433,12 +3433,12 @@ public class TestDatabaseAdvanced {
       assertEquals(stmt.executeUpdate(), 1);
     }
 
-    Index index = ((DatabaseServer)DatabaseClient.getServers().get(0).get(0)).getIndices().get("test").getIndices().get("secondary_delete").get("make_model");
+    Index index = dbServers[0].getIndices().get("test").getIndices().get("secondary_delete").get("make_model");
     Object value = index.get(new Object[]{"make-0".getBytes("utf-8"), "model-0".getBytes("utf-8")});
-    byte[][] keys = ((DatabaseServer)DatabaseClient.getServers().get(0).get(0)).getAddressMap().fromUnsafeToKeys(value);
+    byte[][] keys = dbServers[0].getAddressMap().fromUnsafeToKeys(value);
 
-    index = ((DatabaseServer)DatabaseClient.getServers().get(0).get(0)).getIndices().get("test").getIndices().get("secondary_delete").get("_primarykey");
-    TableSchema tableSchema = ((DatabaseServer)DatabaseClient.getServers().get(0).get(0)).getCommon().getTables("test").get("secondary_delete");
+    index = dbServers[0].getIndices().get("test").getIndices().get("secondary_delete").get("_primarykey");
+    TableSchema tableSchema = dbServers[0].getCommon().getTables("test").get("secondary_delete");
     KeyRecord keyRecord = new KeyRecord(keys[0]);
     Object[] primaryKey = DatabaseCommon.deserializeKey(tableSchema, keyRecord.getPrimaryKey());
     value = index.get(primaryKey);
@@ -3455,11 +3455,11 @@ public class TestDatabaseAdvanced {
 
     assertFalse(rs.next());
 
-    index = ((DatabaseServer)DatabaseClient.getServers().get(0).get(0)).getIndices().get("test").getIndices().get("secondary_delete").get("make_model");
+    index = dbServers[0].getIndices().get("test").getIndices().get("secondary_delete").get("make_model");
     value = index.get(new Object[]{"make-0".getBytes("utf-8")});
     assertEquals(value, null);
 
-    index = ((DatabaseServer)DatabaseClient.getServers().get(0).get(0)).getIndices().get("test").getIndices().get("secondary_delete").get("_primarykey");
+    index = dbServers[0].getIndices().get("test").getIndices().get("secondary_delete").get("_primarykey");
     primaryKey = DatabaseCommon.deserializeKey(tableSchema, keyRecord.getPrimaryKey());
     value = index.get(primaryKey);
     assertNull(value);

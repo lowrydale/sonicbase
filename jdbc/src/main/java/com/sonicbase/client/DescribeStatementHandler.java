@@ -212,7 +212,7 @@ public class DescribeStatementHandler {
       String json = getLicenseServerConfig();
       Config config = new Config(json);
 
-      InputStream in = urlGet("https://" + config.getString("publicAddress") + ":" +
+      InputStream in = urlGet("https://" + config.getString("address") + ":" +
           config.getInt("port") + "/license/currUsage");
 
       ObjectMapper mapper = new ObjectMapper();
@@ -411,8 +411,8 @@ public class DescribeStatementHandler {
     double cpu = retObj.getDouble(ComObject.Tag.CPU);
     double javaMemMin = retObj.getDouble(ComObject.Tag.JAVA_MEM_MIN);
     double javaMemMax = retObj.getDouble(ComObject.Tag.JAVA_MEM_MAX);
-    double recRate = retObj.getDouble(ComObject.Tag.AVG_REC_RATE) / 1000000000d;
-    double transRate = retObj.getDouble(ComObject.Tag.AVG_TRANS_RATE) / 1000000000d;
+    double recRate = retObj.getDouble(ComObject.Tag.AVG_REC_RATE) / 1073741824d;
+    double transRate = retObj.getDouble(ComObject.Tag.AVG_TRANS_RATE) / 1073741824d;
     String diskAvail = retObj.getString(ComObject.Tag.DISK_AVAIL);
     String host = retObj.getString(ComObject.Tag.HOST);
     int port = retObj.getInt(ComObject.Tag.PORT);

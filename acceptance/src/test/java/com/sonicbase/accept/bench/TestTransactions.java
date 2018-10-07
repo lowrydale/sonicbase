@@ -29,7 +29,7 @@ public class TestTransactions {
     String configStr = IOUtils.toString(new BufferedInputStream(getClass().getResourceAsStream("/config/config-4-servers.yaml")), "utf-8");
     Config config = new Config(configStr);
 
-    FileUtils.deleteDirectory(new File(System.getProperty("user.home"), "db"));
+    FileUtils.deleteDirectory(new File(System.getProperty("user.home"), "db-data"));
 
     DatabaseClient.getServers().clear();
 
@@ -67,8 +67,8 @@ public class TestTransactions {
 
 //    final java.sql.Connection conn = DriverManager.getConnection("jdbc:voltdb://localhost:21212");
 
-    conn = DriverManager.getConnection("jdbc:sonicbase:127.0.0.1:9000", "user", "password");
-    conn2 = DriverManager.getConnection("jdbc:sonicbase:127.0.0.1:9000", "user", "password");
+    conn = DriverManager.getConnection("jdbc:sonicbase:localhost:9010", "user", "password");
+    conn2 = DriverManager.getConnection("jdbc:sonicbase:localhost:9010", "user", "password");
 
 //    conn = java.sql.DriverManager.getConnection("jdbc:mysql://localhost/test", "test", "test");
 //    conn2 = java.sql.DriverManager.getConnection("jdbc:mysql://localhost/test", "test", "test");

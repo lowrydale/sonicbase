@@ -161,13 +161,15 @@ public class SnapshotManager {
   }
 
   public void deleteSnapshots() {
-    File dir = getSnapshotReplicaDir();
-    try {
-      FileUtils.deleteDirectory(dir);
-      dir.mkdirs();
-    }
-    catch (IOException e) {
-      throw new DatabaseException(e);
+    if (server.isDurable()) {
+      File dir = getSnapshotReplicaDir();
+      try {
+        FileUtils.deleteDirectory(dir);
+        dir.mkdirs();
+      }
+      catch (IOException e) {
+        throw new DatabaseException(e);
+      }
     }
   }
 
@@ -373,6 +375,9 @@ public class SnapshotManager {
   }
 
   void saveIndexSchema(String dbName, int schemaVersion, TableSchema tableSchema, IndexSchema indexSchema) {
+    if (!server.isDurable()) {
+      return;
+    }
     try {
       File file = new File(getSnapshotSchemaDir(dbName), tableSchema.getName() + File.separator + "indices" +
           File.separator + indexSchema.getName() + File.separator + "schema." + schemaVersion + ".bin");
@@ -388,6 +393,9 @@ public class SnapshotManager {
   }
 
   void saveTableSchema(String dbName, int schemaVersion, String tableName, TableSchema tableSchema) {
+    if (!server.isDurable()) {
+      return;
+    }
     try {
       File file = new File(getSnapshotSchemaDir(dbName), tableName + "/table/schema." + schemaVersion + ".bin");
       FileUtils.forceMkdirParent(file);
@@ -402,6 +410,9 @@ public class SnapshotManager {
   }
 
   void deleteTableSchema(String dbName, int schemaVersion, String tableName) {
+    if (!server.isDurable()) {
+      return;
+    }
     File file = new File(getSnapshotSchemaDir(dbName), tableName);
     try {
       FileUtils.deleteDirectory(file);
@@ -412,6 +423,9 @@ public class SnapshotManager {
   }
 
   public void deleteDbSchema(String dbName) {
+    if (!server.isDurable()) {
+      return;
+    }
     File file = new File(getSnapshotSchemaDir(dbName));
     try {
       FileUtils.deleteDirectory(file);
@@ -422,6 +436,9 @@ public class SnapshotManager {
   }
 
   void deleteIndexSchema(String dbName, int schemaVersion, String table, String indexName) {
+    if (!server.isDurable()) {
+      return;
+    }
     File file = new File(getSnapshotSchemaDir(dbName), table + "/indices/" + indexName);
     try {
       FileUtils.deleteDirectory(file);
@@ -433,7 +450,7 @@ public class SnapshotManager {
 
 
   Thread snapshotThread = null;
-  void runSnapshotLoop() {
+  public void runSnapshotLoop() {
     if (snapshotThread != null) {
       snapshotThread.interrupt();
       try {

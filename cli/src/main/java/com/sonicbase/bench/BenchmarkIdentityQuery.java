@@ -14,9 +14,9 @@ import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
 
 import java.io.File;
-import java.sql.DriverManager;
-import java.sql.PreparedStatement;
-import java.sql.ResultSet;
+import java.sql.*;
+import java.util.ArrayList;
+import java.util.List;
 import java.util.Map;
 import java.util.concurrent.ConcurrentHashMap;
 import java.util.concurrent.ThreadLocalRandom;
@@ -88,6 +88,12 @@ public class BenchmarkIdentityQuery {
           threadCount = 4;
         }
 
+        List<List<Long>> ids = null;
+        if (queryType.equals("batch") || queryType.equals("cbatch")) {
+          ids = collectIds(client, conn);
+        }
+        final List<List<Long>> finalIds = ids;
+
         final int lessShardCount = shardCount;//(int) (shardCount * 0.75);
 
         final AtomicLong firstId = new AtomicLong(-1);
@@ -130,10 +136,9 @@ public class BenchmarkIdentityQuery {
                     }
                     else   if (queryType.equals("batch")) {
                       int batchSize = 3200;
-                      int innerBatchSize = batchSize / lessShardCount;
-                      long startOffset = offset;
+                      int innerBatchSize = batchSize / finalIds.size();
                       StringBuilder builder = new StringBuilder("select id1 from persons where id1 in (");
-                      for (int i1 = 0 ; i1 < innerBatchSize * lessShardCount; i1++) {
+                      for (int i1 = 0 ; i1 < innerBatchSize * (finalIds.size()); i1++) {
                         if (i1 == 0) {
                           builder.append("?");
                         }
@@ -145,7 +150,61 @@ public class BenchmarkIdentityQuery {
                       PreparedStatement stmt = conn.prepareStatement(builder.toString());
 
                       int parm = 0;
-                      for (int j = 0; j < lessShardCount; j++) {
+                      for (int j = 0; j < finalIds.size(); j++) {
+                        for (int k = 0; k < innerBatchSize; k++) {
+                          if (currOffset.get() + k >= finalIds.get(j).size()) {
+                            currOffset.set(0);
+                            logger.info("resetting currOffset");
+                          }
+                          long id = finalIds.get(j).get(currOffset.get() + k);
+                          stmt.setLong(parm++ + 1, id);
+                        }
+                      }
+                      currOffset.addAndGet(innerBatchSize);
+                      ResultSet rs = stmt.executeQuery();
+                      boolean found = rs.next();
+                      if (!found) {
+                        logger.info("lastId={}", lastId);
+                        offset = firstId.get();
+                        currOffset.set(0);
+                        break;
+                      }
+                      else {
+                        int countFound = 0;
+                        boolean hadSome = false;
+                        while (rs.next()) {
+                          countFound++;
+                          hadSome = true;
+                          selectOffset.incrementAndGet();
+                          lastId = rs.getLong("id1");
+                        }
+                        if (batchSize * 0.8 > countFound) {
+                          logger.warn("Returned much fewer than expected: expected={}, actual={}", batchSize, countFound);
+                        }
+                        if (!hadSome) {
+                          offset = firstId.get();
+                          currOffset.set(0);
+                        }
+                      }
+                    }
+                    else   if (queryType.equals("batch.last")) {
+                      int batchSize = 3200;
+                      int innerBatchSize = batchSize / lessShardCount;
+                      long startOffset = offset;
+                      StringBuilder builder = new StringBuilder("select id1 from persons where id1 in (");
+                      for (int i1 = 0 ; i1 < innerBatchSize * (lessShardCount - 2); i1++) {
+                        if (i1 == 0) {
+                          builder.append("?");
+                        }
+                        else {
+                          builder.append(", ?");
+                        }
+                      }
+                      builder.append(")");
+                      PreparedStatement stmt = conn.prepareStatement(builder.toString());
+
+                      int parm = 0;
+                      for (int j = 0; j < lessShardCount - 2; j++) {
                         for (int k = 0; k < innerBatchSize; k++) {
                           long shardedOffset = (j * count) + currOffset.get() + k;
                           stmt.setLong(parm++ + 1, shardedOffset);
@@ -569,6 +628,40 @@ public class BenchmarkIdentityQuery {
       }
     });
     mainThread.start();
+  }
+
+  private List<List<Long>> collectIds(DatabaseClient client, Connection conn) throws SQLException {
+    client.syncSchema();
+
+    List<List<Long>> ret = new ArrayList<>();
+    IndexSchema indexSchema = client.getCommon().getTables("db").get("persons").getIndices().get("_primarykey");
+    TableSchema.Partition[] partitions = indexSchema.getCurrPartitions();
+    for (int i = 0; i < partitions.length; i++) {
+      long lower = 0;
+      if (i != 0) {
+        lower = (long) partitions[i - 1].getUpperKey()[0];
+      }
+      List<Long> ids = new ArrayList<>();
+      try (PreparedStatement stmt = conn.prepareStatement("select * from persons where id1 > ?")) {
+        stmt.setLong(1, lower);
+        try (ResultSet rs = stmt.executeQuery()) {
+          for (int j = 0; j < 100_000; j++) {
+            if (!rs.next()) {
+              break;
+            }
+          }
+          for (int j = 0; j < 100_000; j++) {
+            if (!rs.next()) {
+              break;
+            }
+            ids.add(rs.getLong("id1"));
+          }
+          logger.info("Retrieved ids from shard: shard=" + i + ", count=" + ids.size());
+        }
+      }
+      ret.add(ids);
+    }
+    return ret;
   }
 
 

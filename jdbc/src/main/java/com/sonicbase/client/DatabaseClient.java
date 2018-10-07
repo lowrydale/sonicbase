@@ -59,6 +59,7 @@ public class DatabaseClient {
   private static final ConcurrentHashMap<String, Thread> statsRecorderThreads = new ConcurrentHashMap<>();
   private final String allocatedStack;
   private final StatementHandlerFactory statementHandlerFactory;
+  private final String[] hosts;
   private Object databaseServer;
   private Server[][] servers;
   private final AtomicBoolean isShutdown = new AtomicBoolean();
@@ -81,8 +82,8 @@ public class DatabaseClient {
   private Timer statsTimer;
   private final ConcurrentHashMap<String, StatementCacheEntry> statementCache = new ConcurrentHashMap<>();
 
-  public static final Map<Integer, Map<Integer, Object>> dbservers = new ConcurrentHashMap<>();
-  public static final Map<Integer, Map<Integer, Object>> dbdebugServers = new ConcurrentHashMap<>();
+  public static final Map<String, Map<Integer, Map<Integer, Object>>> dbservers = new ConcurrentHashMap<>();
+  public static final Map<String, Map<Integer, Map<Integer, Object>>> dbdebugServers = new ConcurrentHashMap<>();
 
   private static final MetricRegistry METRICS = new MetricRegistry();
 
@@ -196,6 +197,7 @@ public class DatabaseClient {
       }
       clientRefCount.incrementAndGet();
     }
+    this.hosts = hosts;
     statementHandlerFactory = new StatementHandlerFactory(this);
     allocatedStack = ExceptionUtils.getStackTrace(new Exception());
     allClients.add(this);
@@ -214,6 +216,9 @@ public class DatabaseClient {
     this.isClient = isClient;
     if (common != null) {
       this.common = common;
+    }
+    else {
+      this.common.setIsDurable(false);
     }
 
     if (shard != 0 && replica != 0) {
@@ -1187,10 +1192,11 @@ public class DatabaseClient {
   }
 
   private Object getLocalDbServer(int shard, int replica) {
-    Map<Integer, Map<Integer, Object>> dbServers = DatabaseClient.getServers();
+    String hostPort = hosts[0];
+    Map<String, Map<Integer, Map<Integer, Object>>> dbServers = DatabaseClient.getServers();
     Object dbserver = null;
-    if (dbServers != null && dbServers.get(shard) != null) {
-      dbserver = dbServers.get(shard).get(replica);
+    if (dbServers != null && dbServers.get(hostPort) != null && dbServers.get(hostPort).get(shard) != null) {
+      dbserver = dbServers.get(hostPort).get(shard).get(replica);
     }
     return dbserver;
   }
@@ -1525,11 +1531,11 @@ public class DatabaseClient {
     return id;
   }
 
-  public static Map<Integer, Map<Integer, Object>> getServers() {
+  public static Map<String, Map<Integer, Map<Integer, Object>>> getServers() {
     return dbservers;
   }
 
-  public static Map<Integer, Map<Integer, Object>> getDebugServers() {
+  public static Map<String, Map<Integer, Map<Integer, Object>>> getDebugServers() {
     return dbdebugServers;
   }
 

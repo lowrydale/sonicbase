@@ -3,13 +3,13 @@
   <parent>
     <artifactId>sonicbase-root</artifactId>
     <groupId>com.sonicbase</groupId>
-    <version>1.2.16</version>
+    <version>1.2.17</version>
   </parent>
   <modelVersion>4.0.0</modelVersion>
   <groupId>com.sonicbase</groupId>
   <artifactId>sonicbase-cli</artifactId>
   <name>sonicbase-cli</name>
-  <version>1.2.16</version>
+  <version>1.2.17</version>
   <url>http://maven.apache.org</url>
   <build>
     <pluginManagement>
@@ -682,7 +682,7 @@
     <dependency>
       <groupId>com.sonicbase</groupId>
       <artifactId>sonicbase-jdbc</artifactId>
-      <version>1.2.16</version>
+      <version>1.2.17</version>
       <scope>provided</scope>
       <exclusions>
         <exclusion>
@@ -718,16 +718,20 @@
     <dependency>
       <groupId>com.sonicbase</groupId>
       <artifactId>sonicbase-server</artifactId>
-      <version>1.2.16</version>
+      <version>1.2.17</version>
       <scope>provided</scope>
       <exclusions>
+        <exclusion>
+          <artifactId>fastutil</artifactId>
+          <groupId>it.unimi.dsi</groupId>
+        </exclusion>
         <exclusion>
           <artifactId>netty-all</artifactId>
           <groupId>io.netty</groupId>
         </exclusion>
         <exclusion>
-          <artifactId>aws-java-sdk-lexmodelbuilding</artifactId>
-          <groupId>com.amazonaws</groupId>
+          <artifactId>hadoop-core</artifactId>
+          <groupId>org.apache.hadoop</groupId>
         </exclusion>
       </exclusions>
     </dependency>
@@ -878,12 +882,12 @@
           <groupId>com.google.code.findbugs</groupId>
         </exclusion>
         <exclusion>
-          <artifactId>hadoop-core</artifactId>
-          <groupId>org.apache.hadoop</groupId>
-        </exclusion>
-        <exclusion>
           <artifactId>lzo-core</artifactId>
           <groupId>org.anarres.lzo</groupId>
+        </exclusion>
+        <exclusion>
+          <artifactId>hadoop-core</artifactId>
+          <groupId>org.apache.hadoop</groupId>
         </exclusion>
       </exclusions>
     </dependency>

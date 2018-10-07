@@ -28,6 +28,9 @@ import static com.sonicbase.server.DatabaseServer.TIME_2017;
 public class AddressMap {
   private static final Logger logger = LoggerFactory.getLogger(AddressMap.class);
 
+  public static int MAX_PAGE_SIZE = 256_000;
+  public static boolean MEM_OP = false;
+  private static boolean USE_FAST_UTIL = true;
 
   private final AtomicLong currOuterAddress = new AtomicLong();
   private final AtomicLong currPageId = new AtomicLong();
@@ -35,23 +38,18 @@ public class AddressMap {
   private final ReentrantReadWriteLock.ReadLock[] readLocks = new ReentrantReadWriteLock.ReadLock[10_000];
   private final ReentrantReadWriteLock.WriteLock[] writeLocks = new ReentrantReadWriteLock.WriteLock[10_000];
   private final Unsafe unsafe = getUnsafe();
+  private final boolean useUnsafe;
   private Thread compactionThread;
   private final DatabaseServer server;
   private Long2LongOpenHashMap[] addressMaps = new Long2LongOpenHashMap[10_000];
-  public static int MAX_PAGE_SIZE = 256_000;
-  private static boolean USE_FAST_UTIL = true;
   private ConcurrentHashMap<Long, Page> pages = new ConcurrentHashMap<>();
   private ConcurrentHashMap<Long, Long> addressMap = new ConcurrentHashMap<>();
-  public static boolean MEM_OP = false;
-
-
 
   public static Unsafe getUnsafe() {
     try {
       Field singleoneInstanceField = Unsafe.class.getDeclaredField("theUnsafe");
       singleoneInstanceField.setAccessible(true);
       return (Unsafe) singleoneInstanceField.get(null);
-
     }
     catch (Exception e) {
       throw new DatabaseException(e);
@@ -60,6 +58,7 @@ public class AddressMap {
 
   public AddressMap(DatabaseServer server) {
     this.server = server;
+    this.useUnsafe = server.shouldUseUnsafe();
     for (int i = 0; i < readWriteLocks.length; i++) {
       readWriteLocks[i] = new ReentrantReadWriteLock();
       readLocks[i] = readWriteLocks[i].readLock();
@@ -302,9 +301,12 @@ public class AddressMap {
     return writeLocks[slot];
   }
 
-  public long getUpdateTime(Long outerAddress) {
+  public long getUpdateTime(Object outerAddress) {
+    if (outerAddress instanceof AddressEntry) {
+      return ((AddressEntry)outerAddress).updateTime;
+    }
     if (outerAddress != null) {
-    ReentrantReadWriteLock.ReadLock readLock = getReadLock(outerAddress);
+    ReentrantReadWriteLock.ReadLock readLock = getReadLock((long)outerAddress);
     readLock.lock();
       try {
         return 999999999999999999L;
@@ -419,7 +421,20 @@ public class AddressMap {
     return toUnsafeFromRecords(seconds, records);
   }
 
+  public static class AddressEntry {
+    private byte[][] records;
+    private long updateTime;
+
+    public AddressEntry(byte[][] records, long updateTime) {
+      this.records = records;
+      this.updateTime = updateTime;
+    }
+  }
+
   public Object toUnsafeFromRecords(long updateTime, byte[][] records) {
+    if (!useUnsafe) {
+      return new AddressEntry(records, updateTime);
+    }
     return toUnsafeForUnsafe(updateTime, records);
   }
 
@@ -497,18 +512,22 @@ public class AddressMap {
     }
   }
 
-  public void writeRecordstoExistingAddress(long address, byte[][] records) {
+  public void writeRecordstoExistingAddress(Object address, byte[][] records) {
+    if (address instanceof AddressEntry) {
+      ((AddressEntry)address).records = records;
+      return;
+    }
     int recordsLen = 0;
     for (byte[] record : records) {
       recordsLen += record.length;
     }
 
     if (MEM_OP) {
-      ReentrantReadWriteLock.WriteLock lock = getWriteLock(address);
+      ReentrantReadWriteLock.WriteLock lock = getWriteLock((long)address);
       lock.lock();
       try {
 
-        long innerAddress = getAddress(address);
+        long innerAddress = getAddress((long)address);
         byte[] bytes = new byte[4 + (4 * records.length) + recordsLen];
         int offset = 0; //update time
         DataUtils.intToBytes(records.length, bytes, offset);
@@ -535,7 +554,7 @@ public class AddressMap {
           unsafe.putByte(innerAddress + offset + i, bytes[i]);
         }
 
-        if (address == 0 || address == -1L) {
+        if ((long)address == 0 || (long)address == -1L) {
           throw new DatabaseException("Inserted null address *****************");
         }
       }
@@ -544,7 +563,7 @@ public class AddressMap {
       }
     }
     else {
-      long innerAddress = address;
+      long innerAddress = (long)address;
       byte[] bytes = new byte[4 + (4 * records.length) + recordsLen];
       int offset = 0; //update time
       DataUtils.intToBytes(records.length, bytes, offset);
@@ -580,6 +599,9 @@ public class AddressMap {
 
 
   public byte[][] fromUnsafeToRecords(Object obj) {
+    if (!useUnsafe) {
+      return ((AddressEntry)obj).records;
+    }
     try {
       return fromUnsafeForUnsafe((Long) obj);
     }
@@ -655,6 +677,9 @@ public class AddressMap {
 
   public void freeUnsafeIds(Object obj) {
     try {
+      if (obj instanceof AddressEntry) {
+        return;
+      }
       removeAddress((Long)obj, unsafe);
     }
     catch (Exception e) {

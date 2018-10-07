@@ -1,5 +1,5 @@
 replicationFactor: 1
-dataDirectory: $HOME/db
+dataDirectory: $HOME/db-data
 installDirectory: $HOME/sonicbase
 compressRecords: false
 useUnsafe: true

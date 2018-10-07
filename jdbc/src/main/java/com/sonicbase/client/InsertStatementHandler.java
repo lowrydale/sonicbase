@@ -568,9 +568,7 @@ public class InsertStatementHandler implements StatementHandler {
       byte[] recordBytes = record.serialize(client.getCommon(), SERIALIZATION_VERSION);
       cobj.put(ComObject.Tag.RECORD_BYTES, recordBytes);
     }
-    else {
-      System.out.println("error");
-    }
+
     byte[] keyRecordBytes = keyRecord.serialize(SERIALIZATION_VERSION);
     cobj.put(ComObject.Tag.KEY_RECORD_BYTES, keyRecordBytes);
     byte[] primaryKeyBytes = DatabaseCommon.serializeKey(common.getTables(dbName).get(tableName), primaryKeyIndexName, primaryKey);

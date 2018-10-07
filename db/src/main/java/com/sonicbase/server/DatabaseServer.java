@@ -1,9 +1,5 @@
 package com.sonicbase.server;
 
-import com.fasterxml.jackson.databind.JsonNode;
-import com.fasterxml.jackson.databind.ObjectMapper;
-import com.fasterxml.jackson.databind.node.ArrayNode;
-import com.fasterxml.jackson.databind.node.ObjectNode;
 import com.sonicbase.client.DatabaseClient;
 import com.sonicbase.common.*;
 import com.sonicbase.index.AddressMap;
@@ -56,8 +52,9 @@ public class DatabaseServer {
   private static final String NEXT_RECORD_ID_STR = "nextRecordId/";
   private static final String REPLICA_STR = ", replica=";
   private static final Object deathOverrideMutex = new Object();
-  public static final String USER_DIR_STR = "user.dir";
-  public static final String USER_HOME_STR = "user.home";
+  private static final String USER_DIR_STR = "user.dir";
+  private static final String USER_HOME_STR = "user.home";
+  public static final String USE_UNSAFE_STR = "useUnsafe";
   public static boolean[][] deathOverride;
   private static final Logger logger = LoggerFactory.getLogger(DatabaseServer.class);
   private static final Logger errorLogger = LoggerFactory.getLogger(DatabaseServer.class);
@@ -116,6 +113,8 @@ public class DatabaseServer {
   private String gcLog;
   private Thread reloadServerThread;
   private boolean isServerRoloadRunning;
+  private boolean durable = true;
+  private boolean unsafe;
 
   public static boolean[][] getDeathOverride() {
     return deathOverride;
@@ -136,18 +135,18 @@ public class DatabaseServer {
   public void setConfig(
       final Config config, String cluster, String host, int port, AtomicBoolean isRunning,
       AtomicBoolean isRecovered, String gclog, String xmx) {
-    setConfig(config, cluster, host, port, false, isRunning, isRecovered, gclog, xmx);
+    setConfig(config, cluster, host, port, false, isRunning, isRecovered, gclog, xmx, true, false);
   }
 
   public void setConfig(
       final Config config, String cluster, String host, int port,
       boolean unitTest, AtomicBoolean isRunning, AtomicBoolean isRecovered, String gclog) {
-    setConfig(config, cluster, host, port, unitTest, isRunning, isRecovered, gclog, null);
+    setConfig(config, cluster, host, port, unitTest, isRunning, isRecovered, gclog, null, true, false);
   }
 
   public void setConfig(
       final Config config, String cluster, String host, int port,
-      boolean unitTest, AtomicBoolean isRunning, AtomicBoolean isRecovered, String gclog, String xmx) {
+      boolean unitTest, AtomicBoolean isRunning, AtomicBoolean isRecovered, String gclog, String xmx, boolean durable, boolean disablePro) {
     this.isRunning = isRunning;
     this.isRecovered = isRecovered;
     this.config = config;
@@ -156,6 +155,8 @@ public class DatabaseServer {
     this.port = port;
     this.xmx = xmx;
     this.gcLog = gclog;
+    this.durable = durable;
+    this.unsafe = config.getBoolean(USE_UNSAFE_STR) == null ? true : config.getBoolean(USE_UNSAFE_STR);
 
     this.dataDir = config.getString("dataDirectory");
     this.dataDir = dataDir.replace("$HOME", System.getProperty(USER_HOME_STR));
@@ -180,6 +181,7 @@ public class DatabaseServer {
     this.masterAddress = firstServer.getString(PRIVATE_ADDRESS_STR);
     this.masterPort = firstServer.getInt("port");
 
+    common.setIsDurable(durable);
     if (firstServer.getString(PRIVATE_ADDRESS_STR).equals(host) &&
         firstServer.getInt("port") == port) {
       this.shard = 0;
@@ -192,7 +194,7 @@ public class DatabaseServer {
     boolean optimizedForThroughput = initOpimizedFor(config);
     serversConfig = new ServersConfig(cluster, shards, isInternal, optimizedForThroughput);
 
-    initServersForUnitTest(host, port, unitTest, serversConfig);
+    initServersForUnitTest(cluster, host, port, unitTest, serversConfig);
 
     this.replica = serversConfig.getThisReplica(host, port);
 
@@ -216,14 +218,19 @@ public class DatabaseServer {
 
     initMethodInvokers();
 
-    try {
-      Class proClz = Class.forName("com.sonicbase.server.ProServer");
-      Constructor ctor = proClz.getConstructor(DatabaseServer.class);
-      proServer = ctor.newInstance(this);
-    }
-    catch (Exception e) {
-      logger.warn("Error initializing pro server", e);
+    if (disablePro) {
       initProNoOpMethodInvokers();
+    }
+    else {
+      try {
+        Class proClz = Class.forName("com.sonicbase.server.ProServer");
+        Constructor ctor = proClz.getConstructor(DatabaseServer.class);
+        proServer = ctor.newInstance(this);
+      }
+      catch (Exception e) {
+        logger.warn("Error initializing pro server", e);
+        initProNoOpMethodInvokers();
+      }
     }
     licenseManager = new LicenseManagerProxy(proServer);
 
@@ -311,8 +318,8 @@ public class DatabaseServer {
   }
 
   private void initUnsafe(Config config) {
-    if (config.getBoolean("useUnsafe") != null) {
-      useUnsafe = config.getBoolean("useUnsafe");
+    if (config.getBoolean(USE_UNSAFE_STR) != null) {
+      useUnsafe = config.getBoolean(USE_UNSAFE_STR);
     }
     else {
       useUnsafe = true;
@@ -998,6 +1005,18 @@ public class DatabaseServer {
     licenseManager.startMasterLicenseValidator();
   }
 
+  public boolean isDurable() {
+    return durable;
+  }
+
+  public boolean shouldUseUnsafe() {
+    return unsafe;
+  }
+
+  public void setDurable(boolean durable) {
+    this.durable = durable;
+  }
+
   @SuppressWarnings("squid:S1186") // the NullX509TrustManager isn't suppose to do anything
   private static class NullX509TrustManager implements X509TrustManager {
     public void checkClientTrusted(X509Certificate[] chain, String authType) {
@@ -1168,7 +1187,7 @@ public class DatabaseServer {
     return throttleInsert;
   }
 
-  DeleteManager getDeleteManager() {
+  public DeleteManager getDeleteManager() {
     return deleteManager;
   }
 
@@ -1358,24 +1377,51 @@ public class DatabaseServer {
     return replica;
   }
 
-  private void initServersForUnitTest(
-      String host, int port, boolean unitTest, ServersConfig serversConfig) {
+  private void initServersForUnitTest(String cluster, String host, int port, boolean unitTest, ServersConfig serversConfig) {
+
+    for (ServersConfig.Shard shard : serversConfig.getShards()) {
+      for (ServersConfig.Host replica : shard.getReplicas()) {
+
+        String hostPort = replica.getPublicAddress() + ":" + replica.getPort();
+
+        doInitServersForUnitTest(hostPort, unitTest, serversConfig);
+
+        hostPort = replica.getPrivateAddress() + ":" + replica.getPort();
+
+        doInitServersForUnitTest(hostPort, unitTest, serversConfig);
+      }
+    }
+  }
+
+  private void doInitServersForUnitTest(String hostPort, boolean unitTest, ServersConfig serversConfig) {
     if (unitTest) {
+      Map<Integer, Map<Integer, Object>> hostMap = DatabaseClient.dbservers.get(hostPort);
+      if (hostMap == null) {
+        hostMap = new ConcurrentHashMap<>();
+        DatabaseClient.dbservers.put(hostPort, hostMap);
+      }
       int thisShard = serversConfig.getThisShard(host, port);
       int thisReplica = serversConfig.getThisReplica(host, port);
-      Map<Integer, Object> currShard = DatabaseClient.dbservers.get(thisShard);
+      Map<Integer, Object> currShard = hostMap.get(thisShard);
       if (currShard == null) {
         currShard = new ConcurrentHashMap<>();
-        DatabaseClient.dbservers.put(thisShard, currShard);
+        hostMap.put(thisShard, currShard);
       }
       currShard.put(thisReplica, this);
     }
+
+    Map<Integer, Map<Integer, Object>> clusterMap = DatabaseClient.dbdebugServers.get(hostPort);
+    if (clusterMap == null) {
+      clusterMap = new ConcurrentHashMap<>();
+      DatabaseClient.dbdebugServers.put(hostPort, clusterMap);
+    }
+
     int thisShard = serversConfig.getThisShard(host, port);
     int thisReplica = serversConfig.getThisReplica(host, port);
-    Map<Integer, Object> currShard = DatabaseClient.dbdebugServers.get(thisShard);
+    Map<Integer, Object> currShard = clusterMap.get(thisShard);
     if (currShard == null) {
       currShard = new ConcurrentHashMap<>();
-      DatabaseClient.dbdebugServers.put(thisShard, currShard);
+      clusterMap.put(thisShard, currShard);
     }
     currShard.put(thisReplica, this);
   }
@@ -1585,7 +1631,7 @@ public class DatabaseServer {
 
   long getUpdateTime(Object value) {
     try {
-      return addressMap.getUpdateTime((Long) value);
+      return addressMap.getUpdateTime(value);
     }
     catch (Exception e) {
       throw new DatabaseException(e);
@@ -2005,6 +2051,7 @@ public class DatabaseServer {
   }
 
   private final Object nextIdLock = new Object();
+  private Long maxRecordId;
 
   @SchemaReadLock
   public ComObject allocateRecordIds(ComObject cobj, boolean replayedCommand) {
@@ -2015,24 +2062,37 @@ public class DatabaseServer {
       long nextId;
       long maxId;
       synchronized (nextIdLock) {
-        File file = new File(dataDir, NEXT_RECORD_ID_STR + getShard() + File.separator + getReplica() + NEXT_RECOR_ID_TXT_STR);
-        file.getParentFile().mkdirs();
-        if (!file.exists()) {
-          nextId = 1;
-          maxId = 100000;
+        if (!durable) {
+          if (maxRecordId == null) {
+            nextId = 1;
+            maxRecordId = maxId = 100000;
+          }
+          else {
+            nextId = maxRecordId + 1;
+            maxRecordId += 100000;
+            maxId = maxRecordId;
+          }
         }
         else {
-          try (BufferedReader reader = new BufferedReader(new InputStreamReader(new FileInputStream(file)))) {
-            maxId = Long.valueOf(reader.readLine());
-            nextId = maxId + 1;
-            maxId += 100000;
+          File file = new File(dataDir, NEXT_RECORD_ID_STR + getShard() + File.separator + getReplica() + NEXT_RECOR_ID_TXT_STR);
+          file.getParentFile().mkdirs();
+          if (!file.exists()) {
+            nextId = 1;
+            maxId = 100000;
           }
-          if (file.exists()) {
-            Files.delete(file.toPath());
+          else {
+            try (BufferedReader reader = new BufferedReader(new InputStreamReader(new FileInputStream(file)))) {
+              maxId = Long.valueOf(reader.readLine());
+              nextId = maxId + 1;
+              maxId += 100000;
+            }
+            if (file.exists()) {
+              Files.delete(file.toPath());
+            }
           }
-        }
-        try (BufferedWriter writer = new BufferedWriter(new OutputStreamWriter(new FileOutputStream(file)))) {
-          writer.write(String.valueOf(maxId));
+          try (BufferedWriter writer = new BufferedWriter(new OutputStreamWriter(new FileOutputStream(file)))) {
+            writer.write(String.valueOf(maxId));
+          }
         }
       }
 
@@ -2053,12 +2113,18 @@ public class DatabaseServer {
   public ComObject pushMaxRecordId(ComObject cobj, boolean replayedCommand) {
     try {
       synchronized (nextIdLock) {
-        File file = new File(dataDir, NEXT_RECORD_ID_STR + getShard() + File.separator + getReplica() + NEXT_RECOR_ID_TXT_STR);
-        file.getParentFile().mkdirs();
-        if (file.exists()) {
-          try (BufferedReader reader = new BufferedReader(new InputStreamReader(new FileInputStream(file)))) {
-            long maxId = Long.parseLong(reader.readLine());
-            pushMaxRecordId(NONE_STR, maxId);
+        if (!durable) {
+          long maxId = maxRecordId == null ? 0 : maxRecordId;
+          pushMaxRecordId(NONE_STR, maxId);
+        }
+        else {
+          File file = new File(dataDir, NEXT_RECORD_ID_STR + getShard() + File.separator + getReplica() + NEXT_RECOR_ID_TXT_STR);
+          file.getParentFile().mkdirs();
+          if (file.exists()) {
+            try (BufferedReader reader = new BufferedReader(new InputStreamReader(new FileInputStream(file)))) {
+              long maxId = Long.parseLong(reader.readLine());
+              pushMaxRecordId(NONE_STR, maxId);
+            }
           }
         }
       }
@@ -2097,14 +2163,19 @@ public class DatabaseServer {
     try {
       logger.info("setMaxRecordId - begin");
       synchronized (nextIdLock) {
-        File file = new File(dataDir, NEXT_RECORD_ID_STR + getShard() + File.separator + getReplica() + NEXT_RECOR_ID_TXT_STR);
-        org.apache.commons.io.FileUtils.forceMkdirParent(file);
-        if (file.exists()) {
-          Files.delete(file.toPath());
+        if (!durable) {
+          maxRecordId = maxId;
         }
+        else {
+          File file = new File(dataDir, NEXT_RECORD_ID_STR + getShard() + File.separator + getReplica() + NEXT_RECOR_ID_TXT_STR);
+          org.apache.commons.io.FileUtils.forceMkdirParent(file);
+          if (file.exists()) {
+            Files.delete(file.toPath());
+          }
 
-        try (BufferedWriter writer = new BufferedWriter(new OutputStreamWriter(new FileOutputStream(file)))) {
-          writer.write(String.valueOf(maxId));
+          try (BufferedWriter writer = new BufferedWriter(new OutputStreamWriter(new FileOutputStream(file)))) {
+            writer.write(String.valueOf(maxId));
+          }
         }
       }
 

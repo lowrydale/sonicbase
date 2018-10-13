@@ -5,8 +5,8 @@ SonicBase is an in-memory database. It works well as an embedded or standalone d
 ## For the full **documentation**, follow this [link](https://sonicbase.com/documentation.html)
 
 
-#    Tutorial - Local Deploy
-In this tutorial we will walk you through the process of starting a local cluster and inserting into and reading from it.
+#    Tutorial - Standalone Deploy
+In this tutorial we will walk you through the process of starting a standalone server and inserting into and reading from it.
 
 ###     Download The Software
  Download the latest software from this site.

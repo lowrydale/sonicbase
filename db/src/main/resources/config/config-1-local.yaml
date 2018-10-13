@@ -21,3 +21,4 @@ servers:
 clients:
 - client:
     address: localhost
+    port: 8090

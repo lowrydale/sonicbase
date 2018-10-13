@@ -94,11 +94,11 @@ public class DeleteManager {
 
       IndexSchema indexSchema = databaseServer.getCommon().getTables(dbName).get(tableName).getIndices().get(indexName);
       for (DeleteRequest request : deleteRequests) {
-        Object obj = index.get(request.getKey());
-        if (obj != null) {
+        Object value = index.remove(request.getKey());
+        if (value != null) {
           try {
-            byte[][] content = databaseServer.getAddressMap().fromUnsafeToRecords(obj);
-            processRecords(indexSchema, index, request.getKey(), content);
+            byte[][] content = databaseServer.getAddressMap().fromUnsafeToRecords(value);
+            processRecords(indexSchema, index, request.getKey(), content, value);
           }
           catch (Exception e) {
             logger.error("Error deleting record: db={}, table={}, index={}, key={}", dbName, tableName, indexName, DatabaseCommon.keyToString(request.getKey()));
@@ -220,31 +220,31 @@ public class DeleteManager {
 
   private void processValue(IndexSchema indexSchema, Index index, Object[] currKey) throws InterruptedException {
     synchronized (index.getMutex(currKey)) {
-      Object value = index.get(currKey);
+      Object value = index.remove(currKey); // will likely delete, so go ahead and delete and re-add later if needed
       if (value != null) {
         byte[][] content = databaseServer.getAddressMap().fromUnsafeToRecords(value);
         if (content != null) {
-          processRecords(indexSchema, index, currKey, content);
+          processRecords(indexSchema, index, currKey, content, value);
         }
       }
     }
   }
 
-  private void processRecords(IndexSchema indexSchema, Index index, Object[] currKey, byte[][] content) throws InterruptedException {
+  private void processRecords(IndexSchema indexSchema, Index index, Object[] currKey, byte[][] content, Object value) throws InterruptedException {
     if (indexSchema.isPrimaryKey()) {
-      if ((Record.DB_VIEW_FLAG_DELETING & Record.getDbViewFlags(content[0])) != 0) {
-        Object o = index.remove(currKey);
-        if (o != null) {
-          toFree.put(o);
-        }
+      if ((Record.DB_VIEW_FLAG_DELETING & Record.getDbViewFlags(content[0])) == 0) {
+        index.put(currKey, value);
+      }
+      else {
+        toFree.put(value);
       }
     }
     else {
-      if ((Record.DB_VIEW_FLAG_DELETING & KeyRecord.getDbViewFlags(content[0])) != 0) {
-        Object o = index.remove(currKey);
-        if (o != null) {
-          toFree.put(o);
-        }
+      if ((Record.DB_VIEW_FLAG_DELETING & KeyRecord.getDbViewFlags(content[0])) == 0) {
+        index.put(currKey, value);
+      }
+      else {
+        toFree.put(value);
       }
     }
   }

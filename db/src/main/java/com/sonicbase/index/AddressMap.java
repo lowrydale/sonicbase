@@ -34,9 +34,7 @@ public class AddressMap {
 
   private final AtomicLong currOuterAddress = new AtomicLong();
   private final AtomicLong currPageId = new AtomicLong();
-  private final ReentrantReadWriteLock[] readWriteLocks = new ReentrantReadWriteLock[10_000];
-  private final ReentrantReadWriteLock.ReadLock[] readLocks = new ReentrantReadWriteLock.ReadLock[10_000];
-  private final ReentrantReadWriteLock.WriteLock[] writeLocks = new ReentrantReadWriteLock.WriteLock[10_000];
+  private final Object[] mutexes = new Object[10_000];
   private final Unsafe unsafe = getUnsafe();
   private final boolean useUnsafe;
   private Thread compactionThread;
@@ -59,10 +57,8 @@ public class AddressMap {
   public AddressMap(DatabaseServer server) {
     this.server = server;
     this.useUnsafe = server.shouldUseUnsafe();
-    for (int i = 0; i < readWriteLocks.length; i++) {
-      readWriteLocks[i] = new ReentrantReadWriteLock();
-      readLocks[i] = readWriteLocks[i].readLock();
-      writeLocks[i] = readWriteLocks[i].writeLock();
+    for (int i = 0; i < mutexes.length; i++) {
+      mutexes[i] = new Object();
     }
     for (int i = 0; i < addressMaps.length; i++) {
       addressMaps[i] = new Long2LongOpenHashMap();
@@ -183,16 +179,15 @@ public class AddressMap {
       offset += 1; //freed
       long prevOuterAddress = DataUtils.addressToLong(offset, unsafe);
       offset += 8; //outerAddress
-      ReentrantReadWriteLock.WriteLock lock = getWriteLock(prevOuterAddress);
-      lock.lock();
-      try {
+      Object mutex = getMutex(prevOuterAddress);
+      synchronized (mutex) {
         boolean active = unsafe.getByte(startOffset + 1) != 1;
         offset += 4; //offset from top of page allocation
         offset += 8; //update time
         offset += DataUtils.addressToInt(offset, unsafe);
         offset += 4; //actualSize
         if (active) {
-          int size = (int)(offset - startOffset);
+          int size = (int) (offset - startOffset);
           unsafe.copyMemory(startOffset, newAddress + newPageOffset.get(), size);
           if (USE_FAST_UTIL) {
             addressMaps[(int) (prevOuterAddress % addressMaps.length)].put(prevOuterAddress, newAddress + newPageOffset.get());
@@ -204,13 +199,10 @@ public class AddressMap {
         }
         else {
           if (allocationsToKeep.contains(startOffset)) {
-            missSize.addAndGet((int)(offset - startOffset));
+            missSize.addAndGet((int) (offset - startOffset));
             missCount.incrementAndGet();
           }
         }
-      }
-      finally {
-        lock.unlock();
       }
     }
   }
@@ -291,14 +283,9 @@ public class AddressMap {
 //    }
   }
 
-  private ReentrantReadWriteLock.ReadLock getReadLock(long outerAddress) {
+  private Object getMutex(long outerAddress) {
     int slot = (int) (outerAddress % addressMaps.length);
-    return readLocks[slot];
-  }
-
-  private ReentrantReadWriteLock.WriteLock getWriteLock(long outerAddress) {
-    int slot = (int) (outerAddress % addressMaps.length);
-    return writeLocks[slot];
+    return mutexes[slot];
   }
 
   public long getUpdateTime(Object outerAddress) {
@@ -306,13 +293,9 @@ public class AddressMap {
       return ((AddressEntry)outerAddress).updateTime;
     }
     if (outerAddress != null) {
-    ReentrantReadWriteLock.ReadLock readLock = getReadLock((long)outerAddress);
-    readLock.lock();
-      try {
+      Object mutex = getMutex((long)outerAddress);
+      synchronized (mutex) {
         return 999999999999999999L;
-      }
-      finally {
-        readLock.unlock();
       }
     }
     return 0;
@@ -324,18 +307,14 @@ public class AddressMap {
     }
     else {
       long outerAddress = currOuterAddress.incrementAndGet();
-          ReentrantReadWriteLock.WriteLock lock = getWriteLock(outerAddress);
-          lock.lock();
-      try {
+      Object mutex = getMutex(outerAddress);
+      synchronized (mutex) {
         if (USE_FAST_UTIL) {
           addressMaps[(int) (outerAddress % addressMaps.length)].put(outerAddress, innerAddress);
         }
         else {
           addressMap.put(outerAddress, innerAddress);
         }
-      }
-      finally {
-        lock.unlock();
       }
       return outerAddress;
     }
@@ -358,9 +337,8 @@ public class AddressMap {
       unsafe.freeMemory(outerAddress);
     }
     else {
-      ReentrantReadWriteLock.WriteLock writeLock = getWriteLock(outerAddress);
-      writeLock.lock();
-      try {
+      Object mutex = getMutex(outerAddress);
+      synchronized (mutex) {
         Long innerAddress = null;
         if (USE_FAST_UTIL) {
           innerAddress = addressMaps[(int) (outerAddress % addressMaps.length)].remove(outerAddress);
@@ -368,17 +346,14 @@ public class AddressMap {
         else {
           innerAddress = addressMap.remove(outerAddress);
         }
-        if (innerAddress != null && innerAddress != -1) {
-          if (1 == unsafe.getByte(innerAddress)) {
-            freeSingleAllocation(unsafe, innerAddress);
-          }
-          else {
-            freeMultipleAllocations(unsafe, innerAddress);
-          }
-        }
-      }
-      finally {
-        writeLock.unlock();
+        //        if (innerAddress != null && innerAddress != -1) {
+        //          if (1 == unsafe.getByte(innerAddress)) {
+        //            freeSingleAllocation(unsafe, innerAddress);
+        //          }
+        //          else {
+        //            freeMultipleAllocations(unsafe, innerAddress);
+        //          }
+        //        }
       }
     }
   }
@@ -400,7 +375,7 @@ public class AddressMap {
 
     Page page = pages.get(pageId);
     if (page == null) {
-      logger.error("Page not found");
+      //logger.error("Page not found");
     }
     else {
       page.totalFreeSize.addAndGet(offset);
@@ -432,6 +407,9 @@ public class AddressMap {
   }
 
   public Object toUnsafeFromRecords(long updateTime, byte[][] records) {
+    if (MEM_OP) {
+      return toUnsafeForUnsafe(updateTime, records);
+    }
     if (!useUnsafe) {
       return new AddressEntry(records, updateTime);
     }
@@ -523,11 +501,9 @@ public class AddressMap {
     }
 
     if (MEM_OP) {
-      ReentrantReadWriteLock.WriteLock lock = getWriteLock((long)address);
-      lock.lock();
-      try {
-
-        long innerAddress = getAddress((long)address);
+      Object mutex = ((long)address);
+      synchronized (mutex) {
+        long innerAddress = getAddress((long) address);
         byte[] bytes = new byte[4 + (4 * records.length) + recordsLen];
         int offset = 0; //update time
         DataUtils.intToBytes(records.length, bytes, offset);
@@ -554,12 +530,9 @@ public class AddressMap {
           unsafe.putByte(innerAddress + offset + i, bytes[i]);
         }
 
-        if ((long)address == 0 || (long)address == -1L) {
+        if ((long) address == 0 || (long) address == -1L) {
           throw new DatabaseException("Inserted null address *****************");
         }
-      }
-      finally {
-        lock.unlock();
       }
     }
     else {
@@ -599,10 +572,13 @@ public class AddressMap {
 
 
   public byte[][] fromUnsafeToRecords(Object obj) {
-    if (!useUnsafe) {
-      return ((AddressEntry)obj).records;
-    }
     try {
+      if (MEM_OP) {
+        return fromUnsafeForUnsafe((Long) obj);
+      }
+      if (!useUnsafe) {
+        return ((AddressEntry)obj).records;
+      }
       return fromUnsafeForUnsafe((Long) obj);
     }
     catch (IOException e) {
@@ -612,9 +588,8 @@ public class AddressMap {
 
   private byte[][] fromUnsafeForUnsafe(Long obj) throws IOException {
     if (MEM_OP) {
-      ReentrantReadWriteLock.ReadLock readLock = getReadLock(obj);
-      readLock.lock();
-      try {
+      Object mutex = getMutex(obj);
+      synchronized (mutex) {
         Long innerAddress = getAddress(obj);
         if (innerAddress == null || (long) innerAddress == -1L) {
           return null;
@@ -641,9 +616,6 @@ public class AddressMap {
           ret[i] = record;
         }
         return ret;
-      }
-      finally {
-        readLock.unlock();
       }
     }
     else {

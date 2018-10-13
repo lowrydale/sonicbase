@@ -1161,7 +1161,7 @@ public class PartitionManager extends Thread {
           keys = cobj.putArray(ComObject.Tag.KEYS, ComObject.Type.BYTE_ARRAY_TYPE);
 
           sendDeletes(executor, currObj, futures);
-          logger.info("delete moved entries progress: db={}, table={}, index={}, submittedCount{}=", dbName,
+          logger.debug("delete moved entries progress: db={}, table={}, index={}, submittedCount{}=", dbName,
               tableName, indexName, count);
         }
       }
@@ -1173,7 +1173,7 @@ public class PartitionManager extends Thread {
         cobj.put(ComObject.Tag.INDEX_NAME, indexName);
 
         sendDeletes(executor, cobj, futures);
-        logger.info("delete moved entries progress: db={}, table={}, index={}, submittedCount{}=", dbName,
+        logger.debug("delete moved entries progress: db={}, table={}, index={}, submittedCount{}=", dbName,
             tableName, indexName, count);
       }
     }
@@ -1186,7 +1186,7 @@ public class PartitionManager extends Thread {
         try {
           int currCount = (int) future.get();
           count += currCount;
-          logger.info("delete moved entries progress: db={}, table={}, index={}, finishedCount={}", dbName, tableName,
+          logger.debug("delete moved entries progress: db={}, table={}, index={}, finishedCount={}", dbName, tableName,
               indexName, count);
         }
         catch (Exception e) {

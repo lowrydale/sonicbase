@@ -99,19 +99,22 @@ public class TestPartitionManagerConsistency {
       final AtomicLong highestId = new AtomicLong();
       Thread thread = new Thread(() -> {
         try {
-          for (int i = 0; ; i++) {
+          for (int i = 0; ;) {
             PreparedStatement stmt = conn.prepareStatement("insert into persons (id, id2) VALUES (?, ?)");
-            stmt.setLong(1, i );
-            stmt.setLong(2, (i + 100) % 2);
-            int count = stmt.executeUpdate();
-            assertEquals(count, 1);
-            highestId.set(i);
+            for (int j = 0; j < 5; j++) {
+              stmt.setLong(1, i);
+              stmt.setLong(2, (i + 100) % 2);
+              stmt.addBatch();
+              highestId.set(i);
 
-            Thread.sleep(1);
+              Thread.sleep(1);
 
-            if (highestId.get() % 10000 == 0) {
-              System.out.println("upsert progress: count=" + highestId.get());
+              if (highestId.get() % 10000 == 0) {
+                System.out.println("upsert progress: count=" + highestId.get());
+              }
+              i++;
             }
+            stmt.executeBatch();
           }
         }
         catch (Exception e) {

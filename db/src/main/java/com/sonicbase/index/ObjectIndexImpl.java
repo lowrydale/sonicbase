@@ -16,18 +16,15 @@ public class ObjectIndexImpl implements IndexImpl {
   ObjectIndexImpl(Index index, Comparator[] comparators) {
     this.index = index;
     //don't make this a lambda
-    objectSkipIndex = new ConcurrentSkipListMap<>(new Comparator<Object[]>() {
-      @Override
-      public int compare(Object[] o1, Object[] o2) {
-        int keyLen = (o1.length <= o2.length) ? o1.length : o2.length;
-        for (int i = 0; i < keyLen; i++) {
-          int value = comparators[i].compare(o1[i], o2[i]);
-          if (value != 0) {
-            return value;
-          }
+    objectSkipIndex = new ConcurrentSkipListMap<>((o1, o2) -> {
+      int keyLen = (o1.length <= o2.length) ? o1.length : o2.length;
+      for (int i = 0; i < keyLen; i++) {
+        int value = comparators[i].compare(o1[i], o2[i]);
+        if (value != 0) {
+          return value;
         }
-        return 0;
       }
+      return 0;
     });
   }
 

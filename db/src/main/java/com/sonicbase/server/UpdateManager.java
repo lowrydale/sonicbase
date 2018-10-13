@@ -786,7 +786,8 @@ public class UpdateManager {
 
   public ComObject doInsertIndexEntryByKeyWithRecord(ComObject outerCobj, ComObject cobj, long sequence0, long sequence1,
                                                      short sequence2, boolean replayedCommand, long transactionId,
-                                                     boolean isExpliciteTrans, boolean isCommitting, ComArray batchResponses, MemoryOps memoryOps) {
+                                                     boolean isExpliciteTrans, boolean isCommitting, ComArray batchResponses,
+                                                     MemoryOps memoryOps) {
     int originalOffset = cobj.getInt(ComObject.Tag.ORIGINAL_OFFSET);
     int originalId = 0;
     if (cobj.getLong(ComObject.Tag.ID) != null) {
@@ -828,9 +829,8 @@ public class UpdateManager {
 
       Index index = server.getIndex(dbName, tableName, indexName);
 
-      MemoryOps currOps = memoryOps;
       doInsertKey(outerCobj, replayedCommand, transactionId, dbName, tableSchema, indexSchema, tableName, indexName,
-          recordBytes, primaryKey, ignore, shouldExecute, index, currOps);
+          recordBytes, primaryKey, ignore, shouldExecute, index, memoryOps);
       if (shouldDeleteLock.get()) {
         server.getTransactionManager().deleteLock(dbName, tableName, transactionId, tableSchema, primaryKey);
       }
@@ -1467,15 +1467,11 @@ public class UpdateManager {
               index.addAndGetCount(1);
             }
             else {
-              boolean sameTrans = false;
               byte[][] bytes = server.getAddressMap().fromUnsafeToRecords(existingValue);
-              long transId = Record.getTransId(recordBytes);
-              boolean sameSequence = false;
-              CheckSameTransAndSequence checkSameTransAndSequence = new CheckSameTransAndSequence(recordBytes, sameTrans,
-                  bytes, transId, sameSequence).invoke();
-              sameTrans = checkSameTransAndSequence.isSameTrans();
-              sameSequence = checkSameTransAndSequence.isSameSequence();
-              if (!ignoreDuplicates && existingValue != null && !sameTrans && !sameSequence) {
+              CheckSameTransAndSequence checkSameTransAndSequence = new CheckSameTransAndSequence(recordBytes, bytes).invoke();
+              boolean sameTrans = checkSameTransAndSequence.isSameTrans();
+              boolean sameSequence = checkSameTransAndSequence.isSameSequence();
+              if (!ignoreDuplicates && !sameTrans && !sameSequence) {
                 index.put(key, existingValue);
                 server.getAddressMap().freeUnsafeIds(memOp.getAddress());
                 throw new UniqueConstraintViolationException("Unique constraint violated: table=" + tableName + INDEX_STR +
@@ -1495,15 +1491,11 @@ public class UpdateManager {
             index.addAndGetCount(1);
           }
           else {
-            boolean sameTrans = false;
             byte[][] bytes = server.getAddressMap().fromUnsafeToRecords(existingValue);
-            long transId = Record.getTransId(recordBytes);
-            boolean sameSequence = false;
-            CheckSameTransAndSequence checkSameTransAndSequence = new CheckSameTransAndSequence(recordBytes, sameTrans,
-                bytes, transId, sameSequence).invoke();
-            sameTrans = checkSameTransAndSequence.isSameTrans();
-            sameSequence = checkSameTransAndSequence.isSameSequence();
-            if (!ignoreDuplicates && existingValue != null && !sameTrans && !sameSequence) {
+            CheckSameTransAndSequence checkSameTransAndSequence = new CheckSameTransAndSequence(recordBytes, bytes).invoke();
+            boolean sameTrans = checkSameTransAndSequence.isSameTrans();
+            boolean sameSequence = checkSameTransAndSequence.isSameSequence();
+            if (!ignoreDuplicates && !sameTrans && !sameSequence) {
               index.put(key, existingValue);
               server.getAddressMap().freeUnsafeIds(newUnsafeRecords);
               throw new UniqueConstraintViolationException("Unique constraint violated: table=" + tableName + INDEX_STR +
@@ -2056,15 +2048,11 @@ public class UpdateManager {
     private final byte[] recordBytes;
     private boolean sameTrans;
     private final byte[][] bytes;
-    private final long transId;
     private boolean sameSequence;
 
-    CheckSameTransAndSequence(byte[] recordBytes, boolean sameTrans, byte[][] bytes, long transId, boolean sameSequence) {
+    CheckSameTransAndSequence(byte[] recordBytes, byte[][] bytes) {
       this.recordBytes = recordBytes;
-      this.sameTrans = sameTrans;
       this.bytes = bytes;
-      this.transId = transId;
-      this.sameSequence = sameSequence;
     }
 
     boolean isSameTrans() {
@@ -2076,19 +2064,23 @@ public class UpdateManager {
     }
 
     public CheckSameTransAndSequence invoke() throws IOException {
+      long transId = Record.getTransId(recordBytes);
+
+      DataInputStream in = new DataInputStream(new ByteArrayInputStream(recordBytes));
+      in.readShort(); //serializationVersion
+      long rsequence0 = in.readLong();
+      long rsequence1 = in.readLong();
+
       for (byte[] innerBytes : bytes) {
+
         if (Record.getTransId(innerBytes) == transId) {
           sameTrans = true;
           return this;
         }
-        DataInputStream in = new DataInputStream(new ByteArrayInputStream(innerBytes));
+        in = new DataInputStream(new ByteArrayInputStream(innerBytes));
         in.readShort(); //serializationVersion
         long sequence0 = in.readLong();
         long sequence1 = in.readLong();
-        in = new DataInputStream(new ByteArrayInputStream(recordBytes));
-        in.readShort(); //serializationVersion
-        long rsequence0 = in.readLong();
-        long rsequence1 = in.readLong();
         if (sequence0 == rsequence0 && sequence1 == rsequence1) {
           sameSequence = true;
           return this;

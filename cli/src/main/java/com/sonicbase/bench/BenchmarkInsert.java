@@ -202,7 +202,7 @@ public class BenchmarkInsert {
         final AtomicLong countFinished = new AtomicLong();
 
         final AtomicInteger errorCountInARow = new AtomicInteger();
-        final int batchSize = 2000;
+        final int batchSize = 500;
         while (!shutdown) {
           final long startId = offset + (shard * count);
           insertBegin.set(startId);
@@ -243,10 +243,8 @@ public class BenchmarkInsert {
                       }
                       else {
                         if (true) {
-                          for (int attempt = 0; attempt < 4; attempt++) {
-                            Connection conn = cpds.getConnection();
-                            try {
-                              PreparedStatement stmt = conn.prepareStatement("insert into persons (id1, id2, socialSecurityNumber, relatives, restricted, gender) VALUES (?, ?, ?, ?, ?, ?)");
+                          try (Connection conn = cpds.getConnection()) {
+                            try (PreparedStatement stmt = conn.prepareStatement("insert into persons (id1, id2, socialSecurityNumber, relatives, restricted, gender) VALUES (?, ?, ?, ?, ?, ?)")) {
                               for (int i1 = 0; i1 < batchSize; i1++) {
                               /*
                                create database db
@@ -270,23 +268,13 @@ public class BenchmarkInsert {
                               long currBegin = System.nanoTime();
                               stmt.executeBatch();
                               thisDuration += System.nanoTime() - currBegin;
-                              break;
-                            }
-                            catch (Exception e) {
-                              if (attempt == 3) {
-                                throw e;
-                              }
-                              logger.error(ERROR_STR, e);
-                            }
-                            finally {
-                              conn.close();
+
+                              threadLiveliness.put(threadOffset, System.currentTimeMillis());
+                              totalDuration.addAndGet(thisDuration);
+                              countInserted.addAndGet(batchSize);
+                              logProgress(threadOffset, countInserted, lastLogged, begin, totalDuration, insertErrorCount);
                             }
                           }
-
-                          threadLiveliness.put(threadOffset, System.currentTimeMillis());
-                          totalDuration.addAndGet(thisDuration);
-                          countInserted.addAndGet(batchSize);
-                          logProgress(threadOffset, countInserted, lastLogged, begin, totalDuration, insertErrorCount);
                         }
 
                         if (false) {
@@ -326,11 +314,9 @@ public class BenchmarkInsert {
 
                         thisDuration = 0;
                         if (true) {
-                          for (int attempt = 0; attempt < 4; attempt++) {
-                            Connection conn = cpds.getConnection();
+                          try (Connection conn = cpds.getConnection()) {
                             long currBegin = 0;
-                            try {
-                              PreparedStatement stmt = conn.prepareStatement("insert into Memberships (personId, personId2, membershipName, resortId) VALUES (?, ?, ?, ?)");
+                            try (PreparedStatement stmt = conn.prepareStatement("insert into Memberships (personId, personId2, membershipName, resortId) VALUES (?, ?, ?, ?)")) {
                               for (int i1 = 0; i1 < batchSize; i1++) {
                                 for (int j = 0; j < 2; j++) {
                                   long id1 = offset1 + i1;
@@ -342,28 +328,19 @@ public class BenchmarkInsert {
                                   currBegin = System.nanoTime();
                                   stmt.addBatch();
                                   thisDuration += System.nanoTime() - currBegin;
-                                //  limiter.acquire();
+                                  //  limiter.acquire();
                                 }
                               }
                               currBegin = System.nanoTime();
                               stmt.executeBatch();
                               thisDuration += System.nanoTime() - currBegin;
                               threadLiveliness.put(threadOffset, System.currentTimeMillis());
-                              break;
-                            }
-                            catch (Exception e) {
-                              if (attempt == 3) {
-                                throw e;
-                              }
-                              logger.error(ERROR_STR, e);
-                            }
-                            finally {
-                              conn.close();
+
+                              totalDuration.addAndGet(thisDuration);
+                              countInserted.addAndGet(2 * batchSize);
+                              logProgress(threadOffset, countInserted, lastLogged, begin, totalDuration, insertErrorCount);
                             }
                           }
-                          totalDuration.addAndGet(thisDuration);
-                          countInserted.addAndGet(2 * batchSize);
-                          logProgress(threadOffset, countInserted, lastLogged, begin, totalDuration, insertErrorCount);
                         }
                       }
                     }

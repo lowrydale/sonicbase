@@ -1,6 +1,6 @@
 # sonicbase
 
-SonicBase is an in-memory database. It works well as an embedded or standalone database, but soars when you add multiple servers. It supports jdbc and offers rich SQL support. The dbms is linearly scalable and can hold billions of records. The database is cross-platform, supporting MacOS, Linux, Windows and Cygwin. For extreme performance, the database offers stored procedures. SonicBase supports cross-shard transactions and cross-shard joins. On a 32 node database we achieved 4.3 million batch inserts per second, 26 million batch identity reads per second and 68 million range-based lookups per second.
+SonicBase is an in-memory database. It works well as an embedded or standalone database, but soars when you add multiple servers. It supports jdbc and offers rich SQL support. The dbms is linearly scalable and can hold billions of records. The database is cross-platform, supporting MacOS, Linux, Windows and Cygwin. For extreme performance, the database offers stored procedures. SonicBase supports cross-shard transactions and cross-shard joins. On a 32 node database we achieved 5.2 million batch inserts per second, 26 million batch identity reads per second and 68 million range-based lookups per second.
 
 ## For the full **documentation**, follow this [link](https://sonicbase.com/documentation.html)
 

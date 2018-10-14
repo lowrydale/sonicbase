@@ -1792,6 +1792,7 @@ public class PartitionManager extends Thread {
       }
       isRebalancing.set(true);
 
+      long begin = System.currentTimeMillis();
       Config config = databaseServer.getConfig();
 
       boolean isInternal = false;
@@ -1844,7 +1845,7 @@ public class PartitionManager extends Thread {
 
       beginRebalanceForAllIndexGroups(dbName, indexGroups);
 
-      logger.info("Finished rebalance");
+      logger.info("Finished rebalance for database: db={}, duration={}", dbName, (System.currentTimeMillis() - begin) / 1000f);
       return null;
     }
     catch (Exception e) {

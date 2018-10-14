@@ -1673,6 +1673,7 @@ public class PartitionManager extends Thread {
         return;
       }
       while (!shutdown) {
+        long begin = System.currentTimeMillis();
         boolean ok = false;
         for (int shard = 0; shard < databaseServer.getShardCount(); shard++) {
           ok = false;
@@ -1684,6 +1685,8 @@ public class PartitionManager extends Thread {
         if (!beginRebalanceHandleNotOk(ok)) {
           sendBeginRequest();
         }
+        System.out.println("Total rebalance pass finished: duration=" + (System.currentTimeMillis() - begin) / 1000f);
+        logger.info("Total rebalance pass finished: duration=" + (System.currentTimeMillis() - begin) / 1000f);
       }
     }
     finally {

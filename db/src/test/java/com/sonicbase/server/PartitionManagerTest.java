@@ -32,7 +32,6 @@ import java.util.concurrent.atomic.AtomicBoolean;
 import java.util.concurrent.atomic.AtomicInteger;
 import java.util.concurrent.atomic.AtomicReference;
 
-import static org.mockito.BDDMockito.then;
 import static org.mockito.Matchers.*;
 import static org.mockito.Mockito.*;
 import static org.testng.Assert.assertEquals;
@@ -42,6 +41,8 @@ public class PartitionManagerTest {
 
   @BeforeClass
   public void beforeClass() {
+    System.setProperty("log4j.configuration", "test-log4j.xml");
+
     //System.setProperty("log4j.configuration", "test-log4j.xml");
   }
 
@@ -177,9 +178,19 @@ public class PartitionManagerTest {
         new Answer() {
           public Object answer(InvocationOnMock invocation) {
             Object[] args = invocation.getArguments();
-            return partitionManager.doRebalanceOrderedIndex((ComObject)args[3], false);
+            return partitionManager.rebalanceOrderedIndex((ComObject)args[3], false).serialize();
           }
         });
+
+    when(client.send(eq("PartitionManager:isShardRepartitioningComplete"), anyInt(), anyLong(), any(ComObject.class),
+        eq(DatabaseClient.Replica.SPECIFIED))).thenAnswer(
+        new Answer() {
+          public Object answer(InvocationOnMock invocation) {
+            Object[] args = invocation.getArguments();
+            return partitionManager.isShardRepartitioningComplete((ComObject)args[3], false).serialize();
+          }
+        });
+
 
     when(client.send(eq("PartitionManager:deleteMovedRecords"), anyInt(), eq((long)0), any(ComObject.class),
         eq(DatabaseClient.Replica.SPECIFIED))).thenAnswer(
@@ -190,14 +201,14 @@ public class PartitionManagerTest {
             cobj.put(ComObject.Tag.SEQUENCE_0, 10000L);
             cobj.put(ComObject.Tag.SEQUENCE_1, 10000L);
 
-            return partitionManager.deleteMovedRecords(cobj, false);
+            return partitionManager.deleteMovedRecords(cobj, false).serialize();
           }
         });
 
 
     final AtomicReference<Exception> exception = new AtomicReference<>();
     final AtomicBoolean calledMoveIndexEntries = new AtomicBoolean();
-    when(client.send(eq("PartitionManager:moveIndexEntries"), eq(1), eq((long)0), any(ComObject.class),
+    when(client.send(eq("PartitionManager:moveIndexEntries"), anyInt(), anyLong(), any(ComObject.class),
         eq(DatabaseClient.Replica.DEF))).thenAnswer(
         new Answer() {
           public Object answer(InvocationOnMock invocation) {
@@ -366,7 +377,16 @@ public class PartitionManagerTest {
         new Answer() {
           public Object answer(InvocationOnMock invocation) {
             Object[] args = invocation.getArguments();
-            return partitionManager.doRebalanceOrderedIndex((ComObject)args[3], false);
+            return partitionManager.rebalanceOrderedIndex((ComObject)args[3], false).serialize();
+          }
+        });
+
+    when(client.send(eq("PartitionManager:isShardRepartitioningComplete"), anyInt(), anyLong(), any(ComObject.class),
+        eq(DatabaseClient.Replica.SPECIFIED))).thenAnswer(
+        new Answer() {
+          public Object answer(InvocationOnMock invocation) {
+            Object[] args = invocation.getArguments();
+            return partitionManager.isShardRepartitioningComplete((ComObject)args[3], false).serialize();
           }
         });
 
@@ -379,7 +399,7 @@ public class PartitionManagerTest {
             cobj.put(ComObject.Tag.SEQUENCE_0, 10000L);
             cobj.put(ComObject.Tag.SEQUENCE_1, 10000L);
 
-            return partitionManager.deleteMovedRecords(cobj, false);
+            return partitionManager.deleteMovedRecords(cobj, false).serialize();
           }
         });
 

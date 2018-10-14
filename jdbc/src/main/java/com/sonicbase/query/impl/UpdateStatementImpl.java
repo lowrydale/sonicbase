@@ -420,7 +420,7 @@ public class UpdateStatementImpl extends StatementImpl implements UpdateStatemen
         //update record
         List<Integer> selectedShards = PartitionUtils.findOrderedPartitionForRecord(true,
             false, tableSchema,
-            indexSchema.getName(), null, BinaryExpression.Operator.EQUAL, null,
+            indexSchema, null, BinaryExpression.Operator.EQUAL, null,
             newPrimaryKey, null);
         if (selectedShards.isEmpty()) {
           throw new DatabaseException("No shards selected for query");

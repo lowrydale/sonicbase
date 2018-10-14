@@ -208,7 +208,7 @@ public class DeleteStatementImpl extends StatementImpl implements DeleteStatemen
       if (record != null) {
         List<Integer> selectedShards = PartitionUtils.findOrderedPartitionForRecord(true,
             false, tableSchema,
-            indexSchema.getName(), null, BinaryExpression.Operator.EQUAL, null,
+            indexSchema, null, BinaryExpression.Operator.EQUAL, null,
             entry[0], null);
         if (selectedShards.isEmpty()) {
           throw new DatabaseException("No shards selected for query");

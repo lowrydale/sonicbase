@@ -70,11 +70,8 @@ public class Record {
 
   public static long getTransId(byte[] bytes) {
     try {
-      int offset = 2 + 8 + 8 + 2 + 4 + 2;
-
-      DataInputStream in = new DataInputStream(new ByteArrayInputStream(bytes));
-      in.skipBytes(offset);
-      return Varint.readSignedVarLong(in);
+      int offset = 26;//2 + 8 + 8 + 2 + 4 + 2;
+      return Varint.readSignedVarLong(bytes, offset);
     }
     catch (Exception e) {
       throw new DatabaseException(e);
@@ -88,27 +85,13 @@ public class Record {
   }
 
   public static void setDbViewFlags(byte[] bytes, short dbViewFlag) {
-    ByteArrayOutputStream bytesOut = new ByteArrayOutputStream();
-    DataOutputStream out = new DataOutputStream(bytesOut);
-    try {
-      out.writeShort(dbViewFlag);
-      System.arraycopy(bytesOut.toByteArray(), 0, bytes, 2 + 8 + 8 + 2 + 4, 2);
-    }
-    catch (IOException e) {
-      throw new DatabaseException(e);
-    }
+    int offset = 24; //2 + 8 + 8 + 2 + 4;
+    DataUtils.shortToBytes(dbViewFlag, bytes, offset);
   }
 
   public static void setDbViewNumber(byte[] bytes, int schemaVersion) {
-    ByteArrayOutputStream bytesOut = new ByteArrayOutputStream();
-    DataOutputStream out = new DataOutputStream(bytesOut);
-    try {
-      out.writeInt(schemaVersion);
-      System.arraycopy(bytesOut.toByteArray(), 0, bytes,  2 + 8 + 8 + 2, 4);
-    }
-    catch (IOException e) {
-      throw new DatabaseException(e);
-    }
+    int offset = 20; //2 + 8 + 8 + 2;
+    DataUtils.intToBytes(schemaVersion, bytes, offset);
   }
 
   public static int getDbViewNumber(byte[] bytes) {

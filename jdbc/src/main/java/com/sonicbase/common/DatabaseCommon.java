@@ -337,9 +337,13 @@ public class DatabaseCommon {
   }
 
   private Schema ensureSchemaExists(String dbName) {
+    Schema ret = this.schema.get(dbName);
+    if (ret != null) {
+      return ret;
+    }
     synchronized (this) {
       //faster than computeIfAbsent
-      Schema ret = this.schema.get(dbName);
+      ret = this.schema.get(dbName);
       if (ret == null) {
         ret = new Schema();
         this.schema.put(dbName, ret);

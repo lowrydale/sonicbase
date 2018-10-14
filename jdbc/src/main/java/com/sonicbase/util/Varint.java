@@ -235,6 +235,58 @@ public final class Varint {
     return result;
   }
 
+  public static long readUnsignedVarLong(byte[] bytes, int offset) throws IOException {
+    long tmp;
+    // CHECKSTYLE: stop InnerAssignment
+    if ((tmp = bytes[offset++]) >= 0) {
+      return tmp;
+    }
+    long result = tmp & 0x7f;
+    if ((tmp = bytes[offset++]) >= 0) {
+      result |= tmp << 7;
+    } else {
+      result |= (tmp & 0x7f) << 7;
+      if ((tmp = bytes[offset++]) >= 0) {
+        result |= tmp << 14;
+      } else {
+        result |= (tmp & 0x7f) << 14;
+        if ((tmp = bytes[offset++]) >= 0) {
+          result |= tmp << 21;
+        } else {
+          result |= (tmp & 0x7f) << 21;
+          if ((tmp = bytes[offset++]) >= 0) {
+            result |= tmp << 28;
+          } else {
+            result |= (tmp & 0x7f) << 28;
+            if ((tmp = bytes[offset++]) >= 0) {
+              result |= tmp << 35;
+            } else {
+              result |= (tmp & 0x7f) << 35;
+              if ((tmp = bytes[offset++]) >= 0) {
+                result |= tmp << 42;
+              } else {
+                result |= (tmp & 0x7f) << 42;
+                if ((tmp = bytes[offset++]) >= 0) {
+                  result |= tmp << 49;
+                } else {
+                  result |= (tmp & 0x7f) << 49;
+                  if ((tmp = bytes[offset++]) >= 0) {
+                    result |= tmp << 56;
+                  } else {
+                    result |= (tmp & 0x7f) << 56;
+                    result |= ((long) bytes[offset++]) << 63;
+                  }
+                }
+              }
+            }
+          }
+        }
+      }
+    }
+    // CHECKSTYLE: resume InnerAssignment
+    return result;
+  }
+
   /**
    * @param in to read bytes from
    * @return decode value
@@ -243,6 +295,12 @@ public final class Varint {
    */
   public static long readSignedVarLong(DataInput in) throws IOException {
     long raw = readUnsignedVarLong(in);
+    long temp = (((raw << 63) >> 63) ^ raw) >> 1;
+    return temp ^ (raw & (1L << 63));
+  }
+
+  public static long readSignedVarLong(byte[] bytes, int offset) throws IOException {
+    long raw = readUnsignedVarLong(bytes, offset);
     long temp = (((raw << 63) >> 63) ^ raw) >> 1;
     return temp ^ (raw & (1L << 63));
   }

@@ -357,7 +357,7 @@ public class InsertStatementHandler implements StatementHandler {
 
     if (!keyIsNull) {
       List<Integer> selectedShards = PartitionUtils.findOrderedPartitionForRecord(true, false, tableSchema,
-          indexSchema.getKey(), null, com.sonicbase.query.BinaryExpression.Operator.EQUAL, null, key, null);
+          indexSchema.getValue(), null, com.sonicbase.query.BinaryExpression.Operator.EQUAL, null, key, null);
       for (int partition : selectedShards) {
         int shard = currPartitions[partition].getShardOwning();
         ret.add(new KeyInfo(shard, key, indexSchema.getValue()));

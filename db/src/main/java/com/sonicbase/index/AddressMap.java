@@ -477,9 +477,9 @@ public class AddressMap {
         offset += record.length;
       }
 
-      if (bytes.length > 1000000000) {
-        throw new DatabaseException("Invalid allocation: size=" + bytes.length);
-      }
+//      if (bytes.length > 1000000000) {
+//        throw new DatabaseException("Invalid allocation: size=" + bytes.length);
+//      }
 
       long address = unsafe.allocateMemory(bytes.length);
 
@@ -537,14 +537,13 @@ public class AddressMap {
     }
     else {
       long innerAddress = (long)address;
-      byte[] bytes = new byte[4 + (4 * records.length) + recordsLen];
-      int offset = 0; //update time
-      DataUtils.intToBytes(records.length, bytes, offset);
+      int offset = 8; //update time
+      DataUtils.intToAddress(records.length, innerAddress + offset, unsafe);
       offset += 4;
       for (byte[] record : records) {
-        DataUtils.intToBytes(record.length, bytes, offset);
+        DataUtils.intToAddress(record.length, innerAddress + offset, unsafe);
         offset += 4;
-        System.arraycopy(record, 0, bytes, offset, record.length);
+        DataUtils.bytesToAddress(record, record.length, innerAddress + offset, unsafe);
         offset += record.length;
       }
 
@@ -552,11 +551,6 @@ public class AddressMap {
 
       offset = 0;
       DataUtils.longToAddress(seconds, innerAddress + offset, unsafe);
-      offset += 8; //update time
-
-      for (int i = 0; i < bytes.length; i++) {
-        unsafe.putByte(innerAddress + offset + i, bytes[i]);
-      }
     }
   }
 

@@ -15,6 +15,7 @@ import org.apache.commons.lang.exception.ExceptionUtils;
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
 
+import javax.swing.text.html.HTML;
 import java.io.*;
 import java.util.*;
 import java.util.concurrent.*;
@@ -43,23 +44,15 @@ public class PartitionManager extends Thread {
   private String stateTable = "none";
   private String stateIndex = "none";
   private RepartitionerState state = RepartitionerState.IDLE;
-  private Exception shardRepartitionException;
   private static final ConcurrentHashMap<String, List<PartitionEntry>> previousPartitions = new ConcurrentHashMap<>();
-  private boolean isShardRepartitioningComplete = true;
-  private final AtomicLong countMoved = new AtomicLong();
-  private final AtomicLong countDeleted = new AtomicLong();
   private boolean isRunning = false;
   final AtomicBoolean isRebalancing = new AtomicBoolean();
   private Integer batchOverride = null;
   private final AtomicBoolean isRepartitioningIndex = new AtomicBoolean();
   private boolean shutdown;
   private final AtomicBoolean isComplete = new AtomicBoolean(true);
-  private AtomicLong beginMove = new AtomicLong();
-  private AtomicLong moveDuration = new AtomicLong();
-  private AtomicLong beginDelete = new AtomicLong();
-  private AtomicLong deleteDuration = new AtomicLong();
-  private Thread rebalanceThread;
   private boolean stopRepartitioning;
+  private Map<String, RebalanceContext> rebalanceContexts = new ConcurrentHashMap<>();
 
   public enum RepartitionerState {
     IDLE,
@@ -153,7 +146,7 @@ public class PartitionManager extends Thread {
         long begin = System.currentTimeMillis();
 
         //rebalance with current partitions before resharding
-        doRebalance(dbName, toRebalance, executor, totalBegin, tableName, begin);
+        //doRebalance(dbName, toRebalance, executor, totalBegin, tableName, begin);
 
         Map<String, ComArray[]> partitionSizes = new HashMap<>();
         for (String index : toRebalance) {
@@ -207,6 +200,7 @@ public class PartitionManager extends Thread {
       }
       finally {
         logger.info("rebalance cycle - finished: duration={}sec", (System.currentTimeMillis() - totalBegin)/1000f);
+        //System.out.println("rebalance cycle - finished: duration=" + (System.currentTimeMillis() - totalBegin)/1000f);
         isComplete.set(true);
         state = RepartitionerState.COMPLETE;
       }
@@ -333,7 +327,9 @@ public class PartitionManager extends Thread {
     for (int shard = 0; shard < databaseServer.getShardCount(); shard++) {
       try {
         ComObject cobj = new ComObject();
-        cobj.put(ComObject.Tag.DB_NAME, "__none__");
+        cobj.put(ComObject.Tag.DB_NAME, dbName);
+        cobj.put(ComObject.Tag.TABLE_NAME, tableName);
+        cobj.put(ComObject.Tag.INDEX_NAME, indexName);
         cobj.put(ComObject.Tag.SCHEMA_VERSION, databaseServer.getCommon().getSchemaVersion());
         byte[] bytes = databaseServer.getClient().send("PartitionManager:isShardRepartitioningComplete", shard, masters[shard], cobj, DatabaseClient.Replica.SPECIFIED);
         ComObject retObj = new ComObject(bytes);
@@ -466,7 +462,7 @@ public class PartitionManager extends Thread {
     }
   }
 
-  private void reshardPartitions(String dbName, List<String> toRebalance, Map<String,
+  private synchronized void reshardPartitions(String dbName, List<String> toRebalance, Map<String,
       List<TableSchema.Partition>> copiedPartitionsToApply, Map<String,
       List<TableSchema.Partition>> newPartitionsToApply) throws IOException {
     ByteArrayOutputStream bytesOut = new ByteArrayOutputStream();
@@ -531,16 +527,31 @@ public class PartitionManager extends Thread {
 
   public ComObject isShardRepartitioningComplete(ComObject cobj, boolean replayedCommand) {
     ComObject retObj = new ComObject();
-    retObj.put(ComObject.Tag.IS_COMPLETE, isShardRepartitioningComplete);
-    retObj.put(ComObject.Tag.COUNT_LONG, countMoved.get());
-    retObj.put(ComObject.Tag.FINISHED, isShardRepartitioningComplete);
-    if (shardRepartitionException != null) {
-      retObj.put(ComObject.Tag.EXCEPTION, ExceptionUtils.getFullStackTrace(shardRepartitionException));
+    String dbName = cobj.getString(ComObject.Tag.DB_NAME);
+    String tableName = cobj.getString(ComObject.Tag.TABLE_NAME);
+    String indexName = cobj.getString(ComObject.Tag.INDEX_NAME);
+    RebalanceContext context = rebalanceContexts.get(dbName + ":" + tableName + ":" + indexName);
+    if (context == null) {
+      retObj.put(ComObject.Tag.IS_COMPLETE, true);
+      retObj.put(ComObject.Tag.COUNT_LONG, 0L);
+      retObj.put(ComObject.Tag.FINISHED, true);
+      retObj.put(ComObject.Tag.MOVE_DURATION, 0L);
+      retObj.put(ComObject.Tag.DELETE_DURATION, 0L);
+      retObj.put(ComObject.Tag.MOVE_COUNT, 0L);
+      retObj.put(ComObject.Tag.DELETE_COUNT, 0L);
     }
-    retObj.put(ComObject.Tag.MOVE_DURATION, moveDuration.get());
-    retObj.put(ComObject.Tag.DELETE_DURATION, deleteDuration.get());
-    retObj.put(ComObject.Tag.MOVE_COUNT, countMoved.get());
-    retObj.put(ComObject.Tag.DELETE_COUNT, countDeleted.get());
+    else {
+      retObj.put(ComObject.Tag.IS_COMPLETE, context.isShardRepartitioningComplete);
+      retObj.put(ComObject.Tag.COUNT_LONG, context.countMoved.get());
+      retObj.put(ComObject.Tag.FINISHED, context.isShardRepartitioningComplete);
+      if (context.shardRepartitionException != null) {
+        retObj.put(ComObject.Tag.EXCEPTION, ExceptionUtils.getFullStackTrace(context.shardRepartitionException));
+      }
+      retObj.put(ComObject.Tag.MOVE_DURATION, context.moveDuration.get());
+      retObj.put(ComObject.Tag.DELETE_DURATION, context.deleteDuration.get());
+      retObj.put(ComObject.Tag.MOVE_COUNT, context.countMoved.get());
+      retObj.put(ComObject.Tag.DELETE_COUNT, context.countDeleted.get());
+    }
     return retObj;
   }
 
@@ -799,18 +810,6 @@ public class PartitionManager extends Thread {
     if (replayedCommand) {
       return null;
     }
-    if (rebalanceThread != null) {
-      rebalanceThread.interrupt();
-      try {
-        rebalanceThread.join();
-        rebalanceThread = null;
-      }
-      catch (InterruptedException e) {
-        Thread.currentThread().interrupt();
-        throw new DatabaseException(e);
-      }
-    }
-    isShardRepartitioningComplete = false;
 //
 //    cobj.put(ComObject.Tag.METHOD, "PartitionManager:doRebalanceOrderedIndex");
 //    databaseServer.getLongRunningCommands().addCommand(
@@ -818,12 +817,49 @@ public class PartitionManager extends Thread {
 
     stopRepartitioning = false;
 
-    rebalanceThread = ThreadUtil.createThread(() -> {
-      doRebalanceOrderedIndex(cobj, replayedCommand);
-      rebalanceThread = null;
+
+    final String dbName = cobj.getString(ComObject.Tag.DB_NAME);
+    final String tableName = cobj.getString(ComObject.Tag.TABLE_NAME);
+    final String indexName = cobj.getString(ComObject.Tag.INDEX_NAME);
+    logger.info("doRebalanceOrderedIndex: shard={}, db={}, tableName={}, indexName={}", databaseServer.getShard(),
+        dbName, tableName, indexName);
+
+    RebalanceContext existingContext = rebalanceContexts.get(dbName + ":" + tableName + ":" + indexName);
+
+    if (existingContext != null) {
+      if (existingContext.rebalanceThread != null) {
+        existingContext.rebalanceThread.interrupt();
+        try {
+          existingContext.rebalanceThread.join();
+          existingContext.rebalanceThread = null;
+        }
+        catch (InterruptedException e) {
+          Thread.currentThread().interrupt();
+          throw new DatabaseException(e);
+        }
+      }
+    }
+
+    final Index index = indices.get(dbName).getIndices().get(tableName).get(indexName);
+    final TableSchema tableSchema = common.getTables(dbName).get(tableName);
+    final IndexSchema indexSchema = tableSchema.getIndices().get(indexName);
+
+    RebalanceContext context = new RebalanceContext();
+    context.dbName = dbName;
+    context.tableName = tableName;
+    context.tableSchema = tableSchema;
+    context.indexName = indexName;
+    context.indexSchema = indexSchema;
+    context.index = index;
+
+    rebalanceContexts.put(dbName + ":" + tableName + ":" + indexName, context);
+
+    context.rebalanceThread = ThreadUtil.createThread(() -> {
+      doRebalanceOrderedIndex(cobj, replayedCommand, context, dbName, tableSchema, indexSchema, tableName, indexName, index);
+      context.rebalanceThread = null;
         },
         "PartitionManager.rebalanceOrderedIndex Thread");
-    rebalanceThread.start();
+    context.rebalanceThread.start();
 
     ComObject retObj = new ComObject();
     retObj.put(ComObject.Tag.REPLICA, databaseServer.getReplica());
@@ -874,15 +910,18 @@ public class PartitionManager extends Thread {
   public ComObject stopRepartitioning(final ComObject cobj, boolean replayedCommand) {
     logger.info("stopRepartitioning: shard=" + databaseServer.getShard() + ", replica=" + databaseServer.getReplica());
     stopRepartitioning = true;
-    if (rebalanceThread != null) {
-      rebalanceThread.interrupt();
-      try {
-        rebalanceThread.join();
-        rebalanceThread = null;
-      }
-      catch (InterruptedException e) {
-        Thread.currentThread().interrupt();
-        throw new DatabaseException(e);
+
+    for (RebalanceContext context : rebalanceContexts.values()) {
+      if (context.rebalanceThread != null) {
+        context.rebalanceThread.interrupt();
+        try {
+          context.rebalanceThread.join();
+          context.rebalanceThread = null;
+        }
+        catch (InterruptedException e) {
+          Thread.currentThread().interrupt();
+          throw new DatabaseException(e);
+        }
       }
     }
     return null;
@@ -890,6 +929,14 @@ public class PartitionManager extends Thread {
 
   private class RebalanceContext {
     private final ConcurrentLinkedQueue<Object[]> keysToDelete = new ConcurrentLinkedQueue<>();
+    private boolean isShardRepartitioningComplete = false;
+    private final AtomicLong countMoved = new AtomicLong();
+    private final AtomicLong countDeleted = new AtomicLong();
+    private AtomicLong moveDuration = new AtomicLong();
+    private AtomicLong beginDelete = new AtomicLong();
+    private AtomicLong deleteDuration = new AtomicLong();
+    private Exception shardRepartitionException;
+    private AtomicLong beginMove = new AtomicLong(System.currentTimeMillis());
     public String dbName;
     public String tableName;
     public String indexName;
@@ -897,29 +944,15 @@ public class PartitionManager extends Thread {
     public ThreadPoolExecutor executor;
     public Index index;
     public TableSchema tableSchema;
+    private Thread rebalanceThread;
   }
 
 
-  public ComObject doRebalanceOrderedIndex(final ComObject cobj, boolean replayedCommand) {
-    isShardRepartitioningComplete = false;
-    countMoved.set(0);
-    countDeleted.set(0);
-    shardRepartitionException = null;
-    beginMove.set(System.currentTimeMillis());
+  public ComObject doRebalanceOrderedIndex(final ComObject cobj, boolean replayedCommand, RebalanceContext context, String dbName, TableSchema tableSchema, IndexSchema indexSchema, String tableName, String indexName, Index index) {
 
-    final String dbName = cobj.getString(ComObject.Tag.DB_NAME);
     try {
-      final String tableName = cobj.getString(ComObject.Tag.TABLE_NAME);
-      final String indexName = cobj.getString(ComObject.Tag.INDEX_NAME);
-      logger.info("doRebalanceOrderedIndex: shard={}, db={}, tableName={}, indexName={}", databaseServer.getShard(),
-          dbName, tableName, indexName);
-
-      final Index index = indices.get(dbName).getIndices().get(tableName).get(indexName);
-      final TableSchema tableSchema = common.getTables(dbName).get(tableName);
-      final IndexSchema indexSchema = tableSchema.getIndices().get(indexName);
 
       long begin = System.currentTimeMillis();
-
 
       String[] indexFields = indexSchema.getFields();
       final int[] fieldOffsets = new int[indexFields.length];
@@ -934,13 +967,6 @@ public class PartitionManager extends Thread {
         final AtomicInteger countSubmitted = new AtomicInteger();
         final AtomicInteger countFinished = new AtomicInteger();
 
-        RebalanceContext context = new RebalanceContext();
-        context.dbName = dbName;
-        context.tableName = tableName;
-        context.tableSchema = tableSchema;
-        context.indexName = indexName;
-        context.indexSchema = indexSchema;
-        context.index = index;
         context.executor = ThreadUtil.createExecutor(Runtime.getRuntime().availableProcessors() * 16,
             "SonicBase Repartitioner Move Processor");
 
@@ -959,12 +985,12 @@ public class PartitionManager extends Thread {
             }
 
             if (countSubmitted.get() > 0) {
-              while (countSubmitted.get() > countFinished.get() && shardRepartitionException == null) {
+              while (countSubmitted.get() > countFinished.get() && context.shardRepartitionException == null) {
                 Thread.sleep(1000);
               }
-              if (shardRepartitionException != null) {
-                logger.error("Error processing entries", shardRepartitionException);
-                throw shardRepartitionException;
+              if (context.shardRepartitionException != null) {
+                logger.error("Error processing entries", context.shardRepartitionException);
+                throw context.shardRepartitionException;
               }
             }
           }
@@ -976,18 +1002,18 @@ public class PartitionManager extends Thread {
               tableName, indexName, countVisited.get(), context.keysToDelete.size());
         }
         finally {
-          moveDuration.set(System.currentTimeMillis() - beginMove.get());
-          finishRebalanceOrderedIndex(dbName, tableName, indexName, begin, context.keysToDelete, countVisited, executor);
+          context.moveDuration.set(System.currentTimeMillis() - context.beginMove.get());
+          finishRebalanceOrderedIndex(context, dbName, tableName, indexName, begin, context.keysToDelete, countVisited, executor);
           context.executor.shutdownNow();
         }
       }
     }
     catch (Exception e) {
-      shardRepartitionException = e;
+      context.shardRepartitionException = e;
       logger.error("Error rebalancing index", e);
     }
     finally {
-      isShardRepartitioningComplete = true;
+      context.isShardRepartitioningComplete = true;
     }
     return null;
   }
@@ -1000,10 +1026,10 @@ public class PartitionManager extends Thread {
     return upperKey;
   }
 
-  private void finishRebalanceOrderedIndex(String dbName, String tableName, String indexName, long begin,
+  private void finishRebalanceOrderedIndex(RebalanceContext context, String dbName, String tableName, String indexName, long begin,
                                            ConcurrentLinkedQueue<Object[]> keysToDelete, AtomicLong countVisited,
                                            ThreadPoolExecutor executor) {
-    deleteRecordsOnOtherReplicas(dbName, tableName, indexName, keysToDelete);
+    deleteRecordsOnOtherReplicas(context, dbName, tableName, indexName, keysToDelete);
     executor.shutdownNow();
     logger.info("doRebalanceOrderedIndex finished: db={}, table={}, index={}, countVisited={}, duration={}", dbName,
         tableName, indexName, countVisited.get(), System.currentTimeMillis() - begin);
@@ -1035,7 +1061,7 @@ public class PartitionManager extends Thread {
           doProcessEntries(context, currEntries.get(), cobj);
         }
         catch (Exception e) {
-          shardRepartitionException = e;
+          context.shardRepartitionException = e;
           throw e;
         }
         finally {
@@ -1072,7 +1098,7 @@ public class PartitionManager extends Thread {
             doProcessEntries(context, toProcess, cobj);
           }
           catch (Exception e) {
-            shardRepartitionException = e;
+            context.shardRepartitionException = e;
             logger.error(ERROR_MOVING_ENTRIES_STR, e);
           }
           finally {
@@ -1090,7 +1116,7 @@ public class PartitionManager extends Thread {
         doProcessEntries(context, currEntries.get(), cobj);
       }
       catch (Exception e) {
-        shardRepartitionException = e;
+        context.shardRepartitionException = e;
         throw e;
       }
       finally {
@@ -1120,7 +1146,7 @@ public class PartitionManager extends Thread {
           doProcessEntries(context, toProcess, cobj);
         }
         catch (Exception e) {
-          shardRepartitionException = e;
+          context.shardRepartitionException = e;
           logger.error(ERROR_MOVING_ENTRIES_STR, e);
         }
         finally {
@@ -1132,10 +1158,10 @@ public class PartitionManager extends Thread {
     }
   }
 
-  private void deleteRecordsOnOtherReplicas(final String dbName, String tableName, String indexName,
+  private void deleteRecordsOnOtherReplicas(RebalanceContext context, final String dbName, String tableName, String indexName,
                                             ConcurrentLinkedQueue<Object[]> keysToDelete) {
 
-    beginDelete.set(System.currentTimeMillis());
+    context.beginDelete.set(System.currentTimeMillis());
     int threadCount = Runtime.getRuntime().availableProcessors() * databaseServer.getReplicationFactor() * 2;
     ThreadPoolExecutor executor = ThreadUtil.createExecutor(threadCount, "SonicBase deleteRecordsOnOtherReplicas Thread");
     List<Future> futures = new ArrayList<>();
@@ -1193,8 +1219,8 @@ public class PartitionManager extends Thread {
           logger.error("Error deleting moved records on replica: db={}, table={}, index={}", dbName, tableName, indexName, e);
         }
       }
-      countDeleted.set(count);
-      deleteDuration.set(System.currentTimeMillis() - beginDelete.get());
+      context.countDeleted.set(count);
+      context.deleteDuration.set(System.currentTimeMillis() - context.beginDelete.get());
       executor.shutdownNow();
     }
   }
@@ -1412,7 +1438,7 @@ public class PartitionManager extends Thread {
         byte[][] content = null;
         int shard = 0;
         List<Integer> selectedShards = PartitionUtils.findOrderedPartitionForRecord(true,
-            false, context.tableSchema, context.indexName, null,
+            false, context.tableSchema, context.indexSchema, null,
             BinaryExpression.Operator.EQUAL, null,
             entry.key, null);
         ProcessEntry processEntry = new ProcessEntry(context.index, context.indexSchema, countDeleted, entry, content, shard,
@@ -1469,14 +1495,14 @@ public class PartitionManager extends Thread {
       for (MoveRequest request : list.moveRequests) {
         context.keysToDelete.add(request.getKey());
       }
-      ThreadUtil.sleep(1_000);
+//      ThreadUtil.sleep(1_000);
 
       logger.info("moved entries: db={}, table={}, index={}, count={}, shard={}, duration={}", context.dbName, context.tableName,
           context.indexName, list.moveRequests.size(), shard, (System.currentTimeMillis() - begin));
     }
     catch (Exception e) {
       logger.error(ERROR_MOVING_ENTRIES_STR, e);
-      shardRepartitionException = e;
+      context.shardRepartitionException = e;
     }
     finally {
       //countFinished.incrementAndGet();
@@ -1527,7 +1553,7 @@ public class PartitionManager extends Thread {
     }
     databaseServer.getDatabaseClient().send("PartitionManager:moveIndexEntries", shard, 0, cobj,
         DatabaseClient.Replica.DEF);
-    countMoved.addAndGet(count);
+    context.countMoved.addAndGet(count);
   }
 
   private void setRecordFlags(boolean primaryKey, byte[][] content) {
@@ -1584,7 +1610,8 @@ public class PartitionManager extends Thread {
       if (keys != null) {
         logger.info("moveIndexEntries: db={}, table={}, index={}, count={}", dbName, tableName, indexName, keys.getArray().size());
         int lockCount = 0;
-        for (int i = 0; i < keys.getArray().size(); i++) {
+        int size = keys.getArray().size();
+        for (int i = 0; i < size; i++) {
           try {
             if (lockCount++ == 2) {
               lockCount = 0;
@@ -1673,6 +1700,7 @@ public class PartitionManager extends Thread {
         return;
       }
       while (!shutdown) {
+        long begin = System.currentTimeMillis();
         boolean ok = false;
         for (int shard = 0; shard < databaseServer.getShardCount(); shard++) {
           ok = false;
@@ -1684,6 +1712,7 @@ public class PartitionManager extends Thread {
         if (!beginRebalanceHandleNotOk(ok)) {
           sendBeginRequest();
         }
+        System.out.println("Total rebalance pass finished: duration=" + (System.currentTimeMillis() - begin) / 1000f);
       }
     }
     finally {
@@ -1786,7 +1815,9 @@ public class PartitionManager extends Thread {
 
       while (isRebalancing.get()) {
         Thread.sleep(2000);
+        System.out.println("waiting for rebalance to start");
       }
+      long begin = System.currentTimeMillis();
       isRebalancing.set(true);
 
       Config config = databaseServer.getConfig();
@@ -1841,7 +1872,7 @@ public class PartitionManager extends Thread {
 
       beginRebalanceForAllIndexGroups(dbName, indexGroups);
 
-      logger.info("Finished rebalance");
+      logger.info("Finished rebalance for database: db={}, duration={}", dbName, (System.currentTimeMillis() - begin) / 1000f);
       return null;
     }
     catch (Exception e) {
@@ -1853,20 +1884,37 @@ public class PartitionManager extends Thread {
   }
 
   private void beginRebalanceForAllIndexGroups(String dbName, List<List<String>> indexGroups) {
-    for (List<String> group : indexGroups) {
-      if (group.isEmpty()) {
-        continue;
-      }
-      try {
-        beginRebalance(dbName, group);
-      }
-      catch (Exception e) {
-        StringBuilder builder = new StringBuilder();
-        for (String entry : group) {
-          builder.append(entry).append(",");
+    ThreadPoolExecutor executor = ThreadUtil.createExecutor(1, "SonicBase Rebalance Thread");
+    try {
+      List<Future> futures = new ArrayList<>();
+      for (List<String> group : indexGroups) {
+        if (group.isEmpty()) {
+          continue;
         }
-        logger.error("Error rebalancing index group: group={}", builder.toString(), e);
+        futures.add(executor.submit((Callable) () -> {
+          try {
+            beginRebalance(dbName, group);
+          }
+          catch (Exception e) {
+            StringBuilder builder = new StringBuilder();
+            for (String entry : group) {
+              builder.append(entry).append(",");
+            }
+            logger.error("Error rebalancing index group: group={}", builder.toString(), e);
+          }
+          return null;
+        }));
+
       }
+      for (Future future : futures) {
+        future.get();
+      }
+    }
+    catch (Exception e) {
+      throw new DatabaseException(e);
+    }
+    finally {
+      executor.shutdownNow();
     }
   }
 
@@ -1910,6 +1958,7 @@ public class PartitionManager extends Thread {
     }
     for (int i = 0; i < otherIndices.size(); i++) {
       toRebalance = new ArrayList<>();
+      //todo: don't we need the counts for this index?
       addToRebalance(dbName, toRebalance, entry, otherIndices.get(i), currCounts, force);
       indexGroups.add(toRebalance);
     }
@@ -2253,7 +2302,7 @@ public class PartitionManager extends Thread {
         KeyRecord.setDbViewFlags(content[i], (short) 0);
         KeyRecord.setDbViewNumber(content[i], 0);
       }
-      databaseServer.getAddressMap().writeRecordstoExistingAddress((long)entry.value, content);
+      databaseServer.getAddressMap().writeRecordstoExistingAddress(entry.value, content);
     }
 
     private void insertRecordForPrimaryKey() {
@@ -2261,39 +2310,31 @@ public class PartitionManager extends Thread {
         Record.setDbViewFlags(content[i], (short) 0);
         Record.setDbViewNumber(content[i], 0);
       }
-      databaseServer.getAddressMap().writeRecordstoExistingAddress((long)entry.value, content);
+      databaseServer.getAddressMap().writeRecordstoExistingAddress(entry.value, content);
     }
 
     private void insertRecordForNonPrimaryKeyNonMatchingShard() {
-      byte[][] newContent = new byte[content.length][];
       for (int i = 0; i < content.length; i++) {
-        byte[] newBytes = new byte[content[i].length];
         long existindDbFlags = KeyRecord.getDbViewFlags(content[i]);
         if (existindDbFlags != Record.DB_VIEW_FLAG_DELETING) {
           countDeleted.incrementAndGet();
         }
-        System.arraycopy(content[i], 0, newBytes, 0, content[i].length);
-        KeyRecord.setDbViewFlags(newBytes, Record.DB_VIEW_FLAG_DELETING);
-        KeyRecord.setDbViewNumber(newBytes, common.getSchemaVersion());
-        newContent[i] = newBytes;
+        KeyRecord.setDbViewFlags(content[i], Record.DB_VIEW_FLAG_DELETING);
+        KeyRecord.setDbViewNumber(content[i], common.getSchemaVersion());
       }
-      databaseServer.getAddressMap().writeRecordstoExistingAddress((long)entry.value, newContent);
+      databaseServer.getAddressMap().writeRecordstoExistingAddress((long)entry.value, content);
     }
 
     private void insertRecordForPrimaryKeyNonMatchingShard() {
-      byte[][] newContent = new byte[content.length][];
       for (int i = 0; i < content.length; i++) {
-        byte[] newBytes = new byte[content[i].length];
         long existindDbFlags = Record.getDbViewFlags(content[i]);
         if (existindDbFlags != Record.DB_VIEW_FLAG_DELETING) {
           countDeleted.incrementAndGet();
         }
-        System.arraycopy(content[i], 0, newBytes, 0, content[i].length);
-        Record.setDbViewFlags(newBytes, Record.DB_VIEW_FLAG_DELETING);
-        Record.setDbViewNumber(newBytes, common.getSchemaVersion());
-        newContent[i] = newBytes;
+        Record.setDbViewFlags(content[i], Record.DB_VIEW_FLAG_DELETING);
+        Record.setDbViewNumber(content[i], common.getSchemaVersion());
       }
-      databaseServer.getAddressMap().writeRecordstoExistingAddress(entry.value, newContent);
+      databaseServer.getAddressMap().writeRecordstoExistingAddress(entry.value, content);
     }
   }
 

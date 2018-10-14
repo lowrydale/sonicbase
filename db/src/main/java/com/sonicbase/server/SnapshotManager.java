@@ -514,7 +514,7 @@ public class SnapshotManager {
                             Object[] key, byte[] record, int[] fieldOffsets) {
 
     List<Integer> selectedShards = PartitionUtils.findOrderedPartitionForRecord(true, false,
-        tableSchema, indexSchema.getName(), null, BinaryExpression.Operator.EQUAL,
+        tableSchema, indexSchema, null, BinaryExpression.Operator.EQUAL,
         null, key, null);
     if (selectedShards.isEmpty()) {
       throw new DatabaseException("No shards selected for query");

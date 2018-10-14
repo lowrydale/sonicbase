@@ -251,11 +251,11 @@ public class TestPartitionManagerConsistencySecondaryIndex {
 
             boolean currPartitions = false;
             List<Integer> selectedShards = PartitionUtils.findOrderedPartitionForRecord(false, true, tableSchema,
-                "_primarykey", null, BinaryExpression.Operator.EQUAL, null, new Object[]{i},
+                indexSchema, null, BinaryExpression.Operator.EQUAL, null, new Object[]{i},
                 null);
             if (selectedShards.size() == 0) {
               selectedShards = PartitionUtils.findOrderedPartitionForRecord(true, false, tableSchema,
-                  indexSchema.getName(), null, BinaryExpression.Operator.EQUAL, null, new Object[]{i}, null);
+                  indexSchema, null, BinaryExpression.Operator.EQUAL, null, new Object[]{i}, null);
               currPartitions = true;
             }
             StringBuilder found = new StringBuilder();

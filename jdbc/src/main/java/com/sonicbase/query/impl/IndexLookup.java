@@ -656,7 +656,7 @@ public class IndexLookup {
     public SelectShard invoke() {
         currPartitions = true;
         selectedShards = PartitionUtils.findOrderedPartitionForRecord(true, false, tableSchema,
-            indexSchema.getName(), orderByExpressions, leftOp, rightOp, leftOriginalKey, rightOriginalKey);
+            indexSchema, orderByExpressions, leftOp, rightOp, leftOriginalKey, rightOriginalKey);
       if (localShard == -1) {
         localShard = nextShard = selectedShards.get(currShardOffset);
       }

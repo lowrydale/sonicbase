@@ -33,13 +33,13 @@ public class PartitionUtilsTest {
     indexSchema.setCurrPartitions(currPartitions);
     indexSchema.setLastPartitions(lastPartitions);
     List<Integer> selectedShards = PartitionUtils.findOrderedPartitionForRecord(true, false, tableSchema,
-        indexSchema.getName(), null, BinaryExpression.Operator.EQUAL, null, new Object[]{5},
+        indexSchema, null, BinaryExpression.Operator.EQUAL, null, new Object[]{5},
         null);
 
     assertEquals(selectedShards.size(), 1);
     assertEquals((int)selectedShards.get(0), 0);
     selectedShards = PartitionUtils.findOrderedPartitionForRecord(false, true, tableSchema,
-        indexSchema.getName(), null, BinaryExpression.Operator.EQUAL, null, new Object[]{5}, null);
+        indexSchema, null, BinaryExpression.Operator.EQUAL, null, new Object[]{5}, null);
     assertEquals(selectedShards.size(), 1);
     assertEquals((int)selectedShards.get(0), 1);
 
@@ -66,13 +66,13 @@ public class PartitionUtilsTest {
     indexSchema.setCurrPartitions(currPartitions);
     indexSchema.setLastPartitions(lastPartitions);
     List<Integer> selectedShards = PartitionUtils.findOrderedPartitionForRecord(true, false, tableSchema,
-        indexSchema.getName(), null, BinaryExpression.Operator.GREATER, null, new Object[]{4},
+        indexSchema, null, BinaryExpression.Operator.GREATER, null, new Object[]{4},
         null);
 
     assertEquals(selectedShards.size(), 2);
     assertEquals((int)selectedShards.get(0), 0);
     selectedShards = PartitionUtils.findOrderedPartitionForRecord(false, true, tableSchema,
-        indexSchema.getName(), null, BinaryExpression.Operator.GREATER, null, new Object[]{4}, null);
+        indexSchema, null, BinaryExpression.Operator.GREATER, null, new Object[]{4}, null);
     assertEquals(selectedShards.size(), 1);
     assertEquals((int)selectedShards.get(0), 1);
 
@@ -99,13 +99,13 @@ public class PartitionUtilsTest {
     indexSchema.setCurrPartitions(currPartitions);
     indexSchema.setLastPartitions(lastPartitions);
     List<Integer> selectedShards = PartitionUtils.findOrderedPartitionForRecord(true, false, tableSchema,
-        indexSchema.getName(), null, BinaryExpression.Operator.GREATER_EQUAL, BinaryExpression.Operator.LESS, new Object[]{5},
+        indexSchema, null, BinaryExpression.Operator.GREATER_EQUAL, BinaryExpression.Operator.LESS, new Object[]{5},
         new Object[]{7});
 
     assertEquals(selectedShards.size(), 2);
     assertEquals((int)selectedShards.get(0), 0);
     selectedShards = PartitionUtils.findOrderedPartitionForRecord(false, true, tableSchema,
-        indexSchema.getName(), null, BinaryExpression.Operator.GREATER_EQUAL, BinaryExpression.Operator.LESS, new Object[]{5}, new Object[]{8});
+        indexSchema, null, BinaryExpression.Operator.GREATER_EQUAL, BinaryExpression.Operator.LESS, new Object[]{5}, new Object[]{8});
     assertEquals(selectedShards.size(), 1);
     assertEquals((int)selectedShards.get(0), 1);
 

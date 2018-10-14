@@ -124,7 +124,7 @@ public class PartitionUtils {
 
   public static List<Integer> findOrderedPartitionForRecord(
       boolean includeCurrPartitions, boolean includeLastPartitions,
-      TableSchema tableSchema, String indexName,
+      TableSchema tableSchema, IndexSchema indexSchema,
       List<OrderByExpressionImpl> orderByExpressions,
       BinaryExpression.Operator leftOperator,
       BinaryExpression.Operator rightOperator,
@@ -134,50 +134,49 @@ public class PartitionUtils {
       OrderByExpressionImpl expression = orderByExpressions.get(0);
       String columnName = expression.getColumnName();
       if (expression.getTableName() == null || !expression.getTableName().equals(tableSchema.getName()) ||
-          columnName.equals(tableSchema.getIndices().get(indexName).getFields()[0])) {
+          columnName.equals(indexSchema.getFields()[0])) {
         ascending = expression.isAscending();
       }
     }
 
-    IndexSchema specifiedIndexSchema = tableSchema.getIndices().get(indexName);
-    Comparator[] comparators = specifiedIndexSchema.getComparators();
+    Comparator[] comparators = indexSchema.getComparators();
 
     List<Integer> ret = new ArrayList<>();
 
     List<Integer> selectedPartitions = new ArrayList<>();
     if (includeCurrPartitions) {
-      TableSchema.Partition[] partitions = tableSchema.getIndices().get(indexName).getCurrPartitions();
+      TableSchema.Partition[] partitions = indexSchema.getCurrPartitions();
       if (rightOperator == null) {
-        doSelectPartitions(partitions, tableSchema, indexName, leftOperator, comparators, leftKey,
+        doSelectPartitions(partitions, tableSchema, indexSchema, leftOperator, comparators, leftKey,
             ascending, ret);
       }
       else {
-        doSelectPartitions(partitions, tableSchema, indexName, leftOperator, comparators, leftKey,
+        doSelectPartitions(partitions, tableSchema, indexSchema, leftOperator, comparators, leftKey,
             rightKey, ascending, ret);
       }
     }
 
     if (includeLastPartitions) {
-      findOrderedPartitionsForRecordLastPartitions(tableSchema, indexName, leftOperator, rightOperator, leftKey,
+      findOrderedPartitionsForRecordLastPartitions(tableSchema, indexSchema, leftOperator, rightOperator, leftKey,
           rightKey, ascending, comparators, ret, selectedPartitions);
     }
     return ret;
   }
 
-  private static void findOrderedPartitionsForRecordLastPartitions(TableSchema tableSchema, String indexName,
+  private static void findOrderedPartitionsForRecordLastPartitions(TableSchema tableSchema, IndexSchema indexSchema,
                                                                    BinaryExpression.Operator leftOperator,
                                                                    BinaryExpression.Operator rightOperator, Object[] leftKey,
                                                                    Object[] rightKey, boolean ascending, Comparator[] comparators,
                                                                    List<Integer> ret, List<Integer> selectedPartitions) {
     List<Integer> selectedLastPartitions = new ArrayList<>();
-    TableSchema.Partition[] lastPartitions = tableSchema.getIndices().get(indexName).getLastPartitions();
+    TableSchema.Partition[] lastPartitions = indexSchema.getLastPartitions();
     if (lastPartitions != null) {
       if (rightOperator == null) {
-        doSelectPartitions(lastPartitions, tableSchema, indexName, leftOperator, comparators, leftKey,
+        doSelectPartitions(lastPartitions, tableSchema, indexSchema, leftOperator, comparators, leftKey,
             ascending, selectedLastPartitions);
       }
       else {
-        doSelectPartitions(lastPartitions, tableSchema, indexName, leftOperator, comparators, leftKey,
+        doSelectPartitions(lastPartitions, tableSchema, indexSchema, leftOperator, comparators, leftKey,
             rightKey, ascending, selectedLastPartitions);
       }
       for (int partitionOffset : selectedLastPartitions) {
@@ -205,7 +204,7 @@ public class PartitionUtils {
   }
 
   private static void doSelectPartitions(
-      TableSchema.Partition[] partitions, TableSchema tableSchema, String indexName,
+      TableSchema.Partition[] partitions, TableSchema tableSchema, IndexSchema indexSchema,
       BinaryExpression.Operator leftOperator,
       Comparator[] comparators, Object[] leftKey,
       Object[] rightKey, boolean ascending, List<Integer> selectedPartitions) {
@@ -226,14 +225,14 @@ public class PartitionUtils {
       if (lowerKey == null) {
         continue;
       }
-      doSelectPartitions(partitions, tableSchema, indexName, comparators, selectedPartitions, greaterKey, lessKey, i, lowerKey);
+      doSelectPartitions(partitions, tableSchema, indexSchema, comparators, selectedPartitions, greaterKey, lessKey, i, lowerKey);
     }
   }
 
-  private static void doSelectPartitions(TableSchema.Partition[] partitions, TableSchema tableSchema, String indexName,
+  private static void doSelectPartitions(TableSchema.Partition[] partitions, TableSchema tableSchema, IndexSchema indexSchema,
                                          Comparator[] comparators, List<Integer> selectedPartitions, Object[] greaterKey,
                                          Object[] lessKey, int i, Object[] lowerKey) {
-    String[] indexFields = tableSchema.getIndices().get(indexName).getFields();
+    String[] indexFields = indexSchema.getFields();
     Object[] tempLowerKey = new Object[indexFields.length];
     System.arraycopy(lowerKey, 0, tempLowerKey, 0, indexFields.length);
 
@@ -270,7 +269,7 @@ public class PartitionUtils {
   }
 
   private static void doSelectPartitions(
-      TableSchema.Partition[] partitions, TableSchema tableSchema, String indexName,
+      TableSchema.Partition[] partitions, TableSchema tableSchema, IndexSchema indexSchema,
       BinaryExpression.Operator operator, Comparator[] comparators, Object[] key,
       boolean ascending, List<Integer> selectedPartitions) {
 
@@ -293,16 +292,16 @@ public class PartitionUtils {
       return;
     }
 
-    doChoosePartition(partitions, tableSchema, indexName, operator, comparators, key, ascending, selectedPartitions);
+    doChoosePartition(partitions, tableSchema, indexSchema, operator, comparators, key, ascending, selectedPartitions);
   }
 
-  private static void doChoosePartition(TableSchema.Partition[] partitions, TableSchema tableSchema, String indexName,
+  private static void doChoosePartition(TableSchema.Partition[] partitions, TableSchema tableSchema, IndexSchema indexSchema,
                                         BinaryExpression.Operator operator, Comparator[] comparators, Object[] key,
                                         boolean ascending, List<Integer> selectedPartitions) {
     for (int i = !ascending ? partitions.length - 1 : 0; (!ascending ? i >= 0 : i < partitions.length); i += (!ascending ? -1 : 1)) {
       Object[] lowerKey = partitions[i].getUpperKey();
 
-      HandleLowerKeyIsNull isNull = new HandleLowerKeyIsNull(ascending, tableSchema, indexName, selectedPartitions,
+      HandleLowerKeyIsNull isNull = new HandleLowerKeyIsNull(ascending, tableSchema, indexSchema, selectedPartitions,
           partitions, i, lowerKey, key, operator, comparators).invoke();
       if (isNull.shouldContinue) {
         continue;
@@ -310,7 +309,7 @@ public class PartitionUtils {
       if (isNull.shouldBreak) {
         break;
       }
-      String[] indexFields = tableSchema.getIndices().get(indexName).getFields();
+      String[] indexFields = indexSchema.getFields();
       CompareLowerKeyWithKey compare = new CompareLowerKeyWithKey(selectedPartitions, partitions, i, indexFields,
           lowerKey, key, operator, comparators).invoke();
       if (compare.shouldContinue) {
@@ -332,16 +331,16 @@ public class PartitionUtils {
     private final Comparator[] comparators;
     private final boolean ascending;
     private final TableSchema tableSchema;
-    private final String indexName;
+    private final IndexSchema indexSchema;
     private boolean shouldContinue;
     private boolean shouldBreak;
 
-    HandleLowerKeyIsNull(boolean ascending, TableSchema tableSchema, String indexName,
+    HandleLowerKeyIsNull(boolean ascending, TableSchema tableSchema, IndexSchema indexSchema,
                          List<Integer> selectedPartitions, TableSchema.Partition[] partitions, int i,
                          Object[] lowerKey, Object[] key, BinaryExpression.Operator operator, Comparator[] comparators) {
       this.ascending = ascending;
       this.tableSchema = tableSchema;
-      this.indexName = indexName;
+      this.indexSchema = indexSchema;
       this.selectedPartitions = selectedPartitions;
       this.partitions = partitions;
       this.i = i;
@@ -364,7 +363,7 @@ public class PartitionUtils {
           return this;
         }
 
-        if (compareUpperKeyWithKey(tableSchema, indexName, operator, comparators, key, selectedPartitions, i, lowerLowerKey)) {
+        if (compareUpperKeyWithKey(tableSchema, indexSchema, operator, comparators, key, selectedPartitions, i, lowerLowerKey)) {
           this.shouldContinue = true;
           return this;
         }
@@ -378,10 +377,10 @@ public class PartitionUtils {
       return this;
     }
 
-    private static boolean compareUpperKeyWithKey(TableSchema tableSchema, String indexName,
+    private static boolean compareUpperKeyWithKey(TableSchema tableSchema, IndexSchema indexSchema,
                                                   BinaryExpression.Operator operator, Comparator[] comparators,
                                                   Object[] key, List<Integer> selectedPartitions, int i, Object[] lowerLowerKey) {
-      int compareValue = doCompareLowerKeyWithKey(tableSchema, indexName, comparators, key, lowerLowerKey);
+      int compareValue = doCompareLowerKeyWithKey(tableSchema, indexSchema, comparators, key, lowerLowerKey);
 
       if (compareValue == 0 && operator == BinaryExpression.Operator.GREATER) {
         return true;
@@ -460,9 +459,9 @@ public class PartitionUtils {
   }
 
 
-  private static int doCompareLowerKeyWithKey(TableSchema tableSchema, String indexName, Comparator[] comparators,
+  private static int doCompareLowerKeyWithKey(TableSchema tableSchema, IndexSchema indexSchema, Comparator[] comparators,
                                               Object[] key, Object[] lowerLowerKey) {
-    String[] indexFields = tableSchema.getIndices().get(indexName).getFields();
+    String[] indexFields = indexSchema.getFields();
     Object[] tempLowerKey = new Object[indexFields.length];
     System.arraycopy(lowerLowerKey, 0, tempLowerKey, 0, indexFields.length);
     int compareValue = 0;

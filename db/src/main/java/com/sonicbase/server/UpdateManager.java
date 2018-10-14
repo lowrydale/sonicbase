@@ -2066,10 +2066,8 @@ public class UpdateManager {
     public CheckSameTransAndSequence invoke() throws IOException {
       long transId = Record.getTransId(recordBytes);
 
-      DataInputStream in = new DataInputStream(new ByteArrayInputStream(recordBytes));
-      in.readShort(); //serializationVersion
-      long rsequence0 = in.readLong();
-      long rsequence1 = in.readLong();
+      long rsequence0 = -1;
+      long rsequence1 = -1;
 
       for (byte[] innerBytes : bytes) {
 
@@ -2077,13 +2075,21 @@ public class UpdateManager {
           sameTrans = true;
           return this;
         }
-        in = new DataInputStream(new ByteArrayInputStream(innerBytes));
-        in.readShort(); //serializationVersion
-        long sequence0 = in.readLong();
-        long sequence1 = in.readLong();
-        if (sequence0 == rsequence0 && sequence1 == rsequence1) {
-          sameSequence = true;
-          return this;
+        long sequence0 = DataUtils.bytesToLong(innerBytes, 2);
+
+        if (rsequence0 == -1) {
+          rsequence0 = DataUtils.bytesToLong(recordBytes, 2);
+        }
+
+        if (sequence0 == rsequence0) {
+          long sequence1 = DataUtils.bytesToLong(innerBytes, 10);
+          if (rsequence1 == -1) {
+            rsequence1 = DataUtils.bytesToLong(recordBytes, 10);
+          }
+          if (sequence1 == rsequence1) {
+            sameSequence = true;
+            return this;
+          }
         }
       }
       return this;

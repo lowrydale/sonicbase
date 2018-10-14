@@ -100,4 +100,10 @@ public class DataUtils {
     return result;
   }
 
+  public static void bytesToAddress(byte[] bytes, int length, long address, Unsafe unsafe) {
+    for (int i = 0; i < length; i++) {
+      unsafe.putByte(address + i, bytes[i]);
+    }
+
+  }
 }

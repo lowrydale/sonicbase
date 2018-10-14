@@ -381,7 +381,7 @@ public class ExpressionImpl implements Expression {
     }
     List<Integer> selectedShards = PartitionUtils.findOrderedPartitionForRecord(true,
         false, tableSchema,
-        indexName, null, BinaryExpression.Operator.EQUAL, null, key, null);
+        indexSchema, null, BinaryExpression.Operator.EQUAL, null, key, null);
 
     byte[] ret = client.send("ReadManager:evaluateCounterWithRecord", selectedShards.get(0), 0, cobj, DatabaseClient.Replica.DEF);
     ComObject retObj = new ComObject(ret);
@@ -943,7 +943,7 @@ public class ExpressionImpl implements Expression {
     for (int i = 0; i < keysToRead.size(); i++) {
       List<Integer> selectedShards = PartitionUtils.findOrderedPartitionForRecord(
           true, false, tableSchema,
-          indexSchema.get().getKey(), null, BinaryExpression.Operator.EQUAL,
+          indexSchema.get().getValue(), null, BinaryExpression.Operator.EQUAL,
           null, keysToRead.get(i).getValue(), null);
       if (selectedShards.isEmpty()) {
         throw new DatabaseException("No shards selected for query");

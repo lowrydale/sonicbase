@@ -17,6 +17,7 @@ import net.sf.jsqlparser.statement.Statement;
 import net.sf.jsqlparser.statement.execute.Execute;
 import org.apache.commons.io.FileUtils;
 import org.apache.commons.io.IOUtils;
+import org.apache.commons.lang.exception.ExceptionUtils;
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
 
@@ -55,6 +56,8 @@ public class DatabaseServer {
   private static final String USER_DIR_STR = "user.dir";
   private static final String USER_HOME_STR = "user.home";
   public static final String USE_UNSAFE_STR = "useUnsafe";
+  static final String SONICBASE_SYS_DB_STR = "_sonicbase_sys";
+
   public static boolean[][] deathOverride;
   private static final Logger logger = LoggerFactory.getLogger(DatabaseServer.class);
   private static final Logger errorLogger = LoggerFactory.getLogger(DatabaseServer.class);
@@ -115,6 +118,8 @@ public class DatabaseServer {
   private boolean isServerRoloadRunning;
   private boolean durable = true;
   private boolean unsafe;
+  private Object connMutex = new Object();
+  private ConnectionProxy sysConnection;
 
   public static boolean[][] getDeathOverride() {
     return deathOverride;
@@ -358,6 +363,16 @@ public class DatabaseServer {
       shutdown = true;
 
       shutdownProServer();
+
+      if (sysConnection != null) {
+        try {
+          sysConnection.close();
+        }
+        catch (SQLException e) {
+          logger.error("Error closing connecion", e);
+        }
+        sysConnection = null;
+      }
 
       if (streamsConsumerMonitorthread != null) {
         streamsConsumerMonitorthread.interrupt();
@@ -1456,6 +1471,52 @@ public class DatabaseServer {
     partitionManager.stopShardsFromRepartitioning();
     partitionManager = new PartitionManager(this, common);
     logger.info("Shutdown partitionManager - end");
+  }
+
+  public Connection getSysConnection() {
+    try {
+      ConnectionProxy conn = null;
+      try {
+        synchronized (connMutex) {
+          if (sysConnection != null) {
+            return sysConnection;
+          }
+          List<Config.Shard> array = config.getShards();
+          Config.Shard shard = array.get(0);
+          List<Config.Replica> replicasArray = shard.getReplicas();
+          Boolean priv = config.getBoolean("clientIsPrivate");
+          final String address = priv != null && priv ?
+              replicasArray.get(0).getString("privateAddress") :
+              replicasArray.get(0).getString("publicAddress");
+          final int port = replicasArray.get(0).getInt("port");
+
+          Class.forName("com.sonicbase.jdbcdriver.Driver");
+          conn = new ConnectionProxy("jdbc:sonicbase:" + address + ":" + port, this);
+          try {
+            if (!((ConnectionProxy) conn).databaseExists(SONICBASE_SYS_DB_STR)) {
+              ((ConnectionProxy) conn).createDatabase(SONICBASE_SYS_DB_STR);
+            }
+          }
+          catch (Exception e) {
+            if (!ExceptionUtils.getFullStackTrace(e).toLowerCase().contains("database already exists")) {
+              throw new DatabaseException(e);
+            }
+          }
+
+          sysConnection = new ConnectionProxy("jdbc:sonicbase:" + address + ":" + port + "/_sonicbase_sys", this);
+        }
+      }
+      finally {
+        if (conn != null) {
+          conn.close();
+        }
+      }
+
+      return sysConnection;
+    }
+    catch (Exception e) {
+      throw new DatabaseException(e);
+    }
   }
 
   public ComObject updateIndexSchema(ComObject cobj, boolean replayedCommand) {

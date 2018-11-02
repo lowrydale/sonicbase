@@ -27,6 +27,8 @@ import java.util.concurrent.ThreadPoolExecutor;
 import java.util.concurrent.atomic.AtomicInteger;
 import java.util.concurrent.atomic.AtomicLong;
 
+import static com.sonicbase.server.DatabaseServer.METRIC_READ;
+
 @SuppressWarnings({"squid:S1172", "squid:S1168", "squid:S00107"})
 // all methods called from method invoker must have cobj and replayed command parms
 // I prefer to return null instead of an empty array
@@ -321,6 +323,7 @@ public class ReadManager {
   }
 
   ComObject indexLookup(ComObject cobj, StoredProcedureContextImpl procedureContext) {
+    com.codahale.metrics.Timer.Context ctx = server.getTimers().get(METRIC_READ).time();
     try {
       Integer schemaVersion = cobj.getInt(ComObject.Tag.SCHEMA_VERSION);
       if (schemaVersion != null && schemaVersion < server.getSchemaVersion()) {
@@ -331,8 +334,10 @@ public class ReadManager {
           server.getDatabaseClient().syncSchema();
           schemaVersion = server.getSchemaVersion();
         }
-        logger.error("Client schema is newer than server schema: client={}, server={}", schemaVersion,
-            server.getSchemaVersion());
+        else {
+          logger.error("Client schema is newer than server schema: client={}, server={}", schemaVersion,
+              server.getSchemaVersion());
+        }
       }
 
       short serializationVersion = cobj.getShort(ComObject.Tag.SERIALIZATION_VERSION);
@@ -445,6 +450,9 @@ public class ReadManager {
     }
     catch (IOException e) {
       throw new DatabaseException(e);
+    }
+    finally {
+      ctx.stop();
     }
   }
 

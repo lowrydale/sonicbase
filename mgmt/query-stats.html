@@ -1,0 +1,527 @@
+
+<!doctype html>
+<html>
+<head>
+  <meta http-equiv="X-UA-Compatible" content="IE=edge">
+  <meta name="viewport" content="width=device-width, initial-scale=1">
+  <meta name="description" content="SonicBase Query Stats Table.">
+
+  <script type="text/javascript" src="/javascript/jquery-3.2.1.min.js"></script>
+  <script type="text/javascript" src="/javascript/main.js"></script>
+
+  <script>
+
+      $.ajaxSetup({cache: false});
+
+    var currCluster = "";
+    var currOrderBy = "count";
+    var currAsc = "desc";
+    var offset = 0;
+    var page_size = 50;
+    var cookieName = "SonicBase-QueryStats";
+    var currDate = "";
+    var currQuery = "";
+
+    var nVer = navigator.appVersion;
+    var nAgt = navigator.userAgent;
+    var browserName  = navigator.appName;
+    var fullVersion  = ''+parseFloat(navigator.appVersion);
+    var majorVersion = parseInt(navigator.appVersion,10);
+    var nameOffset,verOffset,ix;
+
+    // In Opera, the true version is after "Opera" or after "Version"
+    if ((verOffset=nAgt.indexOf("Opera"))!=-1) {
+        browserName = "Opera";
+        fullVersion = nAgt.substring(verOffset+6);
+        if ((verOffset=nAgt.indexOf("Version"))!=-1)
+            fullVersion = nAgt.substring(verOffset+8);
+    }
+// In MSIE, the true version is after "MSIE" in userAgent
+    else if ((verOffset=nAgt.indexOf("MSIE"))!=-1) {
+        browserName = "Microsoft Internet Explorer";
+        fullVersion = nAgt.substring(verOffset+5);
+    }
+// In Chrome, the true version is after "Chrome"
+    else if ((verOffset=nAgt.indexOf("Chrome"))!=-1) {
+        browserName = "Chrome";
+        fullVersion = nAgt.substring(verOffset+7);
+    }
+// In Safari, the true version is after "Safari" or after "Version"
+    else if ((verOffset=nAgt.indexOf("Safari"))!=-1) {
+        browserName = "Safari";
+        fullVersion = nAgt.substring(verOffset+7);
+        if ((verOffset=nAgt.indexOf("Version"))!=-1)
+            fullVersion = nAgt.substring(verOffset+8);
+    }
+// In Firefox, the true version is after "Firefox"
+    else if ((verOffset=nAgt.indexOf("Firefox"))!=-1) {
+        browserName = "Firefox";
+        fullVersion = nAgt.substring(verOffset+8);
+    }
+// In most other browsers, "name/version" is at the end of userAgent
+    else if ( (nameOffset=nAgt.lastIndexOf(' ')+1) < (verOffset=nAgt.lastIndexOf('/')) ) {
+        browserName = nAgt.substring(nameOffset,verOffset);
+        fullVersion = nAgt.substring(verOffset+1);
+        if (browserName.toLowerCase()==browserName.toUpperCase()) {
+            browserName = navigator.appName;
+        }
+    }
+    // trim the fullVersion string at semicolon/space if present
+    if ((ix=fullVersion.indexOf(";"))!=-1)
+        fullVersion=fullVersion.substring(0,ix);
+    if ((ix=fullVersion.indexOf(" "))!=-1)
+        fullVersion=fullVersion.substring(0,ix);
+
+    majorVersion = parseInt(''+fullVersion,10);
+    if (isNaN(majorVersion)) {
+        fullVersion  = ''+parseFloat(navigator.appVersion);
+        majorVersion = parseInt(navigator.appVersion,10);
+    }
+
+    function init() {
+        var cookieValue = readCookie(cookieName);
+        if (cookieValue != null) {
+            var parts = cookieValue.split(":");
+            currOrderBy = parts[0];
+            currAsc = parts[1];
+            page_size = parts[2];
+            currCluster = parts[3];
+            document.getElementById("page_size").value = page_size;
+        }
+        setDateRangeOnDatePicker();
+    }
+
+    function getDateStr(date) {
+        var dd = date.getDate();
+        var mm = date.getMonth()+1; //January is 0!
+        var yyyy = date.getFullYear();
+        if(dd<10){
+            dd='0'+dd
+        }
+        if(mm<10){
+            mm='0'+mm
+        }
+
+        return yyyy+'-'+mm+'-'+dd;
+    }
+
+    function getDateCallback(response) {
+
+        if (response.error != null) {
+            alert(response.error);
+        }
+
+        var r = JSON.parse(response);
+        var parts = r.date.split("-");
+        var now = new Date(Number(parts[0]), Number(parts[1] - 1), Number(parts[2]), 0, 0, 0, 0)
+        //alert(r.date + " y=" + parts[0] + ", m=" + parts[1] + ", d=" + parts[2])
+        //alert(now)
+        var monthAgo = new Date();
+        monthAgo.setDate(now.getDate() - 30);
+        document.getElementById("date_picker").setAttribute("max", getDateStr(now));
+        document.getElementById("date_picker").setAttribute("min", getDateStr(monthAgo));
+        currDate = getDateStr(now);
+        pickerDate = currDate;
+        if (browserName == "Safari") {
+            var parts = currDate.split("-");
+            var year = parts[0];
+            var month = parts[1];
+            var day = parts[2];
+            pickerDate = month + "/" + day + "/" + year;
+        }
+        document.getElementById("date_picker").value = pickerDate;
+
+        loadQueries();
+    }
+
+    function setDateRangeOnDatePicker() {
+
+        $.ajaxSetup({
+            error: function(xhr){
+                alert('Request Status: ' + xhr.status + ' Status Text: ' + xhr.statusText + ' ' + xhr.responseText);
+            }
+        });
+
+        $.ajax({
+            headers:{
+                "Accept":"application/json",
+                "Content-type":"application/json"
+            },   url:"/get-date",
+            success:getDateCallback,
+            error: function(xhr) {
+
+                // revert to default
+                alert('Request Status: ' + xhr.status + ' Status Text: ' + xhr.statusText + ' ' + xhr.responseText);
+            }
+        });
+
+    }
+
+    function formatDate(d) {
+        if (d.includes("/")) {
+            var parts = d.split("/");
+
+            if (browserName == "Safari") {
+                var month = parts[0];
+                var day = parts[1];
+                var year = parts[2];
+                d = year + "-" + month + "-" + day
+            }
+            else {
+                var year = parts[2];
+                var month = parts[1];
+                var day = parts[0];
+                d = year + "-" + month + "-" + day
+            }
+        }
+        return d;
+    }
+
+    function selectedDate() {
+        var d = document.getElementById("date_picker").value;
+        d = formatDate(d);
+        currDate = d;
+        offset = 0;
+        loadQueries();
+    }
+
+    function createCookie(name,value,minutes) {
+        var expires = "";
+        if (minutes) {
+            var date = new Date();
+            date.setTime(date.getTime() + (minutes*60*1000));
+            expires = "; expires=" + date.toUTCString();
+        }
+        document.cookie = name + "=" + value + expires + "; path=/";
+    }
+
+
+    function readCookie(name) {
+        var nameEQ = name + "=";
+        var ca = document.cookie.split(';');
+        for(var i=0;i < ca.length;i++) {
+            var c = ca[i];
+            while (c.charAt(0)==' ') c = c.substring(1,c.length);
+            if (c.indexOf(nameEQ) == 0) return c.substring(nameEQ.length,c.length);
+        }
+        return null;
+    }
+
+    function formatNanos(num) {
+      return (num / 1000000).toFixed(4);
+    }
+
+    function refreshCluster(value) {
+        currCluster = value;
+        $('#clusters').val(value);
+        loadQueries(currOrderBy);
+    }
+
+    function selectColumn(column) {
+        currOrderBy = column;
+        loadQueries()
+    }
+
+    function changeOrder(orderBy) {
+        if (currAsc === null) {
+            currAsc = "desc";
+        }
+        else {
+            if (orderBy === currOrderBy) {
+                if (currAsc === "asc") {
+                    currAsc = "desc";
+                }
+                else {
+                    currAsc = "asc";
+                }
+            }
+        }
+        currOrderBy = orderBy;
+        loadQueries()
+    }
+
+    function htmlEncode(value){
+        return $('<div/>').text(value).html();
+    }
+
+    function htmlDecode(value){
+        return $('<div/>').html(value).text();
+    }
+     function loadQueries() {
+
+          $.ajaxSetup({
+              error: function(xhr){
+                  alert('Request Status: ' + xhr.status + ' Status Text: ' + xhr.statusText + ' ' + xhr.responseText);
+              }
+          });
+
+          var selectNode = document.getElementById("clusters");
+          if (selectNode != null && selectNode.options != null) {
+              if (selectNode.selectedIndex != -1) {
+                  currCluster = selectNode.options[selectNode.selectedIndex].value;
+              }
+          }
+          if (currCluster == null || currCluster == "") {
+              currCluster = "_unknown_";
+          }
+
+          if (document.getElementById("page_size") != null) {
+              page_size = document.getElementById("page_size").value;
+          }
+
+         if (document.getElementById("search_text") != null) {
+             currQuery = document.getElementById("search_text").value;
+         }
+
+         var date = formatDate(currDate);
+
+         var encodedQuery = encodeURI(currQuery);
+
+         var d = new Date();
+         var currDateStr = getDateStr(d);
+
+         var timezone = Intl.DateTimeFormat().resolvedOptions().timeZone;
+          $.ajax({
+              headers:{
+                  "Accept":"application/json",
+                  "Content-type":"application/json"
+              },   url:"/query-stats?tz=" + timezone + "&search=" + encodedQuery + "&currDate=" + currDateStr + "&date=" + date + "&cluster=" + currCluster + "&offset=" + offset + "&page_size=" + page_size + "&order_by=" + currOrderBy + "&asc=" + currAsc,
+              success:function(response) {
+
+                  if (response.error != null) {
+                      alert(response.error);
+                  }
+
+
+                  var table = document.getElementById("queries-table");
+
+
+                  while (table.rows.length > 1) {
+                      table.deleteRow(1);
+                  }
+
+                  var r = response;//JSON.parse(response);
+
+                  offset = r.offset;
+
+                  // var clusters = r.clusters;
+                  // var selectNode = document.getElementById("clusters");
+                  // selectNode.innerHTML = "";
+                  // for (var i = 0; i < r.clusters.length; i++) {
+                  //     var cluster = clusters[i];
+                  //     var option = document.createElement("option");
+                  //     option.text = cluster;
+                  //     selectNode.add(option, selectNode.options[null]);
+                  // }
+                  //
+                  // if (currCluster == null || currCluster == "" || currCluster == "_unknown_") {
+                  //     currCluster = clusters[0];
+                  //     $('#clusters').val(clusters[0]);
+                  // }
+                  // else {
+                  //     $('#clusters').val(currCluster);
+                  // }
+
+                  var size = r.queries.length;
+                  for (var i = 0; i < size; i++) {
+                      var db_name = r.queries[i].db_name;
+                      var query = r.queries[i].query;
+                      var count = r.queries[i].count;
+                      var lat_avg = formatNanos(r.queries[i].lat_avg);
+                      var lat_75 = formatNanos(r.queries[i].lat_75);
+                      var lat_95 = formatNanos(r.queries[i].lat_95);
+                      var lat_99 = formatNanos(r.queries[i].lat_99);
+                      var lat_999 = formatNanos(r.queries[i].lat_999);
+                      var lat_max = formatNanos(r.queries[i].lat_max);
+
+                      var rowCount = table.rows.length;
+                      var row = table.insertRow(rowCount);
+                      if (i % 2 == 0) {
+                          row.classList.add("grey-row");
+                      }
+                      var c1 = row.insertCell(0);
+                      var c2 = row.insertCell(1);
+                      var c3 = row.insertCell(2);
+                      var c4 = row.insertCell(3);
+                      var c5 = row.insertCell(4);
+                      var c6 = row.insertCell(5);
+                      var c7 = row.insertCell(6);
+                      var c8 = row.insertCell(7);
+                      var c9 = row.insertCell(8);
+                      c1.innerHTML=db_name;
+                      c2.innerHTML=htmlEncode(query);
+                      c2.classList.add("query");
+                      c3.innerHTML=count;
+                      c4.innerHTML=lat_avg;
+                      //c5.innerHTML=lat_75;
+                      c5.innerHTML=lat_95;
+                      c6.innerHTML=lat_99;
+                      c7.innerHTML=lat_999;
+                      c8.innerHTML=lat_max
+                  }
+
+                  var cookieValue = currOrderBy + ":" + currAsc + ":" + page_size + ":" + currCluster;
+                  createCookie(cookieName, cookieValue, 600000);
+              },
+              error: function(xhr) {
+
+                // revert to default
+                  alert('Request Status: ' + xhr.status + ' Status Text: ' + xhr.statusText + ' ' + xhr.responseText);
+              }
+          });
+      }
+
+      function searchKeyPress(e) {
+          e = e || window.event;
+          if (e.keyCode == 13) {
+              offset = 0;
+              loadQueries();
+              return false;
+          }
+          return true;
+      }
+
+      function pageSizeKeyPress(e) {
+          // look for window.event in case event isn't passed in
+          e = e || window.event;
+          if (e.keyCode == 13) {
+              offset = 0;
+              loadQueries();
+              return false;
+          }
+          return true;
+      }
+
+  </script>
+
+  <script type="text/javascript">
+      var datefield=document.createElement("input")
+      datefield.setAttribute("type", "date")
+      if (datefield.type!="date"){ //if browser doesn't support input type="date", load files for jQuery UI Date Picker
+          document.write('<link href="http://ajax.googleapis.com/ajax/libs/jqueryui/1.8/themes/base/jquery-ui.css" rel="stylesheet" type="text/css" />\n')
+          document.write('<script src="http://ajax.googleapis.com/ajax/libs/jquery/1.4/jquery.min.js"><\/script>\n')
+          document.write('<script src="http://ajax.googleapis.com/ajax/libs/jqueryui/1.8/jquery-ui.min.js"><\/script>\n')
+      }
+  </script>
+
+  <script>
+      if (datefield.type!="date"){ //if browser doesn't support input type="date", initialize date picker widget:
+          jQuery(function($){ //on document.ready
+              $('#date_picker').datepicker();
+          })
+      }
+  </script>
+  <style>
+    table {
+      border-spacing: 0px;
+      /*border-collapse: collapse;*/
+    }
+    td {
+      padding-top: 3px;
+      padding-bottom: 3px;
+      padding-left: 3px;
+      padding-right: 3px;
+      text-align: center;
+    }
+    .grey-row {
+      background-color: #e3ebf0
+    }
+    .header {
+      background-color: #24c2dc;
+      color: white;
+      border:1px solid #757a80;
+    }
+    .query {
+      text-align: left;
+    }
+  </style>
+  <link href="/css/singlePageTemplate.css" rel="stylesheet" type="text/css">
+
+</head>
+
+<body>
+<div id="container">
+<header>
+  <div class="mobile">
+    <a href="http://sonicbase.com">
+      <h4 class="logo">SonicBase™</h4>
+    </a>
+  </div>
+
+  <div class="desktop">
+    <a href="http://sonicbase.com">
+      <img style="margin-top:3px" src="images/logo-white.gif" width="50px"/><h4 class="logo">SonicBase™</h4>
+    </a>
+    <nav>
+      <ul>
+        <li><a href="health.html">HEALTH</a></li>
+        <li><a href="os-stats.html">OS STATS</a></li>
+      </ul>
+    </nav>
+  </div>
+</header>
+
+
+<table style="padding: 0" width="100%">
+  <tr style="height: 10px"><td></td></tr>
+  <tr>
+    <!--<td  style="horiz-align: left;" nowrap="">-->
+<!--Cluster: <select onchange="refreshCluster(this.value)" id="clusters">Cluster</select>-->
+    <!--</td>-->
+    <td style="horiz-align: left; vertical-align: center;" nowrap>Search: <input type="text" id="search_text" onkeypress="return searchKeyPress(event);" placeholder="e.g.: %select%">
+      <img onclick="document.getElementById('search_text').value = '';" src="clear.png" height="10" width="10">
+    </td>
+    <td width="100%"></td>
+    <td nowrap>Date UTC: <input onchange="selectedDate()" type="date" id="date_picker" max="1979-12-31"></td>
+    <td align="left" nowrap="">
+Page Size: <input type="text" id="page_size" size="5" value="50" onkeypress="return pageSizeKeyPress(event);">
+    </td>
+    <td width="100%"></td>
+    <td align="right" nowrap="">
+<img onclick="offset=0; loadQueries()" src="first_page.png" height="15" width="15">
+<img onclick="offset = Math.max(0, Number(offset) - Number(page_size)); loadQueries()" src="prev_page.png" height="15" width="15">
+<img onclick="offset = Number(offset) + Number(page_size); loadQueries()" src="next_page.png" height="15" width="15">
+<img onclick="offset = -1; loadQueries()" src="last_page.png" height="15" width="15">
+    </td>
+
+  </tr>
+  <tr style="height: 10px"><td></td></tr>
+</table>
+
+<script>
+  init();
+</script>
+
+<table width="100%" bord="0"  style="padding-top: 2px; padding-bottom: 2px;" id="queries-table">
+  <tr width="100%" class="header">
+    <td nowrap width="10%" class="header">
+      <table style="width: 100%;border: none"><tr><td onclick="javascript:selectColumn('db_name')">DB Name</td>
+        <td align="right"><img onclick="javascript:changeOrder('db_name')" src="sort-white.png" height="10" width="10"></td></tr></table></td>
+    <td nowrap width="65%" class="header query">
+      <table style="width: 100%;border: none"><tr><td onclick="javascript:selectColumn('query')">Query</td><td  onclick="javascript:selectColumn('query')" style="width: 100%"></td>
+        <td align="right"><img onclick="javascript:changeOrder('query')" src="sort-white.png" height="10" width="10"></td></tr></table></td>
+    <td nowrap witdh="10%" class="header">
+      <table style="width: 100%;border: none"><tr><td onclick="javascript:selectColumn('count')">Count</td>
+        <td align="right"><img onclick="javascript:changeOrder('count')" src="sort-white.png" height="10" width="10"></td></tr></table></td>
+    <td nowrap witdh="10%" class="header">
+        <table style="width: 100%;border: none"><tr><td onclick="javascript:selectColumn('lat_avg')">Avg</td>
+          <td align="right"><img onclick="javascript:changeOrder('lat_avg')" src="sort-white.png" height="10" width="10"></td></tr></table></td>
+    <!--<td nowrap witdh="10%" class="header">-->
+      <!--<table style="width: 100%;border: none"><tr><td onclick="javascript:selectColumn('lat_75')">75%</td>-->
+        <!--<td align="right"><img onclick="javascript:changeOrder('lat_75')" src="sort-white.png" height="10" width="10"></td></tr></table></td>-->
+    <td nowrap witdh="10%" class="header">
+        <table style="width: 100%;border: none"><tr><td onclick="javascript:selectColumn('lat_95')">95%</td>
+          <td align="right"><img onclick="javascript:changeOrder('lat_95')" src="sort-white.png" height="10" width="10"></td></tr></table></td>
+    <td nowrap witdh="10%" class="header">
+        <table style="width: 100%;border: none"><tr><td onclick="javascript:selectColumn('lat_99')">99%</td>
+          <td align="right"><img onclick="javascript:changeOrder('lat_99')" src="sort-white.png" height="10" width="10"></td></tr></table></td>
+    <td nowrap witdh="10%" class="header">
+        <table style="width: 100%;border: none"><tr><td onclick="javascript:selectColumn('lat_999')">99.9%</td>
+          <td align="right"><img onclick="javascript:changeOrder('lat_999')" src="sort-white.png" height="10" width="10"></td></tr></table></td>
+    <td nowrap witdh="10%" class="header">
+        <table style="width: 100%;border: none"><tr><td onclick="javascript:selectColumn('lat_max')">Max</td>
+          <td align="right"><img onclick="javascript:changeOrder('lat_max')" src="sort-white.png" height="10" width="10"></td></tr></table></td>
+  </tr>
+</table>
+</div>
+</body>

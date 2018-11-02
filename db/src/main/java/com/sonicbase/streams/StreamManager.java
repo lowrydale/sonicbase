@@ -1,5 +1,5 @@
 /* © 2018 by Intellectual Reserve, Inc. All rights reserved. */
-package com.sonicbase.stream;
+package com.sonicbase.streams;
 
 import com.fasterxml.jackson.databind.JsonNode;
 import com.fasterxml.jackson.databind.ObjectMapper;
@@ -37,9 +37,7 @@ import java.util.concurrent.ConcurrentHashMap;
 import java.util.concurrent.ConcurrentLinkedQueue;
 import java.util.concurrent.TimeUnit;
 
-public class StreamManagerImpl {
-
-
+public class StreamManager {
   private static Logger logger = LoggerFactory.getLogger(StreamManager.class);
 
   private final com.sonicbase.server.DatabaseServer server;
@@ -61,7 +59,7 @@ public class StreamManagerImpl {
   private boolean isDatabaseInitialized;
   private Connection sysConn;
 
-  public StreamManagerImpl(final DatabaseServer server) {
+  public StreamManager(final DatabaseServer server) {
     this.server = server;
     this.config = server.getConfig();
     logger.info("initializing StreamManager");
@@ -95,7 +93,7 @@ public class StreamManagerImpl {
             }
           }
 
-          StreamManagerImpl.initStreamsConsumerTable(sysConn);
+          StreamManager.initStreamsConsumerTable(sysConn);
 
           while (!shutdown && !Thread.interrupted()) {
             try {
@@ -210,6 +208,7 @@ public class StreamManagerImpl {
       return;
     }
     MessageRequest request = new MessageRequest();
+    request.clusterName = server.getCluster();
     request.dbName = dbName;
     request.tableName = tableName;
     request.recordBytes = recordBytes;
@@ -616,9 +615,10 @@ public class StreamManagerImpl {
 
           String dbName = entry.get("_sonicbase_dbname").asText();
           initConnection(dbName);
+          String clusterName = entry.get("_sonicbase_clustername").asText();
           String tableName = entry.get("_sonicbase_tablename").asText();
           String action = entry.get("_sonicbase_action").asText();
-          String key = dbName + ":" + tableName + ":" + action;
+          String key = clusterName + ":" + dbName + ":" + tableName + ":" + action;
           List<JsonNode> currMsgs = groupedMessages.get(key);
           if (currMsgs == null) {
             currMsgs = new ArrayList<>();
@@ -634,9 +634,10 @@ public class StreamManagerImpl {
     for (Map.Entry<String, List<JsonNode>> entry : groupedMessages.entrySet()) {
       try {
         String[] parts = entry.getKey().split(":");
-        String dbName = parts[0];
-        String tableName = parts[1];
-        String action = parts[2];
+        String cluster = parts[0];
+        String dbName = parts[1];
+        String tableName = parts[2];
+        String action = parts[3];
         final TableSchema tableSchema = server.getCommon().getTables(dbName).get(tableName);
         final List<FieldSchema> fields = tableSchema.getFields();
         if (action.equals(UpdateManager.UpdateType.INSERT.name())) {
@@ -662,7 +663,7 @@ public class StreamManagerImpl {
   private void handleDelete(Map.Entry<String, List<JsonNode>> entry, String dbName, String tableName, List<FieldSchema> fields) throws SQLException {
     for (JsonNode message : entry.getValue()) {
       ObjectNode json = (ObjectNode) message;
-
+      json = (ObjectNode) json.get("record");
       List<FieldSchema> specifiedFields = new ArrayList<>();
       String str = "delete from " + tableName + " where ";
       int offset = 0;
@@ -729,6 +730,7 @@ public class StreamManagerImpl {
       try {
         for (int i = 0; i < 200 && msgs.size() != 0; i++) {
           JsonNode message = msgs.remove(0);
+          message = message.get("record");
           Object[] record = getCurrRecordFromJson(message, fields);
           BulkImportManager.setFieldsInInsertStatement(stmt, 1, record, fields);
 
@@ -1174,6 +1176,7 @@ public class StreamManagerImpl {
   }
 
   class MessageRequest {
+    private String clusterName;
     private String dbName;
     private String tableName;
     private byte[] recordBytes;
@@ -1303,6 +1306,7 @@ public class StreamManagerImpl {
       builder.append("{");
 
       if (currRequest.updateType == UpdateManager.UpdateType.UPDATE) {
+        builder.append("\"_sonicbase_clustername\": \"").append(currRequest.clusterName).append("\",");
         builder.append("\"_sonicbase_dbname\": \"").append(currRequest.dbName).append("\",");
         builder.append("\"_sonicbase_tablename\": \"").append(currRequest.tableName).append("\",");
         builder.append("\"_sonicbase_action\": \"").append(currRequest.updateType).append("\",");
@@ -1322,11 +1326,14 @@ public class StreamManagerImpl {
         TableSchema tableSchema = server.getCommon().getTableSchema(currRequest.dbName, currRequest.tableName, server.getDataDir());
         Record record = new Record(currRequest.dbName, server.getCommon(), currRequest.recordBytes);
 
+        builder.append("\"_sonicbase_clustername\": \"").append(currRequest.clusterName).append("\",");
         builder.append("\"_sonicbase_dbname\": \"").append(currRequest.dbName).append("\",");
         builder.append("\"_sonicbase_tablename\": \"").append(currRequest.tableName).append("\",");
         builder.append("\"_sonicbase_action\": \"").append(currRequest.updateType).append("\",");
 
+        builder.append("\"record\": {");
         getJsonFromRecord(builder, tableSchema, record);
+        builder.append("}");
       }
       builder.append("}");
       offset++;
@@ -1387,6 +1394,7 @@ public class StreamManagerImpl {
       }
 
       MessageRequest request = new MessageRequest();
+      request.clusterName = server.getCluster();
       request.dbName = dbName;
       request.tableName = tableName;
       request.recordBytes = recordBytes;
@@ -1410,9 +1418,6 @@ public class StreamManagerImpl {
       List<FieldSchema> fields = tableSchema.getFields();
       for (FieldSchema fieldSchema : fields) {
         fieldName = fieldSchema.getName();
-        if (fieldName.equals("_sonicbase_id")) {
-          continue;
-        }
         int offset = tableSchema.getFieldOffset(fieldName);
         Object[] recordFields = record.getFields();
         if (recordFields[offset] == null) {

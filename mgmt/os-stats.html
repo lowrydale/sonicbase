@@ -1,0 +1,465 @@
+<html>
+<head>
+  <script type="text/javascript" src="/javascript/svg.js"></script>
+
+  <script type="text/javascript" src="/javascript/jquery-3.2.1.min.js"></script>
+  <script type="text/javascript" src="/javascript/main.js"></script>
+
+  <script>
+      // const stats = {
+      //       max: [
+      //           {time: "2028-12-02:12:30", cpu: 45.0, net_in: 12, net_out: 10, r_mem: 59, j_min: 32, j_max: 40, d_avail: 250},
+      //           {time: "2028-12-02:13:30", cpu: 40.0, net_in: 13},
+      //           {time: "2028-12-02:14:30", cpu: 41.0, net_in: 10},
+      //           {time: "2028-12-02:15:30", cpu: 49.0, net_in: 11}
+      //       ],
+      //       p90: [
+      //           {time: "2028-12-02:12:30", cpu: 30.0, net_in: 11},
+      //           {time: "2028-12-02:13:30", cpu: 32.0, net_in: 10},
+      //           {time: "2028-12-02:14:30", cpu: 32.0, net_in: 8},
+      //           {time: "2028-12-02:15:30", cpu: 36.0, net_in: 6}
+      //       ],
+      //       avg: [
+      //           {time: "2028-12-02:12:30", cpu: 20.0, net_in: 6},
+      //           {time: "2028-12-02:13:30", cpu: 22.0, net_in: 6},
+      //           {time: "2028-12-02:14:30", cpu: 22.0, net_in: 5},
+      //           {time: "2028-12-02:15:30", cpu: 26.0, net_in: 4}
+      //       ]
+      // };
+
+      var stats = "";
+      var currCluster = "";
+      var group;
+      var currTime = "min15";
+      var cookieName = "SonicBase-OSStats";
+
+
+      var draw = null;
+
+      function drawCpu(group, startX, startY, winHeight, winWidth, draw, lineColor) {
+          var prevX = startX;
+          var prevY = startY + winHeight - (group[0].cpu * (winHeight) / 100);
+          for (var i = 1; i < group.length; i++) {
+              var y = startY + winHeight - (group[i].cpu * (winHeight) / 100);
+              var x = startX + i * winWidth / (group.length - 1);
+              var line = draw.line(prevX, prevY, x, y).stroke({width: 3, color: lineColor});
+              prevY = y;
+              prevX = x;
+          }
+          return {prevX: prevX, prevY: prevY, i: i};
+      }
+
+      function drawNetIn(group, startX, startY, draw, winWidth, winHeight, max, lineColor) {
+          prevX = startX;
+          max = Math.max(max, 1);
+          prevY = startY + winHeight - (group[0].net_in * (winHeight) / max);
+          for (var i = 1; i < group.length; i++) {
+              var y = startY + winHeight - (group[i].net_in * (winHeight) / max);
+              var x = startX + i * winWidth / (group.length - 1);
+              var line = draw.line(prevX, prevY, x, y).stroke({width: 3, color: lineColor});
+              prevY = y;
+              prevX = x;
+          }
+      }
+
+      function drawNetOut(group, startX, startY, draw, winWidth, winHeight, max, lineColor) {
+          prevX = startX;
+          max = Math.max(max, 1);
+          prevY = startY + winHeight - (group[0].net_out * (winHeight) / max);
+          for (var i = 1; i < group.length; i++) {
+              var y = startY + winHeight - (group[i].net_out * (winHeight) / max);
+              var x = startX + i * winWidth / (group.length - 1);
+              var line = draw.line(prevX, prevY, x, y).stroke({width: 3, color: lineColor});
+              prevY = y;
+              prevX = x;
+          }
+      }
+
+      function drawResMem(group, startX, startY, draw, winWidth, winHeight, max, lineColor) {
+          prevX = startX;
+          max = Math.max(max, 1);
+          prevY = startY + winHeight - (group[0].r_mem * (winHeight) / max);
+          for (var i = 1; i < group.length; i++) {
+              var y = startY + winHeight - (group[i].r_mem * (winHeight) / max);
+              var x = startX + i * winWidth / (group.length - 1);
+              var line = draw.line(prevX, prevY, x, y).stroke({width: 3, color: lineColor});
+              prevY = y;
+              prevX = x;
+          }
+      }
+
+      function drawJMemMax(group, startX, startY, draw, winWidth, winHeight, max, lineColor) {
+          prevX = startX;
+          max = Math.max(max, 1);
+          prevY = startY + winHeight - (group[0].j_max * (winHeight) / max);
+          for (var i = 1; i < group.length; i++) {
+              var y = startY + winHeight - (group[i].j_max * (winHeight) / max);
+              var x = startX + i * winWidth / (group.length - 1);
+              var line = draw.line(prevX, prevY, x, y).stroke({width: 3, color: lineColor});
+              prevY = y;
+              prevX = x;
+          }
+      }
+
+      function drawJMemMin(group, startX, startY, draw, winWidth, winHeight, max, lineColor) {
+          prevX = startX;
+          max = Math.max(max, 1);
+          prevY = startY + winHeight - (group[0].j_min * (winHeight) / max);
+          for (var i = 1; i < group.length; i++) {
+              var y = startY + winHeight - (group[i].j_min * (winHeight) / max);
+              var x = startX + i * winWidth / (group.length - 1);
+              var line = draw.line(prevX, prevY, x, y).stroke({width: 3, color: lineColor});
+              prevY = y;
+              prevX = x;
+          }
+      }
+
+      function drawDiskAvail(group, startX, startY, draw, winWidth, winHeight, max, lineColor) {
+          prevX = startX;
+          max = Math.max(max, 1);
+          prevY = startY + winHeight - (group[0].d_avail * (winHeight) / max);
+          for (var i = 1; i < group.length; i++) {
+              var y = startY + winHeight - (group[i].d_avail * (winHeight) / max);
+              var x = startX + i * winWidth / (group.length - 1);
+              var line = draw.line(prevX, prevY, x, y).stroke({width: 3, color: lineColor});
+              prevY = y;
+              prevX = x;
+          }
+      }
+
+      function drawGrid(winWidth, winHeight, x, y, divisions) {
+          for (var i = 0; i < divisions; i++) {
+              draw.line(x, y + i * winHeight / divisions, x + winWidth, y + i * winHeight / divisions).stroke({width: 1, color: "#adbecf"});
+              draw.line(x + i * winWidth / divisions, y, x + i * winWidth / divisions, y + winHeight).stroke({width: 1, color: "#adbecf"})
+          }
+      }
+
+      function drawGrid2(winWidth, winHeight, x, y, divisions, minY, maxY, times) {
+          for (var i = 0; i < divisions + 1; i++) {
+              draw.line(x, y + i * winHeight / divisions, x + winWidth, y + i * winHeight / divisions).stroke({width: 1, color: "#3f444c"});
+              draw.line(x + i * winWidth / divisions, y, x + i * winWidth / divisions, y + winHeight).stroke({width: 1, color: "#3f444c"})
+              draw.text((maxY - Number(i * (maxY - minY) / (divisions))).toFixed(1)).font({family: 'Helvetica', size: 11, alignment: "middle", anchor: 'end', leading:  '1.5em'}).move(x - 5, y + i * winHeight /divisions - 3)
+
+              var time = times[i];
+              var pos = time.indexOf("-");
+              time = time.substring(pos + 1);
+              pos = time.lastIndexOf(":");
+              time = time.substring(0, pos);
+              time = time.replace("T", " ");
+              var text = draw.text(time).path("M " + String(5 + x + i * winWidth / divisions) + " " + String(y + winHeight + 5) + " L " + String(5 + x + i * winWidth / divisions + 75) + " " + String(y + winHeight + 80))
+                  text.font({family: 'Helvetica', size: 11})
+// alert("line=" + "M" + String(x + i * winWidth / divisions) + "," + String(y + winHeight + 5) + " M" + String(x + i * winWidth / divisions - 10) + "," + String(y + winHeight + 50))
+//               draw.text(times[i]).font({family: 'Helvetica', size: 10, alignment: "middle", anchor: 'end', leading:  '1.5em'})
+//                   .path("M" + String(x + i * winWidth / divisions) + " " + String(y + winHeight + 5) + " M" + String(x + i * winWidth / divisions - 10) + " " + String(y + winHeight + 50))
+          }
+      }
+
+      function callback(response) {
+          var stats = response;
+
+
+          if (stats.error != null) {
+            alert(stats.error);
+            return;
+          }
+
+          // var clusters = response.clusters;
+          // var selectNode = document.getElementById("clusters");
+          // selectNode.innerHTML = "";
+          // for (var i = 0; i < response.clusters.length; i++) {
+          //     var cluster = clusters[i];
+          //     var option = document.createElement("option");
+          //     option.text = cluster;
+          //     selectNode.add(option, selectNode.options[null]);
+          // }
+          //
+          // if (currCluster == null || currCluster == "" || currCluster == "_unknown_") {
+          //     currCluster = clusters[0];
+          //     $('#clusters').val(clusters[0]);
+          // }
+          // else {
+          //     $('#clusters').val(currCluster);
+          // }
+
+          var winHeight = 300;
+          var winWidth = 300;
+
+          var col1x = 80;
+          var col2x = 460;
+          var col3x = 840;
+          var row1y = 40;
+          var row2y = 440;
+          var row3y = 820;
+
+          draw.text('CPU').center(col1x + winWidth / 2, row1y - 10);
+          var rect = draw.rect(winWidth, winHeight).fill('#000').stroke({ width: 2}).move(col1x, row1y);
+          drawGrid2(winWidth, winHeight, col1x, row1y, 10, 0, 100, stats.times);
+          drawCpu(stats.p75, col1x, row1y, winHeight, winWidth, draw, '#d0abab');
+          drawCpu(stats.p95, col1x, row1y, winHeight, winWidth, draw, '#00ffff');
+          drawCpu(stats.p99, col1x, row1y, winHeight, winWidth, draw, '#ffff00');
+          drawCpu(stats.p999, col1x, row1y, winHeight, winWidth, draw, '#ff00ff');
+          drawCpu(stats.avg, col1x, row1y, winHeight, winWidth, draw, '#3ad03c');
+          drawCpu(stats.max, col1x, row1y, winHeight, winWidth, draw, '#ff0000');
+
+          var max = 0;
+          for (var i = 0; i < stats.max.length; i++) {
+              max = Math.max(max, stats.max[i].net_in);
+          }
+
+          draw.text('Net In').center(col2x + winWidth / 2, row1y - 10);
+          draw.rect(winWidth, winHeight).fill('#000').stroke({width: 2}).move(col2x, row1y);
+          drawGrid2(winWidth, winHeight, col2x, row1y, 10, 0, max, stats.times);
+          drawNetIn(stats.p75, col2x, row1y, draw, winWidth, winHeight, max, '#d0abab');
+          drawNetIn(stats.p95, col2x, row1y, draw, winWidth, winHeight, max, '#00ffff');
+          drawNetIn(stats.p99, col2x, row1y, draw, winWidth, winHeight, max, '#ffff00');
+          drawNetIn(stats.p999, col2x, row1y, draw, winWidth, winHeight, max, '#ff00ff');
+          drawNetIn(stats.avg, col2x, row1y, draw, winWidth, winHeight, max, '#3ad03c');
+          drawNetIn(stats.max, col2x, row1y, draw, winWidth, winHeight, max, '#ff0000');
+
+          max = 0;
+          for (var i = 0; i < stats.max.length; i++) {
+              max = Math.max(max, stats.max[i].net_out);
+          }
+
+          draw.text('Net Out').center(col3x + winWidth / 2, row1y - 10);
+          draw.rect(winWidth, winHeight).fill('#000').stroke({width: 2}).move(col3x, row1y);
+          drawGrid2(winWidth, winHeight, col3x, row1y, 10, 0, max, stats.times);
+          drawNetOut(stats.p75, col3x, row1y, draw, winWidth, winHeight, max, '#d0abab');
+          drawNetOut(stats.p95, col3x, row1y, draw, winWidth, winHeight, max, '#00ffff');
+          drawNetOut(stats.p99, col3x, row1y, draw, winWidth, winHeight, max, '#ffff00');
+          drawNetOut(stats.p999, col3x, row1y, draw, winWidth, winHeight, max, '#ff00ff');
+          drawNetOut(stats.avg, col3x, row1y, draw, winWidth, winHeight, max, '#3ad03c');
+          drawNetOut(stats.max, col3x, row1y, draw, winWidth, winHeight, max, '#ff0000');
+
+          max = stats.maxMem;
+
+          draw.text('Resident Memory').center(col1x + winWidth / 2, row2y - 10);
+          draw.rect(winWidth, winHeight).fill('#000').stroke({width: 2}).move(col1x, row2y);
+          drawGrid2(winWidth, winHeight, col1x, row2y, 10, 0, max, stats.times);
+          drawResMem(stats.p75, col1x, row2y, draw, winWidth, winHeight, max, '#d0abab');
+          drawResMem(stats.p95, col1x, row2y, draw, winWidth, winHeight, max, '#00ffff');
+          drawResMem(stats.p99, col1x, row2y, draw, winWidth, winHeight, max, '#ffff00');
+          drawResMem(stats.p999, col1x, row2y, draw, winWidth, winHeight, max, '#ff00ff');
+          drawResMem(stats.avg, col1x, row2y, draw, winWidth, winHeight, max, '#3ad03c');
+          drawResMem(stats.max, col1x, row2y, draw, winWidth, winHeight, max, '#ff0000');
+
+          max = stats.maxMem;
+
+          draw.text('Java Heap Max').center(col2x + winWidth / 2, row2y - 10)
+          draw.rect(winWidth, winHeight).fill('#000').stroke({width: 2}).move(col2x, row2y);
+          drawGrid2(winWidth, winHeight, col2x, row2y, 10, 0, max, stats.times);
+          drawJMemMax(stats.p75, col2x, row2y, draw, winWidth, winHeight, max, '#d0abab');
+          drawJMemMax(stats.p95, col2x, row2y, draw, winWidth, winHeight, max, '#00ffff');
+          drawJMemMax(stats.p99, col2x, row2y, draw, winWidth, winHeight, max, '#ffff00');
+          drawJMemMax(stats.p999, col2x, row2y, draw, winWidth, winHeight, max, '#ff00ff');
+          drawJMemMax(stats.avg, col2x, row2y, draw, winWidth, winHeight, max, '#3ad03c');
+          drawJMemMax(stats.max, col2x, row2y, draw, winWidth, winHeight, max, '#ff0000');
+
+          max = stats.maxMem;
+
+          draw.text('Java Heap Min').center(col3x + winWidth / 2, row2y - 10)
+          draw.rect(winWidth, winHeight).fill('#000').stroke({width: 2}).move(col3x, row2y);
+          drawGrid2(winWidth, winHeight, col3x, row2y, 10, 0, max, stats.times);
+          drawJMemMin(stats.p75, col3x, row2y, draw, winWidth, winHeight, max, '#d0abab');
+          drawJMemMin(stats.p95, col3x, row2y, draw, winWidth, winHeight, max, '#00ffff');
+          drawJMemMin(stats.p99, col3x, row2y, draw, winWidth, winHeight, max, '#ffff00');
+          drawJMemMin(stats.p999, col3x, row2y, draw, winWidth, winHeight, max, '#ff00ff');
+          drawJMemMin(stats.avg, col3x, row2y, draw, winWidth, winHeight, max, '#3ad03c');
+          drawJMemMin(stats.max, col3x, row2y, draw, winWidth, winHeight, max, '#ff0000');
+
+          max = stats.maxDisk;
+
+          draw.text('Disk Available').center(col1x + winWidth / 2, row3y - 10)
+          var rect = draw.rect(winWidth, winHeight).fill('#000').stroke({ width: 2 }).move(col1x, row3y);
+          drawGrid2(winWidth, winHeight, col1x, row3y, 10, 0, max, stats.times);
+          drawDiskAvail(stats.p75, col1x, row3y, draw, winHeight, winWidth, max, '#d0abab');
+          drawDiskAvail(stats.p95, col1x, row3y, draw, winHeight, winWidth, max, '#00ffff');
+          drawDiskAvail(stats.p99, col1x, row3y, draw, winHeight, winWidth, max, '#ffff00');
+          drawDiskAvail(stats.p999, col1x, row3y, draw, winHeight, winWidth, max, '#ff00ff');
+          drawDiskAvail(stats.avg, col1x, row3y, draw, winHeight, winWidth, max, '#3ad03c');
+          drawDiskAvail(stats.max, col1x, row3y, draw, winHeight, winWidth, max, '#ff0000');
+
+          var cookieValue = currTime + ":" + currCluster;
+          createCookie(cookieName, cookieValue, 600000);
+
+
+          draw.line(col3x + winWidth + 40, row1y + 20, col3x + winWidth + 90, row1y + 20).stroke({width: 3, color: '#3ad03c'});
+          draw.line(col3x + winWidth + 40, row1y + 40, col3x + winWidth + 90, row1y + 40).stroke({width: 3, color: '#d0abab'});
+          draw.line(col3x + winWidth + 40, row1y + 60, col3x + winWidth + 90, row1y + 60).stroke({width: 3, color: '#00ffff'});
+          draw.line(col3x + winWidth + 40, row1y + 80, col3x + winWidth + 90, row1y + 80).stroke({width: 3, color: '#ffff00'});
+          draw.line(col3x + winWidth + 40, row1y + 100, col3x + winWidth + 90, row1y + 100).stroke({width: 3, color: '#ff00ff'});
+          draw.line(col3x + winWidth + 40, row1y + 120, col3x + winWidth + 90, row1y + 120).stroke({width: 3, color: '#ff0000'});
+
+          draw.text("avg").font({family: 'Helvetica', size: 10}).move(col3x + winWidth + 90 + 20, row1y + 15)
+          draw.text("75th percentile").font({family: 'Helvetica', size: 12}).move(col3x + winWidth + 90 + 20, row1y + 35)
+          draw.text("95th percentile").font({family: 'Helvetica', size: 12}).move(col3x + winWidth + 90 + 20, row1y + 55)
+          draw.text("99th percentile").font({family: 'Helvetica', size: 12}).move(col3x + winWidth + 90 + 20, row1y + 75)
+          draw.text("99.9th percentile").font({family: 'Helvetica', size: 12}).move(col3x + winWidth + 90 + 20, row1y + 95)
+          draw.text("max").font({family: 'Helvetica', size: 12}).move(col3x + winWidth + 90 + 20, row1y + 115)
+
+          // drawDiskAvail(stats.max, col1x, row3y, draw, winHeight, winWidth, max, '#ff0000');
+          // drawDiskAvail(stats.p75, col1x, row3y, draw, winHeight, winWidth, max, '#0f0');
+          // drawDiskAvail(stats.p95, col1x, row3y, draw, winHeight, winWidth, max, '#ffa000');
+          // drawDiskAvail(stats.p99, col1x, row3y, draw, winHeight, winWidth, max, '#ffff00');
+          // drawDiskAvail(stats.p999, col1x, row3y, draw, winHeight, winWidth, max, '#8709ff');
+          // drawDiskAvail(stats.avg, col1x, row3y, draw, winHeight, winWidth, max, '#0000ff');
+
+      }
+
+      function refreshCluster(value) {
+          currCluster = value;
+          $('#clusters').val(value);
+          getStats();
+      }
+
+      function createCookie(name,value,minutes) {
+          var expires = "";
+          if (minutes) {
+              var date = new Date();
+              date.setTime(date.getTime() + (minutes*60*1000));
+              expires = "; expires=" + date.toUTCString();
+          }
+          document.cookie = name + "=" + value + expires + "; path=/";
+      }
+
+
+      function readCookie(name) {
+          var nameEQ = name + "=";
+          var ca = document.cookie.split(';');
+          for(var i=0;i < ca.length;i++) {
+              var c = ca[i];
+              while (c.charAt(0)==' ') c = c.substring(1,c.length);
+              if (c.indexOf(nameEQ) == 0) return c.substring(nameEQ.length,c.length);
+          }
+          return null;
+      }
+
+
+      function getStats() {
+          draw.clear();
+
+          $.ajaxSetup({
+              error: function(xhr){
+                  alert('Request Status: ' + xhr.status + ' Status Text: ' + xhr.statusText + ' ' + xhr.responseText);
+              }
+          });
+
+          if (currCluster == null || currCluster == "") {
+              currCluster = "_unknown_";
+          }
+
+
+          currTime = document.getElementById("times").value;
+
+          var timezone = Intl.DateTimeFormat().resolvedOptions().timeZone;
+
+          $.ajax({
+              headers:{
+                  "Accept":"application/json",
+                  "Content-type":"application/json"
+              },   url:"/os-stats?tz=" + timezone + "&cluster=" + currCluster + "&time=" + currTime,
+              success:callback,
+              error: function(xhr) {
+
+                  // revert to default
+                  alert('Request Status: ' + xhr.status + ' Status Text: ' + xhr.statusText + ' ' + xhr.responseText);
+              }
+          });
+      }
+
+      function drawStats() {
+          getStats();
+      }
+
+      function init() {
+          if (draw == null) {
+              draw = SVG('cpu-drawing').size(1600, 1600);
+              //draw.rect(1600, 1600).fill("#666666").stroke("none").moveTo(0, 0).back()
+          }
+          var cookieValue = readCookie(cookieName);
+          if (cookieValue != null) {
+              var parts = cookieValue.split(":");
+              currTime = parts[0];
+              currCluster = parts[1];
+              //document.getElementById("clusters").value = currCluster;
+              document.getElementById("times").value = currTime;
+          }
+
+      }
+  </script>
+  <link href="/css/singlePageTemplate.css" rel="stylesheet" type="text/css">
+
+</head>
+
+<body >
+<div class="container">
+
+  <header>
+    <div class="mobile">
+      <a href="http://sonicbase.com">
+        <h4 class="logo">SonicBase™</h4>
+      </a>
+    </div>
+
+    <div class="desktop">
+      <a href="http://sonicbase.com">
+        <img style="margin-top:3px" src="images/logo-white.gif" width="50px"/><h4 class="logo">SonicBase™</h4>
+      </a>
+      <nav>
+        <ul>
+          <li><a href="health.html">HEALTH</a></li>
+          <li><a href="query-stats.html">QUERY STATS</a></li>
+        </ul>
+      </nav>
+    </div>
+  </header>
+
+
+  <table style="padding: 0;" width="100%">
+    <tr style="height: 10px"><td></td></tr>
+
+    <tr>
+      <td width="100%"></td>
+    <!--<td  style="horiz-align: left;" nowrap="">-->
+      <!--Cluster: <select onchange="refreshCluster(this.value)" id="clusters">Cluster</select>-->
+    <!--</td>-->
+    <td  style="horiz-align: right;" nowrap="">
+      Time: <select onchange="drawStats()" id="times">
+      <option value="min15">15 minutes</option>
+      <option value="hour1">1 hour</option>
+      <option value="hour6">6 hours</option>
+      <option value="hour24">24 hours</option>
+      <option value="day7">7 days</option>
+      <option value="day30">30 days</option>
+      <option value="today">today</option>
+      <option value="yesterday">yesterday</option>
+
+
+    </select>
+    </td>
+  </tr>
+    <tr style="height: 10px"><td></td></tr>
+</table>
+
+<table>
+<tr>
+  <td>
+    <div id="cpu-drawing"></div>
+</svg>
+  </td>
+  <td>
+
+  </td>
+</tr>
+</table>
+
+<script>
+  init();
+    drawStats();
+</script>
+
+
+
+</div>
+</body>
+</html>

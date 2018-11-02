@@ -281,7 +281,7 @@ public class InsertStatementHandler implements StatementHandler {
   private long getRecordId(AtomicLong recordId, String dbName, TableSchema tableSchema) {
     long id = -1;
     for (IndexSchema indexSchema : tableSchema.getIndices().values()) {
-      if (indexSchema.isPrimaryKey() && indexSchema.getFields()[0].equals(SONICBASE_ID_STR)) {
+      if (indexSchema.isPrimaryKey()) {// && indexSchema.getFields()[0].equals(SONICBASE_ID_STR)) {
         if (recordId.get() == -1L) {
           id = client.allocateId(dbName);
         }

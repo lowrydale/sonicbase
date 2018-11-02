@@ -1,5 +1,5 @@
 /* © 2018 by Intellectual Reserve, Inc. All rights reserved. */
-package com.sonicbase.stream;
+package com.sonicbase.streams;
 
 public class Message {
   private String body;

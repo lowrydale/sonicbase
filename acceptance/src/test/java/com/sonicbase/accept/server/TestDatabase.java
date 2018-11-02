@@ -18,6 +18,7 @@ import com.sonicbase.query.impl.SelectContextImpl;
 import com.sonicbase.schema.IndexSchema;
 import com.sonicbase.schema.TableSchema;
 import com.sonicbase.server.DatabaseServer;
+import com.sonicbase.server.ProServer;
 import org.apache.commons.io.FileUtils;
 import org.apache.commons.io.IOUtils;
 import org.apache.commons.lang.exception.ExceptionUtils;
@@ -27,6 +28,7 @@ import org.testng.annotations.AfterClass;
 import org.testng.annotations.BeforeClass;
 import org.testng.annotations.DataProvider;
 import org.testng.annotations.Test;
+import org.yaml.snakeyaml.Yaml;
 
 import javax.crypto.*;
 import java.io.BufferedInputStream;
@@ -79,7 +81,7 @@ public class TestDatabase {
   public void beforeClass() throws Exception {
     try {
       System.setProperty("log4j.configuration", "test-log4j.xml");
-
+//      System.setProperty("log4j.configuration", "/Users/lowryda/Dropbox/git/sonicbase/db/src/main/resources/log4j.xml");
 
       String configStr = IOUtils.toString(new BufferedInputStream(getClass().getResourceAsStream("/config/config-4-servers.yaml")), "utf-8");
       Config config = new Config(configStr);
@@ -209,18 +211,25 @@ public class TestDatabase {
       dbServers[3].runSnapshot();
 
       ObjectMapper mapper = new ObjectMapper();
-      ObjectNode backupConfig = (ObjectNode) mapper.readTree("{\n" +
-          "    \"type\" : \"fileSystem\",\n" +
-          "    \"directory\": \"$HOME/db/backup\",\n" +
-          "    \"period\": \"daily\",\n" +
-          "    \"time\": \"23:00\",\n" +
-          "    \"maxBackupCount\": 10,\n" +
-          "    \"sharedDirectory\": true\n" +
-          "  }");
+      Map<String, Object> backupConfig = new Yaml().loadAs(
+          "type: fileSystem\n" +
+              "directory: $HOME/db/backup\n" +
+              "period: daily\n" +
+              "time: 23:00\n" +
+              "maxBackupCount: 10\n" +
+              "sharedDirectory: true\n", Map.class);
 
-//      for (DatabaseServer dbServer : dbServers) {
-//        dbServer.setBackupConfig(backupConfig);
-//      }
+//          "    \"type\" : \"fileSystem\",\n" +
+//          "    \"directory\": \"$HOME/db/backup\",\n" +
+//          "    \"period\": \"daily\",\n" +
+//          "    \"time\": \"23:00\",\n" +
+//          "    \"maxBackupCount\": 10,\n" +
+//          "    \"sharedDirectory\": true\n" +
+//          "  }");
+
+      for (DatabaseServer dbServer : dbServers) {
+        ((ProServer)dbServer.getProServer()).getBackupManager().setBackupConfig(backupConfig);
+      }
 
       clusterClient.syncSchema();
 
@@ -231,6 +240,26 @@ public class TestDatabase {
         }
       }
 
+      clusterClient.startBackup();
+      while (true) {
+        Thread.sleep(1000);
+        if (clusterClient.isBackupComplete()) {
+          break;
+        }
+      }
+
+      Thread.sleep(5000);
+
+      File file = new File(System.getProperty("user.home"), "/db/backup");
+      File[] dirs = file.listFiles();
+
+      clusterClient.startRestore(dirs[0].getName());
+      while (true) {
+        Thread.sleep(1000);
+        if (clusterClient.isRestoreComplete()) {
+          break;
+        }
+      }
       dbServers[0].enableSnapshot(false);
       dbServers[1].enableSnapshot(false);
       dbServers[2].enableSnapshot(false);

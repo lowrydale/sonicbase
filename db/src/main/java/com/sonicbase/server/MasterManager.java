@@ -417,7 +417,6 @@ public class MasterManager {
         }, 5 * 60 * 1000L, 5 * 60 * 1000L);
 
         server.startStreamsConsumerMonitor();
-        server.startMasterLicenseValidator();
 
         server.shutdownDeathMonitor();
 

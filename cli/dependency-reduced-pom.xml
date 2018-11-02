@@ -722,12 +722,28 @@
       <scope>provided</scope>
       <exclusions>
         <exclusion>
+          <artifactId>kafka-clients</artifactId>
+          <groupId>org.apache.kafka</groupId>
+        </exclusion>
+        <exclusion>
           <artifactId>fastutil</artifactId>
           <groupId>it.unimi.dsi</groupId>
         </exclusion>
         <exclusion>
           <artifactId>netty-all</artifactId>
           <groupId>io.netty</groupId>
+        </exclusion>
+        <exclusion>
+          <artifactId>aws-java-sdk-s3</artifactId>
+          <groupId>com.amazonaws</groupId>
+        </exclusion>
+        <exclusion>
+          <artifactId>aws-java-sdk-kinesis</artifactId>
+          <groupId>com.amazonaws</groupId>
+        </exclusion>
+        <exclusion>
+          <artifactId>aws-java-sdk-sqs</artifactId>
+          <groupId>com.amazonaws</groupId>
         </exclusion>
         <exclusion>
           <artifactId>hadoop-core</artifactId>

@@ -1,3 +1,9 @@
+1.2.18
+open sourced pro version
+integrated Logstash
+integrated Elasticsearch
+
+
 1.2.17
 Added support for embedded databases
 Simplified configuration of servers

@@ -1,5 +1,8 @@
 package com.sonicbase.server;
 
+import com.codahale.metrics.MetricRegistry;
+import com.codahale.metrics.Snapshot;
+import com.codahale.metrics.Timer;
 import com.sonicbase.client.DatabaseClient;
 import com.sonicbase.common.*;
 import com.sonicbase.index.AddressMap;
@@ -10,6 +13,7 @@ import com.sonicbase.procedure.*;
 import com.sonicbase.query.DatabaseException;
 import com.sonicbase.schema.IndexSchema;
 import com.sonicbase.schema.TableSchema;
+import com.sonicbase.streams.StreamManager;
 import net.sf.jsqlparser.expression.*;
 import net.sf.jsqlparser.expression.operators.relational.ExpressionList;
 import net.sf.jsqlparser.parser.CCJSqlParserManager;
@@ -17,6 +21,7 @@ import net.sf.jsqlparser.statement.Statement;
 import net.sf.jsqlparser.statement.execute.Execute;
 import org.apache.commons.io.FileUtils;
 import org.apache.commons.io.IOUtils;
+import org.apache.commons.lang.exception.ExceptionUtils;
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
 
@@ -55,6 +60,17 @@ public class DatabaseServer {
   private static final String USER_DIR_STR = "user.dir";
   private static final String USER_HOME_STR = "user.home";
   public static final String USE_UNSAFE_STR = "useUnsafe";
+  static final String SONICBASE_SYS_DB_STR = "_sonicbase_sys";
+  public static final String METRIC_SNAPSHOT_WRITE = "snapshotWrite";
+  public static final String METRIC_SNAPSHOT_RECOVER = "snapshotRecover";
+  public static final String METRIC_REPART_MOVE_ENTRY = "repartMoveEntry";
+  public static final String METRIC_REPART_PROCESS_ENTRY = "repartProcessEntry";
+  public static final String METRIC_REPART_DELETE_ENTRY = "repartDeleteEntry";
+  public static final String METRIC_READ = "read";
+  public static final String METRIC_INSERT = "insert";
+  public static final String METRIC_UPDATE = "update";
+  public static final String METRIC_DELETE = "delete";
+
   public static boolean[][] deathOverride;
   private static final Logger logger = LoggerFactory.getLogger(DatabaseServer.class);
   private static final Logger errorLogger = LoggerFactory.getLogger(DatabaseServer.class);
@@ -109,12 +125,18 @@ public class DatabaseServer {
   private LogManager logManager;
   private SchemaManager schemaManager;
   private Object proServer;
-  private LicenseManagerProxy licenseManager;
   private String gcLog;
   private Thread reloadServerThread;
   private boolean isServerRoloadRunning;
   private boolean durable = true;
   private boolean unsafe;
+  private Object connMutex = new Object();
+  private ConnectionProxy sysConnection;
+  private StreamManager streamManager;
+
+  private static final MetricRegistry METRICS = new MetricRegistry();
+  private final Map<String, Timer> timers = new HashMap<>();
+  private Thread metricsThread;
 
   public static boolean[][] getDeathOverride() {
     return deathOverride;
@@ -130,6 +152,45 @@ public class DatabaseServer {
 
   private Logger getClientErrorLogger() {
     return clientErrorLogger;
+  }
+
+
+  public void initTimers() {
+    timers.put(METRIC_SNAPSHOT_WRITE, METRICS.timer("snapshotWrite"));
+    timers.put(METRIC_SNAPSHOT_RECOVER, METRICS.timer("snapshotRecover"));
+    timers.put(METRIC_REPART_MOVE_ENTRY, METRICS.timer("repartMoveEntry"));
+    timers.put(METRIC_REPART_PROCESS_ENTRY, METRICS.timer("repartProcessEntry"));
+    timers.put(METRIC_REPART_DELETE_ENTRY, METRICS.timer("repartDeleteEntry"));
+    timers.put(METRIC_READ, METRICS.timer("read"));
+    timers.put(METRIC_INSERT, METRICS.timer("insert"));
+    timers.put(METRIC_UPDATE, METRICS.timer("update"));
+    timers.put(METRIC_DELETE, METRICS.timer("delete"));
+
+    metricsThread = ThreadUtil.createThread(() -> {
+      while (!shutdown) {
+        try {
+          Thread.sleep(10_000);
+          for (Map.Entry<String, Timer> entry : timers.entrySet()) {
+            Snapshot snapshot = entry.getValue().getSnapshot();
+            logger.info("Stats - {}: count={}, 1minRate={}, 5minRate={}, mean={}, 95pct={}, 99pct={}, 999pct={}, max={}",
+                entry.getKey(), entry.getValue().getCount(), entry.getValue().getOneMinuteRate(), entry.getValue().getFiveMinuteRate(), snapshot.getMean(),
+                snapshot.get95thPercentile(), snapshot.get99thPercentile(), snapshot.get999thPercentile(), snapshot.getMax());
+          }
+        }
+        catch (InterruptedException e) {
+          Thread.currentThread().interrupt();
+          break;
+        }
+        catch (Exception e) {
+          logger.error("Error logging metrics", e);
+        }
+      }
+    }, "SonicBase Metrics Thread");
+    metricsThread.start();
+  }
+
+  public Map<String, Timer> getTimers() {
+    return timers;
   }
 
   public void setConfig(
@@ -178,6 +239,8 @@ public class DatabaseServer {
     initCompressRecords(config);
     initUnsafe(config);
 
+    initTimers();
+
     this.masterAddress = firstServer.getString(PRIVATE_ADDRESS_STR);
     this.masterPort = firstServer.getInt("port");
 
@@ -203,6 +266,8 @@ public class DatabaseServer {
     common.setServersConfig(serversConfig);
     this.shard = common.getShard();
     this.shardCount = serversConfig.getShardCount();
+
+    com.sonicbase.logger.Logger.init(shard, replica, config.getString("logstashServers"));
 
     common.setServersConfig(serversConfig);
 
@@ -232,8 +297,6 @@ public class DatabaseServer {
         initProNoOpMethodInvokers();
       }
     }
-    licenseManager = new LicenseManagerProxy(proServer);
-
     updateManager.initStreamManager();
 
     this.replicationFactor = shards.get(0).getReplicas().size();
@@ -283,7 +346,6 @@ public class DatabaseServer {
   private void initProNoOpMethodInvokers() {
     this.methodInvoker.registerNoOpMethodProvider("StreamManager");
     this.methodInvoker.registerNoOpMethodProvider("BackupManager");
-    this.methodInvoker.registerNoOpMethodProvider("LicenseManager");
     this.methodInvoker.registerNoOpMethodProvider("MonitorManager");
     this.methodInvoker.registerNoOpMethodProvider("OSStatsManager");
   }
@@ -337,8 +399,10 @@ public class DatabaseServer {
     this.bulkImportManager = new BulkImportManager(this);
     this.masterManager = new MasterManager(this);
     this.partitionManager = new PartitionManager(this, common);
+    this.streamManager = new StreamManager(this);
 
     this.methodInvoker = new MethodInvoker(this, logManager);
+    this.methodInvoker.registerMethodProvider("StreamManager", streamManager);
     this.methodInvoker.registerMethodProvider("BulkImportManager", bulkImportManager);
     this.methodInvoker.registerMethodProvider("DeleteManager", deleteManager);
     this.methodInvoker.registerMethodProvider("LogManager", logManager);
@@ -358,6 +422,16 @@ public class DatabaseServer {
       shutdown = true;
 
       shutdownProServer();
+
+      if (sysConnection != null) {
+        try {
+          sysConnection.close();
+        }
+        catch (SQLException e) {
+          logger.error("Error closing connecion", e);
+        }
+        sysConnection = null;
+      }
 
       if (streamsConsumerMonitorthread != null) {
         streamsConsumerMonitorthread.interrupt();
@@ -381,10 +455,13 @@ public class DatabaseServer {
       }
       readManager.shutdown();
       bulkImportManager.shutdown();
+      streamManager.shutdown();
 
       addressMap.shutdown();
 
       executor.shutdownNow();
+
+      logger.error("_sonicbase_shutdown_");
     }
     catch (Exception e) {
       throw new DatabaseException("Error shutting down DatabaseServer", e);
@@ -540,7 +617,6 @@ public class DatabaseServer {
     shutdownDeathMonitor();
     shutdownRepartitioner();
 
-    licenseManager.shutdownMasterLicenseValidator();
     updateManager.stopStreamsConsumerMasterMonitor();
 
 
@@ -1001,10 +1077,6 @@ public class DatabaseServer {
     return proServer;
   }
 
-  void startMasterLicenseValidator() {
-    licenseManager.startMasterLicenseValidator();
-  }
-
   public boolean isDurable() {
     return durable;
   }
@@ -1015,6 +1087,10 @@ public class DatabaseServer {
 
   public void setDurable(boolean durable) {
     this.durable = durable;
+  }
+
+  public StreamManager getStreamManager() {
+    return this.streamManager;
   }
 
   @SuppressWarnings("squid:S1186") // the NullX509TrustManager isn't suppose to do anything
@@ -1456,6 +1532,52 @@ public class DatabaseServer {
     partitionManager.stopShardsFromRepartitioning();
     partitionManager = new PartitionManager(this, common);
     logger.info("Shutdown partitionManager - end");
+  }
+
+  public Connection getSysConnection() {
+    try {
+      ConnectionProxy conn = null;
+      try {
+        synchronized (connMutex) {
+          if (sysConnection != null) {
+            return sysConnection;
+          }
+          List<Config.Shard> array = config.getShards();
+          Config.Shard shard = array.get(0);
+          List<Config.Replica> replicasArray = shard.getReplicas();
+          Boolean priv = config.getBoolean("clientIsPrivate");
+          final String address = priv != null && priv ?
+              replicasArray.get(0).getString("privateAddress") :
+              replicasArray.get(0).getString("publicAddress");
+          final int port = replicasArray.get(0).getInt("port");
+
+          Class.forName("com.sonicbase.jdbcdriver.Driver");
+          conn = new ConnectionProxy("jdbc:sonicbase:" + address + ":" + port, this);
+          try {
+            if (!((ConnectionProxy) conn).databaseExists(SONICBASE_SYS_DB_STR)) {
+              ((ConnectionProxy) conn).createDatabase(SONICBASE_SYS_DB_STR);
+            }
+          }
+          catch (Exception e) {
+            if (!ExceptionUtils.getFullStackTrace(e).toLowerCase().contains("database already exists")) {
+              throw new DatabaseException(e);
+            }
+          }
+
+          sysConnection = new ConnectionProxy("jdbc:sonicbase:" + address + ":" + port + "/_sonicbase_sys", this);
+        }
+      }
+      finally {
+        if (conn != null) {
+          conn.close();
+        }
+      }
+
+      return sysConnection;
+    }
+    catch (Exception e) {
+      throw new DatabaseException(e);
+    }
   }
 
   public ComObject updateIndexSchema(ComObject cobj, boolean replayedCommand) {

@@ -1,5 +1,6 @@
 package com.sonicbase.server;
 
+import com.codahale.metrics.Timer;
 import com.fasterxml.jackson.databind.JsonNode;
 import com.fasterxml.jackson.databind.ObjectMapper;
 import com.fasterxml.jackson.databind.node.ArrayNode;
@@ -19,6 +20,7 @@ import com.sonicbase.query.impl.InsertStatementImpl;
 import com.sonicbase.query.impl.SelectStatementImpl;
 import com.sonicbase.schema.IndexSchema;
 import com.sonicbase.schema.TableSchema;
+import com.sonicbase.streams.StreamManager;
 import com.sonicbase.util.TestUtils;
 import net.sf.jsqlparser.JSQLParserException;
 import net.sf.jsqlparser.parser.CCJSqlParserManager;
@@ -46,6 +48,8 @@ import java.util.concurrent.atomic.AtomicLong;
 import static com.sonicbase.client.DatabaseClient.SERIALIZATION_VERSION;
 import static com.sonicbase.client.InsertStatementHandler.BATCH_STATUS_FAILED;
 import static com.sonicbase.client.InsertStatementHandler.BATCH_STATUS_SUCCCESS;
+import static com.sonicbase.server.DatabaseServer.*;
+import static com.sonicbase.server.MonitorManagerImpl.METRICS;
 import static org.mockito.Matchers.*;
 import static org.mockito.Mockito.doAnswer;
 import static org.mockito.Mockito.mock;
@@ -98,6 +102,23 @@ public class UpdateManagerTest {
     Config config = new Config(configStr);
 
     when(server.getConfig()).thenReturn(config);
+
+    final Map<String, Timer> timers = new HashMap<>();
+
+    timers.put(METRIC_SNAPSHOT_WRITE, METRICS.timer("snapshotWrite"));
+    timers.put(METRIC_SNAPSHOT_RECOVER, METRICS.timer("snapshotRecover"));
+    timers.put(METRIC_REPART_MOVE_ENTRY, METRICS.timer("repartMoveEntry"));
+    timers.put(METRIC_REPART_PROCESS_ENTRY, METRICS.timer("repartProcessEntry"));
+    timers.put(METRIC_REPART_DELETE_ENTRY, METRICS.timer("repartDeleteEntry"));
+    timers.put(METRIC_READ, METRICS.timer("read"));
+    timers.put(METRIC_INSERT, METRICS.timer("insert"));
+    timers.put(METRIC_UPDATE, METRICS.timer("update"));
+    timers.put(METRIC_DELETE, METRICS.timer("delete"));
+
+    when(server.getTimers()).thenReturn(timers);
+
+    when(server.getStreamManager()).thenReturn(mock(StreamManager.class));
+
     transManager = new TransactionManager(server);
     when(server.getTransactionManager()).thenReturn(transManager);
 

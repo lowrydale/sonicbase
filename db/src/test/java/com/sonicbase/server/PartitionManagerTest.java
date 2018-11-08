@@ -1,5 +1,6 @@
 package com.sonicbase.server;
 
+import com.codahale.metrics.Timer;
 import com.fasterxml.jackson.databind.JsonNode;
 import com.fasterxml.jackson.databind.ObjectMapper;
 import com.fasterxml.jackson.databind.node.ArrayNode;
@@ -32,6 +33,10 @@ import java.util.concurrent.atomic.AtomicBoolean;
 import java.util.concurrent.atomic.AtomicInteger;
 import java.util.concurrent.atomic.AtomicReference;
 
+import static com.sonicbase.server.DatabaseServer.*;
+import static com.sonicbase.server.DatabaseServer.METRIC_DELETE;
+import static com.sonicbase.server.DatabaseServer.METRIC_UPDATE;
+import static com.sonicbase.server.MonitorManagerImpl.METRICS;
 import static org.mockito.BDDMockito.then;
 import static org.mockito.Matchers.*;
 import static org.mockito.Mockito.*;
@@ -40,14 +45,31 @@ import static org.testng.Assert.assertTrue;
 
 public class PartitionManagerTest {
 
+  private DatabaseServer server;
+
   @BeforeClass
   public void beforeClass() {
-    //System.setProperty("log4j.configuration", "test-log4j.xml");
+    System.setProperty("log4j.configuration", "test-log4j.xml");
+
+    server = mock(DatabaseServer.class);
+
+    final Map<String, Timer> timers = new HashMap<>();
+
+    timers.put(METRIC_SNAPSHOT_WRITE, METRICS.timer("snapshotWrite"));
+    timers.put(METRIC_SNAPSHOT_RECOVER, METRICS.timer("snapshotRecover"));
+    timers.put(METRIC_REPART_MOVE_ENTRY, METRICS.timer("repartMoveEntry"));
+    timers.put(METRIC_REPART_PROCESS_ENTRY, METRICS.timer("repartProcessEntry"));
+    timers.put(METRIC_REPART_DELETE_ENTRY, METRICS.timer("repartDeleteEntry"));
+    timers.put(METRIC_READ, METRICS.timer("read"));
+    timers.put(METRIC_INSERT, METRICS.timer("insert"));
+    timers.put(METRIC_UPDATE, METRICS.timer("update"));
+    timers.put(METRIC_DELETE, METRICS.timer("delete"));
+
+    when(server.getTimers()).thenReturn(timers);
   }
 
   @Test
   public void test() throws Exception {
-    DatabaseServer server = mock(DatabaseServer.class);
     AddressMap addressMap = new AddressMap(server);
     when(server.getAddressMap()).thenReturn(addressMap);
     when(server.getBatchRepartCount()).thenReturn(new AtomicInteger(0));
@@ -127,12 +149,10 @@ public class PartitionManagerTest {
 
     byte[] bytes0 = cobj.serialize();
     when(client.send(   eq("PartitionManager:getPartitionSize"), anyInt(), eq((long)0), (ComObject) anyObject(), eq(DatabaseClient.Replica.MASTER))).thenAnswer(
-        new Answer() {
-          public Object answer(InvocationOnMock invocation) {
+        (Answer) invocation -> {
 //            Object[] args = invocation.getArguments();
 //            return partitionManager.getPartitionSize((ComObject)args[3], false).serialize();
-            return bytes0;
-          }
+          return bytes0;
         });
 
     cobj = new ComObject();
@@ -159,11 +179,9 @@ public class PartitionManagerTest {
     array.add(DatabaseCommon.serializeKey(tableSchema, "_primarykey", keys.get(4)));
     bytes1 = cobj.serialize();
     when(client.send(   eq("PartitionManager:getKeyAtOffset"), eq(0), eq((long)0), (ComObject) anyObject(), eq(DatabaseClient.Replica.MASTER))).thenAnswer(
-        new Answer() {
-          public Object answer(InvocationOnMock invocation) {
-            Object[] args = invocation.getArguments();
-            return partitionManager.getKeyAtOffset((ComObject)args[3], false).serialize();
-          }
+        (Answer) invocation -> {
+          Object[] args = invocation.getArguments();
+          return partitionManager.getKeyAtOffset((ComObject)args[3], false).serialize();
         });
 
 //    cobj.put(ComObject.Tag.replica, 0);
@@ -172,26 +190,30 @@ public class PartitionManagerTest {
 //        bytes3
 //    );
 
+    when(client.send(eq("PartitionManager:isShardRepartitioningComplete"), anyInt(), anyLong(), any(ComObject.class),
+        eq(DatabaseClient.Replica.SPECIFIED))).thenAnswer(
+        (Answer) invocation -> {
+          Object[] args = invocation.getArguments();
+          return partitionManager.isShardRepartitioningComplete((ComObject)args[3], false).serialize();
+        });
+
+
     when(client.send(eq("PartitionManager:rebalanceOrderedIndex"), eq(0), eq((long)0), any(ComObject.class),
         eq(DatabaseClient.Replica.MASTER))).thenAnswer(
-        new Answer() {
-          public Object answer(InvocationOnMock invocation) {
-            Object[] args = invocation.getArguments();
-            return partitionManager.doRebalanceOrderedIndex((ComObject)args[3], false);
-          }
+        (Answer) invocation -> {
+          Object[] args = invocation.getArguments();
+          return partitionManager.doRebalanceOrderedIndex((ComObject)args[3], false);
         });
 
     when(client.send(eq("PartitionManager:deleteMovedRecords"), anyInt(), eq((long)0), any(ComObject.class),
         eq(DatabaseClient.Replica.SPECIFIED))).thenAnswer(
-        new Answer() {
-          public Object answer(InvocationOnMock invocation) {
-            Object[] args = invocation.getArguments();
-            ComObject cobj = (ComObject)args[3];
-            cobj.put(ComObject.Tag.SEQUENCE_0, 10000L);
-            cobj.put(ComObject.Tag.SEQUENCE_1, 10000L);
+        (Answer) invocation -> {
+          Object[] args = invocation.getArguments();
+          ComObject cobj12 = (ComObject)args[3];
+          cobj12.put(ComObject.Tag.SEQUENCE_0, 10000L);
+          cobj12.put(ComObject.Tag.SEQUENCE_1, 10000L);
 
-            return partitionManager.deleteMovedRecords(cobj, false);
-          }
+          return partitionManager.deleteMovedRecords(cobj12, false);
         });
 
 
@@ -199,27 +221,25 @@ public class PartitionManagerTest {
     final AtomicBoolean calledMoveIndexEntries = new AtomicBoolean();
     when(client.send(eq("PartitionManager:moveIndexEntries"), eq(1), eq((long)0), any(ComObject.class),
         eq(DatabaseClient.Replica.DEF))).thenAnswer(
-        new Answer() {
-          public Object answer(InvocationOnMock invocation) {
-            try {
-              calledMoveIndexEntries.set(true);
-              Object[] args = invocation.getArguments();
-              ComObject cobj = (ComObject) args[3];
-              ComArray sentKeys = cobj.getArray(ComObject.Tag.KEYS);
-              for (int i = 5; i < keys.size(); i++) {
-                ComObject keyObj = (ComObject) sentKeys.getArray().get(i - 5);
-                byte[] bytes = keyObj.getByteArray(ComObject.Tag.KEY_BYTES);
-                Object[] key = DatabaseCommon.deserializeKey(tableSchema, bytes);
-                if (!key[0].equals(keys.get(i)[0])) {
-                  exception.set(new Exception());
-                }
+        (Answer) invocation -> {
+          try {
+            calledMoveIndexEntries.set(true);
+            Object[] args = invocation.getArguments();
+            ComObject cobj1 = (ComObject) args[3];
+            ComArray sentKeys = cobj1.getArray(ComObject.Tag.KEYS);
+            for (int i1 = 5; i1 < keys.size(); i1++) {
+              ComObject keyObj = (ComObject) sentKeys.getArray().get(i1 - 5);
+              byte[] bytes = keyObj.getByteArray(ComObject.Tag.KEY_BYTES);
+              Object[] key = DatabaseCommon.deserializeKey(tableSchema, bytes);
+              if (!key[0].equals(keys.get(i1)[0])) {
+                exception.set(new Exception());
               }
             }
-            catch (Exception e) {
-              exception.set(e);
-            }
-            return null;
           }
+          catch (Exception e) {
+            exception.set(e);
+          }
+          return null;
         });
 
     List<String> toRebalance = new ArrayList<>();
@@ -235,7 +255,6 @@ public class PartitionManagerTest {
 
   @Test
   public void testShard2() throws Exception {
-    DatabaseServer server = mock(DatabaseServer.class);
     AddressMap addressMap = new AddressMap(server);
     when(server.getAddressMap()).thenReturn(addressMap);
     when(server.getBatchRepartCount()).thenReturn(new AtomicInteger(0));
@@ -416,7 +435,6 @@ public class PartitionManagerTest {
 
   @Test
   public void testGetIndexCounts() throws Exception {
-    DatabaseServer server = mock(DatabaseServer.class);
     AddressMap addressMap = new AddressMap(server);
     when(server.getAddressMap()).thenReturn(addressMap);
     when(server.getBatchRepartCount()).thenReturn(new AtomicInteger(0));
@@ -565,6 +583,21 @@ public class PartitionManagerTest {
     for (int shard = 0; shard < shardCount; shard++) {
       DatabaseServer server = mock(DatabaseServer.class);
       servers[shard] = server;
+
+      final Map<String, Timer> timers = new HashMap<>();
+
+      timers.put(METRIC_SNAPSHOT_WRITE, METRICS.timer("snapshotWrite"));
+      timers.put(METRIC_SNAPSHOT_RECOVER, METRICS.timer("snapshotRecover"));
+      timers.put(METRIC_REPART_MOVE_ENTRY, METRICS.timer("repartMoveEntry"));
+      timers.put(METRIC_REPART_PROCESS_ENTRY, METRICS.timer("repartProcessEntry"));
+      timers.put(METRIC_REPART_DELETE_ENTRY, METRICS.timer("repartDeleteEntry"));
+      timers.put(METRIC_READ, METRICS.timer("read"));
+      timers.put(METRIC_INSERT, METRICS.timer("insert"));
+      timers.put(METRIC_UPDATE, METRICS.timer("update"));
+      timers.put(METRIC_DELETE, METRICS.timer("delete"));
+
+      when(server.getTimers()).thenReturn(timers);
+
       UpdateManager updateManager = new UpdateManager(server);
       DeleteManager deleteManager = mock(DeleteManager.class);
       when(server.getDeleteManager()).thenReturn(deleteManager);

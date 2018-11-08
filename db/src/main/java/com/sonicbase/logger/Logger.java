@@ -337,7 +337,9 @@ public class Logger extends AppenderSkeleton {
         node.put("this.replica", replica);
         node.put("value", value);
 
-        connection.out.writeBytes(node.toString() + "\n");
+        if (connection != null) {
+          connection.out.writeBytes(node.toString() + "\n");
+        }
         return ret;
       }
       catch (Exception e) {
@@ -355,7 +357,9 @@ public class Logger extends AppenderSkeleton {
         node.put("value", value);
 
         try {
-          connection.out.writeBytes(node.toString() + "\n");
+          if (connection != null) {
+            connection.out.writeBytes(node.toString() + "\n");
+          }
         }
         catch (IOException e1) {
         }

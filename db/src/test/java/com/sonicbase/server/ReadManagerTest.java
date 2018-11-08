@@ -1,5 +1,6 @@
 package com.sonicbase.server;
 
+import com.codahale.metrics.Timer;
 import com.fasterxml.jackson.databind.JsonNode;
 import com.fasterxml.jackson.databind.ObjectMapper;
 import com.fasterxml.jackson.databind.node.ArrayNode;
@@ -35,6 +36,8 @@ import java.util.List;
 import java.util.Map;
 import java.util.concurrent.atomic.AtomicInteger;
 
+import static com.sonicbase.server.DatabaseServer.METRIC_READ;
+import static com.sonicbase.server.MonitorManagerImpl.METRICS;
 import static org.mockito.Matchers.*;
 import static org.mockito.Mockito.mock;
 import static org.mockito.Mockito.when;
@@ -198,7 +201,15 @@ public class ReadManagerTest {
     ComArray columnArray = cobj.putArray(ComObject.Tag.COLUMN_OFFSETS, ComObject.Type.INT_TYPE);
     ExpressionImpl.writeColumns(tableSchema, columns, columnArray);
 
+
     ReadManager readManager = new ReadManager(server);
+
+
+    final Map<String, Timer> timers = new HashMap<>();
+
+    timers.put(METRIC_READ, METRICS.timer("read"));
+
+    when(server.getTimers()).thenReturn(timers);
 
     ComObject retObj = readManager.indexLookup(cobj, false);
 

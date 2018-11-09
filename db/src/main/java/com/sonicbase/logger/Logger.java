@@ -229,6 +229,10 @@ public class Logger extends AppenderSkeleton {
       return;
     }
 
+    if (servers == null) {
+      return;
+    }
+
     queue.add(loggingEvent);
   }
 

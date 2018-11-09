@@ -18,6 +18,8 @@ import java.util.concurrent.*;
 import java.util.concurrent.atomic.AtomicBoolean;
 import java.util.concurrent.atomic.AtomicLong;
 
+import static com.sonicbase.server.DatabaseServer.METRIC_SAVE_DELETE;
+
 @SuppressWarnings({"squid:S1172", "squid:S1168", "squid:S00107"})
 // all methods called from method invoker must have cobj and replayed command parms
 // I prefer to return null instead of an empty array
@@ -116,6 +118,7 @@ public class DeleteManager {
         file = new File(getReplicaRoot(), dateStr + "-" + System.nanoTime() + "-" +  rand.nextInt(50000) + ".bin");
       }
       file.getParentFile().mkdirs();
+      AtomicLong count = databaseServer.getStats().get(METRIC_SAVE_DELETE).getCount();
       TableSchema tableSchema = databaseServer.getCommon().getTables(dbName).get(tableName);
       try (DataOutputStream out = new DataOutputStream(new BufferedOutputStream(new FileOutputStream(file)))) {
         Varint.writeSignedVarLong(DatabaseClient.SERIALIZATION_VERSION, out);
@@ -125,6 +128,7 @@ public class DeleteManager {
         out.writeInt(databaseServer.getCommon().getSchemaVersion() + 1);
         for (DeleteRequest key : deleteRequests) {
           out.write(DatabaseCommon.serializeKey(tableSchema, indexName, key.getKey()));
+          count.incrementAndGet();
         }
       }
     }

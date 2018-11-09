@@ -19,11 +19,13 @@ import net.sf.jsqlparser.expression.operators.relational.ExpressionList;
 import net.sf.jsqlparser.parser.CCJSqlParserManager;
 import net.sf.jsqlparser.statement.Statement;
 import net.sf.jsqlparser.statement.execute.Execute;
+import org.apache.commons.collections.map.HashedMap;
 import org.apache.commons.io.FileUtils;
 import org.apache.commons.io.IOUtils;
 import org.apache.commons.lang.exception.ExceptionUtils;
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
+import sun.java2d.pipe.SpanShapeRenderer;
 
 import javax.net.ssl.*;
 import java.io.*;
@@ -67,9 +69,15 @@ public class DatabaseServer {
   public static final String METRIC_REPART_PROCESS_ENTRY = "repartProcessEntry";
   public static final String METRIC_REPART_DELETE_ENTRY = "repartDeleteEntry";
   public static final String METRIC_READ = "read";
-  public static final String METRIC_INSERT = "insert";
+  public static final String METRIC_INSERT = "indexInsert";
+  public static final String METRIC_INNER_INSERT = "innerIndexInsert";
+  public static final String METRIC_SECONDARY_INDEX_INSERT = "secondaryIndexInsert";
+  public static final String METRIC_SECONDARY_INDEX_INNER_INSERT = "secondaryIndexInnerInsert";
   public static final String METRIC_UPDATE = "update";
   public static final String METRIC_DELETE = "delete";
+  public static final String METRIC_LOG_WRITE = "logWrite";
+  public static final String METRIC_LOG_MESSAGE = "logMessage";
+  public static final String METRIC_SAVE_DELETE = "saveDelete";
 
   public static boolean[][] deathOverride;
   private static final Logger logger = LoggerFactory.getLogger(DatabaseServer.class);
@@ -138,6 +146,8 @@ public class DatabaseServer {
   private final Map<String, Timer> timers = new HashMap<>();
   private Thread metricsThread;
 
+  private Map<String, SimpleStats> stats = new HashedMap();
+
   public static boolean[][] getDeathOverride() {
     return deathOverride;
   }
@@ -154,6 +164,19 @@ public class DatabaseServer {
     return clientErrorLogger;
   }
 
+  public Map<String, SimpleStats> getStats() {
+    return stats;
+  }
+
+
+  public static class SimpleStats {
+    private AtomicLong count = new AtomicLong();
+    private long begin = System.currentTimeMillis();
+
+    public AtomicLong getCount() {
+      return count;
+    }
+  }
 
   public void initTimers() {
     timers.put(METRIC_SNAPSHOT_WRITE, METRICS.timer("snapshotWrite"));
@@ -166,16 +189,49 @@ public class DatabaseServer {
     timers.put(METRIC_UPDATE, METRICS.timer("update"));
     timers.put(METRIC_DELETE, METRICS.timer("delete"));
 
+    stats.put(METRIC_INSERT, new SimpleStats());
+    stats.put(METRIC_INNER_INSERT, new SimpleStats());
+    stats.put(METRIC_SECONDARY_INDEX_INSERT, new SimpleStats());
+    stats.put(METRIC_SECONDARY_INDEX_INNER_INSERT, new SimpleStats());
+
+    stats.put(METRIC_SNAPSHOT_WRITE, new SimpleStats());
+    stats.put(METRIC_SNAPSHOT_RECOVER, new SimpleStats());
+    stats.put(METRIC_REPART_MOVE_ENTRY, new SimpleStats());
+    stats.put(METRIC_REPART_PROCESS_ENTRY, new SimpleStats());
+    stats.put(METRIC_REPART_DELETE_ENTRY, new SimpleStats());
+    stats.put(METRIC_READ, new SimpleStats());
+    stats.put(METRIC_UPDATE, new SimpleStats());
+    stats.put(METRIC_DELETE, new SimpleStats());
+    stats.put(METRIC_LOG_MESSAGE, new SimpleStats());
+    stats.put(METRIC_LOG_WRITE, new SimpleStats());
+    stats.put(METRIC_SAVE_DELETE, new SimpleStats());
+
     metricsThread = ThreadUtil.createThread(() -> {
       while (!shutdown) {
         try {
           Thread.sleep(10_000);
-          for (Map.Entry<String, Timer> entry : timers.entrySet()) {
-            Snapshot snapshot = entry.getValue().getSnapshot();
-            logger.info("Stats - {}: count={}, 1minRate={}, 5minRate={}, mean={}, 95pct={}, 99pct={}, 999pct={}, max={}",
-                entry.getKey(), entry.getValue().getCount(), entry.getValue().getOneMinuteRate(), entry.getValue().getFiveMinuteRate(), snapshot.getMean(),
-                snapshot.get95thPercentile(), snapshot.get99thPercentile(), snapshot.get999thPercentile(), snapshot.getMax());
+//          for (Map.Entry<String, Timer> entry : timers.entrySet()) {
+//            Snapshot snapshot = entry.getValue().getSnapshot();
+//            logger.info("Stats - {}: count={}, 1minRate={}, 5minRate={}, mean={}, 95pct={}, 99pct={}, 999pct={}, max={}",
+//                entry.getKey(), snapshot.size(), entry.getValue().getOneMinuteRate(), entry.getValue().getFiveMinuteRate(), snapshot.getMean(),
+//                snapshot.get95thPercentile(), snapshot.get99thPercentile(), snapshot.get999thPercentile(), snapshot.getMax());
+//
+//          }
+          StringBuilder builder = new StringBuilder();
+          boolean first = true;
+          for (Map.Entry<String, SimpleStats> entry : stats.entrySet()) {
+            if (first) {
+              first = false;
+            }
+            else {
+              builder.append(", ");
+            }
+            builder.append(entry.getKey()).append("Rate").append("=").append((double)entry.getValue().count.get() / ((double)System.currentTimeMillis() - entry.getValue().begin) * 1000f);
+
+            entry.getValue().count.set(0);
+            entry.getValue().begin = System.currentTimeMillis();
           }
+          logger.info("Server Stats: {}", builder.toString());
         }
         catch (InterruptedException e) {
           Thread.currentThread().interrupt();
@@ -267,7 +323,7 @@ public class DatabaseServer {
     this.shard = common.getShard();
     this.shardCount = serversConfig.getShardCount();
 
-    com.sonicbase.logger.Logger.init(shard, replica, config.getString("logstashServers"));
+    com.sonicbase.logger.Logger.init(shard, replica, stats.get(METRIC_LOG_MESSAGE).getCount(), config.getString("logstashServers"));
 
     common.setServersConfig(serversConfig);
 

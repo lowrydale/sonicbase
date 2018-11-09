@@ -39,6 +39,7 @@ public class Logger extends AppenderSkeleton {
   private static int shard;
   private static int replica;
   private static ConcurrentHashMap<String, Type> types = new ConcurrentHashMap<>();
+  private static AtomicLong countLogged;
 
   public Logger() {
   }
@@ -126,8 +127,9 @@ public class Logger extends AppenderSkeleton {
     }
   }
 
-  public static void init(int shard, int replica, String serversStr) {
+  public static void init(int shard, int replica, AtomicLong count, String serversStr) {
     try {
+      Logger.countLogged = count;
       Logger.shard = shard;
       Logger.replica = replica;
       if (serversStr == null) {
@@ -227,6 +229,10 @@ public class Logger extends AppenderSkeleton {
       return;
     }
 
+    if (servers == null) {
+      return;
+    }
+
     queue.add(loggingEvent);
   }
 
@@ -267,6 +273,7 @@ public class Logger extends AppenderSkeleton {
     try {
       String body = json.toString();
       connection.out.writeBytes( body + "\n");
+      countLogged.incrementAndGet();
     }
     catch (Exception e) {
       throw new DatabaseException(e);

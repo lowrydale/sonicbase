@@ -22,7 +22,7 @@ import java.util.concurrent.ThreadPoolExecutor;
 import java.util.concurrent.atomic.AtomicInteger;
 import java.util.concurrent.atomic.AtomicLong;
 
-import static com.sonicbase.server.DatabaseServer.METRIC_REPART_MOVE_ENTRY;
+import static com.sonicbase.server.DatabaseServer.METRIC_SNAPSHOT_RECOVER;
 import static com.sonicbase.server.DatabaseServer.METRIC_SNAPSHOT_WRITE;
 
 @SuppressWarnings({"squid:S1172", "squid:S2629", "squid:S1168", "squid:S3516", "squid:S00107"})
@@ -311,6 +311,8 @@ public class SnapshotManager {
           }
 
           addRecordsToIndex(index, isPrimaryKey, key, updateTime, records);
+
+          server.getStats().get(METRIC_SNAPSHOT_RECOVER).getCount().incrementAndGet();
 
           recoveredCount.incrementAndGet();
           if (currOffset == 0 && (System.currentTimeMillis() - lastLogged.get()) > 2000) {
@@ -684,6 +686,7 @@ public class SnapshotManager {
         writeRecords(dbName, deleteIfOlder, lastLogged, tableEntry, indexEntry, fieldOffsets, subBegin, savedCount,
             outStreams, key, bucket, records, updateTime);
 
+        server.getStats().get(METRIC_SNAPSHOT_WRITE).getCount().incrementAndGet();
         ctx.stop();
         return true;
       });

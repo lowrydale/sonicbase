@@ -8,7 +8,7 @@ user: ubuntu
 clientIsPrivate: false
 defaultPort: 9010
 defaultHttpPort: 8080
-logstashServers: 127.0.0.1:9001
+#logstashServers: 127.0.0.1:9001
 #streams:
 #  processorThreadCount: 8
 #  producers:

@@ -452,6 +452,7 @@ public class ReadManager {
       throw new DatabaseException(e);
     }
     finally {
+      server.getStats().get(METRIC_READ).getCount().incrementAndGet();
       ctx.stop();
     }
   }

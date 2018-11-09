@@ -9,13 +9,13 @@ clientIsPrivate: false
 defaultPort: 9010
 defaultHttpPort: 8080
 logstashServers: 127.0.0.1:9001
-streams:
-  processorThreadCount: 8
-  producers:
-  - producer:
-      className: com.sonicbase.streams.ElasticsearchProducer
-      mappingFile: es-mapping.yaml
-      maxBatchSize: 200
+#streams:
+#  processorThreadCount: 8
+#  producers:
+#  - producer:
+#      className: com.sonicbase.streams.ElasticsearchProducer
+#      mappingFile: es-mapping.yaml
+#      maxBatchSize: 200
 servers:
 - server:
     address: localhost

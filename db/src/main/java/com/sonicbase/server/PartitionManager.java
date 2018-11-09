@@ -12,9 +12,12 @@ import com.sonicbase.schema.IndexSchema;
 import com.sonicbase.schema.Schema;
 import com.sonicbase.schema.TableSchema;
 import com.sonicbase.util.PartitionUtils;
+import it.unimi.dsi.fastutil.ints.IntOpenHashSet;
+import it.unimi.dsi.fastutil.ints.IntSet;
 import org.apache.commons.lang.exception.ExceptionUtils;
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
+import sun.util.resources.cldr.shi.LocaleNames_shi_Tfng;
 
 import java.io.*;
 import java.util.*;
@@ -267,8 +270,8 @@ public class PartitionManager extends Thread {
         common.getTables(dbName).get(tableName).getIndices().get(indexName).deleteLastPartitions();
 
         logger.info("master - rebalance ordered index - finished: db={}, table={}, index={}, duration={}, " +
-            "moveMin={}({}), moveMinCount={}({}), moveMax={}({}), moveMaxCount={}({}), moveAvg={}, " +
-            "moveCountAvg={}, moveCountTotal={}, deleteMin={}({}), deleteMinCount={}({}), deleteMax={}({}), deleteMaxCount={}({}), " +
+            "moveMin={}, moveMinShard={}, moveMinCount={}, moveMinCountShard={}, moveMax={}, moveMaxShard={}, moveMaxCount={}, moveMaxCountShard={}, moveAvg={}, " +
+            "moveCountAvg={}, moveCountTotal={}, deleteMin={}, deleteMinShard={}, deleteMinCount={}, deleteMinCountShard={}, deleteMax={}, deleteMaxShard={}, deleteMaxCount={}, deleteMaxCountShard={}, " +
             "deleteAvg={}, deleteCountAvg={}, deleteCountTotal={}", dbName, tableName,
             indexName, (System.currentTimeMillis() - begin), timings.moveMin, timings.moveMinShard,
             timings.moveMinCount, timings.moveMinCountShard, timings.moveMax, timings.moveMaxShard,
@@ -1154,6 +1157,7 @@ public class PartitionManager extends Thread {
       for (Object[] key : keysToDelete) {
 
         timer.time().stop();
+        databaseServer.getStats().get(METRIC_REPART_DELETE_ENTRY).getCount().incrementAndGet();
 
         keys.add(DatabaseCommon.serializeKey(tableSchema, indexName, key));
         if (keys.getArray().size() > batchSize) {
@@ -1416,6 +1420,7 @@ public class PartitionManager extends Thread {
         break;
       }
       timer.time().stop();
+      databaseServer.getStats().get(METRIC_REPART_PROCESS_ENTRY).getCount().incrementAndGet();
       try {
         if (lockCount++ % 2 == 0) {
           lockCount = 0;
@@ -1512,6 +1517,7 @@ public class PartitionManager extends Thread {
         break;
       }
       timer.time().stop();
+      databaseServer.getStats().get(METRIC_REPART_MOVE_ENTRY).getCount().incrementAndGet();
       try {
         count++;
         byte[] bytes = DatabaseCommon.serializeKey(context.tableSchema, context.indexName, moveRequest.key);

@@ -36,9 +36,7 @@ import java.util.concurrent.atomic.AtomicBoolean;
 import java.util.concurrent.atomic.AtomicLong;
 
 import static com.sonicbase.index.AddressMap.MEM_OP;
-import static com.sonicbase.server.DatabaseServer.METRIC_DELETE;
-import static com.sonicbase.server.DatabaseServer.METRIC_INSERT;
-import static com.sonicbase.server.DatabaseServer.METRIC_UPDATE;
+import static com.sonicbase.server.DatabaseServer.*;
 import static com.sonicbase.server.TransactionManager.OperationType.*;
 
 @SuppressWarnings({"squid:S1172", "squid:S1168", "squid:S00107"})
@@ -562,6 +560,7 @@ public class UpdateManager {
         server.getTransactionManager().deleteLock(dbName, tableName, transactionId, tableSchema, primaryKey);
       }
 
+      server.getStats().get(METRIC_SECONDARY_INDEX_INSERT).getCount().incrementAndGet();
       return null;
     }
     catch (EOFException e) {
@@ -851,6 +850,8 @@ public class UpdateManager {
       }
       ComObject retObj = new ComObject();
       retObj.put(ComObject.Tag.COUNT, 1);
+
+      server.getStats().get(METRIC_INSERT).getCount().incrementAndGet();
       return retObj;
     }
     catch (Exception e) {
@@ -1195,6 +1196,7 @@ public class UpdateManager {
       }
     }
     streamManager.publishInsertOrUpdate(cobj, dbName, tableName, bytes, existingBytes, UpdateType.UPDATE);
+    server.getStats().get(METRIC_UPDATE).getCount().incrementAndGet();
     ctx.stop();
   }
 
@@ -1412,6 +1414,7 @@ public class UpdateManager {
         }
       }
     }
+    server.getStats().get(METRIC_SECONDARY_INDEX_INNER_INSERT).getCount().incrementAndGet();
     ctx.stop();
   }
 
@@ -1526,6 +1529,7 @@ public class UpdateManager {
       throw new DatabaseException(e);
     }
     finally {
+      server.getStats().get(METRIC_INNER_INSERT).getCount().incrementAndGet();
       ctx.stop();
     }
   }
@@ -1643,6 +1647,7 @@ public class UpdateManager {
       }
     }
     ctx.stop();
+    server.getStats().get(METRIC_DELETE).getCount().incrementAndGet();
     return bytes;
   }
 

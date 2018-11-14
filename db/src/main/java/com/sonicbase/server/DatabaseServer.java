@@ -1,8 +1,5 @@
 package com.sonicbase.server;
 
-import com.codahale.metrics.MetricRegistry;
-import com.codahale.metrics.Snapshot;
-import com.codahale.metrics.Timer;
 import com.sonicbase.client.DatabaseClient;
 import com.sonicbase.common.*;
 import com.sonicbase.index.AddressMap;
@@ -25,7 +22,6 @@ import org.apache.commons.io.IOUtils;
 import org.apache.commons.lang.exception.ExceptionUtils;
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
-import sun.java2d.pipe.SpanShapeRenderer;
 
 import javax.net.ssl.*;
 import java.io.*;
@@ -65,7 +61,8 @@ public class DatabaseServer {
   static final String SONICBASE_SYS_DB_STR = "_sonicbase_sys";
   public static final String METRIC_SNAPSHOT_WRITE = "snapshotWrite";
   public static final String METRIC_SNAPSHOT_RECOVER = "snapshotRecover";
-  public static final String METRIC_REPART_MOVE_ENTRY = "repartMoveEntry";
+  public static final String METRIC_REPART_MOVE_SEND_ENTRY = "repartMoveSendEntry";
+  public static final String METRIC_REPART_MOVE_RCV_ENTRY = "repartMoveRcvEntry";
   public static final String METRIC_REPART_PROCESS_ENTRY = "repartProcessEntry";
   public static final String METRIC_REPART_DELETE_ENTRY = "repartDeleteEntry";
   public static final String METRIC_READ = "read";
@@ -142,11 +139,10 @@ public class DatabaseServer {
   private ConnectionProxy sysConnection;
   private StreamManager streamManager;
 
-  private static final MetricRegistry METRICS = new MetricRegistry();
-  private final Map<String, Timer> timers = new HashMap<>();
   private Thread metricsThread;
 
   private Map<String, SimpleStats> stats = new HashedMap();
+  private Thread serverStatsMonitorThread;
 
   public static boolean[][] getDeathOverride() {
     return deathOverride;
@@ -168,6 +164,92 @@ public class DatabaseServer {
     return stats;
   }
 
+  private ConcurrentHashMap<String, Map<String, AggregateStats>> aggregateServerStats = new ConcurrentHashMap<>();
+
+
+  public void startServerStatsMonitor() {
+    if (serverStatsMonitorThread != null) {
+      shutdownServerStatsMonitor();
+    }
+    serverStatsMonitorThread = ThreadUtil.createThread(() -> {
+      while (!shutdown) {
+        try {
+          Thread.sleep(10_000);
+
+          Map<String, Double> aggregate = new HashMap<>();
+          StringBuilder builder = new StringBuilder();
+          for (Map<String, AggregateStats> entry : aggregateServerStats.values()) {
+            for (Map.Entry<String, AggregateStats> stat : entry.entrySet()) {
+              String name = stat.getKey();
+              AggregateStats currStats = stat.getValue();
+              if (currStats.timeRegistered > System.currentTimeMillis() - 15_000) {
+                Double value = aggregate.computeIfAbsent(name, (k) -> new Double(0));
+                aggregate.put(name, value + currStats.rate);
+              }
+            }
+          }
+
+          boolean first = true;
+          for (Map.Entry<String, Double> entry : aggregate.entrySet()) {
+            if (first) {
+              first = false;
+            }
+            else {
+              builder.append(", ");
+            }
+            builder.append(entry.getKey()).append("=").append(entry.getValue());
+          }
+
+          logger.info("Aggregate Server Stats: {}", builder.toString());
+        }
+        catch (InterruptedException e) {
+          Thread.currentThread().interrupt();
+          break;
+        }
+        catch (Exception e) {
+          logger.error("Error monitoring server stats", e);
+        }
+      }
+    }, "SonicBase Server Stats Monitor");
+    serverStatsMonitorThread.start();
+  }
+
+  private void shutdownServerStatsMonitor() {
+    if (serverStatsMonitorThread != null) {
+      serverStatsMonitorThread.interrupt();
+      try {
+        serverStatsMonitorThread.join();
+        serverStatsMonitorThread = null;
+      }
+      catch (InterruptedException e) {
+        Thread.currentThread().interrupt();
+      }
+    }
+  }
+
+  private class AggregateStats {
+    private double rate;
+    private long timeRegistered;
+
+    public AggregateStats(double rate, long timeRegistered) {
+      this.rate = rate;
+      this.timeRegistered = timeRegistered;
+    }
+  }
+
+  public ComObject registerServerStats(ComObject cobj, boolean replayedCommand) {
+    int shard = cobj.getInt(ComObject.Tag.SHARD);
+    int replica = cobj.getInt(ComObject.Tag.REPLICA);
+    Map<String, AggregateStats> stats = aggregateServerStats.computeIfAbsent(shard + ":" + replica, (k)->new ConcurrentHashMap<>());
+    ComArray array = cobj.getArray(ComObject.Tag.STATS);
+    for (int i = 0; i < array.getArray().size(); i++) {
+      ComObject innerObj = (ComObject) array.getArray().get(i);
+      String name = innerObj.getString(ComObject.Tag.NAME);
+      double rate = innerObj.getDouble(ComObject.Tag.RATE);
+      stats.put(name, new AggregateStats(rate, System.currentTimeMillis()));
+    }
+    return null;
+  }
 
   public static class SimpleStats {
     private AtomicLong count = new AtomicLong();
@@ -179,32 +261,7 @@ public class DatabaseServer {
   }
 
   public void initTimers() {
-    timers.put(METRIC_SNAPSHOT_WRITE, METRICS.timer("snapshotWrite"));
-    timers.put(METRIC_SNAPSHOT_RECOVER, METRICS.timer("snapshotRecover"));
-    timers.put(METRIC_REPART_MOVE_ENTRY, METRICS.timer("repartMoveEntry"));
-    timers.put(METRIC_REPART_PROCESS_ENTRY, METRICS.timer("repartProcessEntry"));
-    timers.put(METRIC_REPART_DELETE_ENTRY, METRICS.timer("repartDeleteEntry"));
-    timers.put(METRIC_READ, METRICS.timer("read"));
-    timers.put(METRIC_INSERT, METRICS.timer("insert"));
-    timers.put(METRIC_UPDATE, METRICS.timer("update"));
-    timers.put(METRIC_DELETE, METRICS.timer("delete"));
-
-    stats.put(METRIC_INSERT, new SimpleStats());
-    stats.put(METRIC_INNER_INSERT, new SimpleStats());
-    stats.put(METRIC_SECONDARY_INDEX_INSERT, new SimpleStats());
-    stats.put(METRIC_SECONDARY_INDEX_INNER_INSERT, new SimpleStats());
-
-    stats.put(METRIC_SNAPSHOT_WRITE, new SimpleStats());
-    stats.put(METRIC_SNAPSHOT_RECOVER, new SimpleStats());
-    stats.put(METRIC_REPART_MOVE_ENTRY, new SimpleStats());
-    stats.put(METRIC_REPART_PROCESS_ENTRY, new SimpleStats());
-    stats.put(METRIC_REPART_DELETE_ENTRY, new SimpleStats());
-    stats.put(METRIC_READ, new SimpleStats());
-    stats.put(METRIC_UPDATE, new SimpleStats());
-    stats.put(METRIC_DELETE, new SimpleStats());
-    stats.put(METRIC_LOG_MESSAGE, new SimpleStats());
-    stats.put(METRIC_LOG_WRITE, new SimpleStats());
-    stats.put(METRIC_SAVE_DELETE, new SimpleStats());
+    stats = initStats();
 
     metricsThread = ThreadUtil.createThread(() -> {
       while (!shutdown) {
@@ -217,6 +274,8 @@ public class DatabaseServer {
 //                snapshot.get95thPercentile(), snapshot.get99thPercentile(), snapshot.get999thPercentile(), snapshot.getMax());
 //
 //          }
+          ComObject cobj = new ComObject();
+          ComArray array = cobj.putArray(ComObject.Tag.STATS, ComObject.Type.OBJECT_TYPE);
           StringBuilder builder = new StringBuilder();
           boolean first = true;
           for (Map.Entry<String, SimpleStats> entry : stats.entrySet()) {
@@ -228,10 +287,18 @@ public class DatabaseServer {
             }
             builder.append(entry.getKey()).append("Rate").append("=").append((double)entry.getValue().count.get() / ((double)System.currentTimeMillis() - entry.getValue().begin) * 1000f);
 
+            ComObject innerObj = new ComObject();
+            innerObj.put(ComObject.Tag.NAME,  entry.getKey() + "Rate");
+            innerObj.put(ComObject.Tag.RATE, (double)entry.getValue().count.get() / ((double)System.currentTimeMillis() - entry.getValue().begin) * 1000f);
+            array.add(innerObj);
             entry.getValue().count.set(0);
             entry.getValue().begin = System.currentTimeMillis();
           }
           logger.info("Server Stats: {}", builder.toString());
+          cobj.put(ComObject.Tag.SHARD, getShard());
+          cobj.put(ComObject.Tag.REPLICA, getReplica());
+
+          getClient().send("DatabaseServer:registerServerStats", 0, 0, cobj, DatabaseClient.Replica.MASTER);
         }
         catch (InterruptedException e) {
           Thread.currentThread().interrupt();
@@ -245,8 +312,26 @@ public class DatabaseServer {
     metricsThread.start();
   }
 
-  public Map<String, Timer> getTimers() {
-    return timers;
+  public static Map<String, SimpleStats> initStats() {
+    Map<String, SimpleStats> stats = new HashedMap();
+    stats.put(METRIC_INSERT, new SimpleStats());
+    stats.put(METRIC_INNER_INSERT, new SimpleStats());
+    stats.put(METRIC_SECONDARY_INDEX_INSERT, new SimpleStats());
+    stats.put(METRIC_SECONDARY_INDEX_INNER_INSERT, new SimpleStats());
+
+    stats.put(METRIC_SNAPSHOT_WRITE, new SimpleStats());
+    stats.put(METRIC_SNAPSHOT_RECOVER, new SimpleStats());
+    stats.put(METRIC_REPART_MOVE_SEND_ENTRY, new SimpleStats());
+    stats.put(METRIC_REPART_MOVE_RCV_ENTRY, new SimpleStats());
+    stats.put(METRIC_REPART_PROCESS_ENTRY, new SimpleStats());
+    stats.put(METRIC_REPART_DELETE_ENTRY, new SimpleStats());
+    stats.put(METRIC_READ, new SimpleStats());
+    stats.put(METRIC_UPDATE, new SimpleStats());
+    stats.put(METRIC_DELETE, new SimpleStats());
+    stats.put(METRIC_LOG_MESSAGE, new SimpleStats());
+    stats.put(METRIC_LOG_WRITE, new SimpleStats());
+    stats.put(METRIC_SAVE_DELETE, new SimpleStats());
+    return stats;
   }
 
   public void setConfig(
@@ -323,7 +408,7 @@ public class DatabaseServer {
     this.shard = common.getShard();
     this.shardCount = serversConfig.getShardCount();
 
-    com.sonicbase.logger.Logger.init(shard, replica, stats.get(METRIC_LOG_MESSAGE).getCount(), config.getString("logstashServers"));
+    com.sonicbase.logger.Logger.init(cluster, shard, replica, stats.get(METRIC_LOG_MESSAGE).getCount(), config.getString("logstashServers"));
 
     common.setServersConfig(serversConfig);
 
@@ -398,6 +483,7 @@ public class DatabaseServer {
     logger.info("Started server");
 
   }
+
 
   private void initProNoOpMethodInvokers() {
     this.methodInvoker.registerNoOpMethodProvider("StreamManager");
@@ -659,7 +745,7 @@ public class DatabaseServer {
         builder.append(common.getServersConfig().getShards()[i].getReplicas()[j].isDead() ? "dead" : "alive").append("]");
       }
     }
-    logger.info("Death status={}", builder);
+    logger.info("Death status=\"{}\"", builder);
 
     if (replicationFactor > 1 && masterManager.isNoLongerMaster()) {
       demoteFromMaster();
@@ -669,9 +755,10 @@ public class DatabaseServer {
   }
 
   private void demoteFromMaster() throws InterruptedException {
-    logger.info("No longer master. Shutting down resources");
+    logger.info("No longer mastter. Shutting down resources");
     shutdownDeathMonitor();
     shutdownRepartitioner();
+    shutdownServerStatsMonitor();
 
     updateManager.stopStreamsConsumerMasterMonitor();
 
@@ -1855,6 +1942,8 @@ public class DatabaseServer {
   public ComObject prepareToComeAlive(ComObject cobj, boolean replayedCommand) {
     String slicePoint = null;
     try {
+      logger.info("prepareToComeAlive");
+
       ComObject pcobj = new ComObject();
       pcobj.put(ComObject.Tag.DB_NAME, NONE_STR);
       pcobj.put(ComObject.Tag.SCHEMA_VERSION, common.getSchemaVersion());

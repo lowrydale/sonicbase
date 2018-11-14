@@ -103,19 +103,8 @@ public class UpdateManagerTest {
 
     when(server.getConfig()).thenReturn(config);
 
-    final Map<String, Timer> timers = new HashMap<>();
-
-    timers.put(METRIC_SNAPSHOT_WRITE, METRICS.timer("snapshotWrite"));
-    timers.put(METRIC_SNAPSHOT_RECOVER, METRICS.timer("snapshotRecover"));
-    timers.put(METRIC_REPART_MOVE_ENTRY, METRICS.timer("repartMoveEntry"));
-    timers.put(METRIC_REPART_PROCESS_ENTRY, METRICS.timer("repartProcessEntry"));
-    timers.put(METRIC_REPART_DELETE_ENTRY, METRICS.timer("repartDeleteEntry"));
-    timers.put(METRIC_READ, METRICS.timer("read"));
-    timers.put(METRIC_INSERT, METRICS.timer("insert"));
-    timers.put(METRIC_UPDATE, METRICS.timer("update"));
-    timers.put(METRIC_DELETE, METRICS.timer("delete"));
-
-    when(server.getTimers()).thenReturn(timers);
+    Map<String, DatabaseServer.SimpleStats> stats = DatabaseServer.initStats();
+    when(server.getStats()).thenReturn(stats);;
 
     when(server.getStreamManager()).thenReturn(mock(StreamManager.class));
 

@@ -1,13 +1,17 @@
 package com.sonicbase.server;
 
 import com.sonicbase.client.DatabaseClient;
-import com.sonicbase.common.*;
+import com.sonicbase.common.ComObject;
+import com.sonicbase.common.DatabaseCommon;
+import com.sonicbase.common.ServersConfig;
+import com.sonicbase.common.ThreadUtil;
 import com.sonicbase.jdbcdriver.ConnectionProxy;
 import com.sonicbase.jdbcdriver.StatementProxy;
 import com.sonicbase.query.DatabaseException;
 import com.sonicbase.schema.IndexSchema;
 import com.sonicbase.schema.Schema;
 import com.sonicbase.schema.TableSchema;
+import com.sonicbase.server.osstats.GcLogAnalyzer;
 import org.apache.commons.io.input.ReversedLinesFileReader;
 import org.apache.commons.lang.StringUtils;
 import org.apache.commons.lang.exception.ExceptionUtils;
@@ -33,6 +37,7 @@ public class OSStatsManagerImpl {
 
   private final DatabaseServer server;
   private final ProServer proServer;
+  private GcLogAnalyzer gcAnalyzer;
   private Thread persisterThread;
 
   private AtomicBoolean initialized = new AtomicBoolean();
@@ -45,15 +50,16 @@ public class OSStatsManagerImpl {
   private Thread netMonitorThread;
   private AtomicBoolean aboveMemoryThreshold = new AtomicBoolean();
   private Thread memoryMonitorThread;
-  private Thread statsThread;
   private boolean enable = true;
   private boolean isDatabaseInitialized;
+  private Timer statsTimer;
 
 
   public OSStatsManagerImpl(ProServer proServer, DatabaseServer server) {
     this.proServer = proServer;
     this.server = server;
-
+    this.gcAnalyzer = new GcLogAnalyzer(server);
+    gcAnalyzer.start();
     startStatsMonitoring();
   }
 
@@ -61,12 +67,9 @@ public class OSStatsManagerImpl {
     try {
       this.shutdown = true;
 
+      gcAnalyzer.shutdown();
 
-      if (statsThread != null) {
-        statsThread.interrupt();
-        statsThread.join();
-        statsThread = null;
-      }
+      statsTimer.cancel();
 
       if (persisterThread != null) {
         persisterThread.interrupt();
@@ -103,9 +106,8 @@ public class OSStatsManagerImpl {
       }
     }
 
-    statsThread = ThreadUtil.createThread(new StatsMonitor(), "SonicBase Stats Monitor Thread");
-    statsThread.start();
-
+    statsTimer = new Timer();
+    statsTimer.scheduleAtFixedRate(new ScheduledStatsTask(), 20_000, 20_000);
 
     netMonitorThread = ThreadUtil.createThread(new NetMonitor(), "SonicBase Network Monitor Thread");
     netMonitorThread.start();
@@ -260,8 +262,8 @@ public class OSStatsManagerImpl {
 
       try {
         Double totalMem = getTotalMemory();
-        String[] avail = getDiskAvailable();
-        String totalDisk = avail == null ? "" : avail[0];
+        Double[] avail = getDiskAvailable();
+        Double totalDisk = avail == null ? 0 : avail[0];
 
         if (!shutdown) {
           try {
@@ -270,7 +272,7 @@ public class OSStatsManagerImpl {
             try (PreparedStatement stmt = conn.prepareStatement("insert ignore into os_totals (host, mem, disk) values (?,?,?)")) {
               stmt.setString(1, server.getHost() + ":" + server.getPort());
               stmt.setDouble(2, totalMem);
-              stmt.setDouble(3, getNumber(totalDisk));
+              stmt.setDouble(3, totalDisk);
               stmt.executeUpdate();
             }
             logger.info("os_stats init os_totals- end");
@@ -303,7 +305,7 @@ public class OSStatsManagerImpl {
             stmt.setDouble(6, stats.javaMemMax);
             stmt.setDouble(7, avgRecRate);
             stmt.setDouble(8, avgTransRate);
-            stmt.setDouble(9, getNumber(stats.diskAvail));
+            stmt.setDouble(9, stats.diskAvail);
             stmt.executeUpdate();
           }
 
@@ -389,7 +391,7 @@ public class OSStatsManagerImpl {
     double javaMemMax;
     double avgRecRate;
     double avgTransRate;
-    String diskAvail;
+    double diskAvail;
   }
 
   public OSStats doGetOSStats() throws InterruptedException {
@@ -667,9 +669,10 @@ public class OSStatsManagerImpl {
 
   private void getMacNetStats(List<Double> transRate, List<Double> recRate) throws IOException, InterruptedException {
     while (!shutdown) {
-      ProcessBuilder builder = new ProcessBuilder().command("ifstat");
+      ProcessBuilder builder = new ProcessBuilder().command("ifstat", "-n");
       Process p = builder.start();
       try (BufferedReader in = new BufferedReader(new InputStreamReader(p.getInputStream()))) {
+        Thread.sleep(10_000);
         String firstLine = null;
         String secondLine = null;
         Set<Integer> toSkip = new HashSet<>();
@@ -692,21 +695,29 @@ public class OSStatsManagerImpl {
           }
           else {
             try {
-              double trans = 0;
-              double rec = 0;
-              for (int i = 0; i < parts.length; i++) {
-                if (toSkip.contains(i / 2)) {
-                  continue;
+              for (int j = 0; j < 10; j++) {
+                double trans = 0;
+                double rec = 0;
+                for (int i = 0; i < parts.length; i++) {
+                  if (toSkip.contains(i / 2)) {
+                    continue;
+                  }
+                  if (i % 2 == 0) {
+                    rec += Double.valueOf(parts[i]);
+                  }
+                  else if (i % 2 == 1) {
+                    trans += Double.valueOf(parts[i]);
+                  }
                 }
-                if (i % 2 == 0) {
-                  rec += Double.valueOf(parts[i]);
+                transRate.add(trans);
+                recRate.add(rec);
+                line = in.readLine();
+                if (line == null) {
+                  break;
                 }
-                else if (i % 2 == 1) {
-                  trans += Double.valueOf(parts[i]);
-                }
+                parts = line.trim().split("\\s+");
               }
-              transRate.add(trans);
-              recRate.add(rec);
+
               if (transRate.size() > 10) {
                 transRate.remove(0);
               }
@@ -717,13 +728,13 @@ public class OSStatsManagerImpl {
               for (Double currRec : recRate) {
                 total += currRec;
               }
-              avgRecRate = total / recRate.size();
+              avgRecRate = 1024d * total / recRate.size();
 
               total = 0d;
               for (Double currTrans : transRate) {
                 total += currTrans;
               }
-              avgTransRate = total / transRate.size();
+              avgTransRate = 1024d * total / transRate.size();
             }
             catch (Exception e) {
               logger.error("Error reading net traffic line: line=" + line, e);
@@ -731,7 +742,7 @@ public class OSStatsManagerImpl {
             break;
           }
         }
-        p.waitFor();
+        p.destroyForcibly();
       }
       finally {
         p.destroy();
@@ -743,6 +754,7 @@ public class OSStatsManagerImpl {
 
   private void getJavaMemStats(AtomicReference<Double> javaMemMin, AtomicReference<Double> javaMemMax) {
     String line = null;
+
     File file = new File(server.getGcLog() + ".0.current");
     try (ReversedLinesFileReader fr = new ReversedLinesFileReader(file, Charset.forName("utf-8"))) {
       String ch;
@@ -801,8 +813,6 @@ public class OSStatsManagerImpl {
     }
   }
 
-
-
   public double getResGigWindows() throws IOException, InterruptedException {
     if (shutdown) {
       return 0;
@@ -847,12 +857,12 @@ public class OSStatsManagerImpl {
     }
   }
 
-  private String[] getDiskAvailable() {
+  private Double[] getDiskAvailable() {
     try {
       if (shutdown) {
         return null;
       }
-      ProcessBuilder builder = new ProcessBuilder().command("df", "-h");
+      ProcessBuilder builder = new ProcessBuilder().command("df", "-k");
       Process p = builder.start();
       try {
         Integer availPos = null;
@@ -872,13 +882,13 @@ public class OSStatsManagerImpl {
             String[] parts = line.split("\\s+");
             if (availPos == null) {
               for (int i = 0; i < parts.length; i++) {
-                if (parts[i].toLowerCase().trim().equals("avail")) {
+                if (parts[i].toLowerCase().trim().equals("available")) {
                   availPos = i;
                 }
                 else if (parts[i].toLowerCase().trim().startsWith("mounted")) {
                   mountedPos = i;
                 }
-                else if (parts[i].toLowerCase().trim().startsWith("size")) {
+                else if (parts[i].toLowerCase().trim().startsWith("1k-blocks") || parts[i].toLowerCase().trim().startsWith("1024-blocks")) {
                   totalSizePos = i;
                 }
               }
@@ -899,7 +909,7 @@ public class OSStatsManagerImpl {
           p.waitFor();
 
           if (bestLineMatching != -1) {
-            return new String[]{totals.get(bestLineMatching), avails.get(bestLineMatching)};
+            return new Double[]{Double.valueOf(totals.get(bestLineMatching)) * 1024, Double.valueOf(avails.get(bestLineMatching)) * 1024};
           }
         }
       }
@@ -913,9 +923,9 @@ public class OSStatsManagerImpl {
     }
   }
 
-  public String getDiskAvailWindows() throws IOException, InterruptedException {
+  public double getDiskAvailWindows() throws IOException, InterruptedException {
     if (shutdown) {
-      return null;
+      return 0;
     }
     ProcessBuilder builder = new ProcessBuilder().command("bin/disk-avail.bat");
     Process p = builder.start();
@@ -923,7 +933,8 @@ public class OSStatsManagerImpl {
       String values = in.readLine();
       p.waitFor();
 
-      return values;
+      Double ret = Double.valueOf(values);
+      return ret * 1024 * 1024 * 1024;
     }
     finally {
       p.destroy();
@@ -1193,27 +1204,22 @@ public class OSStatsManagerImpl {
     }
   }
 
-  private class StatsMonitor implements Runnable {
+  private class ScheduledStatsTask extends TimerTask {
     @Override
     public void run() {
-      while (!shutdown && !Thread.interrupted()) {
-        try {
-          for (int i = 0; i < 100; i++) {
-            Thread.sleep(300);
-          }
-          if (!enable) {
-            continue;
-          }
-          OSStatsManagerImpl.OSStats stats = doGetOSStats();
-          logger.info("OS Stats: CPU=" + String.format("%.2f", stats.cpu) + ", resGig=" + String.format("%.2f", stats.resGig) +
-              ", javaMemMin=" + String.format("%.2f", stats.javaMemMin) + ", javaMemMax=" + String.format("%.2f", stats.javaMemMax) +
-              ", NetOut=" + String.format("%.2f", stats.avgTransRate) + ", NetIn=" + String.format("%.2f", stats.avgRecRate) +
-              ", DiskAvail=" + stats.diskAvail);
-        }
-        catch (InterruptedException e) {
-          break;
+      try {
+        if (!enable) {
+          return;
         }
 
+        OSStatsManagerImpl.OSStats stats = doGetOSStats();
+        logger.info("OS Stats: cpu=" + String.format("%.2f", stats.cpu) + ", resGig=" + String.format("%.2f", stats.resGig) +
+            ", javaMemMin=" + String.format("%.2f", stats.javaMemMin) + ", javaMemMax=" + String.format("%.2f", stats.javaMemMax) +
+            ", netOut=" + String.format("%.2f", stats.avgTransRate) + ", netIn=" + String.format("%.2f", stats.avgRecRate) +
+            ", diskAvail=" + stats.diskAvail);
+      }
+      catch (InterruptedException e) {
+        Thread.currentThread().interrupt();
       }
     }
   }

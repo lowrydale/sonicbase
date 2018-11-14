@@ -40,6 +40,7 @@ public class Logger extends AppenderSkeleton {
   private static int replica;
   private static ConcurrentHashMap<String, Type> types = new ConcurrentHashMap<>();
   private static AtomicLong countLogged;
+  private static String cluster;
 
   public Logger() {
   }
@@ -127,9 +128,10 @@ public class Logger extends AppenderSkeleton {
     }
   }
 
-  public static void init(int shard, int replica, AtomicLong count, String serversStr) {
+  public static void init(String cluster, int shard, int replica, AtomicLong count, String serversStr) {
     try {
       Logger.countLogged = count;
+      Logger.cluster = cluster;
       Logger.shard = shard;
       Logger.replica = replica;
       if (serversStr == null) {
@@ -233,7 +235,13 @@ public class Logger extends AppenderSkeleton {
       return;
     }
 
-    queue.add(loggingEvent);
+    try {
+      queue.put(loggingEvent);
+    }
+    catch (InterruptedException e) {
+      Thread.currentThread().interrupt();
+      throw new DatabaseException(e);
+    }
   }
 
   private static void processEvent(Connection connection, LoggingEvent loggingEvent) {
@@ -261,22 +269,22 @@ public class Logger extends AppenderSkeleton {
     cal.setTime(new java.sql.Date(timeStamp));
 
     json.put("timeStamp", DateUtils.toDbString(cal));
+    json.put("this.cluster", cluster);
     json.put("this.shard", shard);
     json.put("this.replica", replica);
     try {
-
       parseMessage(connection, msg, json, msg);
+      try {
+        String body = json.toString();
+        connection.out.writeBytes( body + "\n");
+        countLogged.incrementAndGet();
+      }
+      catch (Exception e) {
+        throw new DatabaseException(e);
+      }
     }
     catch (Exception e) {
-      throw new DatabaseException("Error parsing message: msg=" + msg, e);
-    }
-    try {
-      String body = json.toString();
-      connection.out.writeBytes( body + "\n");
-      countLogged.incrementAndGet();
-    }
-    catch (Exception e) {
-      throw new DatabaseException(e);
+      e.printStackTrace();
     }
   }
 
@@ -336,7 +344,7 @@ public class Logger extends AppenderSkeleton {
         ret.originalMessage = origMsg;
 
         node.put("message", "registering field for first time: field=" + key + ", isNumeric=true");
-        node.put("isNumberic", true);
+        node.put("isNumeric", true);
         node.put("field", key);
         node.put("currentMessage", origMsg);
         node.put("logLevel", "INFO");
@@ -355,7 +363,7 @@ public class Logger extends AppenderSkeleton {
         ret.originalMessage = origMsg;
 
         node.put("message", "registering field for first time: field=" + key + ", isNumeric=false");
-        node.put("isNumberic", false);
+        node.put("isNumeric", false);
         node.put("field", key);
         node.put("currentMessage", origMsg);
         node.put("logLevel", "INFO");

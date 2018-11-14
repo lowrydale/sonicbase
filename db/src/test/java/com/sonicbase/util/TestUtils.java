@@ -7,6 +7,8 @@ import com.sonicbase.schema.DataType;
 import com.sonicbase.schema.FieldSchema;
 import com.sonicbase.schema.IndexSchema;
 import com.sonicbase.schema.TableSchema;
+import com.sonicbase.server.DatabaseServer;
+import org.apache.commons.collections.map.HashedMap;
 
 import java.io.UnsupportedEncodingException;
 import java.math.BigDecimal;
@@ -15,6 +17,7 @@ import java.sql.Time;
 import java.sql.Timestamp;
 import java.util.ArrayList;
 import java.util.List;
+import java.util.Map;
 
 public class TestUtils {
   public static List<Object[]> createKeys(int count) {

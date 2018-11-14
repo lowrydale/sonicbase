@@ -12,12 +12,9 @@ import com.sonicbase.schema.IndexSchema;
 import com.sonicbase.schema.Schema;
 import com.sonicbase.schema.TableSchema;
 import com.sonicbase.util.PartitionUtils;
-import it.unimi.dsi.fastutil.ints.IntOpenHashSet;
-import it.unimi.dsi.fastutil.ints.IntSet;
 import org.apache.commons.lang.exception.ExceptionUtils;
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
-import sun.util.resources.cldr.shi.LocaleNames_shi_Tfng;
 
 import java.io.*;
 import java.util.*;
@@ -27,9 +24,7 @@ import java.util.concurrent.atomic.AtomicInteger;
 import java.util.concurrent.atomic.AtomicLong;
 import java.util.concurrent.atomic.AtomicReference;
 
-import static com.sonicbase.server.DatabaseServer.METRIC_REPART_DELETE_ENTRY;
-import static com.sonicbase.server.DatabaseServer.METRIC_REPART_MOVE_ENTRY;
-import static com.sonicbase.server.DatabaseServer.METRIC_REPART_PROCESS_ENTRY;
+import static com.sonicbase.server.DatabaseServer.*;
 
 @SuppressWarnings({"squid:S1172", "squid:S1168", "squid:S00107"})
 // all methods called from method invoker must have cobj and replayed command parms
@@ -68,6 +63,8 @@ public class PartitionManager extends Thread {
   private AtomicLong deleteDuration = new AtomicLong();
   private Thread rebalanceThread;
   private boolean stopRepartitioning;
+  private AtomicLong moveRcvCount = new AtomicLong();
+  private AtomicLong lastRcvReset = new AtomicLong();
 
   public enum RepartitionerState {
     IDLE,
@@ -269,7 +266,7 @@ public class PartitionManager extends Thread {
 
         common.getTables(dbName).get(tableName).getIndices().get(indexName).deleteLastPartitions();
 
-        logger.info("master - rebalance ordered index - finished: db={}, table={}, index={}, duration={}, " +
+          logger.info("master - rebalance ordered index - finished: db={}, table={}, index={}, duration={}, " +
             "moveMin={}, moveMinShard={}, moveMinCount={}, moveMinCountShard={}, moveMax={}, moveMaxShard={}, moveMaxCount={}, moveMaxCountShard={}, moveAvg={}, " +
             "moveCountAvg={}, moveCountTotal={}, deleteMin={}, deleteMinShard={}, deleteMinCount={}, deleteMinCountShard={}, deleteMax={}, deleteMaxShard={}, deleteMaxCount={}, deleteMaxCountShard={}, " +
             "deleteAvg={}, deleteCountAvg={}, deleteCountTotal={}", dbName, tableName,
@@ -980,7 +977,7 @@ public class PartitionManager extends Thread {
             databaseServer.setThrottleInsert(false);
           }
 
-          logger.info("doProcessEntries - all finished: db={}, table={}, index={}, count={}, countToDelete={}", dbName,
+            logger.info("doProcessEntries - all finished: db={}, table={}, index={}, count={}, countToDelete={}", dbName,
               tableName, indexName, countVisited.get(), context.keysToDelete.size());
         }
         finally {
@@ -1142,8 +1139,6 @@ public class PartitionManager extends Thread {
 
   private void deleteRecordsOnOtherReplicas(final String dbName, String tableName, String indexName,
                                             ConcurrentLinkedQueue<Object[]> keysToDelete) {
-
-    Timer timer = databaseServer.getTimers().get(METRIC_REPART_DELETE_ENTRY);
     beginDelete.set(System.currentTimeMillis());
     int threadCount = Runtime.getRuntime().availableProcessors() * databaseServer.getReplicationFactor() * 2;
     ThreadPoolExecutor executor = ThreadUtil.createExecutor(threadCount, "SonicBase deleteRecordsOnOtherReplicas Thread");
@@ -1155,8 +1150,6 @@ public class PartitionManager extends Thread {
       ComArray keys = cobj.putArray(ComObject.Tag.KEYS, ComObject.Type.BYTE_ARRAY_TYPE);
       int batchSize = 20_000;
       for (Object[] key : keysToDelete) {
-
-        timer.time().stop();
         databaseServer.getStats().get(METRIC_REPART_DELETE_ENTRY).getCount().incrementAndGet();
 
         keys.add(DatabaseCommon.serializeKey(tableSchema, indexName, key));
@@ -1414,12 +1407,10 @@ public class PartitionManager extends Thread {
     int consecutiveErrors = 0;
     int lockCount = 0;
     AtomicInteger countDeleted = new AtomicInteger();
-    Timer timer = databaseServer.getTimers().get(METRIC_REPART_PROCESS_ENTRY);
     for (MapEntry entry : toProcess) {
       if (stopRepartitioning) {
         break;
       }
-      timer.time().stop();
       databaseServer.getStats().get(METRIC_REPART_PROCESS_ENTRY).getCount().incrementAndGet();
       try {
         if (lockCount++ % 2 == 0) {
@@ -1510,14 +1501,12 @@ public class PartitionManager extends Thread {
     cobj.put(ComObject.Tag.SCHEMA_VERSION, common.getSchemaVersion());
     ComArray keys = cobj.putArray(ComObject.Tag.KEYS, ComObject.Type.OBJECT_TYPE);
     int consecutiveErrors = 0;
-    Timer timer = databaseServer.getTimers().get(METRIC_REPART_MOVE_ENTRY);
     List<Timer.Context> ctxs = new ArrayList<>();
     for (MoveRequest moveRequest : moveRequests) {
       if (stopRepartitioning) {
         break;
       }
-      timer.time().stop();
-      databaseServer.getStats().get(METRIC_REPART_MOVE_ENTRY).getCount().incrementAndGet();
+      databaseServer.getStats().get(METRIC_REPART_MOVE_SEND_ENTRY).getCount().incrementAndGet();
       try {
         count++;
         byte[] bytes = DatabaseCommon.serializeKey(context.tableSchema, context.indexName, moveRequest.key);
@@ -1592,6 +1581,24 @@ public class PartitionManager extends Thread {
     }
   }
 
+  public AtomicLong getMoveRcvCount() {
+    return moveRcvCount;
+  }
+
+  public AtomicLong getLastRcvReset() {
+    return lastRcvReset;
+  }
+
+  private void registerForThrottle() {
+    moveRcvCount.incrementAndGet();
+    synchronized (moveRcvCount) {
+      if (System.currentTimeMillis() - lastRcvReset.get() > 30_000) {
+        lastRcvReset.set(System.currentTimeMillis());
+        moveRcvCount.set(0);
+      }
+    }
+  }
+
   @SchemaReadLock
   public ComObject moveIndexEntries(ComObject cobj, boolean replayedCommand) {
     String dbName = cobj.getString(ComObject.Tag.DB_NAME);
@@ -1602,6 +1609,7 @@ public class PartitionManager extends Thread {
       ComArray keys = cobj.getArray(ComObject.Tag.KEYS);
       List<MoveRequest> moveRequests = new ArrayList<>();
       if (keys != null) {
+        AtomicLong srvCount = databaseServer.getStats().get(METRIC_REPART_MOVE_RCV_ENTRY).getCount();
         logger.info("moveIndexEntries: db={}, table={}, index={}, count={}", dbName, tableName, indexName, keys.getArray().size());
         int lockCount = 0;
         for (int i = 0; i < keys.getArray().size(); i++) {
@@ -1609,6 +1617,9 @@ public class PartitionManager extends Thread {
             if (lockCount++ == 2) {
               lockCount = 0;
             }
+            srvCount.incrementAndGet();
+            registerForThrottle();
+
             ComObject keyObj = (ComObject) keys.getArray().get(i);
             Object[] key = DatabaseCommon.deserializeKey(common.getTables(dbName).get(tableName),
                 keyObj.getByteArray(ComObject.Tag.KEY_BYTES));

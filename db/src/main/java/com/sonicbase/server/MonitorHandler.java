@@ -206,7 +206,7 @@ public class MonitorHandler extends AbstractHandler {
       }
       logger.info("os_totals count: " + totalsCount);
       node.put("maxMem", maxMem);
-      node.put("maxDisk", maxDisk);
+      node.put("maxDisk", maxDisk / 1024 / 1024 / 1024);
 
 
       Date date = new Date(System.currentTimeMillis());
@@ -279,7 +279,6 @@ public class MonitorHandler extends AbstractHandler {
             currMillis += intervalSize;
           }
 
-          System.out.println("min=" + minDate + ", max=" + maxDate);
           intervalSize = range / 10;
           List<String> times = new ArrayList<>();
           currMillis = minMillis;
@@ -392,7 +391,7 @@ public class MonitorHandler extends AbstractHandler {
       obj.put("r_mem", h.resGigSnapshot.getMax());
       obj.put("j_min", h.javaMemMinSnapshot.getMax());
       obj.put("j_max", h.javaMemMaxSnapshot.getMax());
-      obj.put("d_avail", h.diskAvailSnapshot.getMax());
+      obj.put("d_avail", h.diskAvailSnapshot.getMax() / 1024 / 1024 / 1024);
     }
     ArrayNode p75 = node.putArray("p75");
     for (Map.Entry<String, Histograms> statsList : buckets.entrySet()) {
@@ -406,7 +405,7 @@ public class MonitorHandler extends AbstractHandler {
       obj.put("r_mem", h.resGigSnapshot.get75thPercentile());
       obj.put("j_min", h.javaMemMinSnapshot.get75thPercentile());
       obj.put("j_max", h.javaMemMaxSnapshot.get75thPercentile());
-      obj.put("d_avail", h.diskAvailSnapshot.get75thPercentile());
+      obj.put("d_avail", h.diskAvailSnapshot.get75thPercentile() / 1024 / 1024 / 1024);
     }
     ArrayNode p95 = node.putArray("p95");
     for (Map.Entry<String, Histograms> statsList : buckets.entrySet()) {
@@ -420,7 +419,7 @@ public class MonitorHandler extends AbstractHandler {
       obj.put("r_mem", h.resGigSnapshot.get95thPercentile());
       obj.put("j_min", h.javaMemMinSnapshot.get95thPercentile());
       obj.put("j_max", h.javaMemMaxSnapshot.get95thPercentile());
-      obj.put("d_avail", h.diskAvailSnapshot.get95thPercentile());
+      obj.put("d_avail", h.diskAvailSnapshot.get95thPercentile() / 1024 / 1024 / 1024);
     }
     ArrayNode p99 = node.putArray("p99");
     for (Map.Entry<String, Histograms> statsList : buckets.entrySet()) {
@@ -434,7 +433,7 @@ public class MonitorHandler extends AbstractHandler {
       obj.put("r_mem", h.resGigSnapshot.get99thPercentile());
       obj.put("j_min", h.javaMemMinSnapshot.get99thPercentile());
       obj.put("j_max", h.javaMemMaxSnapshot.get99thPercentile());
-      obj.put("d_avail", h.diskAvailSnapshot.get99thPercentile());
+      obj.put("d_avail", h.diskAvailSnapshot.get99thPercentile() / 1024 / 1024 / 1024);
     }
     ArrayNode p999 = node.putArray("p999");
     for (Map.Entry<String, Histograms> statsList : buckets.entrySet()) {
@@ -448,7 +447,7 @@ public class MonitorHandler extends AbstractHandler {
       obj.put("r_mem", h.resGigSnapshot.get999thPercentile());
       obj.put("j_min", h.javaMemMinSnapshot.get999thPercentile());
       obj.put("j_max", h.javaMemMaxSnapshot.get999thPercentile());
-      obj.put("d_avail", h.diskAvailSnapshot.get999thPercentile());
+      obj.put("d_avail", h.diskAvailSnapshot.get999thPercentile() / 1024 / 1024 / 1024);
     }
     ArrayNode avg = node.putArray("avg");
     for (Map.Entry<String, Histograms> statsList : buckets.entrySet()) {
@@ -462,7 +461,7 @@ public class MonitorHandler extends AbstractHandler {
       obj.put("r_mem", h.resGigSnapshot.getMean());
       obj.put("j_min", h.javaMemMinSnapshot.getMean());
       obj.put("j_max", h.javaMemMaxSnapshot.getMean());
-      obj.put("d_avail", h.diskAvailSnapshot.getMean());
+      obj.put("d_avail", h.diskAvailSnapshot.getMean() / 1024 / 1024 / 1024);
     }
   }
 

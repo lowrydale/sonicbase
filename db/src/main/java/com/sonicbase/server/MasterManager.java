@@ -418,6 +418,8 @@ public class MasterManager {
 
         server.startStreamsConsumerMonitor();
 
+        server.startServerStatsMonitor();
+
         server.shutdownDeathMonitor();
 
         logger.info("starting death monitor");

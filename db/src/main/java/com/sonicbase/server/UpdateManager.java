@@ -554,13 +554,13 @@ public class UpdateManager {
 
       if (shouldExecute.get()) {
         doInsertKey(dbName, isExplicitTrans, key, keyRecordBytes, tableName, index, indexSchema);
+        server.getStats().get(METRIC_SECONDARY_INDEX_INSERT).getCount().incrementAndGet();
       }
 
       if (shouldDeleteLock.get()) {
         server.getTransactionManager().deleteLock(dbName, tableName, transactionId, tableSchema, primaryKey);
       }
 
-      server.getStats().get(METRIC_SECONDARY_INDEX_INSERT).getCount().incrementAndGet();
       return null;
     }
     catch (EOFException e) {
@@ -746,7 +746,13 @@ public class UpdateManager {
         lastReset.set(System.currentTimeMillis());
         insertCount.set(0);
       }
-      while (insertCount.get() / (double) (System.currentTimeMillis() - lastReset.get()) * 1000d > 200_000) {
+
+      double moveRate = server.getPartitionManager().getMoveRcvCount().get() /
+          (double) (System.currentTimeMillis() - server.getPartitionManager().getLastRcvReset().get()) * 1000d;
+
+      double acceptableRate = Math.max(75_000, 200_000 - moveRate);
+
+      while (insertCount.get() / (double) (System.currentTimeMillis() - lastReset.get()) * 1000d > acceptableRate) {
         ThreadUtil.sleep(20);
       }
     }
@@ -1178,7 +1184,6 @@ public class UpdateManager {
 
   private void doUpdateRecord(ComObject cobj, String dbName, String tableName, String indexName, Object[] primaryKey,
                               byte[] bytes) {
-    Timer.Context ctx = server.getTimers().get(METRIC_UPDATE).time();
     //because this is the primary key index we won't have more than one index entry for the key
     Index index = server.getIndex(dbName, tableName, indexName);
     Object newValue = server.getAddressMap().toUnsafeFromRecords(new byte[][]{bytes});
@@ -1197,7 +1202,6 @@ public class UpdateManager {
     }
     streamManager.publishInsertOrUpdate(cobj, dbName, tableName, bytes, existingBytes, UpdateType.UPDATE);
     server.getStats().get(METRIC_UPDATE).getCount().incrementAndGet();
-    ctx.stop();
   }
 
   private void setSequenceNumbersOnUpdate(ComObject cobj, Object[] primaryKey, Record record) {
@@ -1312,8 +1316,6 @@ public class UpdateManager {
    * Caller must synchronized index
    */
   private void doActualInsertKey(String dbName, boolean isExplicitTrans, Object[] key, byte[] keyRecordBytes, String tableName, Index index, IndexSchema indexSchema) {
-
-    Timer.Context ctx = server.getTimers().get(METRIC_INSERT).time();
     int fieldCount = index.getComparators().length;
     if (fieldCount != key.length) {
       Object[] newKey = new Object[fieldCount];
@@ -1415,7 +1417,6 @@ public class UpdateManager {
       }
     }
     server.getStats().get(METRIC_SECONDARY_INDEX_INNER_INSERT).getCount().incrementAndGet();
-    ctx.stop();
   }
 
   private boolean doActualInsertKeyPrep(byte[] keyRecordBytes, Index index, byte[][] records) {
@@ -1464,8 +1465,6 @@ public class UpdateManager {
     if (recordBytes == null) {
       throw new DatabaseException("Invalid record, null");
     }
-
-    Timer.Context ctx = server.getTimers().get(METRIC_INSERT).time();
 
     try {
       if (MEM_OP && !memoryOps.isExplicitTrans()) {
@@ -1530,7 +1529,6 @@ public class UpdateManager {
     }
     finally {
       server.getStats().get(METRIC_INNER_INSERT).getCount().incrementAndGet();
-      ctx.stop();
     }
   }
 
@@ -1636,7 +1634,6 @@ public class UpdateManager {
   }
 
   private byte[][] doDeleteRecordRemoveFromIndex(Object[] key, Index index) {
-    Timer.Context ctx = server.getTimers().get(METRIC_DELETE).time();
     byte[][] bytes = null;
     synchronized (index.getMutex(key)) {
       Object value = index.remove(key);
@@ -1646,7 +1643,6 @@ public class UpdateManager {
         index.addAndGetCount(-1);
       }
     }
-    ctx.stop();
     server.getStats().get(METRIC_DELETE).getCount().incrementAndGet();
     return bytes;
   }

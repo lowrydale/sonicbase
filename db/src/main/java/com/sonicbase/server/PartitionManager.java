@@ -1,6 +1,5 @@
 package com.sonicbase.server;
 
-import com.codahale.metrics.Timer;
 import com.sonicbase.client.DatabaseClient;
 import com.sonicbase.common.*;
 import com.sonicbase.index.Index;
@@ -773,14 +772,14 @@ public class PartitionManager extends Thread {
   }
 
   public static class MoveRequest {
-    private final boolean shouldDeleteNow;
+    private final int keyOffset;
     private Object[] key;
     private byte[][] content;
 
-     MoveRequest(Object[] key, byte[][] value, boolean shouldDeleteNow) {
+     MoveRequest(Object[] key, byte[][] value, int keyOffset) {
       this.key = key;
       this.content = value;
-      this.shouldDeleteNow = shouldDeleteNow;
+      this.keyOffset = keyOffset;
     }
 
     public Object[] getKey() {
@@ -797,6 +796,10 @@ public class PartitionManager extends Thread {
 
     public void setContent(byte[][] content) {
       this.content = content;
+    }
+
+    public int getKeyOffset() {
+      return keyOffset;
     }
   }
 
@@ -816,10 +819,6 @@ public class PartitionManager extends Thread {
       }
     }
     isShardRepartitioningComplete = false;
-//
-//    cobj.put(ComObject.Tag.METHOD, "PartitionManager:doRebalanceOrderedIndex");
-//    databaseServer.getLongRunningCommands().addCommand(
-//        databaseServer.getLongRunningCommands().createSingleCommand(cobj.serialize()));
 
     stopRepartitioning = false;
 
@@ -902,6 +901,7 @@ public class PartitionManager extends Thread {
     public ThreadPoolExecutor executor;
     public Index index;
     public TableSchema tableSchema;
+    public ThreadPoolExecutor deleteExecutor;
   }
 
 
@@ -946,8 +946,11 @@ public class PartitionManager extends Thread {
         context.indexName = indexName;
         context.indexSchema = indexSchema;
         context.index = index;
-        context.executor = ThreadUtil.createExecutor(Runtime.getRuntime().availableProcessors() * 16,
+        context.executor = ThreadUtil.createExecutor(Runtime.getRuntime().availableProcessors() * 64,
             "SonicBase Repartitioner Move Processor");
+        context.deleteExecutor = ThreadUtil.createExecutor(Runtime.getRuntime().availableProcessors() * 64,
+            "SonicBase deleteRecordsOnOtherReplicas Thread");
+
 
         try {
           TableSchema.Partition currPartition = indexSchema.getCurrPartitions()[databaseServer.getShard()];
@@ -984,6 +987,7 @@ public class PartitionManager extends Thread {
           moveDuration.set(System.currentTimeMillis() - beginMove.get());
           finishRebalanceOrderedIndex(dbName, tableName, indexName, begin, context.keysToDelete, countVisited, executor);
           context.executor.shutdownNow();
+          context.deleteExecutor.shutdownNow();
         }
       }
     }
@@ -997,18 +1001,9 @@ public class PartitionManager extends Thread {
     return null;
   }
 
-  private Object[] getUpperKey(Index index, TableSchema.Partition currPartition) {
-    Object[] upperKey = currPartition.getUpperKey();
-    if (upperKey == null) {
-      upperKey = index.lastEntry().getKey();
-    }
-    return upperKey;
-  }
-
   private void finishRebalanceOrderedIndex(String dbName, String tableName, String indexName, long begin,
                                            ConcurrentLinkedQueue<Object[]> keysToDelete, AtomicLong countVisited,
                                            ThreadPoolExecutor executor) {
-    deleteRecordsOnOtherReplicas(dbName, tableName, indexName, keysToDelete);
     executor.shutdownNow();
     logger.info("doRebalanceOrderedIndex finished: db={}, table={}, index={}, countVisited={}, duration={}", dbName,
         tableName, indexName, countVisited.get(), System.currentTimeMillis() - begin);
@@ -1062,7 +1057,7 @@ public class PartitionManager extends Thread {
       }
       countVisited.incrementAndGet();
       currEntries.get().add(new MapEntry(key, value));
-      if (currEntries.get().size() >= (batchOverride == null ? 20_000 : batchOverride) *
+      if (currEntries.get().size() >= (batchOverride == null ? 1_000 : batchOverride) *
           databaseServer.getShardCount()) {
         final List<MapEntry> toProcess = currEntries.get();
         currEntries.set(new ArrayList<>());
@@ -1111,7 +1106,7 @@ public class PartitionManager extends Thread {
                               final AtomicInteger countFinished) {
     countVisited.incrementAndGet();
     currEntries.get().add(new MapEntry(key, value));
-    if (currEntries.get().size() >= (batchOverride == null ? 20000 : batchOverride) * databaseServer.getShardCount()) {
+    if (currEntries.get().size() >= (batchOverride == null ? 1_000 : batchOverride) * databaseServer.getShardCount()) {
       final List<MapEntry> toProcess = currEntries.get();
       currEntries.set(new ArrayList<>());
       countSubmitted.incrementAndGet();
@@ -1137,50 +1132,47 @@ public class PartitionManager extends Thread {
     }
   }
 
-  private void deleteRecordsOnOtherReplicas(final String dbName, String tableName, String indexName,
-                                            ConcurrentLinkedQueue<Object[]> keysToDelete) {
+  private void deleteRecordsOnOtherReplicas(RebalanceContext context, List<Object[]> keysToDelete) {
     beginDelete.set(System.currentTimeMillis());
-    int threadCount = Runtime.getRuntime().availableProcessors() * databaseServer.getReplicationFactor() * 2;
-    ThreadPoolExecutor executor = ThreadUtil.createExecutor(threadCount, "SonicBase deleteRecordsOnOtherReplicas Thread");
     List<Future> futures = new ArrayList<>();
     try {
       int count = 0;
-      TableSchema tableSchema = common.getTables(dbName).get(tableName);
+      TableSchema tableSchema = common.getTables(context.dbName).get(context.tableName);
       ComObject cobj = new ComObject();
       ComArray keys = cobj.putArray(ComObject.Tag.KEYS, ComObject.Type.BYTE_ARRAY_TYPE);
-      int batchSize = 20_000;
+      int batchSize = 500;
       for (Object[] key : keysToDelete) {
         databaseServer.getStats().get(METRIC_REPART_DELETE_ENTRY).getCount().incrementAndGet();
 
-        keys.add(DatabaseCommon.serializeKey(tableSchema, indexName, key));
+        keys.add(DatabaseCommon.serializeKey(tableSchema, context.indexName, key));
         if (keys.getArray().size() > batchSize) {
           count += keys.getArray().size();
 
-          cobj.put(ComObject.Tag.DB_NAME, dbName);
+          cobj.put(ComObject.Tag.DB_NAME, context.dbName);
           cobj.put(ComObject.Tag.METHOD, "PartitionManager:deleteMovedRecords");
           cobj.put(ComObject.Tag.SCHEMA_VERSION, common.getSchemaVersion());
-          cobj.put(ComObject.Tag.TABLE_NAME, tableName);
-          cobj.put(ComObject.Tag.INDEX_NAME, indexName);
+          cobj.put(ComObject.Tag.TABLE_NAME, context.tableName);
+          cobj.put(ComObject.Tag.INDEX_NAME, context.indexName);
 
           final ComObject currObj = cobj;
           cobj = new ComObject();
           keys = cobj.putArray(ComObject.Tag.KEYS, ComObject.Type.BYTE_ARRAY_TYPE);
 
-          sendDeletes(executor, currObj, futures);
-          logger.debug("delete moved entries progress: db={}, table={}, index={}, submittedCount{}=", dbName,
-              tableName, indexName, count);
+          sendDeletes(context.deleteExecutor, currObj, futures);
+          logger.debug("delete moved entries progress: db={}, table={}, index={}, submittedCount{}=", context.dbName,
+              context.tableName, context.indexName, count);
         }
       }
       if (!keys.getArray().isEmpty()) {
-        cobj.put(ComObject.Tag.DB_NAME, dbName);
+        cobj.put(ComObject.Tag.DB_NAME, context.dbName);
         cobj.put(ComObject.Tag.METHOD, "PartitionManager:deleteMovedRecords");
         cobj.put(ComObject.Tag.SCHEMA_VERSION, common.getSchemaVersion());
-        cobj.put(ComObject.Tag.TABLE_NAME, tableName);
-        cobj.put(ComObject.Tag.INDEX_NAME, indexName);
+        cobj.put(ComObject.Tag.TABLE_NAME, context.tableName);
+        cobj.put(ComObject.Tag.INDEX_NAME, context.indexName);
 
-        sendDeletes(executor, cobj, futures);
-        logger.debug("delete moved entries progress: db={}, table={}, index={}, submittedCount{}=", dbName,
-            tableName, indexName, count);
+        sendDeletes(context.deleteExecutor, cobj, futures);
+        logger.debug("delete moved entries progress: db={}, table={}, index={}, submittedCount{}=", context.dbName,
+            context.tableName, context.indexName, count);
       }
     }
     catch (Exception e) {
@@ -1192,16 +1184,15 @@ public class PartitionManager extends Thread {
         try {
           int currCount = (int) future.get();
           count += currCount;
-          logger.debug("delete moved entries progress: db={}, table={}, index={}, finishedCount={}", dbName, tableName,
-              indexName, count);
+          logger.debug("delete moved entries progress: db={}, table={}, index={}, finishedCount={}", context.dbName, context.tableName,
+              context.indexName, count);
         }
         catch (Exception e) {
-          logger.error("Error deleting moved records on replica: db={}, table={}, index={}", dbName, tableName, indexName, e);
+          logger.error("Error deleting moved records on replica: db={}, table={}, index={}", context.dbName, context.tableName, context.indexName, e);
         }
       }
       countDeleted.set(count);
       deleteDuration.set(System.currentTimeMillis() - beginDelete.get());
-      executor.shutdownNow();
     }
   }
 
@@ -1472,11 +1463,10 @@ public class PartitionManager extends Thread {
   private void moveIndexEntriesToShard(RebalanceContext context, int shard, MoveRequestList list) {
     try {
       long begin = System.currentTimeMillis();
-      doMoveIndexEntriesToShard(context, shard, list.moveRequests);
-      for (MoveRequest request : list.moveRequests) {
-        context.keysToDelete.add(request.getKey());
-      }
-      ThreadUtil.sleep(1_000);
+      List<Object[]> keysToDelete = new ArrayList<>();
+      doMoveIndexEntriesToShard(context, shard, list.moveRequests, keysToDelete);
+
+      deleteRecordsOnOtherReplicas(context, keysToDelete);
 
       logger.info("moved entries: db={}, table={}, index={}, count={}, shard={}, duration={}", context.dbName, context.tableName,
           context.indexName, list.moveRequests.size(), shard, (System.currentTimeMillis() - begin));
@@ -1492,7 +1482,8 @@ public class PartitionManager extends Thread {
   }
 
 
-  private void doMoveIndexEntriesToShard(RebalanceContext context, int shard, List<MoveRequest> moveRequests) {
+  private void doMoveIndexEntriesToShard(RebalanceContext context, int shard, List<MoveRequest> moveRequests,
+                                         List<Object[]> keysToDelete) {
     int count = 0;
     ComObject cobj = new ComObject();
     cobj.put(ComObject.Tag.DB_NAME, context.dbName);
@@ -1501,28 +1492,28 @@ public class PartitionManager extends Thread {
     cobj.put(ComObject.Tag.SCHEMA_VERSION, common.getSchemaVersion());
     ComArray keys = cobj.putArray(ComObject.Tag.KEYS, ComObject.Type.OBJECT_TYPE);
     int consecutiveErrors = 0;
-    List<Timer.Context> ctxs = new ArrayList<>();
     for (MoveRequest moveRequest : moveRequests) {
       if (stopRepartitioning) {
         break;
       }
       databaseServer.getStats().get(METRIC_REPART_MOVE_SEND_ENTRY).getCount().incrementAndGet();
+      ComObject innerObj = new ComObject();
       try {
         count++;
         byte[] bytes = DatabaseCommon.serializeKey(context.tableSchema, context.indexName, moveRequest.key);
-        ComObject innerObj = new ComObject();
         keys.add(innerObj);
         innerObj.remove(ComObject.Tag.SERIALIZATION_VERSION);
         innerObj.put(ComObject.Tag.KEY_BYTES, bytes);
 
         byte[][] content = moveRequest.getContent();
 
-        setRecordFlags(context.indexSchema.isPrimaryKey(), content);
+        setRecordFlagsToAdding(context.indexSchema.isPrimaryKey(), content);
 
         ComArray records = innerObj.putArray(ComObject.Tag.RECORDS, ComObject.Type.BYTE_ARRAY_TYPE);
         for (int i = 0; i < content.length; i++) {
           records.add(content[i]);
         }
+
         consecutiveErrors = 0;
       }
       catch (Exception e) {
@@ -1532,14 +1523,47 @@ public class PartitionManager extends Thread {
         }
         logger.error("Error moving record: db={}, table={}, index={}, key={}, destShard={}", context.dbName,
             context.tableName, context.indexName, DatabaseCommon.keyToString(moveRequest.key), shard, e);
+        keys.remove(innerObj);
       }
     }
-    databaseServer.getDatabaseClient().send("PartitionManager:moveIndexEntries", shard, 0, cobj,
-        DatabaseClient.Replica.DEF);
+    ComObject ret = new ComObject(databaseServer.getDatabaseClient().send("PartitionManager:moveIndexEntries", shard, 0, cobj,
+        DatabaseClient.Replica.DEF));
+    ComArray failedKeys = ret.getArray(ComObject.Tag.KEYS);
+    ConcurrentSkipListMap<Object[], Object[]> failedKeysMap = null;
+    if (!failedKeys.getArray().isEmpty()) {
+      failedKeysMap = new ConcurrentSkipListMap<>(context.index.getComparator());
+      for (int i = 0; i < failedKeys.getArray().size(); i++) {
+        try {
+          int offset = (int) failedKeys.getArray().get(i);
+          ComObject keyObj = (ComObject) keys.getArray().get(offset);
+          byte[] keyBytes = keyObj.getByteArray(ComObject.Tag.KEY_BYTES);
+          Object[] key = DatabaseCommon.deserializeKey(context.tableSchema, keyBytes);
+          failedKeysMap.put(key, key);
+        }
+        catch (Exception e) {
+          logger.error("Error deserializing key: db={}, table={}, index={}", context.dbName, context.tableName, context.indexName);
+        }
+      }
+    }
+
+    try {
+      for (int i = 0; i < keys.getArray().size(); i++) {
+        ComObject keyObj = (ComObject) keys.getArray().get(i);
+        byte[] keyBytes = keyObj.getByteArray(ComObject.Tag.KEY_BYTES);
+        Object[] key = DatabaseCommon.deserializeKey(context.tableSchema, keyBytes);
+        if (failedKeysMap == null || !failedKeysMap.containsKey(key)) {
+          keysToDelete.add(key);
+        }
+      }
+    }
+    catch (Exception e) {
+      throw new DatabaseException(e);
+    }
+
     countMoved.addAndGet(count);
   }
 
-  private void setRecordFlags(boolean primaryKey, byte[][] content) {
+  private void setRecordFlagsToAdding(boolean primaryKey, byte[][] content) {
     if (primaryKey) {
       for (int i = 0; i < content.length; i++) {
         byte[] recordBytes = content[i];
@@ -1566,12 +1590,11 @@ public class PartitionManager extends Thread {
 
   private void enqueueMoveRequest(RebalanceContext context, Map<Integer, List<MoveRequest>> moveRequests,
                                   List<MoveRequestList> lists, MapEntry entry, byte[][] content,
-                                  int shard) throws InterruptedException {
+                                  int shard) {
     if (content != null) {
       final List<MoveRequest> list = moveRequests.get(shard);
-      boolean shouldDeleteNow = false;
-      list.add(new MoveRequest(entry.key, content, shouldDeleteNow));
-      if (list.size() > (batchOverride == null ? 5_000 : batchOverride)) {
+      list.add(new MoveRequest(entry.key, content, 0));
+      if (list.size() > (batchOverride == null ? 500 : batchOverride)) {
         moveRequests.put(shard, new ArrayList<>());
         MoveRequestList requestList = new MoveRequestList(list);
         lists.add(requestList);
@@ -1604,13 +1627,16 @@ public class PartitionManager extends Thread {
     String dbName = cobj.getString(ComObject.Tag.DB_NAME);
     String tableName = cobj.getString(ComObject.Tag.TABLE_NAME);
     String indexName = cobj.getString(ComObject.Tag.INDEX_NAME);
+
+    ComObject ret = new ComObject();
+    ComArray failedKeys = ret.putArray(ComObject.Tag.KEYS, ComObject.Type.INT_TYPE);
     try {
       databaseServer.getBatchRepartCount().incrementAndGet();
       ComArray keys = cobj.getArray(ComObject.Tag.KEYS);
       List<MoveRequest> moveRequests = new ArrayList<>();
       if (keys != null) {
         AtomicLong srvCount = databaseServer.getStats().get(METRIC_REPART_MOVE_RCV_ENTRY).getCount();
-        logger.info("moveIndexEntries: db={}, table={}, index={}, count={}", dbName, tableName, indexName, keys.getArray().size());
+        logger.debug("moveIndexEntries: db={}, table={}, index={}, count={}", dbName, tableName, indexName, keys.getArray().size());
         int lockCount = 0;
         for (int i = 0; i < keys.getArray().size(); i++) {
           try {
@@ -1629,10 +1655,11 @@ public class PartitionManager extends Thread {
               for (int j = 0; j < content.length; j++) {
                 content[j] = (byte[]) records.getArray().get(j);
               }
-              moveRequests.add(new MoveRequest(key, content, false));
+              moveRequests.add(new MoveRequest(key, content, i));
             }
           }
           catch (Exception e) {
+            failedKeys.add(i);
             logger.error("Error handling move request: db={}, table={}, index={}, count={}", dbName, tableName, indexName, keys.getArray().size());
           }
         }
@@ -1641,9 +1668,9 @@ public class PartitionManager extends Thread {
 
       IndexSchema indexSchema = databaseServer.getIndexSchema(dbName, tableName, indexName);
       databaseServer.getUpdateManager().doInsertKeys(cobj, false, dbName, moveRequests, index, tableName, indexSchema,
-          replayedCommand, true);
+          replayedCommand, true, failedKeys);
 
-      return null;
+      return ret;
     }
     finally {
       databaseServer.getBatchRepartCount().decrementAndGet();
@@ -2294,7 +2321,7 @@ public class PartitionManager extends Thread {
         KeyRecord.setDbViewFlags(content[i], (short) 0);
         KeyRecord.setDbViewNumber(content[i], 0);
       }
-      databaseServer.getAddressMap().writeRecordstoExistingAddress((long)entry.value, content);
+      databaseServer.getAddressMap().writeRecordstoExistingAddress(entry.value, content);
     }
 
     private void insertRecordForPrimaryKey() {
@@ -2302,7 +2329,7 @@ public class PartitionManager extends Thread {
         Record.setDbViewFlags(content[i], (short) 0);
         Record.setDbViewNumber(content[i], 0);
       }
-      databaseServer.getAddressMap().writeRecordstoExistingAddress((long)entry.value, content);
+      databaseServer.getAddressMap().writeRecordstoExistingAddress(entry.value, content);
     }
 
     private void insertRecordForNonPrimaryKeyNonMatchingShard() {
@@ -2318,7 +2345,7 @@ public class PartitionManager extends Thread {
         KeyRecord.setDbViewNumber(newBytes, common.getSchemaVersion());
         newContent[i] = newBytes;
       }
-      databaseServer.getAddressMap().writeRecordstoExistingAddress((long)entry.value, newContent);
+      databaseServer.getAddressMap().writeRecordstoExistingAddress(entry.value, newContent);
     }
 
     private void insertRecordForPrimaryKeyNonMatchingShard() {

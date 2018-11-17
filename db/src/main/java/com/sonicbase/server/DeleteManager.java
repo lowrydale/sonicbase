@@ -18,6 +18,7 @@ import java.util.concurrent.*;
 import java.util.concurrent.atomic.AtomicBoolean;
 import java.util.concurrent.atomic.AtomicLong;
 
+import static com.sonicbase.client.DatabaseClient.SERIALIZATION_VERSION_28;
 import static com.sonicbase.server.DatabaseServer.METRIC_SAVE_DELETE;
 
 @SuppressWarnings({"squid:S1172", "squid:S1168", "squid:S00107"})
@@ -127,9 +128,12 @@ public class DeleteManager {
         out.writeUTF(indexName);
         out.writeInt(databaseServer.getCommon().getSchemaVersion() + 1);
         for (DeleteRequest key : deleteRequests) {
-          out.write(DatabaseCommon.serializeKey(tableSchema, indexName, key.getKey()));
+          byte[] bytes = DatabaseCommon.serializeKey(tableSchema, indexName, key.getKey());
+          out.writeInt(bytes.length);
+          out.write(bytes);
           count.incrementAndGet();
         }
+        out.writeInt(0);
       }
     }
     catch (Exception e) {
@@ -176,7 +180,7 @@ public class DeleteManager {
   }
 
   private boolean doDeletesProcessStream(boolean ignoreVersion, List<Future> futures, DataInputStream in) throws IOException {
-    Varint.readSignedVarLong(in); //serializationVersion
+    long serializationVersion = Varint.readSignedVarLong(in);
     String dbName = in.readUTF();
     String tableName = in.readUTF();
     TableSchema tableSchema = databaseServer.getCommon().getTables(dbName).get(tableName);
@@ -197,7 +201,7 @@ public class DeleteManager {
     List<Object[]> batch = new ArrayList<>();
     int errorsInARow = 0;
     while (!shutdown) {
-      ProcessKey processKey = new ProcessKey(futures, in, tableSchema, indexSchema, index, batch, errorsInARow).invoke();
+      ProcessKey processKey = new ProcessKey(futures, serializationVersion, in, tableSchema, indexSchema, index, batch, errorsInARow).invoke();
       batch = processKey.getBatch();
       errorsInARow = processKey.getErrorsInARow();
       if (processKey.is()) {
@@ -449,6 +453,7 @@ public class DeleteManager {
   }
 
   private class ProcessKey {
+    private final long serializationVersion;
     private boolean myResult;
     private final List<Future> futures;
     private final DataInputStream in;
@@ -458,9 +463,10 @@ public class DeleteManager {
     private List<Object[]> batch;
     private int errorsInARow;
 
-    ProcessKey(List<Future> futures, DataInputStream in, TableSchema tableSchema, IndexSchema indexSchema,
+    ProcessKey(List<Future> futures, long serializationVersion, DataInputStream in, TableSchema tableSchema, IndexSchema indexSchema,
                Index index, List<Object[]> batch, int errorsInARow) {
       this.futures = futures;
+      this.serializationVersion = serializationVersion;
       this.in = in;
       this.tableSchema = tableSchema;
       this.indexSchema = indexSchema;
@@ -484,19 +490,30 @@ public class DeleteManager {
     public ProcessKey invoke() {
       Object[] key = null;
       try {
-        key = DatabaseCommon.deserializeKey(tableSchema, in);
+        if (serializationVersion == SERIALIZATION_VERSION_28) {
+          key = DatabaseCommon.deserializeKey(tableSchema, in);
+        }
+        else {
+          int len = in.readInt();
+          if (len == 0) {
+            myResult = true;
+            return this;
+          }
+          byte[] bytes = new byte[len];
+          in.readFully(bytes);
+          key = DatabaseCommon.deserializeKey(tableSchema, bytes);
+        }
         errorsInARow = 0;
         batch.add(key);
         if (batch.size() > 1_000) {
           batch = processBatch(futures, indexSchema, index, batch);
         }
       }
-      catch (EOFException e) {
-        //expected
-        myResult = true;
-        return this;
-      }
       catch (Exception e) {
+        if (serializationVersion == SERIALIZATION_VERSION_28 && e instanceof EOFException) {
+          myResult = true;
+          return this;
+        }
         logger.error("Error deserializing key: " + ((errorsInARow > 20) ? " aborting" : ""), e);
         if (errorsInARow++ > 20) {
           myResult = true;

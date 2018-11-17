@@ -8,6 +8,7 @@ import com.sonicbase.client.DatabaseClient;
 import com.sonicbase.common.*;
 import com.sonicbase.index.Indices;
 import com.sonicbase.query.DatabaseException;
+import com.sonicbase.util.TestUtils;
 import org.mockito.invocation.InvocationOnMock;
 import org.mockito.stubbing.Answer;
 import org.testng.annotations.BeforeClass;
@@ -15,6 +16,7 @@ import org.testng.annotations.Test;
 
 import java.io.File;
 import java.io.IOException;
+import java.util.Map;
 import java.util.concurrent.atomic.AtomicLong;
 
 import static com.sonicbase.client.DatabaseClient.SERIALIZATION_VERSION;
@@ -49,6 +51,8 @@ public class LogManagerTest {
     indices = new Indices();
     when(server.getIndices(anyString())).thenReturn(indices);
     when(server.getReplicationFactor()).thenReturn(2);
+    Map<String, DatabaseServer.SimpleStats> stats = DatabaseServer.initStats();
+    when(server.getStats()).thenReturn(stats);
 
     JsonNode node = new ObjectMapper().readTree(" { \"shards\" : [\n" +
         "    {\n" +

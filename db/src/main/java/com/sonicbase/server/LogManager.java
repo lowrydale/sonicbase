@@ -951,10 +951,12 @@ public class LogManager {
 
   public LogRequest logRequest(byte[] body, boolean enableQueuing, String methodStr,
                                Long existingSequence0, Long existingSequence1, AtomicLong timeLogging) {
-    if (!server.isDurable()) {
-      return null;
-    }
     LogRequest request = null;
+    if (!server.isDurable()) {
+      request = new LogRequest(1);
+      request.getLatch().countDown();
+      return request;
+    }
     try {
       if (enableQueuing && DatabaseClient.getWriteVerbs().contains(methodStr)) {
         request = new LogRequest(1);

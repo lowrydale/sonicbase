@@ -290,6 +290,24 @@ public class Logger extends AppenderSkeleton {
 
   protected static void parseMessage(Connection connection, String origMsg, ObjectNode json, String msg) throws IOException {
     int pos = msg.indexOf("=");
+    if (pos == -1) {
+      json.put("shortMessage", msg);
+    }
+    else {
+      int pos2 = msg.lastIndexOf(":", pos);
+      if (pos2 == -1) {
+        pos2 = msg.lastIndexOf(" ", pos);
+        if (pos2 == -1) {
+          json.put("shortMessage", msg);
+        }
+        else {
+          json.put("shortMessage", msg.substring(0, pos2));
+        }
+      }
+      else {
+        json.put("shortMessage", msg.substring(0, pos2));
+      }
+    }
     while (pos != -1) {
       int pos2 = msg.lastIndexOf(' ', pos);
       String key = msg.substring(pos2 + 1, pos);

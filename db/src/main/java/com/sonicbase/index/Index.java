@@ -59,6 +59,10 @@ public class Index {
     return comparators;
   }
 
+  public Comparator<Object[]> getComparator() {
+    return comparator;
+  }
+
   int getObjectArrayComparator(Comparator[] comparators, Object[] o1, Object[] o2) {
     int keyLen = (o1.length <= o2.length) ? o1.length : o2.length;
     for (int i = 0; i < keyLen; i++) {

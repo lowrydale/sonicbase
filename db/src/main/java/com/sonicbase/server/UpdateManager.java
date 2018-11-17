@@ -747,14 +747,18 @@ public class UpdateManager {
         insertCount.set(0);
       }
 
-      double moveRate = server.getPartitionManager().getMoveRcvCount().get() /
-          (double) (System.currentTimeMillis() - server.getPartitionManager().getLastRcvReset().get()) * 1000d;
-
-      double acceptableRate = Math.max(75_000, 200_000 - moveRate);
-
-      while (insertCount.get() / (double) (System.currentTimeMillis() - lastReset.get()) * 1000d > acceptableRate) {
+      while (insertCount.get() / (double) (System.currentTimeMillis() - lastReset.get()) * 1000d > 200_000) {
         ThreadUtil.sleep(20);
       }
+
+//      double moveRate = server.getPartitionManager().getMoveRcvCount().get() /
+//          (double) (System.currentTimeMillis() - server.getPartitionManager().getLastRcvReset().get()) * 1000d;
+//
+//      double acceptableRate = Math.max(75_000, 200_000 - moveRate);
+//
+//      while (insertCount.get() / (double) (System.currentTimeMillis() - lastReset.get()) * 1000d > acceptableRate) {
+//        ThreadUtil.sleep(20);
+//      }
     }
   }
 
@@ -1237,19 +1241,19 @@ public class UpdateManager {
   }
 
   private void doInsertKey(String dbName, boolean isExplicitTrans, Object[] key, byte[] keyRecordBytes, String tableName, Index index, IndexSchema indexSchema) {
-    doActualInsertKey(dbName, isExplicitTrans, key, keyRecordBytes, tableName, index, indexSchema);
+    doActualInsertKey(dbName, isExplicitTrans, key, keyRecordBytes, false, tableName, index, indexSchema);
   }
 
   void doInsertKeys(final ComObject cobj, boolean isExpliciteTrans, final String dbName, List<PartitionManager.MoveRequest> moveRequests,
                     final Index index,
                     final String tableName, final IndexSchema indexSchema, boolean replayedCommand,
-                    final boolean movingRecord) {
+                    final boolean movingRecord, ComArray failedKeys) {
     try {
       if (indexSchema.isPrimaryKey()) {
-        doInsertKeysForPrimaryKey(cobj, isExpliciteTrans, dbName, moveRequests, index, tableName, indexSchema, replayedCommand, movingRecord);
+        doInsertKeysForPrimaryKey(cobj, isExpliciteTrans, dbName, moveRequests, index, tableName, indexSchema, replayedCommand, movingRecord, failedKeys);
       }
       else {
-        doInsertKeysForNonPrimaryKey(dbName, isExpliciteTrans, moveRequests, index, tableName, indexSchema, replayedCommand);
+        doInsertKeysForNonPrimaryKey(dbName, isExpliciteTrans, moveRequests, index, tableName, indexSchema, replayedCommand, failedKeys);
       }
     }
     catch (Exception e) {
@@ -1259,53 +1263,39 @@ public class UpdateManager {
 
   private void doInsertKeysForNonPrimaryKey(String dbName, boolean isExpliciteTrans, List<PartitionManager.MoveRequest> moveRequests, Index index,
                                             String tableName, IndexSchema indexSchema,
-                                            boolean replayedCommand) throws InterruptedException, java.util.concurrent.ExecutionException {
-    if (replayedCommand) {
-      List<Future> futures = new ArrayList<>();
-      for (final PartitionManager.MoveRequest moveRequest : moveRequests) {
-        futures.add(server.getExecutor().submit((Callable) () -> {
-          byte[][] content = moveRequest.getContent();
-          for (int i = 0; i < content.length; i++) {
-            doActualInsertKey(dbName, isExpliciteTrans, moveRequest.getKey(), content[i], tableName, index, indexSchema);
-          }
-          return null;
-        }));
-      }
-      for (Future future : futures) {
-        future.get();
-      }
-    }
-    else {
-      for (PartitionManager.MoveRequest moveRequest : moveRequests) {
+                                            boolean replayedCommand, ComArray failedKeys) {
+    for (final PartitionManager.MoveRequest moveRequest : moveRequests) {
+      try {
         byte[][] content = moveRequest.getContent();
         for (int i = 0; i < content.length; i++) {
-          doActualInsertKey(dbName, isExpliciteTrans, moveRequest.getKey(), content[i], tableName, index, indexSchema);
+          doActualInsertKey(dbName, isExpliciteTrans, moveRequest.getKey(), content[i], true, tableName, index, indexSchema);
         }
+      }
+      catch (Exception e) {
+        failedKeys.add(moveRequest.getKeyOffset());
+        logger.error("Error inserting secondary key: db={}, table={}, index={}, key={}", dbName, tableName,
+            indexSchema.getName(), DatabaseCommon.keyToString(moveRequest.getKey()), e);
       }
     }
   }
 
   private void doInsertKeysForPrimaryKey(ComObject cobj, boolean isExpliciteTrans, String dbName, List<PartitionManager.MoveRequest> moveRequests,
                                          Index index, String tableName, IndexSchema indexSchema, boolean replayedCommand,
-                                         boolean movingRecord) {
+                                         boolean movingRecord, ComArray failedKeys) {
     MemoryOps memoryOps = new MemoryOps(server, isExpliciteTrans);
     for (int j = 0; j < memoryOps.phaseCount; j++) {
-      if (replayedCommand) {
-        for (final PartitionManager.MoveRequest moveRequest : moveRequests) {
+      for (final PartitionManager.MoveRequest moveRequest : moveRequests) {
+        try {
           byte[][] content = moveRequest.getContent();
           for (int i = 0; i < content.length; i++) {
             doActualInsertKeyWithRecord(cobj, dbName, content[i], moveRequest.getKey(), index, tableName,
                 indexSchema.getName(), true, movingRecord, memoryOps);
           }
         }
-      }
-      else {
-        for (PartitionManager.MoveRequest moveRequest : moveRequests) {
-          byte[][] content = moveRequest.getContent();
-          for (int i = 0; i < content.length; i++) {
-            doActualInsertKeyWithRecord(cobj, dbName, content[i], moveRequest.getKey(), index, tableName,
-                indexSchema.getName(), true, movingRecord, memoryOps);
-          }
+        catch (Exception e) {
+          failedKeys.add(moveRequest.getKeyOffset());
+          logger.error("Error inserting record: db={}, table={}, index={}, key={}", dbName, tableName, indexSchema.getName(),
+              DatabaseCommon.keyToString(moveRequest.getKey()), e);
         }
       }
       memoryOps.execute();
@@ -1315,7 +1305,8 @@ public class UpdateManager {
   /**
    * Caller must synchronized index
    */
-  private void doActualInsertKey(String dbName, boolean isExplicitTrans, Object[] key, byte[] keyRecordBytes, String tableName, Index index, IndexSchema indexSchema) {
+  private void doActualInsertKey(String dbName, boolean isExplicitTrans, Object[] key, byte[] keyRecordBytes,
+                                 boolean ignoreDuplicates, String tableName, Index index, IndexSchema indexSchema) {
     int fieldCount = index.getComparators().length;
     if (fieldCount != key.length) {
       Object[] newKey = new Object[fieldCount];
@@ -1331,7 +1322,7 @@ public class UpdateManager {
         if (records != null) {
           boolean replaced = doActualInsertKeyPrep(keyRecordBytes, index, records);
 
-          if (indexSchema.isUnique()) {
+          if (!ignoreDuplicates && indexSchema.isUnique()) {
             throw new UniqueConstraintViolationException("Unique constraint violated: table=" + tableName + INDEX_STR +
                 indexSchema.getName() + KEY_STR + DatabaseCommon.keyToString(key));
           }
@@ -1369,7 +1360,7 @@ public class UpdateManager {
             byte[][] records = server.getAddressMap().fromUnsafeToRecords(existingValue);
             boolean replaced = doActualInsertKeyPrep(keyRecordBytes, index, records);
 
-            if (indexSchema.isUnique()) {
+            if (!ignoreDuplicates && indexSchema.isUnique()) {
               throw new UniqueConstraintViolationException("Unique constraint violated: table=" + tableName + INDEX_STR +
                   indexSchema.getName() + KEY_STR + DatabaseCommon.keyToString(key));
             }
@@ -1404,7 +1395,7 @@ public class UpdateManager {
           byte[][] records = server.getAddressMap().fromUnsafeToRecords(existingValue);
           boolean replaced = doActualInsertKeyPrep(keyRecordBytes, index, records);
 
-          if (indexSchema.isUnique()) {
+          if (!ignoreDuplicates && indexSchema.isUnique()) {
             throw new UniqueConstraintViolationException("Unique constraint violated: table=" + tableName + INDEX_STR +
                 indexSchema.getName() + KEY_STR + DatabaseCommon.keyToString(key));
           }

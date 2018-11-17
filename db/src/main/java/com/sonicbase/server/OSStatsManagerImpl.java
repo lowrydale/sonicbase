@@ -76,6 +76,7 @@ public class OSStatsManagerImpl {
         persisterThread.join();
         persisterThread = null;
       }
+
       if (netMonitorThread != null) {
         netMonitorThread.interrupt();
         netMonitorThread.join();

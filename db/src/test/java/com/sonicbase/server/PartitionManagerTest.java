@@ -756,7 +756,7 @@ public class PartitionManagerTest {
               ComObject cobj = (ComObject)args[3];
               cobj.put(ComObject.Tag.SEQUENCE_0, 10000L);
               cobj.put(ComObject.Tag.SEQUENCE_1, 10000L);
-              partitionManagers[(Integer)args[1]].moveIndexEntries(cobj, false);
+              return partitionManagers[(Integer)args[1]].moveIndexEntries(cobj, false).serialize();
 
 //              Object[] args = invocation.getArguments();
 //              ComObject cobj = (ComObject) args[3];

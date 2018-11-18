@@ -19,8 +19,6 @@ then
   export _GC_="$SONIC_BASE_HOME/logs/gc.log"
 fi
 
-#-XX:NewRatio=2 -XX:SurvivorRatio=10 -XX:ParallelGCThreads=4 -XX:ConcGCThreads=2
-
 java_opts="-server  -XX:+UseG1GC -XX:MaxGCPauseMillis=150 -XX:-ResizePLAB"
 java_opts="$java_opts -verbose:gc -XX:+UseGCLogFileRotation -XX:NumberOfGCLogFiles=3 -XX:GCLogFileSize=2m -Xloggc:$_GC_"
 

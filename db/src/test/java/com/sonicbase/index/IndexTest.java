@@ -7,11 +7,57 @@ import org.testng.annotations.Test;
 
 import java.io.UnsupportedEncodingException;
 import java.util.List;
+import java.util.concurrent.ConcurrentHashMap;
 import java.util.concurrent.atomic.AtomicInteger;
 
 import static org.testng.Assert.assertEquals;
 
 public class IndexTest {
+
+  @Test
+  public void testBatchOrig() {
+    ConcurrentHashMap<Long, Object> origMap = new ConcurrentHashMap<>();
+    long offset = 0;
+    while (true) {
+      origMap.put(offset++, offset);
+      if (offset % 1_000 == 0) {
+        System.out.println("count=" + offset);
+      }
+    }
+  }
+
+  private final int batchSize = 100;
+
+  private class Entry {
+    long key;
+    Object address;
+  }
+  private class InnerMap {
+    private Entry[] keys = new Entry[batchSize];
+
+  }
+
+  @Test
+  public void testBatchNew() {
+    ConcurrentHashMap<Long, Object> newMap = new ConcurrentHashMap<>();
+    long offset = 0;
+    while (true) {
+      Entry[] keys = new Entry[batchSize];
+      for (long i = offset; i < offset + batchSize; i++) {
+        Entry entry = new Entry();
+        keys[(int) (i - offset)] = entry;
+        entry.key = offset;
+        entry.address = offset;
+
+        if (i % 1_000 == 0) {
+          System.out.println("count=" + i);
+        }
+      }
+      newMap.put(offset, keys);
+      offset += batchSize;
+    }
+  }
+
 
   @Test
   public void test() throws UnsupportedEncodingException {

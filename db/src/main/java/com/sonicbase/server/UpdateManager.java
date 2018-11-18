@@ -747,18 +747,18 @@ public class UpdateManager {
         insertCount.set(0);
       }
 
-      while (insertCount.get() / (double) (System.currentTimeMillis() - lastReset.get()) * 1000d > 200_000) {
-        ThreadUtil.sleep(20);
-      }
-
-//      double moveRate = server.getPartitionManager().getMoveRcvCount().get() /
-//          (double) (System.currentTimeMillis() - server.getPartitionManager().getLastRcvReset().get()) * 1000d;
-//
-//      double acceptableRate = Math.max(75_000, 200_000 - moveRate);
-//
-//      while (insertCount.get() / (double) (System.currentTimeMillis() - lastReset.get()) * 1000d > acceptableRate) {
+//      while (insertCount.get() / (double) (System.currentTimeMillis() - lastReset.get()) * 1000d > 200_000) {
 //        ThreadUtil.sleep(20);
 //      }
+
+      double moveRate = server.getPartitionManager().getMoveRcvCount().get() /
+          (double) (System.currentTimeMillis() - server.getPartitionManager().getLastRcvReset().get()) * 1000d;
+
+      double acceptableRate = Math.max(75_000, 200_000 - moveRate);
+
+      while (insertCount.get() / (double) (System.currentTimeMillis() - lastReset.get()) * 1000d > acceptableRate) {
+        ThreadUtil.sleep(20);
+      }
     }
   }
 

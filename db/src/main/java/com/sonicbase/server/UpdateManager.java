@@ -1,9 +1,9 @@
 package com.sonicbase.server;
 
+import com.codahale.metrics.Timer;
 import com.sonicbase.client.DatabaseClient;
 import com.sonicbase.client.InsertStatementHandler;
 import com.sonicbase.common.*;
-import com.sonicbase.index.AddressMap;
 import com.sonicbase.index.Index;
 import com.sonicbase.index.Indices;
 import com.sonicbase.index.MemoryOps;
@@ -17,11 +17,10 @@ import com.sonicbase.schema.DataType;
 import com.sonicbase.schema.FieldSchema;
 import com.sonicbase.schema.IndexSchema;
 import com.sonicbase.schema.TableSchema;
-import net.sf.jsqlparser.schema.Database;
+import com.sonicbase.streams.StreamManager;
 import org.apache.commons.lang.exception.ExceptionUtils;
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
-import sun.misc.Unsafe;
 
 import java.io.ByteArrayInputStream;
 import java.io.DataInputStream;
@@ -37,6 +36,9 @@ import java.util.concurrent.atomic.AtomicBoolean;
 import java.util.concurrent.atomic.AtomicLong;
 
 import static com.sonicbase.index.AddressMap.MEM_OP;
+import static com.sonicbase.server.DatabaseServer.METRIC_DELETE;
+import static com.sonicbase.server.DatabaseServer.METRIC_INSERT;
+import static com.sonicbase.server.DatabaseServer.METRIC_UPDATE;
 import static com.sonicbase.server.TransactionManager.OperationType.*;
 
 @SuppressWarnings({"squid:S1172", "squid:S1168", "squid:S00107"})
@@ -54,8 +56,9 @@ public class UpdateManager {
   public static final String INDEX_STR = ", index=";
   public static final String KEY_STR = ", key=";
   private final com.sonicbase.server.DatabaseServer server;
-  private StreamManagerProxy streamManager;
+  private StreamManager streamManager;
   private final AtomicLong batchCount = new AtomicLong();
+  private final AtomicLong batchEntryCountSizeLastLogged = new AtomicLong();
   private final AtomicLong batchEntryCount = new AtomicLong();
   private final AtomicLong lastBatchLogReset = new AtomicLong(System.currentTimeMillis());
   private final AtomicLong batchDuration = new AtomicLong();
@@ -73,7 +76,7 @@ public class UpdateManager {
   }
 
   void initStreamManager() {
-    streamManager = new StreamManagerProxy(server.getProServer());
+    streamManager = server.getStreamManager();
     try {
       streamManager.initPublisher();
     }
@@ -630,10 +633,12 @@ public class UpdateManager {
     try {
       final ComArray array = cobj.getArray(ComObject.Tag.INSERT_OBJECTS);
 
+      batchEntryCountSizeLastLogged.addAndGet(array.getArray().size());
       batchEntryCount.addAndGet(array.getArray().size());
       if (batchCount.incrementAndGet() % 1000 == 0) {
-        logger.info("batchInsert stats: batchSize={}, avgBatchSize={}, avgBatchDuration={}", array.getArray().size(),
-            (batchEntryCount.get() / batchCount.get()), ((double)batchDuration.get() / batchCount.get() / 1000000d));
+        logger.info("batchInsert stats: batchSize={}, count={}, avgBatchSize={}, avgBatchDuration={}", array.getArray().size(),
+            batchEntryCountSizeLastLogged.get(), (batchEntryCount.get() / batchCount.get()), ((double)batchDuration.get() / batchCount.get() / 1000000d));
+        batchEntryCountSizeLastLogged.set(0);
         synchronized (lastBatchLogReset) {
           if (System.currentTimeMillis() - lastBatchLogReset.get() > 4 * 60 * 1000) {
             lastBatchLogReset.set(System.currentTimeMillis());
@@ -1172,6 +1177,7 @@ public class UpdateManager {
 
   private void doUpdateRecord(ComObject cobj, String dbName, String tableName, String indexName, Object[] primaryKey,
                               byte[] bytes) {
+    Timer.Context ctx = server.getTimers().get(METRIC_UPDATE).time();
     //because this is the primary key index we won't have more than one index entry for the key
     Index index = server.getIndex(dbName, tableName, indexName);
     Object newValue = server.getAddressMap().toUnsafeFromRecords(new byte[][]{bytes});
@@ -1189,6 +1195,7 @@ public class UpdateManager {
       }
     }
     streamManager.publishInsertOrUpdate(cobj, dbName, tableName, bytes, existingBytes, UpdateType.UPDATE);
+    ctx.stop();
   }
 
   private void setSequenceNumbersOnUpdate(ComObject cobj, Object[] primaryKey, Record record) {
@@ -1303,6 +1310,8 @@ public class UpdateManager {
    * Caller must synchronized index
    */
   private void doActualInsertKey(String dbName, boolean isExplicitTrans, Object[] key, byte[] keyRecordBytes, String tableName, Index index, IndexSchema indexSchema) {
+
+    Timer.Context ctx = server.getTimers().get(METRIC_INSERT).time();
     int fieldCount = index.getComparators().length;
     if (fieldCount != key.length) {
       Object[] newKey = new Object[fieldCount];
@@ -1403,6 +1412,7 @@ public class UpdateManager {
         }
       }
     }
+    ctx.stop();
   }
 
   private boolean doActualInsertKeyPrep(byte[] keyRecordBytes, Index index, byte[][] records) {
@@ -1451,6 +1461,8 @@ public class UpdateManager {
     if (recordBytes == null) {
       throw new DatabaseException("Invalid record, null");
     }
+
+    Timer.Context ctx = server.getTimers().get(METRIC_INSERT).time();
 
     try {
       if (MEM_OP && !memoryOps.isExplicitTrans()) {
@@ -1512,6 +1524,9 @@ public class UpdateManager {
     }
     catch (Exception e) {
       throw new DatabaseException(e);
+    }
+    finally {
+      ctx.stop();
     }
   }
 
@@ -1617,6 +1632,7 @@ public class UpdateManager {
   }
 
   private byte[][] doDeleteRecordRemoveFromIndex(Object[] key, Index index) {
+    Timer.Context ctx = server.getTimers().get(METRIC_DELETE).time();
     byte[][] bytes = null;
     synchronized (index.getMutex(key)) {
       Object value = index.remove(key);
@@ -1626,6 +1642,7 @@ public class UpdateManager {
         index.addAndGetCount(-1);
       }
     }
+    ctx.stop();
     return bytes;
   }
 

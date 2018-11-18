@@ -938,7 +938,7 @@ public class NettyServer {
         break;
       }
       catch (Exception e) {
-        logger.error("Error checking if server is healthy: shard={}, replica={}", shard, replica);
+        logger.error("Error checking if server is healthy: shard={}, replica={}", shard, replica, e);
       }
       if (System.currentTimeMillis() - beginTime > 2 * 60 * 1000) {
         logger.error("Server appears to be dead, skipping: shard={}, replica={}", shard, replica);

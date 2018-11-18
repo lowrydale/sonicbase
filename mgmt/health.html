@@ -1,0 +1,182 @@
+<html>
+<head>
+  <script type="text/javascript" src="/javascript/svg.js"></script>
+
+  <script type="text/javascript" src="/javascript/jquery-3.2.1.min.js"></script>
+  <script type="text/javascript" src="/javascript/main.js"></script>
+
+
+
+  <script>
+
+    var currCluster = "";
+    var draw;
+
+      // replicaNode.put("host", replica.getPrivateAddress() + ":" + replica.getPort());
+      // replicaNode.put("shard", String.valueOf(j));
+      // replicaNode.put("replica", String.valueOf(i));
+      // replicaNode.put("dead", String.valueOf(replica.isDead()));
+      // replicaNode.put("master", String.valueOf(shard.getMasterReplica() == i));
+
+      function callback(response) {
+
+          if (response.error != null) {
+              alert(response.error);
+          }
+
+
+          // var clusters = response.clusters;
+          // var selectNode = document.getElementById("clusters");
+          // selectNode.innerHTML = "";
+          // for (var i = 0; i < response.clusters.length; i++) {
+          //     var cluster = clusters[i];
+          //     var option = document.createElement("option");
+          //     option.text = cluster;
+          //     selectNode.add(option, selectNode.options[null]);
+          // }
+          //
+          // if (currCluster == null || currCluster == "" || currCluster == "_unknown_") {
+          //     currCluster = clusters[0];
+          //     $('#clusters').val(clusters[0]);
+          // }
+          // else {
+          //     $('#clusters').val(currCluster);
+          // }
+
+          if (response.shards == null) {
+              return;
+          }
+
+          var elem = document.getElementById("health-drawing");
+          elem.outerHTML = "";
+          delete elem;
+
+          var div = document.createElement("div");
+          div.id = "health-drawing";
+          document.getElementById("drawing-parent").appendChild(div);
+
+        var shardCount = response.shards.length;
+        draw = SVG('health-drawing').size(1200, shardCount * 160);
+          draw.clear();
+
+        for (var i = 0; i < response.shards.length; i++) {
+            draw.text("shard: " + i).move(50, 60 + i * 120 + 120 / 2 - 10);
+            for (var j = 0; j < response.shards[i].length; j++) {
+                if (i == 0) {
+                    draw.text("replica: " + i).center(140 + j * 220 + 200 / 2, 30);
+                }
+                var color = "#0f0";
+                if (response.shards[i][j].dead === "true") {
+                    color = "#f00";
+                }
+                draw.rect(200, 100).fill(color).stroke({width: 2, color: "#000"}).move(140 + j * 220, 60 + i * 120);
+                draw.text(response.shards[i][j].host).center(140 + j * 220 + 200 / 2, 60 + i * 120 + 10);
+                if (response.shards[i][j].master === "true") {
+                    text = draw.text("M").center(120 + j * 220 + 200 / 2, 60 + i * 120 + 15);
+                    text.font({family: 'Helvetica', size: 60})
+                }
+            }
+        }
+
+      }
+
+      function refreshCluster(value) {
+          currCluster = value;
+          $('#clusters').val(value);
+          getHealth();
+      }
+
+
+      function getHealth() {
+          $.ajaxSetup({
+              error: function(xhr){
+                  alert('Request Status: ' + xhr.status + ' Status Text: ' + xhr.statusText + ' ' + xhr.responseText);
+              }
+          });
+
+          if (currCluster == null || currCluster == "") {
+              currCluster = "_unknown_";
+          }
+          $.ajax({
+              headers:{
+                  "Accept":"application/json",
+                  "Content-type":"application/json"
+              },   url:"/health?cluster=" + currCluster,
+              success:callback,
+              error: function(xhr) {
+
+                  // revert to default
+                  alert('Request Status: ' + xhr.status + ' Status Text: ' + xhr.statusText + ' ' + xhr.responseText);
+              }
+          });
+      }
+
+    function init() {
+
+    }
+
+
+  </script>
+
+  <link href="/css/singlePageTemplate.css" rel="stylesheet" type="text/css">
+
+
+
+</head>
+
+<body style="background: rgba(12,181,177,0.41)">
+
+<div class="container">
+
+<header>
+  <div class="mobile">
+    <a href="http://sonicbase.com">
+      <h4 class="logo">SonicBase™</h4>
+    </a>
+  </div>
+
+  <div class="desktop">
+    <a href="http://sonicbase.com">
+      <img style="margin-top:3px" src="images/logo-white.gif" width="50px"/><h4 class="logo">SonicBase™</h4>
+    </a>
+    <nav>
+      <ul>
+        <li><a href="os-stats.html">OS STATS</a></li>
+        <li><a href="query-stats.html">QUERY STATS</a></li>
+      </ul>
+    </nav>
+  </div>
+</header>
+
+
+
+
+<!--<table style="padding: 0" width="100%">-->
+  <!--<tr>-->
+    <!--<td  style="horiz-align: left;" nowrap="">-->
+      <!--Cluster: <select onchange="refreshCluster(this.value)" id="clusters">Cluster</select>-->
+    <!--</td>-->
+  <!--</tr>-->
+<!--</table>-->
+
+<table>
+  <tr>
+    <td id="drawing-parent">
+      <div id="health-drawing"></div>
+      </svg>
+    </td>
+    <td>
+
+    </td>
+  </tr>
+</table>
+
+<script>
+    init();
+    getHealth();
+</script>
+
+
+</div>
+</body>
+</html>

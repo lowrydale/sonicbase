@@ -8,6 +8,8 @@ import com.sonicbase.query.DatabaseException;
 import com.sonicbase.query.impl.OrderByExpressionImpl;
 import com.sonicbase.schema.IndexSchema;
 import com.sonicbase.schema.TableSchema;
+import org.slf4j.Logger;
+import org.slf4j.LoggerFactory;
 
 import java.util.ArrayList;
 import java.util.Comparator;
@@ -21,6 +23,8 @@ import java.util.concurrent.Future;
 // I prefer to return null instead of an empty array
 // I don't know a good way to reduce the parameter count
 public class PartitionUtils {
+  private static final Logger logger = LoggerFactory.getLogger(PartitionUtils.class);
+
   private PartitionUtils() {
   }
 
@@ -50,6 +54,7 @@ public class PartitionUtils {
   }
   public static GlobalIndexCounts getIndexCounts(final String dbName, final DatabaseClient client) {
     try {
+      long begin = System.currentTimeMillis();
       final GlobalIndexCounts ret = new GlobalIndexCounts();
       List<Future> futures = new ArrayList<>();
       for (int i = 0; i < client.getShardCount(); i++) {
@@ -79,6 +84,8 @@ public class PartitionUtils {
           }
         }
       }
+      long end = System.currentTimeMillis();
+      logger.info("getIndexCounts for all shards - finished: db={}, duration={}", dbName, end - begin);
       return ret;
     }
     catch (Exception e) {

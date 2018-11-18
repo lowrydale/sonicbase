@@ -1,0 +1,28 @@
+esClusters:
+- esCluster:
+  name: es1
+  hosts: 127.0.0.1:9200
+sbClusters:
+- sbCluster:
+  name: 1-local
+  databases:
+  - database:
+    name: db
+    tables:
+    - table:
+      name: persons
+      esCluster: es1
+      esIndex: persons
+      fields:
+        id1: id1
+        id2: id2
+        name: name
+        socialsecuritynumber: ssn
+    - table:
+      name: memberships
+      esCluster: es1
+      esIndex: memberships
+      fields:
+        personId: id
+        personId2: id2
+        membershipname: name

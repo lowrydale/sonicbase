@@ -1,5 +1,6 @@
 package com.sonicbase.server;
 
+import com.codahale.metrics.Timer;
 import com.fasterxml.jackson.databind.JsonNode;
 import com.fasterxml.jackson.databind.ObjectMapper;
 import com.fasterxml.jackson.databind.node.ArrayNode;
@@ -15,6 +16,7 @@ import com.sonicbase.schema.IndexSchema;
 import com.sonicbase.schema.TableSchema;
 import com.sonicbase.util.TestUtils;
 import org.apache.commons.io.IOUtils;
+import org.testng.annotations.BeforeClass;
 import org.testng.annotations.Test;
 
 import java.io.*;
@@ -23,6 +25,10 @@ import java.util.List;
 import java.util.Map;
 import java.util.concurrent.atomic.AtomicInteger;
 
+import static com.sonicbase.server.DatabaseServer.*;
+import static com.sonicbase.server.DatabaseServer.METRIC_DELETE;
+import static com.sonicbase.server.DatabaseServer.METRIC_UPDATE;
+import static com.sonicbase.server.MonitorManagerImpl.METRICS;
 import static org.mockito.Matchers.anyString;
 import static org.mockito.Mockito.mock;
 import static org.mockito.Mockito.when;
@@ -32,9 +38,33 @@ import static org.testng.Assert.assertTrue;
 
 public class SnapshotManagerTest {
 
+  private DatabaseServer server;
+
+  @BeforeClass
+  public void beforeClass() {
+    System.setProperty("log4j.configuration", "test-log4j.xml");
+
+    server = mock(DatabaseServer.class);
+
+    final Map<String, Timer> timers = new HashMap<>();
+
+    timers.put(METRIC_SNAPSHOT_WRITE, METRICS.timer("snapshotWrite"));
+    timers.put(METRIC_SNAPSHOT_RECOVER, METRICS.timer("snapshotRecover"));
+    timers.put(METRIC_REPART_MOVE_ENTRY, METRICS.timer("repartMoveEntry"));
+    timers.put(METRIC_REPART_PROCESS_ENTRY, METRICS.timer("repartProcessEntry"));
+    timers.put(METRIC_REPART_DELETE_ENTRY, METRICS.timer("repartDeleteEntry"));
+    timers.put(METRIC_READ, METRICS.timer("read"));
+    timers.put(METRIC_INSERT, METRICS.timer("insert"));
+    timers.put(METRIC_UPDATE, METRICS.timer("update"));
+    timers.put(METRIC_DELETE, METRICS.timer("delete"));
+
+    when(server.getTimers()).thenReturn(timers);
+
+
+  }
+
   @Test
   public void test() throws Exception {
-    com.sonicbase.server.DatabaseServer server = mock(DatabaseServer.class);
     when(server.isDurable()).thenReturn(true);
     AddressMap addressMap = new AddressMap(server);
     when(server.getAddressMap()).thenReturn(addressMap);
@@ -94,7 +124,6 @@ public class SnapshotManagerTest {
 
   @Test
   public void testDeleteIndexSchema() throws IOException {
-    DatabaseServer server = mock(DatabaseServer.class);
     when(server.isDurable()).thenReturn(true);
     when(server.getDataDir()).thenReturn("/tmp/database");
     FileUtils.deleteDirectory(new File("/tmp/database"));
@@ -114,7 +143,6 @@ public class SnapshotManagerTest {
 
   @Test
   public void testDeleteTableSchema() throws IOException {
-    DatabaseServer server = mock(DatabaseServer.class);
     when(server.isDurable()).thenReturn(true);
     when(server.getDataDir()).thenReturn("/tmp/database");
     FileUtils.deleteDirectory(new File("/tmp/database"));
@@ -133,7 +161,6 @@ public class SnapshotManagerTest {
 
   @Test
   public void testDeleteDbSchema() throws IOException {
-    DatabaseServer server = mock(DatabaseServer.class);
     when(server.isDurable()).thenReturn(true);
     when(server.getDataDir()).thenReturn("/tmp/database");
     FileUtils.deleteDirectory(new File("/tmp/database"));

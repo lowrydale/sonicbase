@@ -1,5 +1,6 @@
 package com.sonicbase.server;
 
+import com.codahale.metrics.Timer;
 import com.sonicbase.client.DatabaseClient;
 import com.sonicbase.common.*;
 import com.sonicbase.index.Index;
@@ -22,6 +23,10 @@ import java.util.concurrent.atomic.AtomicBoolean;
 import java.util.concurrent.atomic.AtomicInteger;
 import java.util.concurrent.atomic.AtomicLong;
 import java.util.concurrent.atomic.AtomicReference;
+
+import static com.sonicbase.server.DatabaseServer.METRIC_REPART_DELETE_ENTRY;
+import static com.sonicbase.server.DatabaseServer.METRIC_REPART_MOVE_ENTRY;
+import static com.sonicbase.server.DatabaseServer.METRIC_REPART_PROCESS_ENTRY;
 
 @SuppressWarnings({"squid:S1172", "squid:S1168", "squid:S00107"})
 // all methods called from method invoker must have cobj and replayed command parms
@@ -174,8 +179,8 @@ public class PartitionManager extends Thread {
           for (Future future : futures) {
             future.get();
           }
-          logger.info("master - getPartitionSize finished: db={}, table={}, index={}, duration={}sec", dbName, tableName, indexName,
-              (System.currentTimeMillis() - begin) / 1000f);
+          logger.info("master - getPartitionSize finished: db={}, table={}, index={}, duration={}", dbName, tableName, indexName,
+              (System.currentTimeMillis() - begin));
           partitionSizes.put(index, currPartitionSizes);
         }
 
@@ -206,7 +211,7 @@ public class PartitionManager extends Thread {
         throw new DatabaseException(e);
       }
       finally {
-        logger.info("rebalance cycle - finished: duration={}sec", (System.currentTimeMillis() - totalBegin)/1000f);
+        logger.info("rebalance cycle - finished: duration={}", (System.currentTimeMillis() - totalBegin));
         isComplete.set(true);
         state = RepartitionerState.COMPLETE;
       }
@@ -261,11 +266,11 @@ public class PartitionManager extends Thread {
 
         common.getTables(dbName).get(tableName).getIndices().get(indexName).deleteLastPartitions();
 
-        logger.info("master - rebalance ordered index - finished: db={}, table={}, index={}, duration={}sec, " +
+        logger.info("master - rebalance ordered index - finished: db={}, table={}, index={}, duration={}, " +
             "moveMin={}({}), moveMinCount={}({}), moveMax={}({}), moveMaxCount={}({}), moveAvg={}, " +
             "moveCountAvg={}, moveCountTotal={}, deleteMin={}({}), deleteMinCount={}({}), deleteMax={}({}), deleteMaxCount={}({}), " +
             "deleteAvg={}, deleteCountAvg={}, deleteCountTotal={}", dbName, tableName,
-            indexName, (System.currentTimeMillis() - begin) / 1000d, timings.moveMin, timings.moveMinShard,
+            indexName, (System.currentTimeMillis() - begin), timings.moveMin, timings.moveMinShard,
             timings.moveMinCount, timings.moveMinCountShard, timings.moveMax, timings.moveMaxShard,
             timings.moveMaxCount, timings.moveMaxCountShard,
             timings.moveTotal / (double)databaseServer.getShardCount(),
@@ -626,7 +631,7 @@ public class PartitionManager extends Thread {
       innerBuilder.append("]");
       builder.append("{shard=").append(partition.getShardOwning()).append(", upperKey=").append(innerBuilder.toString()).append(", unboundUpper=").append(partition.isUnboundUpper()).append("}");
     }
-    logger.info("Applying new partitions: dbName={}, tableName={}, indexName={}, partitions={}", dbName, tableName,
+    logger.info("Applying new partitions: dbName={}, tableName={}, indexName={}, partitions=\"{}\"", dbName, tableName,
         indexName, builder);
   }
 
@@ -1135,6 +1140,7 @@ public class PartitionManager extends Thread {
   private void deleteRecordsOnOtherReplicas(final String dbName, String tableName, String indexName,
                                             ConcurrentLinkedQueue<Object[]> keysToDelete) {
 
+    Timer timer = databaseServer.getTimers().get(METRIC_REPART_DELETE_ENTRY);
     beginDelete.set(System.currentTimeMillis());
     int threadCount = Runtime.getRuntime().availableProcessors() * databaseServer.getReplicationFactor() * 2;
     ThreadPoolExecutor executor = ThreadUtil.createExecutor(threadCount, "SonicBase deleteRecordsOnOtherReplicas Thread");
@@ -1146,6 +1152,9 @@ public class PartitionManager extends Thread {
       ComArray keys = cobj.putArray(ComObject.Tag.KEYS, ComObject.Type.BYTE_ARRAY_TYPE);
       int batchSize = 20_000;
       for (Object[] key : keysToDelete) {
+
+        timer.time().stop();
+
         keys.add(DatabaseCommon.serializeKey(tableSchema, indexName, key));
         if (keys.getArray().size() > batchSize) {
           count += keys.getArray().size();
@@ -1401,10 +1410,12 @@ public class PartitionManager extends Thread {
     int consecutiveErrors = 0;
     int lockCount = 0;
     AtomicInteger countDeleted = new AtomicInteger();
+    Timer timer = databaseServer.getTimers().get(METRIC_REPART_PROCESS_ENTRY);
     for (MapEntry entry : toProcess) {
       if (stopRepartitioning) {
         break;
       }
+      timer.time().stop();
       try {
         if (lockCount++ % 2 == 0) {
           lockCount = 0;
@@ -1494,10 +1505,13 @@ public class PartitionManager extends Thread {
     cobj.put(ComObject.Tag.SCHEMA_VERSION, common.getSchemaVersion());
     ComArray keys = cobj.putArray(ComObject.Tag.KEYS, ComObject.Type.OBJECT_TYPE);
     int consecutiveErrors = 0;
+    Timer timer = databaseServer.getTimers().get(METRIC_REPART_MOVE_ENTRY);
+    List<Timer.Context> ctxs = new ArrayList<>();
     for (MoveRequest moveRequest : moveRequests) {
       if (stopRepartitioning) {
         break;
       }
+      timer.time().stop();
       try {
         count++;
         byte[] bytes = DatabaseCommon.serializeKey(context.tableSchema, context.indexName, moveRequest.key);
@@ -1624,6 +1638,8 @@ public class PartitionManager extends Thread {
     try {
       String dbName = cobj.getString(ComObject.Tag.DB_NAME);
 
+      long begin = System.currentTimeMillis();
+
       logger.info("getIndexCounts - begin: dbName={}", dbName);
 
       ComObject retObj = new ComObject();
@@ -1649,6 +1665,8 @@ public class PartitionManager extends Thread {
         }
       }
 
+      long end = System.currentTimeMillis();
+      logger.info("getIndexCounts - finished: dbName={}, duration={}", dbName, end - begin);
       return retObj;
     }
     catch (Exception e) {
@@ -1727,6 +1745,7 @@ public class PartitionManager extends Thread {
 
   private boolean sendBeginRequest() {
     try {
+      long begin = System.currentTimeMillis();
       for (String dbName : databaseServer.getDbNames(databaseServer.getDataDir())) {
         ComObject cobj = new ComObject();
         cobj.put(ComObject.Tag.DB_NAME, dbName);
@@ -1735,7 +1754,12 @@ public class PartitionManager extends Thread {
         cobj.put(ComObject.Tag.FORCE, false);
         beginRebalance(cobj, false);
       }
-      Thread.sleep(2000);
+      long end = System.currentTimeMillis();
+      logger.info("Finished rebalance of all databases: duration={}", end - begin);
+
+      if (end - begin < 30_000) {
+        Thread.sleep(Math.max(1, 30_000 - (end - begin)));
+      }
     }
     catch (InterruptedException e) {
       Thread.currentThread().interrupt();
@@ -1778,7 +1802,7 @@ public class PartitionManager extends Thread {
       innerBuilder.append("]");
       builder.append("{ shard=").append(partition.getShardOwning()).append(", upperKey=").append(innerBuilder.toString()).append(", unboundUpper=").append(partition.isUnboundUpper()).append("}");
     }
-    logger.info("Current partitions to consider: dbName={}, table={}, index={}, partitions={}", dbName, tableName,
+    logger.info("Current partitions to consider: dbName={}, table={}, index={}, partitions=\"{}\"", dbName, tableName,
         indexName, builder);
   }
 
@@ -1999,8 +2023,8 @@ public class PartitionManager extends Thread {
         calculatePartitions(dbName, databaseServer.getShardCount(), newPartitions, indexName,
             tableSchema.getName(), currPartitionSizes, totalCount, (localDbName, shard, localTableName, indexName1, offsets) ->
                 getKeyAtOffset(localDbName, shard, localTableName, indexName1, offsets));
-        logger.info("master - calculating partitions - finished: db={}, table={}, index={}, currSizes={}, duration={}sec",
-            dbName, tableName, indexName, builder, System.currentTimeMillis() - begin / 1000d);
+        logger.info("master - calculating partitions - finished: db={}, table={}, index={}, currSizes={}, duration={}",
+            dbName, tableName, indexName, builder, System.currentTimeMillis() - begin);
 
         Index dbIndex = databaseServer.getIndex(dbName, tableName, indexName);
         final Comparator[] comparators = dbIndex.getComparators();

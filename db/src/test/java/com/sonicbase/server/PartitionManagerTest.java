@@ -53,19 +53,8 @@ public class PartitionManagerTest {
 
     server = mock(DatabaseServer.class);
 
-    final Map<String, Timer> timers = new HashMap<>();
-
-    timers.put(METRIC_SNAPSHOT_WRITE, METRICS.timer("snapshotWrite"));
-    timers.put(METRIC_SNAPSHOT_RECOVER, METRICS.timer("snapshotRecover"));
-    timers.put(METRIC_REPART_MOVE_ENTRY, METRICS.timer("repartMoveEntry"));
-    timers.put(METRIC_REPART_PROCESS_ENTRY, METRICS.timer("repartProcessEntry"));
-    timers.put(METRIC_REPART_DELETE_ENTRY, METRICS.timer("repartDeleteEntry"));
-    timers.put(METRIC_READ, METRICS.timer("read"));
-    timers.put(METRIC_INSERT, METRICS.timer("insert"));
-    timers.put(METRIC_UPDATE, METRICS.timer("update"));
-    timers.put(METRIC_DELETE, METRICS.timer("delete"));
-
-    when(server.getTimers()).thenReturn(timers);
+    Map<String, DatabaseServer.SimpleStats> stats = DatabaseServer.initStats();
+    when(server.getStats()).thenReturn(stats);
   }
 
   @Test
@@ -584,19 +573,8 @@ public class PartitionManagerTest {
       DatabaseServer server = mock(DatabaseServer.class);
       servers[shard] = server;
 
-      final Map<String, Timer> timers = new HashMap<>();
-
-      timers.put(METRIC_SNAPSHOT_WRITE, METRICS.timer("snapshotWrite"));
-      timers.put(METRIC_SNAPSHOT_RECOVER, METRICS.timer("snapshotRecover"));
-      timers.put(METRIC_REPART_MOVE_ENTRY, METRICS.timer("repartMoveEntry"));
-      timers.put(METRIC_REPART_PROCESS_ENTRY, METRICS.timer("repartProcessEntry"));
-      timers.put(METRIC_REPART_DELETE_ENTRY, METRICS.timer("repartDeleteEntry"));
-      timers.put(METRIC_READ, METRICS.timer("read"));
-      timers.put(METRIC_INSERT, METRICS.timer("insert"));
-      timers.put(METRIC_UPDATE, METRICS.timer("update"));
-      timers.put(METRIC_DELETE, METRICS.timer("delete"));
-
-      when(server.getTimers()).thenReturn(timers);
+      Map<String, DatabaseServer.SimpleStats> stats = DatabaseServer.initStats();
+      when(server.getStats()).thenReturn(stats);
 
       UpdateManager updateManager = new UpdateManager(server);
       DeleteManager deleteManager = mock(DeleteManager.class);
@@ -778,7 +756,7 @@ public class PartitionManagerTest {
               ComObject cobj = (ComObject)args[3];
               cobj.put(ComObject.Tag.SEQUENCE_0, 10000L);
               cobj.put(ComObject.Tag.SEQUENCE_1, 10000L);
-              partitionManagers[(Integer)args[1]].moveIndexEntries(cobj, false);
+              return partitionManagers[(Integer)args[1]].moveIndexEntries(cobj, false).serialize();
 
 //              Object[] args = invocation.getArguments();
 //              ComObject cobj = (ComObject) args[3];

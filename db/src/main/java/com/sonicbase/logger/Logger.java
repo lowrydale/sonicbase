@@ -39,6 +39,8 @@ public class Logger extends AppenderSkeleton {
   private static int shard;
   private static int replica;
   private static ConcurrentHashMap<String, Type> types = new ConcurrentHashMap<>();
+  private static AtomicLong countLogged;
+  private static String cluster;
 
   public Logger() {
   }
@@ -126,8 +128,10 @@ public class Logger extends AppenderSkeleton {
     }
   }
 
-  public static void init(int shard, int replica, String serversStr) {
+  public static void init(String cluster, int shard, int replica, AtomicLong count, String serversStr) {
     try {
+      Logger.countLogged = count;
+      Logger.cluster = cluster;
       Logger.shard = shard;
       Logger.replica = replica;
       if (serversStr == null) {
@@ -227,7 +231,17 @@ public class Logger extends AppenderSkeleton {
       return;
     }
 
-    queue.add(loggingEvent);
+    if (servers == null) {
+      return;
+    }
+
+    try {
+      queue.put(loggingEvent);
+    }
+    catch (InterruptedException e) {
+      Thread.currentThread().interrupt();
+      throw new DatabaseException(e);
+    }
   }
 
   private static void processEvent(Connection connection, LoggingEvent loggingEvent) {
@@ -255,26 +269,45 @@ public class Logger extends AppenderSkeleton {
     cal.setTime(new java.sql.Date(timeStamp));
 
     json.put("timeStamp", DateUtils.toDbString(cal));
+    json.put("this.cluster", cluster);
     json.put("this.shard", shard);
     json.put("this.replica", replica);
     try {
-
       parseMessage(connection, msg, json, msg);
+      try {
+        String body = json.toString();
+        connection.out.writeBytes( body + "\n");
+        countLogged.incrementAndGet();
+      }
+      catch (Exception e) {
+        throw new DatabaseException(e);
+      }
     }
     catch (Exception e) {
-      throw new DatabaseException("Error parsing message: msg=" + msg, e);
-    }
-    try {
-      String body = json.toString();
-      connection.out.writeBytes( body + "\n");
-    }
-    catch (Exception e) {
-      throw new DatabaseException(e);
+      e.printStackTrace();
     }
   }
 
   protected static void parseMessage(Connection connection, String origMsg, ObjectNode json, String msg) throws IOException {
     int pos = msg.indexOf("=");
+    if (pos == -1) {
+      json.put("shortMessage", msg);
+    }
+    else {
+      int pos2 = msg.lastIndexOf(":", pos);
+      if (pos2 == -1) {
+        pos2 = msg.lastIndexOf(" ", pos);
+        if (pos2 == -1) {
+          json.put("shortMessage", msg);
+        }
+        else {
+          json.put("shortMessage", msg.substring(0, pos2));
+        }
+      }
+      else {
+        json.put("shortMessage", msg.substring(0, pos2));
+      }
+    }
     while (pos != -1) {
       int pos2 = msg.lastIndexOf(' ', pos);
       String key = msg.substring(pos2 + 1, pos);
@@ -329,7 +362,7 @@ public class Logger extends AppenderSkeleton {
         ret.originalMessage = origMsg;
 
         node.put("message", "registering field for first time: field=" + key + ", isNumeric=true");
-        node.put("isNumberic", true);
+        node.put("isNumeric", true);
         node.put("field", key);
         node.put("currentMessage", origMsg);
         node.put("logLevel", "INFO");
@@ -348,7 +381,7 @@ public class Logger extends AppenderSkeleton {
         ret.originalMessage = origMsg;
 
         node.put("message", "registering field for first time: field=" + key + ", isNumeric=false");
-        node.put("isNumberic", false);
+        node.put("isNumeric", false);
         node.put("field", key);
         node.put("currentMessage", origMsg);
         node.put("logLevel", "INFO");

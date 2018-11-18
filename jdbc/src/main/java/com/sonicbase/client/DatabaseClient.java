@@ -30,7 +30,8 @@ import java.util.concurrent.atomic.AtomicLong;
 // I prefer to return null instead of an empty array
 // I don't know a good way to reduce the parameter count
 public class DatabaseClient {
-  public static final short SERIALIZATION_VERSION = 28;
+  public static final short SERIALIZATION_VERSION = 29;
+  public static final short SERIALIZATION_VERSION_29 = 29;
   public static final short SERIALIZATION_VERSION_28 = 28;
   public static final short SERIALIZATION_VERSION_27 = 27;
   public static final short SERIALIZATION_VERSION_26 = 26;

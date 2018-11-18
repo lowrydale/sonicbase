@@ -204,4 +204,8 @@ public class ComArray {
     this.array.add(localArray);
     return localArray;
   }
+
+  public void remove(ComObject innerObj) {
+    this.array.remove(innerObj);
+  }
 }

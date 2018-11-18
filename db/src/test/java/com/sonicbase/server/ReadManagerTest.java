@@ -25,6 +25,7 @@ import net.sf.jsqlparser.parser.CCJSqlParserManager;
 import net.sf.jsqlparser.schema.Column;
 import net.sf.jsqlparser.statement.Statement;
 import net.sf.jsqlparser.statement.select.*;
+import org.apache.commons.collections.map.HashedMap;
 import org.testng.annotations.Test;
 
 import java.io.IOException;
@@ -205,11 +206,8 @@ public class ReadManagerTest {
     ReadManager readManager = new ReadManager(server);
 
 
-    final Map<String, Timer> timers = new HashMap<>();
-
-    timers.put(METRIC_READ, METRICS.timer("read"));
-
-    when(server.getTimers()).thenReturn(timers);
+    Map<String, DatabaseServer.SimpleStats> stats = DatabaseServer.initStats();
+    when(server.getStats()).thenReturn(stats);
 
     ComObject retObj = readManager.indexLookup(cobj, false);
 

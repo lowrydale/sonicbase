@@ -22,7 +22,7 @@ import java.util.concurrent.ThreadPoolExecutor;
 import java.util.concurrent.atomic.AtomicInteger;
 import java.util.concurrent.atomic.AtomicLong;
 
-import static com.sonicbase.server.DatabaseServer.METRIC_REPART_MOVE_ENTRY;
+import static com.sonicbase.server.DatabaseServer.METRIC_SNAPSHOT_RECOVER;
 import static com.sonicbase.server.DatabaseServer.METRIC_SNAPSHOT_WRITE;
 
 @SuppressWarnings({"squid:S1172", "squid:S2629", "squid:S1168", "squid:S3516", "squid:S00107"})
@@ -311,6 +311,8 @@ public class SnapshotManager {
           }
 
           addRecordsToIndex(index, isPrimaryKey, key, updateTime, records);
+
+          server.getStats().get(METRIC_SNAPSHOT_RECOVER).getCount().incrementAndGet();
 
           recoveredCount.incrementAndGet();
           if (currOffset == 0 && (System.currentTimeMillis() - lastLogged.get()) > 2000) {
@@ -610,7 +612,6 @@ public class SnapshotManager {
 
   private void doRunSnapshot(String dbName, File file, Long deleteIfOlder, AtomicLong countSaved, AtomicLong lastLogged,
                              AtomicInteger tableCount, AtomicInteger indexCount) throws IOException {
-    Timer timer = server.getTimers().get(METRIC_SNAPSHOT_WRITE);
     for (final Map.Entry<String, TableSchema> tableEntry : server.getCommon().getTables(dbName).entrySet()) {
       tableCount.incrementAndGet();
       for (final Map.Entry<String, IndexSchema> indexEntry : tableEntry.getValue().getIndices().entrySet()) {
@@ -635,7 +636,7 @@ public class SnapshotManager {
             outStreams[i] = new DataOutputStream(new BufferedOutputStream(new FileOutputStream(currFile), 65_000));
           }
 
-          snapshotIndex(dbName, timer, deleteIfOlder, countSaved, lastLogged, tableEntry, indexEntry, fieldOffsets, subBegin,
+          snapshotIndex(dbName, deleteIfOlder, countSaved, lastLogged, tableEntry, indexEntry, fieldOffsets, subBegin,
               savedCount, index, outStreams);
 
           logger.info("Snapshot progress - finished index: count={}, rate={}, duration={}, table={}, index={}",
@@ -656,7 +657,7 @@ public class SnapshotManager {
     }
   }
 
-  private void snapshotIndex(String dbName, Timer timer, Long deleteIfOlder, AtomicLong countSaved, AtomicLong lastLogged,
+  private void snapshotIndex(String dbName, Long deleteIfOlder, AtomicLong countSaved, AtomicLong lastLogged,
                              Map.Entry<String, TableSchema> tableEntry, Map.Entry<String, IndexSchema> indexEntry,
                              int[] fieldOffsets, long subBegin, AtomicLong savedCount, Index index,
                              DataOutputStream[] outStreams) {
@@ -664,7 +665,6 @@ public class SnapshotManager {
     Map.Entry<Object[], Object> first = index.firstEntry();
     if (first != null) {
       index.visitTailMap(first.getKey(), (key, value) -> {
-        Timer.Context ctx = timer.time();
         int bucket = (int) (countSaved.incrementAndGet() % SNAPSHOT_PARTITION_COUNT);
         byte[][] records = null;
         long updateTime = 0;
@@ -684,7 +684,7 @@ public class SnapshotManager {
         writeRecords(dbName, deleteIfOlder, lastLogged, tableEntry, indexEntry, fieldOffsets, subBegin, savedCount,
             outStreams, key, bucket, records, updateTime);
 
-        ctx.stop();
+        server.getStats().get(METRIC_SNAPSHOT_WRITE).getCount().incrementAndGet();
         return true;
       });
     }

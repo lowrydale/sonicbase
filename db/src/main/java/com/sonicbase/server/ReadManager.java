@@ -323,7 +323,6 @@ public class ReadManager {
   }
 
   ComObject indexLookup(ComObject cobj, StoredProcedureContextImpl procedureContext) {
-    com.codahale.metrics.Timer.Context ctx = server.getTimers().get(METRIC_READ).time();
     try {
       Integer schemaVersion = cobj.getInt(ComObject.Tag.SCHEMA_VERSION);
       if (schemaVersion != null && schemaVersion < server.getSchemaVersion()) {
@@ -452,7 +451,7 @@ public class ReadManager {
       throw new DatabaseException(e);
     }
     finally {
-      ctx.stop();
+      server.getStats().get(METRIC_READ).getCount().incrementAndGet();
     }
   }
 

@@ -21,6 +21,7 @@ import java.util.concurrent.atomic.AtomicReference;
 import java.util.zip.GZIPInputStream;
 
 import static com.sonicbase.client.DatabaseClient.SERIALIZATION_VERSION_26;
+import static com.sonicbase.server.DatabaseServer.METRIC_LOG_WRITE;
 
 @SuppressWarnings({"squid:S1172", "squid:S1168", "squid:S00107"})
 // all methods called from method invoker must have cobj and replayed command parms
@@ -505,7 +506,9 @@ public class LogManager {
           closeAndCreateLog();
         }
 
+        AtomicLong count = server.getStats().get(METRIC_LOG_WRITE).getCount();
         for (LogRequest request : requests) {
+          count.incrementAndGet();
           writer.writeInt(1);
           writer.write(request.getBuffer());
           countLogged.incrementAndGet();
@@ -948,10 +951,12 @@ public class LogManager {
 
   public LogRequest logRequest(byte[] body, boolean enableQueuing, String methodStr,
                                Long existingSequence0, Long existingSequence1, AtomicLong timeLogging) {
-    if (!server.isDurable()) {
-      return null;
-    }
     LogRequest request = null;
+    if (!server.isDurable()) {
+      request = new LogRequest(1);
+      request.getLatch().countDown();
+      return request;
+    }
     try {
       if (enableQueuing && DatabaseClient.getWriteVerbs().contains(methodStr)) {
         request = new LogRequest(1);

@@ -772,7 +772,7 @@ public class UpdateManager {
       double moveRate = server.getPartitionManager().getMoveRcvCount().get() /
           (double) (System.currentTimeMillis() - server.getPartitionManager().getLastRcvReset().get()) * 1000d;
 
-      double acceptableRate = Math.max(75_000, 300_000 - moveRate);
+      double acceptableRate = Math.max(75_000, 250_000 - moveRate);
 
       while (insertCount.get() / (double) (System.currentTimeMillis() - lastReset.get()) * 1000d > acceptableRate) {
         ThreadUtil.sleep(20);

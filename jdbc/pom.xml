@@ -2,7 +2,7 @@
   <modelVersion>4.0.0</modelVersion>
   <groupId>com.sonicbase</groupId>
   <artifactId>sonicbase-jdbc</artifactId>
-  <version>1.2.18</version>
+  <version>1.2.19</version>
 
   <name>SonicBase</name>
   <description>JDBC Driver for SonicBase, an in-memory distributed relational database</description>

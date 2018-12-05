@@ -920,7 +920,7 @@ public class NettyServer {
         if (databaseServer.getShard() == shard && databaseServer.getReplica() == replica) {
           break;
         }
-        ComObject cobj = new ComObject();
+        ComObject cobj = new ComObject(1);
         cobj.put(ComObject.Tag.METHOD, "DatabaseServer:healthCheckPriority");
         byte[] ret = databaseServer.getDatabaseClient().send(null, shard, replica, cobj,
             DatabaseClient.Replica.SPECIFIED);
@@ -938,7 +938,7 @@ public class NettyServer {
         break;
       }
       catch (Exception e) {
-        logger.error("Error checking if server is healthy: shard={}, replica={}", shard, replica, e);
+        logger.warn("Error checking if server is healthy: shard={}, replica={}", shard, replica, e);
       }
       if (System.currentTimeMillis() - beginTime > 2 * 60 * 1000) {
         logger.error("Server appears to be dead, skipping: shard={}, replica={}", shard, replica);

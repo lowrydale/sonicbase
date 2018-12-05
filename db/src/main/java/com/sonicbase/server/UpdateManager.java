@@ -420,14 +420,14 @@ public class UpdateManager {
 
   @SchemaReadLock
   public ComObject batchInsertIndexEntryByKey(ComObject cobj, boolean replayedCommand) {
-    ComObject retObj = new ComObject();
-    final ComArray batchResponses = retObj.putArray(ComObject.Tag.BATCH_RESPONSES, ComObject.Type.OBJECT_TYPE);
+    ComObject retObj = new ComObject(2);
+    ComArray array = cobj.getArray(ComObject.Tag.INSERT_OBJECTS);
+    final ComArray batchResponses = retObj.putArray(ComObject.Tag.BATCH_RESPONSES, ComObject.Type.OBJECT_TYPE, array.getArray().size());
 
     AtomicBoolean isExplicitTrans = new AtomicBoolean();
     AtomicLong transactionId = new AtomicLong();
     int count = 0;
     try {
-      ComArray array = cobj.getArray(ComObject.Tag.INSERT_OBJECTS);
       for (int i = 0; i < array.getArray().size(); i++) {
         ComObject innerObj = (ComObject) array.getArray().get(i);
         int originalOffset = innerObj.getInt(ComObject.Tag.ORIGINAL_OFFSET);
@@ -444,7 +444,7 @@ public class UpdateManager {
           if (-1 != ExceptionUtils.indexOfThrowable(e, UniqueConstraintViolationException.class)) {
             if (batchResponses != null) {
               synchronized (batchResponses) {
-                ComObject obj = new ComObject();
+                ComObject obj = new ComObject(3);
                 obj.put(ComObject.Tag.ORIGINAL_OFFSET, originalOffset);
                 obj.put(ComObject.Tag.ID, id);
                 obj.put(ComObject.Tag.INT_STATUS, InsertStatementHandler.BATCH_STATUS_UNIQUE_CONSTRAINT_VIOLATION);
@@ -455,7 +455,7 @@ public class UpdateManager {
           else {
             if (batchResponses != null) {
               synchronized (batchResponses) {
-                ComObject obj = new ComObject();
+                ComObject obj = new ComObject(3);
                 obj.put(ComObject.Tag.ORIGINAL_OFFSET, originalOffset);
                 obj.put(ComObject.Tag.ID, id);
                 obj.put(ComObject.Tag.INT_STATUS, InsertStatementHandler.BATCH_STATUS_FAILED);
@@ -627,7 +627,7 @@ public class UpdateManager {
     final long transactionId = cobj.getLong(ComObject.Tag.TRANSACTION_ID);
     int count = 0;
 
-    final ComObject retObj = new ComObject();
+    final ComObject retObj = new ComObject(1);
 
     try {
       final ComArray array = cobj.getArray(ComObject.Tag.INSERT_OBJECTS);
@@ -648,7 +648,7 @@ public class UpdateManager {
         }
       }
 
-      final ComArray batchResponses = retObj.putArray(ComObject.Tag.BATCH_RESPONSES, ComObject.Type.OBJECT_TYPE);
+      final ComArray batchResponses = retObj.putArray(ComObject.Tag.BATCH_RESPONSES, ComObject.Type.OBJECT_TYPE, array.getArray().size());
       final long begin = System.nanoTime();
       List<InsertRequest> requests = new ArrayList<>();
 
@@ -734,12 +734,30 @@ public class UpdateManager {
         throw new DatabaseException(e);
       }
       else {
-        logger.error(ERROR_INSERTING_RECORD_STR, e);
+        String dbName = cobj.getString(ComObject.Tag.DB_NAME);
+
+        TableSchema tableSchema = server.getCommon().getTablesById(dbName).get(innerObj.getInt(ComObject.Tag.TABLE_ID));
+        IndexSchema indexSchema = tableSchema.getIndexesById().get(innerObj.getInt(ComObject.Tag.INDEX_ID));
+
+        String tableName = tableSchema.getName();
+        String indexName = indexSchema.getName();
+
+        byte[] keyBytes = innerObj.getByteArray(ComObject.Tag.KEY_BYTES);
+        Object[] primaryKey = null;
+        try {
+          primaryKey = DatabaseCommon.deserializeKey(tableSchema, keyBytes);
+        }
+        catch (EOFException e1) {
+          logger.error("Error derializing key", e1);
+        }
+
+        logger.error("Error inserting record: db={}, table={}, index={}, key={}", dbName, tableName, indexName,
+            primaryKey == null ? null : DatabaseCommon.keyToString(primaryKey), e);
       }
     }
   }
 
-  private void throttle() throws InterruptedException {
+  void throttle() throws InterruptedException {
     insertCount.incrementAndGet();
     synchronized (insertCount) {
       if (System.currentTimeMillis() - lastReset.get() > 30_000) {
@@ -747,18 +765,18 @@ public class UpdateManager {
         insertCount.set(0);
       }
 
-      while (insertCount.get() / (double) (System.currentTimeMillis() - lastReset.get()) * 1000d > 200_000) {
-        ThreadUtil.sleep(20);
-      }
-
-//      double moveRate = server.getPartitionManager().getMoveRcvCount().get() /
-//          (double) (System.currentTimeMillis() - server.getPartitionManager().getLastRcvReset().get()) * 1000d;
-//
-//      double acceptableRate = Math.max(75_000, 200_000 - moveRate);
-//
-//      while (insertCount.get() / (double) (System.currentTimeMillis() - lastReset.get()) * 1000d > acceptableRate) {
+//      while (insertCount.get() / (double) (System.currentTimeMillis() - lastReset.get()) * 1000d > 200_000) {
 //        ThreadUtil.sleep(20);
 //      }
+
+      double moveRate = server.getPartitionManager().getMoveRcvCount().get() /
+          (double) (System.currentTimeMillis() - server.getPartitionManager().getLastRcvReset().get()) * 1000d;
+
+      double acceptableRate = Math.max(75_000, 300_000 - moveRate);
+
+      while (insertCount.get() / (double) (System.currentTimeMillis() - lastReset.get()) * 1000d > acceptableRate) {
+        ThreadUtil.sleep(20);
+      }
     }
   }
 
@@ -851,14 +869,14 @@ public class UpdateManager {
 
       if (batchResponses != null) {
         synchronized (batchResponses) {
-          ComObject obj = new ComObject();
+          ComObject obj = new ComObject(3);
           obj.put(ComObject.Tag.ORIGINAL_OFFSET, originalOffset);
           obj.put(ComObject.Tag.ID, originalId);
           obj.put(ComObject.Tag.INT_STATUS, InsertStatementHandler.BATCH_STATUS_SUCCCESS);
           batchResponses.add(obj);
         }
       }
-      ComObject retObj = new ComObject();
+      ComObject retObj = new ComObject(1);
       retObj.put(ComObject.Tag.COUNT, 1);
 
       server.getStats().get(METRIC_INSERT).getCount().incrementAndGet();
@@ -868,7 +886,7 @@ public class UpdateManager {
       if (-1 != ExceptionUtils.indexOfThrowable(e, UniqueConstraintViolationException.class)) {
         if (batchResponses != null) {
           synchronized (batchResponses) {
-            ComObject obj = new ComObject();
+            ComObject obj = new ComObject(3);
             obj.put(ComObject.Tag.ORIGINAL_OFFSET, originalOffset);
             obj.put(ComObject.Tag.ID, originalId);
             obj.put(ComObject.Tag.INT_STATUS, InsertStatementHandler.BATCH_STATUS_UNIQUE_CONSTRAINT_VIOLATION);
@@ -879,7 +897,7 @@ public class UpdateManager {
       else {
         if (batchResponses != null) {
           synchronized (batchResponses) {
-            ComObject obj = new ComObject();
+            ComObject obj = new ComObject(3);
             obj.put(ComObject.Tag.ORIGINAL_OFFSET, originalOffset);
             obj.put(ComObject.Tag.ID, originalId);
             obj.put(ComObject.Tag.INT_STATUS, InsertStatementHandler.BATCH_STATUS_FAILED);
@@ -1244,7 +1262,7 @@ public class UpdateManager {
     doActualInsertKey(dbName, isExplicitTrans, key, keyRecordBytes, false, tableName, index, indexSchema);
   }
 
-  void doInsertKeys(final ComObject cobj, boolean isExpliciteTrans, final String dbName, List<PartitionManager.MoveRequest> moveRequests,
+  void doInsertKeys(final ComObject cobj, boolean isExpliciteTrans, final String dbName, PartitionManager.MoveRequestArray moveRequests,
                     final Index index,
                     final String tableName, final IndexSchema indexSchema, boolean replayedCommand,
                     final boolean movingRecord, ComArray failedKeys) {
@@ -1261,10 +1279,11 @@ public class UpdateManager {
     }
   }
 
-  private void doInsertKeysForNonPrimaryKey(String dbName, boolean isExpliciteTrans, List<PartitionManager.MoveRequest> moveRequests, Index index,
+  private void doInsertKeysForNonPrimaryKey(String dbName, boolean isExpliciteTrans, PartitionManager.MoveRequestArray moveRequests, Index index,
                                             String tableName, IndexSchema indexSchema,
                                             boolean replayedCommand, ComArray failedKeys) {
-    for (final PartitionManager.MoveRequest moveRequest : moveRequests) {
+    for (int k = 0; k < moveRequests.getPos(); k++) {
+      PartitionManager.MoveRequest moveRequest = moveRequests.getRequests()[k];
       try {
         byte[][] content = moveRequest.getContent();
         for (int i = 0; i < content.length; i++) {
@@ -1279,12 +1298,13 @@ public class UpdateManager {
     }
   }
 
-  private void doInsertKeysForPrimaryKey(ComObject cobj, boolean isExpliciteTrans, String dbName, List<PartitionManager.MoveRequest> moveRequests,
+  private void doInsertKeysForPrimaryKey(ComObject cobj, boolean isExpliciteTrans, String dbName, PartitionManager.MoveRequestArray moveRequests,
                                          Index index, String tableName, IndexSchema indexSchema, boolean replayedCommand,
                                          boolean movingRecord, ComArray failedKeys) {
     MemoryOps memoryOps = new MemoryOps(server, isExpliciteTrans);
     for (int j = 0; j < memoryOps.phaseCount; j++) {
-      for (final PartitionManager.MoveRequest moveRequest : moveRequests) {
+      for (int k = 0; k < moveRequests.getPos(); k++) {
+        PartitionManager.MoveRequest moveRequest = moveRequests.getRequests()[k];
         try {
           byte[][] content = moveRequest.getContent();
           for (int i = 0; i < content.length; i++) {
@@ -1930,7 +1950,7 @@ public class UpdateManager {
             }
             stmt.executeBatch();
           }
-          ComObject retObj = new ComObject();
+          ComObject retObj = new ComObject(1);
           retObj.put(ComObject.Tag.COUNT, totalCountInserted);
           return retObj;
         }

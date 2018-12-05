@@ -889,7 +889,7 @@ public class SelectStatementImpl extends StatementImpl implements SelectStatemen
             explain.getBuilder().append("Server select\n");
           }
         }
-        ComObject cobj = new ComObject();
+        ComObject cobj = new ComObject(7);
         cobj.put(ComObject.Tag.LEGACY_SELECT_STATEMENT, serialize());
         cobj.put(ComObject.Tag.SCHEMA_VERSION, client.getCommon().getSchemaVersion());
         cobj.put(ComObject.Tag.COUNT, pageSize);
@@ -1122,7 +1122,7 @@ public class SelectStatementImpl extends StatementImpl implements SelectStatemen
       for (int i = 0; i < shardCount; i++) {
         final int shard = i;
         futures.add(client.getExecutor().submit((Callable) () -> {
-          ComObject cobj = new ComObject();
+          ComObject cobj = new ComObject(8);
 
           prepareComObjectForCountRecords(dbName, cobj);
 

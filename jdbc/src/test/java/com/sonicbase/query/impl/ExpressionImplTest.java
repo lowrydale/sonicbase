@@ -66,7 +66,7 @@ public class ExpressionImplTest {
       when(client.send(eq("ReadManager:countRecords"), anyInt(), anyLong(), anyObject(), anyObject())).thenAnswer(new Answer(){
         @Override
         public Object answer(InvocationOnMock invocationOnMock) throws Throwable {
-          ComObject retObj = new ComObject();
+          ComObject retObj = new ComObject(1);
           retObj.put(ComObject.Tag.COUNT_LONG, 2_001L);
           return retObj.serialize();
         }
@@ -123,10 +123,10 @@ public class ExpressionImplTest {
       when(client.send(eq("ReadManager:indexLookup"), anyInt(), anyLong(), anyObject(), anyObject())).thenAnswer(new Answer(){
         @Override
         public Object answer(InvocationOnMock invocationOnMock) throws Throwable {
-          ComObject retObj = new ComObject();
-          ComArray array = retObj.putArray(ComObject.Tag.KEYS, ComObject.Type.BYTE_ARRAY_TYPE);
-          array = retObj.putArray(ComObject.Tag.KEY_RECORDS, ComObject.Type.BYTE_ARRAY_TYPE);
-          array = retObj.putArray(ComObject.Tag.RECORDS, ComObject.Type.BYTE_ARRAY_TYPE);
+          ComObject retObj = new ComObject(3);
+          ComArray array = retObj.putArray(ComObject.Tag.KEYS, ComObject.Type.BYTE_ARRAY_TYPE, records.length);
+          array = retObj.putArray(ComObject.Tag.KEY_RECORDS, ComObject.Type.BYTE_ARRAY_TYPE, records.length);
+          array = retObj.putArray(ComObject.Tag.RECORDS, ComObject.Type.BYTE_ARRAY_TYPE, records.length);
 
           for (int i = 0; i < records.length; i++) {
             byte[] bytes = records[i];
@@ -193,7 +193,7 @@ public class ExpressionImplTest {
       when(client.send(eq("ReadManager:evaluateCounterWithRecord"), anyInt(), anyLong(), anyObject(), anyObject())).thenAnswer(new Answer(){
         @Override
         public Object answer(InvocationOnMock invocationOnMock) throws Throwable {
-          ComObject retObj = new ComObject();
+          ComObject retObj = new ComObject(1);
           Counter counter = new Counter();
           counter.setDataType(DataType.Type.BIGINT);
           counter.setTableName(tableSchema.getName());
@@ -225,7 +225,7 @@ public class ExpressionImplTest {
       when(client.send(eq("ReadManager:evaluateCounterGetKeys"), anyInt(), anyLong(), anyObject(), anyObject())).thenAnswer(new Answer(){
         @Override
         public Object answer(InvocationOnMock invocationOnMock) throws Throwable {
-          ComObject retObj = new ComObject();
+          ComObject retObj = new ComObject(3);
           byte[] minKey = DatabaseCommon.serializeKey(tableSchema, indexSchema.getName(), new Object[]{0L});
           if (minKey != null) {
             retObj.put(ComObject.Tag.MIN_KEY, minKey);
@@ -251,10 +251,10 @@ public class ExpressionImplTest {
       when(client.send(eq("ReadManager:indexLookup"), anyInt(), anyLong(), anyObject(), anyObject())).thenAnswer(new Answer(){
         @Override
         public Object answer(InvocationOnMock invocationOnMock) throws Throwable {
-          ComObject retObj = new ComObject();
-          ComArray array = retObj.putArray(ComObject.Tag.KEYS, ComObject.Type.BYTE_ARRAY_TYPE);
-          array = retObj.putArray(ComObject.Tag.KEY_RECORDS, ComObject.Type.BYTE_ARRAY_TYPE);
-          array = retObj.putArray(ComObject.Tag.RECORDS, ComObject.Type.BYTE_ARRAY_TYPE);
+          ComObject retObj = new ComObject(4);
+          ComArray array = retObj.putArray(ComObject.Tag.KEYS, ComObject.Type.BYTE_ARRAY_TYPE, records.length);
+          array = retObj.putArray(ComObject.Tag.KEY_RECORDS, ComObject.Type.BYTE_ARRAY_TYPE, records.length);
+          array = retObj.putArray(ComObject.Tag.RECORDS, ComObject.Type.BYTE_ARRAY_TYPE, records.length);
 
           for (int i = 0; i < records.length; i++) {
             byte[] bytes = records[i];
@@ -264,7 +264,7 @@ public class ExpressionImplTest {
           retObj.put(ComObject.Tag.CURR_OFFSET, records.length);
           retObj.put(ComObject.Tag.COUNT_RETURNED, records.length);
 
-          array = retObj.putArray(ComObject.Tag.COUNTERS, ComObject.Type.BYTE_ARRAY_TYPE);
+          array = retObj.putArray(ComObject.Tag.COUNTERS, ComObject.Type.BYTE_ARRAY_TYPE, 1);
 
           Counter counter = new Counter();
           counter.setDataType(DataType.Type.BIGINT);

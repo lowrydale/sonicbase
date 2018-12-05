@@ -8,6 +8,7 @@ import java.io.DataInputStream;
 import java.io.DataOutputStream;
 import java.io.IOException;
 import java.util.*;
+import java.util.concurrent.ConcurrentHashMap;
 
 @ExcludeRename
 @SuppressWarnings({"squid:S1168", "squid:S00107"})
@@ -16,13 +17,13 @@ import java.util.*;
 public class TableSchema {
   private int version;
   private List<FieldSchema> fields = new ArrayList<>();
-  private final Map<String, Integer> fieldOffsets = new HashMap<>();
+  private final Map<String, Integer> fieldOffsets = new ConcurrentHashMap<>();
   private String name;
-  private Map<String, IndexSchema> indexes = new HashMap<>();
+  private Map<String, IndexSchema> indexes = new ConcurrentHashMap<>();
   private String[] primaryKey;
   private int tableId;
   private List<PreviousFields> previousFields = new ArrayList<>();
-  private final Map<Integer, IndexSchema> indexesById = new HashMap<>();
+  private final Map<Integer, IndexSchema> indexesById = new ConcurrentHashMap<>();
 
   public void addField(FieldSchema schema) {
     fields.add(schema);

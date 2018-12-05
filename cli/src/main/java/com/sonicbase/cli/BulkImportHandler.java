@@ -34,7 +34,7 @@ class BulkImportHandler {
       return;
     }
 
-    ComObject cobj = new ComObject();
+    ComObject cobj = new ComObject(2);
     cobj.put(ComObject.Tag.METHOD, "BulkImportManager:getBulkImportProgress");
     cobj.put(ComObject.Tag.DB_NAME, cli.getCurrDbName());
     byte[] bytes = cli.getConn().sendToMaster(cobj);
@@ -84,7 +84,7 @@ class BulkImportHandler {
       return;
     }
 
-    ComObject cobj = new ComObject();
+    ComObject cobj = new ComObject(6);
     cobj.put(ComObject.Tag.DB_NAME, cli.getCurrDbName());
     int pos = command.indexOf("from");
     int pos1 = command.indexOf('(', pos);
@@ -135,7 +135,7 @@ class BulkImportHandler {
       return;
     }
 
-    ComObject cobj = new ComObject();
+    ComObject cobj = new ComObject(2);
     cobj.put(ComObject.Tag.METHOD, "BulkImportManager:cancelBulkImport");
     cobj.put(ComObject.Tag.DB_NAME, cli.getCurrDbName());
     for (int i = 0; i < cli.getConn().getShardCount(); i++) {

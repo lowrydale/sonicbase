@@ -301,7 +301,7 @@ public class DescribeStatementHandler {
           line.put("replica", String.valueOf(i));
 
 
-          ComObject cobj = new ComObject();
+          ComObject cobj = new ComObject(2);
           cobj.put(ComObject.Tag.DB_NAME, "__none__");
           cobj.put(ComObject.Tag.SCHEMA_VERSION, client.getCommon().getSchemaVersion());
 
@@ -400,7 +400,7 @@ public class DescribeStatementHandler {
       line.put("diskAvail", "?");
       return line;
     }
-    ComObject cobj = new ComObject();
+    ComObject cobj = new ComObject(2);
     cobj.put(ComObject.Tag.DB_NAME, "__none__");
     cobj.put(ComObject.Tag.SCHEMA_VERSION, client.getCommon().getSchemaVersion());
 

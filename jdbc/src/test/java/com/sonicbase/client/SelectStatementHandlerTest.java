@@ -106,10 +106,10 @@ public class SelectStatementHandlerTest {
         }
 
         if (method.equals("ReadManager:indexLookupExpression")) {
-          return new ComObject().serialize();
+          return new ComObject(1).serialize();
         }
         else if (method.equals("ReadManager:serverSetSelect")) {
-          ComObject retObj = new ComObject();
+          ComObject retObj = new ComObject(5);
 
           retObj.put(ComObject.Tag.RESULT_SET_ID, 100L);
           retObj.put(ComObject.Tag.SERVER_SELECT_PAGE_NUMBER, 0L);
@@ -118,9 +118,9 @@ public class SelectStatementHandlerTest {
 
           if (0 == setOpeeratorCallCount.getAndIncrement()) {
             if (records != null) {
-              ComArray tableArray = retObj.putArray(ComObject.Tag.TABLE_RECORDS, ComObject.Type.ARRAY_TYPE);
+              ComArray tableArray = retObj.putArray(ComObject.Tag.TABLE_RECORDS, ComObject.Type.ARRAY_TYPE, records.length);
               for (byte[] tableRecords : records) {
-                ComArray recordArray = tableArray.addArray(ComObject.Type.BYTE_ARRAY_TYPE);
+                ComArray recordArray = tableArray.addArray(ComObject.Type.BYTE_ARRAY_TYPE, tableRecords.length);
 
                 for (int i = 0; i < tableRecords.length; i++) {
                   byte[] record = tableRecords;
@@ -137,10 +137,10 @@ public class SelectStatementHandlerTest {
           return retObj.serialize();
         }
         else if (method.equals("ReadManager:indexLookup")) {
-          ComObject retObj = new ComObject();
-          ComArray array = retObj.putArray(ComObject.Tag.KEYS, ComObject.Type.BYTE_ARRAY_TYPE);
-          array = retObj.putArray(ComObject.Tag.KEY_RECORDS, ComObject.Type.BYTE_ARRAY_TYPE);
-          array = retObj.putArray(ComObject.Tag.RECORDS, ComObject.Type.BYTE_ARRAY_TYPE);
+          ComObject retObj = new ComObject(5);
+          ComArray array = retObj.putArray(ComObject.Tag.KEYS, ComObject.Type.BYTE_ARRAY_TYPE, records.length);
+          array = retObj.putArray(ComObject.Tag.KEY_RECORDS, ComObject.Type.BYTE_ARRAY_TYPE, records.length);
+          array = retObj.putArray(ComObject.Tag.RECORDS, ComObject.Type.BYTE_ARRAY_TYPE, records.length);
 
           for (int i = 0; i < records.length; i++) {
             byte[] bytes = records[i];
@@ -153,8 +153,8 @@ public class SelectStatementHandlerTest {
           return retObj.serialize();
         }
         else if (method.equals("ReadManager:batchIndexLookup")) {
-          ComObject retObj = new ComObject();
-          ComArray retKeysArray = retObj.putArray(ComObject.Tag.RET_KEYS, ComObject.Type.OBJECT_TYPE);
+          ComObject retObj = new ComObject(1);
+          ComArray retKeysArray = retObj.putArray(ComObject.Tag.RET_KEYS, ComObject.Type.OBJECT_TYPE, records.length);
 
           ComArray keys = body.getArray(ComObject.Tag.KEYS);
           for (Object keyObj : keys.getArray()) {
@@ -165,15 +165,15 @@ public class SelectStatementHandlerTest {
             for (int i = 0; i < records.length; i++) {
               Record record = new Record("test", common, records[i]);
               if ((long) record.getFields()[1] == (long) leftKey[0]) {
-                ComObject retEntry = new ComObject();
+                ComObject retEntry = new ComObject(5);
                 retKeysArray.add(retEntry);
 
                 retEntry.put(ComObject.Tag.OFFSET, i);
                 retEntry.put(ComObject.Tag.KEY_COUNT, 0);
 
-                ComArray keysArray = retEntry.putArray(ComObject.Tag.KEY_RECORDS, ComObject.Type.BYTE_ARRAY_TYPE);
-                keysArray = retEntry.putArray(ComObject.Tag.KEYS, ComObject.Type.BYTE_ARRAY_TYPE);
-                ComArray retRecordsArray = retEntry.putArray(ComObject.Tag.RECORDS, ComObject.Type.BYTE_ARRAY_TYPE);
+                ComArray keysArray = retEntry.putArray(ComObject.Tag.KEY_RECORDS, ComObject.Type.BYTE_ARRAY_TYPE, 1);
+                keysArray = retEntry.putArray(ComObject.Tag.KEYS, ComObject.Type.BYTE_ARRAY_TYPE, 1);
+                ComArray retRecordsArray = retEntry.putArray(ComObject.Tag.RECORDS, ComObject.Type.BYTE_ARRAY_TYPE, 1);
                 byte[] bytes = records[i];
                 retRecordsArray.add(bytes);
               }
@@ -183,12 +183,12 @@ public class SelectStatementHandlerTest {
         }
         else if (method.equals("ReadManager:serverSelect")) {
 
-          ComObject retObj = new ComObject();
+          ComObject retObj = new ComObject(2);
           retObj.put(ComObject.Tag.LEGACY_SELECT_STATEMENT, body.getByteArray(ComObject.Tag.LEGACY_SELECT_STATEMENT));
 
-          ComArray tableArray = retObj.putArray(ComObject.Tag.TABLE_RECORDS, ComObject.Type.ARRAY_TYPE);
+          ComArray tableArray = retObj.putArray(ComObject.Tag.TABLE_RECORDS, ComObject.Type.ARRAY_TYPE, records.length);
           for (byte[] record : records) {
-            ComArray recordArray = tableArray.addArray(ComObject.Type.BYTE_ARRAY_TYPE);
+            ComArray recordArray = tableArray.addArray(ComObject.Type.BYTE_ARRAY_TYPE, 1);
             recordArray.add(record);
           }
           return retObj.serialize();
@@ -433,7 +433,7 @@ public class SelectStatementHandlerTest {
     SelectBody selectBody = selectNode.getSelectBody();
     SelectStatementImpl selectStatement = SelectStatementHandler.parseSelectStatement(client, new ParameterHandler(), (PlainSelect) selectBody, new AtomicInteger(0));
     selectStatement.setTableNames(new String[]{"table2"});
-    ComObject cobj = new ComObject();
+    ComObject cobj = new ComObject(6);
     cobj.put(ComObject.Tag.LEGACY_SELECT_STATEMENT, selectStatement.serialize());
     cobj.put(ComObject.Tag.SCHEMA_VERSION, client.getCommon().getSchemaVersion());
     cobj.put(ComObject.Tag.COUNT, 100);

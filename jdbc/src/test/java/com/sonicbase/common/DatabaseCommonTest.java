@@ -14,7 +14,7 @@ import static org.testng.Assert.assertEquals;
 public class DatabaseCommonTest {
 
   @Test
-  public void testKeySerialization() throws UnsupportedEncodingException, EOFException {
+  public void testKeySerialization() throws IOException {
 
     DatabaseCommon common = new DatabaseCommon();
     TableSchema tableSchema = ClientTestUtils.createTable();
@@ -26,6 +26,10 @@ public class DatabaseCommonTest {
     byte[] bytes = DatabaseCommon.serializeKey(tableSchema, indexSchema.getName(), keys.get(0));
 
     Object[] key = DatabaseCommon.deserializeKey(tableSchema, bytes);
+
+    assertEquals(compareKeys(indexSchema, keys, key), 0);
+
+    key = DatabaseCommon.deserializeKey(tableSchema, new DataInputStream(new ByteArrayInputStream(bytes)));
 
     assertEquals(compareKeys(indexSchema, keys, key), 0);
   }

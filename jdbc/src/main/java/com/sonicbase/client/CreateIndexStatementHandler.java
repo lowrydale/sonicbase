@@ -51,7 +51,7 @@ public class CreateIndexStatementHandler implements StatementHandler {
   }
 
   private void doCreateIndex(String dbName, CreateIndexStatementImpl statement) {
-    ComObject cobj = new ComObject();
+    ComObject cobj = new ComObject(6);
     cobj.put(ComObject.Tag.DB_NAME, dbName);
     cobj.put(ComObject.Tag.SCHEMA_VERSION, client.getCommon().getSchemaVersion());
     cobj.put(ComObject.Tag.MASTER_SLAVE, "master");

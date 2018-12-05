@@ -93,10 +93,10 @@ public class ReadManagerTest {
     orderByExpression.setAscending(true);
     orderByExpression.setColumnName("field1");
 
-    ComObject cobj = new ComObject();
+    ComObject cobj = new ComObject(12);
     cobj.put(ComObject.Tag.TABLE_ID, tableSchema.getTableId());
     cobj.put(ComObject.Tag.LEGACY_EXPRESSION, ExpressionImpl.serializeExpression(expression));
-    ComArray array = cobj.putArray(ComObject.Tag.ORDER_BY_EXPRESSIONS, ComObject.Type.BYTE_ARRAY_TYPE);
+    ComArray array = cobj.putArray(ComObject.Tag.ORDER_BY_EXPRESSIONS, ComObject.Type.BYTE_ARRAY_TYPE, 1);
     array.add(orderByExpression.serialize());
 
     cobj.put(ComObject.Tag.RIGHT_KEY, DatabaseCommon.serializeTypedKey(new Object[]{500L}));
@@ -110,7 +110,7 @@ public class ReadManagerTest {
     List<ColumnImpl> columns = new ArrayList<>();
     columns.add(new ColumnImpl(null, null, tableSchema.getName(), "field1", null));
 
-    ComArray columnArray = cobj.putArray(ComObject.Tag.COLUMN_OFFSETS, ComObject.Type.INT_TYPE);
+    ComArray columnArray = cobj.putArray(ComObject.Tag.COLUMN_OFFSETS, ComObject.Type.INT_TYPE, columns.size());
     ExpressionImpl.writeColumns(tableSchema, columns, columnArray);
 
 
@@ -161,7 +161,7 @@ public class ReadManagerTest {
       i++;
     }
 
-    ComObject cobj = new ComObject();
+    ComObject cobj = new ComObject(21);
 
     cobj.put(ComObject.Tag.DB_NAME, "test");
     cobj.put(ComObject.Tag.SCHEMA_VERSION, 1000);
@@ -187,7 +187,7 @@ public class ReadManagerTest {
     OrderByExpressionImpl orderByExpression = new OrderByExpressionImpl();
     orderByExpression.setAscending(true);
     orderByExpression.setColumnName("field1");
-    ComArray array = cobj.putArray(ComObject.Tag.ORDER_BY_EXPRESSIONS, ComObject.Type.BYTE_ARRAY_TYPE);
+    ComArray array = cobj.putArray(ComObject.Tag.ORDER_BY_EXPRESSIONS, ComObject.Type.BYTE_ARRAY_TYPE, 1);
     byte[] bytes = orderByExpression.serialize();
     array.add(bytes);
 
@@ -199,7 +199,7 @@ public class ReadManagerTest {
 
     List<ColumnImpl> columns = new ArrayList<>();
     columns.add(new ColumnImpl(null, null, tableSchema.getName(), "field1", null));
-    ComArray columnArray = cobj.putArray(ComObject.Tag.COLUMN_OFFSETS, ComObject.Type.INT_TYPE);
+    ComArray columnArray = cobj.putArray(ComObject.Tag.COLUMN_OFFSETS, ComObject.Type.INT_TYPE, columns.size());
     ExpressionImpl.writeColumns(tableSchema, columns, columnArray);
 
 
@@ -259,7 +259,7 @@ public class ReadManagerTest {
     expression.setOperator(BinaryExpression.Operator.EQUAL);
 
 
-    ComObject cobj = new ComObject();
+    ComObject cobj = new ComObject(7);
     cobj.put(ComObject.Tag.SERIALIZATION_VERSION, DatabaseClient.SERIALIZATION_VERSION);
 
     cobj.put(ComObject.Tag.LEGACY_EXPRESSION, ExpressionImpl.serializeExpression(expression));
@@ -310,23 +310,23 @@ public class ReadManagerTest {
       index.put(key, address);
       i++;
     }
-    ComObject cobj = new ComObject();
+    ComObject cobj = new ComObject(9);
     cobj.put(ComObject.Tag.TABLE_NAME, tableSchema.getName());
     cobj.put(ComObject.Tag.INDEX_NAME, indexSchema.getName());
     cobj.put(ComObject.Tag.LEFT_OPERATOR, BinaryExpression.Operator.EQUAL.getId());
 
     List<ColumnImpl> columns = new ArrayList<>();
     columns.add(new ColumnImpl(null, null, tableSchema.getName(), "field1", null));
-    ComArray columnArray = cobj.putArray(ComObject.Tag.COLUMN_OFFSETS, ComObject.Type.INT_TYPE);
+    ComArray columnArray = cobj.putArray(ComObject.Tag.COLUMN_OFFSETS, ComObject.Type.INT_TYPE, columns.size());
     ExpressionImpl.writeColumns(tableSchema, columns, columnArray);
 
     cobj.put(ComObject.Tag.SINGLE_VALUE, false);
 
 
-    ComArray keyArray = cobj.putArray(ComObject.Tag.KEYS, ComObject.Type.OBJECT_TYPE);
+    ComArray keyArray = cobj.putArray(ComObject.Tag.KEYS, ComObject.Type.OBJECT_TYPE, keys.size());
     int k = 0; ///(offset * srcValues.size() / threadCount);
     for (; k < keys.size(); k++) {
-      ComObject key = new ComObject();
+      ComObject key = new ComObject(2);
       keyArray.add(key);
       key.put(ComObject.Tag.OFFSET, k);
       key.put(ComObject.Tag.KEY_BYTES, DatabaseCommon.serializeKey(tableSchema, indexSchema.getName(), keys.get(k)));
@@ -408,9 +408,9 @@ public class ReadManagerTest {
     when(client.getCommon()).thenReturn(common);
 
 
-    ComObject retObj = new ComObject();
+    ComObject retObj = new ComObject(3);
 
-    ComArray array = retObj.putArray(ComObject.Tag.RECORDS, ComObject.Type.BYTE_ARRAY_TYPE);
+    ComArray array = retObj.putArray(ComObject.Tag.RECORDS, ComObject.Type.BYTE_ARRAY_TYPE, records.length);
     for (int j = 0; j < records.length; j++) {
       array.add(records[j]);
     }
@@ -433,7 +433,7 @@ public class ReadManagerTest {
     orderByExpressions.add(orderByExpression);
 
     select.setOrderByExpressions(orderByExpressions);
-    ComObject cobj = new ComObject();
+    ComObject cobj = new ComObject(6);
     cobj.put(ComObject.Tag.LEGACY_SELECT_STATEMENT, select.serialize());
     cobj.put(ComObject.Tag.SCHEMA_VERSION, 1000);
     cobj.put(ComObject.Tag.COUNT, 100);
@@ -501,8 +501,8 @@ public class ReadManagerTest {
     when(client.getCommon()).thenReturn(common);
     when(server.getClient()).thenReturn(client);
 
-    ComObject retObj = new ComObject();
-    ComArray array = retObj.putArray(ComObject.Tag.RECORDS, ComObject.Type.BYTE_ARRAY_TYPE);
+    ComObject retObj = new ComObject(3);
+    ComArray array = retObj.putArray(ComObject.Tag.RECORDS, ComObject.Type.BYTE_ARRAY_TYPE, records.length);
     for (int j = 0; j < records.length; j++) {
       array.add(records[j]);
     }
@@ -550,23 +550,23 @@ public class ReadManagerTest {
     setOperation.setOperations(operations);
     setOperation.setOrderBy(orderBy);
 
-    ComObject cobj = new ComObject();
-    array = cobj.putArray(ComObject.Tag.SELECT_STATEMENTS, ComObject.Type.BYTE_ARRAY_TYPE);
+    ComObject cobj = new ComObject(10);
+    array = cobj.putArray(ComObject.Tag.SELECT_STATEMENTS, ComObject.Type.BYTE_ARRAY_TYPE, setOperation.getSelectStatements().length);
     for (int i = 0; i < setOperation.getSelectStatements().length; i++) {
       setOperation.getSelectStatements()[i].setTableNames(new String[]{setOperation.getSelectStatements()[i].getFromTable()});
       array.add(setOperation.getSelectStatements()[i].serialize());
     }
     if (setOperation.getOrderBy() != null) {
-      ComArray orderByArray = cobj.putArray(ComObject.Tag.ORDER_BY_EXPRESSIONS, ComObject.Type.BYTE_ARRAY_TYPE);
+      ComArray orderByArray = cobj.putArray(ComObject.Tag.ORDER_BY_EXPRESSIONS, ComObject.Type.BYTE_ARRAY_TYPE, setOperation.getOrderBy().length);
       for (int i = 0; i < setOperation.getOrderBy().length; i++) {
         orderByArray.add(setOperation.getOrderBy()[i].serialize());
       }
     }
-    ComArray tablesArray = cobj.putArray(ComObject.Tag.TABLES, ComObject.Type.STRING_TYPE);
+    ComArray tablesArray = cobj.putArray(ComObject.Tag.TABLES, ComObject.Type.STRING_TYPE, tableNames.length);
     for (int i = 0; i < tableNames.length; i++) {
       tablesArray.add(tableNames[i]);
     }
-    ComArray strArray = cobj.putArray(ComObject.Tag.OPERATIONS, ComObject.Type.STRING_TYPE);
+    ComArray strArray = cobj.putArray(ComObject.Tag.OPERATIONS, ComObject.Type.STRING_TYPE, setOperation.getOperations().length);
     for (int i = 0; i < setOperation.getOperations().length; i++) {
       strArray.add(setOperation.getOperations()[i]);
     }

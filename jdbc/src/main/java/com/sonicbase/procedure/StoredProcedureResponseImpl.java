@@ -47,8 +47,8 @@ public class StoredProcedureResponseImpl implements StoredProcedureResponse {
   }
 
   public ComObject serialize() {
-    ComObject ret = new ComObject();
-    ComArray array = ret.putArray(ComObject.Tag.RECORDS, ComObject.Type.OBJECT_TYPE);
+    ComObject ret = new ComObject(1);
+    ComArray array = ret.putArray(ComObject.Tag.RECORDS, ComObject.Type.OBJECT_TYPE, records.size());
     for (Record record : records) {
       array.add(((RecordImpl)record).serialize());
     }

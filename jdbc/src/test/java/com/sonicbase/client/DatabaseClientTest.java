@@ -117,9 +117,9 @@ public class DatabaseClientTest {
     DatabaseClient client = new DatabaseClient(null, "localhost", 9010, 0, 0, false, common, null) {
       public byte[] send(String verb, int shard, long partition, ComObject cobj, Replica replica) {
 
-        cobj = new ComObject();
-        ComArray array = cobj.putArray(ComObject.Tag.SIZES, ComObject.Type.OBJECT_TYPE);
-        ComObject size0Obj = new ComObject();
+        cobj = new ComObject(1);
+        ComArray array = cobj.putArray(ComObject.Tag.SIZES, ComObject.Type.OBJECT_TYPE, 1);
+        ComObject size0Obj = new ComObject(3);
         size0Obj.put(ComObject.Tag.SHARD, 0);
         size0Obj.put(ComObject.Tag.SIZE, (long)1001);
         size0Obj.put(ComObject.Tag.RAW_SIZE, (long)1001);
@@ -145,7 +145,7 @@ public class DatabaseClientTest {
       public byte[] sendToMaster(String verb, ComObject cobj) {
 
         if (verb.equals("PartitionManager:isRepartitioningComplete")) {
-          ComObject ret = new ComObject();
+          ComObject ret = new ComObject(1);
           ret.put(ComObject.Tag.FINISHED, true);
           return ret.serialize();
         }
@@ -220,7 +220,7 @@ public class DatabaseClientTest {
   public void testAllocateId() {
     DatabaseClient client = new DatabaseClient(null, "localhost", 9010, 0, 0, false, common, null) {
       public byte[] sendToMaster(String method, ComObject cobj) {
-        ComObject retObj = new ComObject();
+        ComObject retObj = new ComObject(2);
         retObj.put(ComObject.Tag.NEXT_ID, 1001L);
         retObj.put(ComObject.Tag.MAX_ID, 2000);
         return retObj.serialize();
@@ -228,7 +228,7 @@ public class DatabaseClientTest {
       public byte[] send(String method,
                          int shard, long authUser, ComObject body, Replica replica) {
 
-        ComObject retObj = new ComObject();
+        ComObject retObj = new ComObject(1);
         try {
           TableSchema tableSchema = ClientTestUtils.createTable();
           DatabaseCommon common = new DatabaseCommon();
@@ -271,7 +271,7 @@ public class DatabaseClientTest {
 
     DatabaseClient client = new DatabaseClient(null, "localhost", 9010, 0, 0, false, common, null) {
       public byte[] sendToMaster(String method, ComObject cobj) {
-        ComObject retObj = new ComObject();
+        ComObject retObj = new ComObject(2);
         retObj.put(ComObject.Tag.NEXT_ID, 1001L);
         retObj.put(ComObject.Tag.MAX_ID, 2000);
         return retObj.serialize();
@@ -280,17 +280,17 @@ public class DatabaseClientTest {
                          int shard, long authUser, ComObject body, Replica replica) {
 
         if (method.equals("BackupManager:isEntireRestoreComplete")) {
-          ComObject retObj = new ComObject();
+          ComObject retObj = new ComObject(1);
           retObj.put(ComObject.Tag.IS_COMPLETE, true);
           return retObj.serialize();
         }
         if (method.equals("BackupManager:isEntireBackupComplete")) {
-          ComObject retObj = new ComObject();
+          ComObject retObj = new ComObject(1);
           retObj.put(ComObject.Tag.IS_COMPLETE, true);
           return retObj.serialize();
         }
         if (method.equals("DatabaseServer:getConfig")) {
-          ComObject retObj = new ComObject();
+          ComObject retObj = new ComObject(1);
           try {
             byte[] bytes = common.serializeConfig(SERIALIZATION_VERSION);
             retObj.put(ComObject.Tag.CONFIG_BYTES, bytes);
@@ -301,7 +301,7 @@ public class DatabaseClientTest {
           }
         }
 
-        ComObject retObj = new ComObject();
+        ComObject retObj = new ComObject(1);
         try {
           TableSchema tableSchema = ClientTestUtils.createTable();
           DatabaseCommon common = new DatabaseCommon();
@@ -337,7 +337,7 @@ public class DatabaseClientTest {
       public byte[] send(String method,
                          int shard, long authUser, ComObject body, Replica replica) {
 
-        ComObject retObj = new ComObject();
+        ComObject retObj = new ComObject(1);
         try {
           TableSchema tableSchema = ClientTestUtils.createTable();
           DatabaseCommon common = new DatabaseCommon();
@@ -511,36 +511,36 @@ public class DatabaseClientTest {
     client.setServers(servers);
 
     called.clear();
-    client.send("method", servers[0], 0, 0, new ComObject(),
+    client.send("method", servers[0], 0, 0, new ComObject(1),
         DatabaseClient.Replica.SPECIFIED, true);
 
     assertEquals(called.iterator().next(), "localhost:9010");
     assertEquals(called.size(), 1);
 
     called.clear();
-    client.send("method", servers[0], 0, 0, new ComObject(),
+    client.send("method", servers[0], 0, 0, new ComObject(1),
         DatabaseClient.Replica.DEF, true);
-    client.send("method", servers[0], 0, 0, new ComObject(),
+    client.send("method", servers[0], 0, 0, new ComObject(1),
         DatabaseClient.Replica.DEF, true);
-    client.send("method", servers[0], 0, 0, new ComObject(),
+    client.send("method", servers[0], 0, 0, new ComObject(1),
         DatabaseClient.Replica.DEF, true);
     assertEquals(called.size(), 3);
 
     called.clear();
-    client.send("method", servers[0], 0, 0, new ComObject(),
+    client.send("method", servers[0], 0, 0, new ComObject(1),
         DatabaseClient.Replica.MASTER, true);
 
     assertEquals(called.iterator().next(), "localhost:9010");
     assertEquals(called.size(), 1);
 
     called.clear();
-    client.send("method", servers[0], 0, 0, new ComObject(),
+    client.send("method", servers[0], 0, 0, new ComObject(1),
         DatabaseClient.Replica.ALL, true);
     assertEquals(called.size(), 3);
 
 
     called.clear();
-    client.send("UpdateManager:deleteRecord", servers[0], 0, 0, new ComObject(),
+    client.send("UpdateManager:deleteRecord", servers[0], 0, 0, new ComObject(1),
         DatabaseClient.Replica.SPECIFIED, true);
 
     assertEquals(called.iterator().next(), "localhost:9010");
@@ -549,7 +549,7 @@ public class DatabaseClientTest {
 
     servers[0][1].setDead(true);
     called.clear();
-    client.send("UpdateManager:deleteRecord", servers[0], 0, 1, new ComObject(),
+    client.send("UpdateManager:deleteRecord", servers[0], 0, 1, new ComObject(1),
         DatabaseClient.Replica.SPECIFIED, false);
 
     assertEquals(called.iterator().next(), "localhost:9010");
@@ -558,7 +558,7 @@ public class DatabaseClientTest {
     servers[0][1].setDead(false);
 
     called.clear();
-    client.send("UpdateManager:deleteRecord", servers[0], 0, 0, new ComObject(),
+    client.send("UpdateManager:deleteRecord", servers[0], 0, 0, new ComObject(1),
         DatabaseClient.Replica.DEF, false);
 
     assertEquals(called.size(), 3);
@@ -566,7 +566,7 @@ public class DatabaseClientTest {
     servers[0][0].setDead(true);
 
     called.clear();
-    client.send("UpdateManager:deleteRecord", servers[0], 0, 0, new ComObject(),
+    client.send("UpdateManager:deleteRecord", servers[0], 0, 0, new ComObject(1),
         DatabaseClient.Replica.DEF, false);
 
     assertTrue(called.contains("localhost:9020"));
@@ -577,7 +577,7 @@ public class DatabaseClientTest {
     servers[0][1].setDead(true);
 
     called.clear();
-    client.send("UpdateManager:deleteRecord", servers[0], 0, 0, new ComObject(),
+    client.send("UpdateManager:deleteRecord", servers[0], 0, 0, new ComObject(1),
         DatabaseClient.Replica.DEF, false);
 
     assertTrue(called.contains("localhost:9010"));
@@ -677,7 +677,7 @@ public class DatabaseClientTest {
       }
     };
 
-    ComObject cobj = new ComObject();
+    ComObject cobj = new ComObject(1);
     cobj.put(ComObject.Tag.METHOD, "DatabaseServer:heartbeat");
     client.sendToMaster(cobj);
 
@@ -700,7 +700,7 @@ public class DatabaseClientTest {
       }
     };
 
-    ComObject cobj = new ComObject();
+    ComObject cobj = new ComObject(1);
     cobj.put(ComObject.Tag.METHOD, "DatabaseServer:heartbeat");
     client.sendToAllShards(null, 0, cobj, DatabaseClient.Replica.SPECIFIED);
 

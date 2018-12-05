@@ -33,7 +33,7 @@ shards:
         publicAddress: localhost
         privateAddress: localhost
         port: 9160
-        httpPort: 8080
+        httpPort: 8090
 clients:
 - client:
     publicAddress: localhost

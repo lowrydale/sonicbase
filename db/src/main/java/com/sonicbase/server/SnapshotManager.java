@@ -1,6 +1,5 @@
 package com.sonicbase.server;
 
-import com.codahale.metrics.Timer;
 import com.sonicbase.client.DatabaseClient;
 import com.sonicbase.common.*;
 import com.sonicbase.index.Index;
@@ -165,7 +164,7 @@ public class SnapshotManager {
   }
 
   public void deleteSnapshots() {
-    if (server.isDurable()) {
+    if (!server.isNotDurable()) {
       File dir = getSnapshotReplicaDir();
       try {
         FileUtils.deleteDirectory(dir);
@@ -381,7 +380,7 @@ public class SnapshotManager {
   }
 
   void saveIndexSchema(String dbName, int schemaVersion, TableSchema tableSchema, IndexSchema indexSchema) {
-    if (!server.isDurable()) {
+    if (server.isNotDurable()) {
       return;
     }
     try {
@@ -399,7 +398,7 @@ public class SnapshotManager {
   }
 
   void saveTableSchema(String dbName, int schemaVersion, String tableName, TableSchema tableSchema) {
-    if (!server.isDurable()) {
+    if (server.isNotDurable()) {
       return;
     }
     try {
@@ -416,7 +415,7 @@ public class SnapshotManager {
   }
 
   void deleteTableSchema(String dbName, int schemaVersion, String tableName) {
-    if (!server.isDurable()) {
+    if (server.isNotDurable()) {
       return;
     }
     File file = new File(getSnapshotSchemaDir(dbName), tableName);
@@ -429,7 +428,7 @@ public class SnapshotManager {
   }
 
   public void deleteDbSchema(String dbName) {
-    if (!server.isDurable()) {
+    if (server.isNotDurable()) {
       return;
     }
     File file = new File(getSnapshotSchemaDir(dbName));
@@ -442,7 +441,7 @@ public class SnapshotManager {
   }
 
   void deleteIndexSchema(String dbName, int schemaVersion, String table, String indexName) {
-    if (!server.isDurable()) {
+    if (server.isNotDurable()) {
       return;
     }
     File file = new File(getSnapshotSchemaDir(dbName), table + "/indices/" + indexName);
@@ -535,7 +534,7 @@ public class SnapshotManager {
       throw new DatabaseException("No shards selected for query");
     }
 
-    ComObject cobj = new ComObject();
+    ComObject cobj = new ComObject(7);
     cobj.put(ComObject.Tag.SERIALIZATION_VERSION, DatabaseClient.SERIALIZATION_VERSION);
     cobj.put(ComObject.Tag.KEY_BYTES, DatabaseCommon.serializeKey(tableSchema, indexSchema.getName(), key));
     cobj.put(ComObject.Tag.SCHEMA_VERSION, server.getCommon().getSchemaVersion());
@@ -546,7 +545,7 @@ public class SnapshotManager {
     server.getClient().send("UpdateManager:deleteRecord", selectedShards.get(0), 0, cobj,
         DatabaseClient.Replica.DEF);
 
-    cobj = new ComObject();
+    cobj = new ComObject(5);
     cobj.put(ComObject.Tag.DB_NAME, dbName);
     cobj.put(ComObject.Tag.SCHEMA_VERSION, server.getCommon().getSchemaVersion());
     cobj.put(ComObject.Tag.TABLE_NAME, tableName);
@@ -633,7 +632,7 @@ public class SnapshotManager {
             File currFile = new File(file, tableEntry.getKey() + File.separator + indexEntry.getKey() +
                 File.separator + i + ".bin");
             currFile.getParentFile().mkdirs();
-            outStreams[i] = new DataOutputStream(new BufferedOutputStream(new FileOutputStream(currFile), 65_000));
+            outStreams[i] = new DataOutputStream(new BufferedOutputStream(new FileOutputStream(currFile)));
           }
 
           snapshotIndex(dbName, deleteIfOlder, countSaved, lastLogged, tableEntry, indexEntry, fieldOffsets, subBegin,

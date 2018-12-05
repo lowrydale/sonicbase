@@ -18,16 +18,20 @@ import java.util.concurrent.atomic.AtomicBoolean;
 
 public class EmbeddedDatabase {
   private DatabaseServer server;
-  private boolean durable = false;
+  private boolean notDurable = false;
   private String dataDir;
   private boolean useUnsafe = false;
 
   public EmbeddedDatabase() {
   }
 
-  public void setDurability(String path) {
-    durable = true;
+  public void enableDurability(String path) {
+    notDurable = false;
     dataDir = path;
+  }
+
+  public void disableDurability() {
+    notDurable = true;
   }
 
   public void setUseUnsafe(boolean useUnsafe) {
@@ -46,9 +50,9 @@ public class EmbeddedDatabase {
 
       server = new DatabaseServer();
       server.setConfig(config, "1-local", "localhost", 8999, true,
-          new AtomicBoolean(true), new AtomicBoolean(true), "", "", durable, true);
+          new AtomicBoolean(true), new AtomicBoolean(true), "", "", notDurable, true);
 
-      if (durable) {
+      if (!notDurable) {
         server.recoverFromSnapshot();
 
         server.getLogManager().applyLogs();

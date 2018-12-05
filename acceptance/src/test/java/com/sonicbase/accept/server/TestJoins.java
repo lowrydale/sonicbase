@@ -71,7 +71,7 @@ public class TestJoins {
     List<Future> futures = new ArrayList<>();
     for (int i = 0; i < dbServers.length; i++) {
       dbServers[i] = new com.sonicbase.server.DatabaseServer();
-      dbServers[i].setConfig(config, "4-servers", "localhost", 9010 + (50 * i), true, new AtomicBoolean(true), new AtomicBoolean(true),null);
+      dbServers[i].setConfig(config, "4-servers", "localhost", 9010 + (50 * i), true, new AtomicBoolean(true), new AtomicBoolean(true),null, false);
       dbServers[i].setRole(role);
     }
     for (Future future : futures) {
@@ -189,7 +189,7 @@ public class TestJoins {
 //    assertEquals(client.getPartitionSize(2, "persons", "_1__primarykey"), 9);
 //    assertEquals(client.getPartitionSize(3, "persons", "_1__primarykey"), 8);
 
-    ComObject cobj = new ComObject();
+    ComObject cobj = new ComObject(3);
     cobj.put(ComObject.Tag.DB_NAME, "test");
     cobj.put(ComObject.Tag.SCHEMA_VERSION, client.getCommon().getSchemaVersion());
     cobj.put(ComObject.Tag.METHOD, "DeleteManager:forceDeletes");

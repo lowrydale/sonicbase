@@ -116,7 +116,7 @@ public class UpdateStatementImpl extends StatementImpl implements UpdateStatemen
 
   public static void deleteKey(DatabaseClient client, String dbName, String tableName, InsertStatementHandler.KeyInfo keyInfo, String primaryKeyIndexName,
                         Object[] primaryKey, int schemaRetryCount) {
-    ComObject cobj = new ComObject();
+    ComObject cobj = new ComObject(12);
     cobj.put(ComObject.Tag.DB_NAME, dbName);
     if (schemaRetryCount < 2) {
       cobj.put(ComObject.Tag.SCHEMA_VERSION, client.getCommon().getSchemaVersion());
@@ -242,21 +242,27 @@ public class UpdateStatementImpl extends StatementImpl implements UpdateStatemen
       }
 
       for (Object[][] entry : ret.getKeys()) {
-        try {
-          processRecord(dbName, select, sequence0, sequence1, sequence2, restrictToThisServer, procedureContext, schemaRetryCount,
-              rand, tableSchema, indexSchema, fieldOffsets, entry);
+        while (true) {
+          try {
+            processRecord(dbName, select, sequence0, sequence1, sequence2, restrictToThisServer, procedureContext, schemaRetryCount,
+                rand, tableSchema, indexSchema, fieldOffsets, entry);
 
-          countUpdated++;
-        }
-        catch (Exception e) {
-          int index = ExceptionUtils.indexOfThrowable(e, NotFoundException.class);
-          if (-1 != index) {
+            countUpdated++;
+            break;
+          }
+          catch (SchemaOutOfSyncException e) {
             continue;
           }
-          else if (e.getMessage() != null && e.getMessage().contains("NotFoundException")) {
-            continue;
+          catch (Exception e) {
+            int index = ExceptionUtils.indexOfThrowable(e, NotFoundException.class);
+            if (-1 != index) {
+              continue;
+            }
+            else if (e.getMessage() != null && e.getMessage().contains("NotFoundException")) {
+              continue;
+            }
+            throw new DatabaseException(e);
           }
-          throw new DatabaseException(e);
         }
       }
       myResult = false;
@@ -326,7 +332,7 @@ public class UpdateStatementImpl extends StatementImpl implements UpdateStatemen
     private void doUpdateRecord(SelectStatementImpl select, String dbName, Long sequence0, Long sequence1, Short sequence2, int schemaRetryCount,
                                 Random rand, TableSchema tableSchema, IndexSchema indexSchema, Record record,
                                 Record oldRecord, Object[] newPrimaryKey, Object[] oldPrimaryKey, List<Integer> selectedShards) {
-      ComObject cobj = new ComObject();
+      ComObject cobj = new ComObject(16);
       cobj.put(ComObject.Tag.DB_NAME, dbName);
       if (schemaRetryCount < 2) {
         cobj.put(ComObject.Tag.SCHEMA_VERSION, client.getCommon().getSchemaVersion());

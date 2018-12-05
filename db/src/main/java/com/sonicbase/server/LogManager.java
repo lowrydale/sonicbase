@@ -71,7 +71,7 @@ public class LogManager {
         throw new DatabaseException(e);
       }
     }
-    if (server.isDurable()) {
+    if (!server.isNotDurable()) {
       int logThreadCount = 4;
       for (int i = 0; i < logThreadCount; i++) {
         LogWriter logWriter = new LogWriter(i, -1, logRequests);
@@ -84,33 +84,21 @@ public class LogManager {
   }
 
   public static class LogRequest {
-    private byte[] buffer;
     private final CountDownLatch latch = new CountDownLatch(1);
-    private List<byte[]> buffers;
     private final long[] sequenceNumbers;
     private final long[] times;
     private long begin;
     private AtomicLong timeLogging;
+    private String methodStr;
+    private byte[] body;
 
     LogRequest(int size) {
       this.sequenceNumbers = new long[size];
       this.times = new long[size];
     }
 
-    byte[] getBuffer() {
-      return buffer;
-    }
-
-    void setBuffer(byte[] buffer) {
-      this.buffer = buffer;
-    }
-
     public CountDownLatch getLatch() {
       return latch;
-    }
-
-    public List<byte[]> getBuffers() {
-      return buffers;
     }
 
     long[] getSequences1() {
@@ -135,6 +123,14 @@ public class LogManager {
 
     public long getBegin() {
       return begin;
+    }
+
+    public void setMethod(String methodStr) {
+      this.methodStr = methodStr;
+    }
+
+    public void setBody(byte[] body) {
+      this.body = body;
     }
   }
 
@@ -174,7 +170,7 @@ public class LogManager {
   }
 
   void skipToMaxSequenceNumber() throws IOException {
-    if (!server.isDurable()) {
+    if (server.isNotDurable()) {
       if (maxAllocatedLogSequenceNumber.get() == 0) {
         logSequenceNumber.set(0);
         maxAllocatedLogSequenceNumber.set(SEQUENCE_NUM_ALLOC_COUNT);
@@ -223,7 +219,7 @@ public class LogManager {
       long sequenceNum = cobj.getLong(ComObject.Tag.SEQUENCE_NUMBER);
 
       maxAllocatedLogSequenceNumber.set(sequenceNum);
-      if (server.isDurable()) {
+      if (!server.isNotDurable()) {
         File file = new File(rootDir, "logSequenceNum" + File.separator + databaseServer.getShard() + File.separator +
             databaseServer.getReplica() + File.separator + "logSequenceNum.txt");
         file.getParentFile().mkdirs();
@@ -246,7 +242,7 @@ public class LogManager {
     for (int replica = 0; replica < server.getReplicationFactor(); replica++) {
       if (replica != server.getReplica()) {
         try {
-          ComObject localCobj = new ComObject();
+          ComObject localCobj = new ComObject(3);
           localCobj.put(ComObject.Tag.DB_NAME, NONE_STR);
           localCobj.put(ComObject.Tag.SCHEMA_VERSION, server.getCommon().getSchemaVersion());
           localCobj.put(ComObject.Tag.SEQUENCE_NUMBER, maxAllocatedLogSequenceNumber.get());
@@ -321,7 +317,7 @@ public class LogManager {
 
   public ComObject getLogFile(ComObject cobj, boolean replayedCommand) {
     try {
-      ComObject retObj = new ComObject();
+      ComObject retObj = new ComObject(1);
       int replica = cobj.getInt(ComObject.Tag.REPLICA);
       String filename = cobj.getString(ComObject.Tag.FILENAME);
       File file = new File(getLogRoot() + File.separator + PEER_STR + replica + File.separator + filename);
@@ -347,10 +343,10 @@ public class LogManager {
     int replicaNum = cobj.getInt(ComObject.Tag.REPLICA);
 
     try {
-      ComObject retObj = new ComObject();
+      ComObject retObj = new ComObject(1);
       File[] files = new File(getLogRoot() + File.separator + PEER_STR + replicaNum).listFiles();
       if (files != null) {
-        ComArray fileNameArray = retObj.putArray(ComObject.Tag.FILENAMES, ComObject.Type.STRING_TYPE);
+        ComArray fileNameArray = retObj.putArray(ComObject.Tag.FILENAMES, ComObject.Type.STRING_TYPE, files.length);
         for (File file : files) {
           fileNameArray.add(file.getName());
         }
@@ -384,32 +380,22 @@ public class LogManager {
   }
 
   void logRequestForPeer(byte[] request, String methodStr, long sequence0, long sequence1, int deadReplica) {
-    if (!server.isDurable()) {
+    if (server.isNotDurable()) {
       return;
     }
     startLoggingForPeer(deadReplica);
 
     try {
-      ByteArrayOutputStream bytesOut = new ByteArrayOutputStream();
-      DataOutputStream out = new DataOutputStream(bytesOut);
-
-      Varint.writeSignedVarLong(DatabaseClient.SERIALIZATION_VERSION, out);
-      out.writeUTF(methodStr);
-      Varint.writeSignedVarLong(sequence0, out);
-      Varint.writeSignedVarLong(sequence1, out);
-      out.writeInt(request.length);
-      out.write(request);
-
       LogRequest logRequest = new LogRequest(1);
-      logRequest.setBuffer(bytesOut.toByteArray());
+      logRequest.methodStr = methodStr;
+      logRequest.getSequences0()[0] = sequence0;
+      logRequest.getSequences1()[0] = sequence1;
+      logRequest.body = request;
       peerLogRequests.get(deadReplica).put(logRequest);
       logRequest.getLatch().await();
     }
     catch (InterruptedException e) {
       Thread.currentThread().interrupt();
-      throw new DatabaseException(e);
-    }
-    catch (IOException e) {
       throw new DatabaseException(e);
     }
   }
@@ -510,7 +496,12 @@ public class LogManager {
         for (LogRequest request : requests) {
           count.incrementAndGet();
           writer.writeInt(1);
-          writer.write(request.getBuffer());
+          Varint.writeSignedVarLong(DatabaseClient.SERIALIZATION_VERSION, writer);
+          writer.writeUTF(request.methodStr);
+          Varint.writeSignedVarLong(request.getSequences0()[0], writer);
+          Varint.writeSignedVarLong(request.getSequences1()[0], writer);
+          writer.writeInt(request.body.length);
+          writer.write(request.body);
           countLogged.incrementAndGet();
         }
         writer.flush();
@@ -603,7 +594,7 @@ public class LogManager {
 
   void getLogsFromPeer(int replica) {
     try {
-      ComObject cobj = new ComObject();
+      ComObject cobj = new ComObject(4);
       cobj.put(ComObject.Tag.DB_NAME, NONE_STR);
       cobj.put(ComObject.Tag.SCHEMA_VERSION, server.getCommon().getSchemaVersion());
       cobj.put(ComObject.Tag.METHOD, "LogManager:sendLogsToPeer");
@@ -619,7 +610,7 @@ public class LogManager {
         if (filenames != null) {
           for (int i = 0; i < filenames.getArray().size(); i++) {
             String filename = (String) filenames.getArray().get(i);
-            cobj = new ComObject();
+            cobj = new ComObject(5);
             cobj.put(ComObject.Tag.DB_NAME, NONE_STR);
             cobj.put(ComObject.Tag.SCHEMA_VERSION, server.getCommon().getSchemaVersion());
             cobj.put(ComObject.Tag.METHOD, "LogManager:getLogFile");
@@ -633,7 +624,7 @@ public class LogManager {
             sendQueueFile(replica, filename, bytes);
             logger.info("Received log file: filename={}, replica={}", filename, replica);
           }
-          cobj = new ComObject();
+          cobj = new ComObject(4);
           cobj.put(ComObject.Tag.DB_NAME, NONE_STR);
           cobj.put(ComObject.Tag.SCHEMA_VERSION, server.getCommon().getSchemaVersion());
           cobj.put(ComObject.Tag.METHOD, "LogManager:deletePeerLogs");
@@ -952,7 +943,7 @@ public class LogManager {
   public LogRequest logRequest(byte[] body, boolean enableQueuing, String methodStr,
                                Long existingSequence0, Long existingSequence1, AtomicLong timeLogging) {
     LogRequest request = null;
-    if (!server.isDurable()) {
+    if (server.isNotDurable()) {
       request = new LogRequest(1);
       request.getLatch().countDown();
       return request;
@@ -960,8 +951,6 @@ public class LogManager {
     try {
       if (enableQueuing && DatabaseClient.getWriteVerbs().contains(methodStr)) {
         request = new LogRequest(1);
-        ByteArrayOutputStream bytesOut = new ByteArrayOutputStream();
-        DataOutputStream out = new DataOutputStream(bytesOut);
 
         long sequence1 = 0;
         long sequence0 = 0;
@@ -978,16 +967,10 @@ public class LogManager {
           sequence1 = getNextSequencenNum();
         }
 
-        Varint.writeSignedVarLong(DatabaseClient.SERIALIZATION_VERSION, out);
-        out.writeUTF(methodStr);
-        Varint.writeSignedVarLong(sequence0, out);
-        Varint.writeSignedVarLong(sequence1, out);
-        out.writeInt(body.length);
-        out.write(body);
-
         request.getSequences0()[0] = sequence0;
         request.getSequences1()[0] = sequence1;
-        request.setBuffer(bytesOut.toByteArray());
+        request.setMethod(methodStr);
+        request.setBody(body);
         request.setBegin(System.nanoTime());
         request.setTimeLogging(timeLogging);
 

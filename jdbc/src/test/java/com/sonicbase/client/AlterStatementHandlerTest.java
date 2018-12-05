@@ -35,7 +35,7 @@ public class AlterStatementHandlerTest {
     final AtomicBoolean calledAdd = new AtomicBoolean();
     when(client.sendToMaster(eq("SchemaManager:addColumn"), anyObject())).thenAnswer(invocationOnMock -> {
       calledAdd.set(true);
-      ComObject ret = new ComObject();
+      ComObject ret = new ComObject(1);
       ret.put(ComObject.Tag.SCHEMA_BYTES, common.serializeSchema((short) 1000));
       return ret.serialize();
     });
@@ -61,7 +61,7 @@ public class AlterStatementHandlerTest {
     final AtomicBoolean calledDrop = new AtomicBoolean();
     when(client.sendToMaster(eq("SchemaManager:dropColumn"), anyObject())).thenAnswer(invocationOnMock -> {
       calledDrop.set(true);
-      ComObject ret = new ComObject();
+      ComObject ret = new ComObject(1);
       ret.put(ComObject.Tag.SCHEMA_BYTES, common.serializeSchema((short) 1000));
       return ret.serialize();
     });

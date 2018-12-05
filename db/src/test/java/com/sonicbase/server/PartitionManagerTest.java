@@ -1,6 +1,5 @@
 package com.sonicbase.server;
 
-import com.codahale.metrics.Timer;
 import com.fasterxml.jackson.databind.JsonNode;
 import com.fasterxml.jackson.databind.ObjectMapper;
 import com.fasterxml.jackson.databind.node.ArrayNode;
@@ -33,11 +32,6 @@ import java.util.concurrent.atomic.AtomicBoolean;
 import java.util.concurrent.atomic.AtomicInteger;
 import java.util.concurrent.atomic.AtomicReference;
 
-import static com.sonicbase.server.DatabaseServer.*;
-import static com.sonicbase.server.DatabaseServer.METRIC_DELETE;
-import static com.sonicbase.server.DatabaseServer.METRIC_UPDATE;
-import static com.sonicbase.server.MonitorManagerImpl.METRICS;
-import static org.mockito.BDDMockito.then;
 import static org.mockito.Matchers.*;
 import static org.mockito.Mockito.*;
 import static org.testng.Assert.assertEquals;
@@ -72,7 +66,7 @@ public class PartitionManagerTest {
     when(server.getSnapshotManager()).thenReturn(mock(SnapshotManager.class));
 
     DatabaseCommon common = TestUtils.createCommon(tableSchema);
-    common.setIsDurable(true);
+    common.setIsNotDurable(true);
     JsonNode node = new ObjectMapper().readTree(" { \"shards\" : [\n" +
         "    {\n" +
         "      \"replicas\": [\n" +
@@ -90,7 +84,6 @@ public class PartitionManagerTest {
     common.setServersConfig(serversConfig);
     when(server.getCommon()).thenReturn(common);
     when(server.useUnsafe()).thenReturn(true);
-    when(server.isDurable()).thenReturn(true);
 
     Indices indices = new Indices();
     indices.addIndex(tableSchema, indexSchema.getName(), indexSchema.getComparators());
@@ -118,19 +111,19 @@ public class PartitionManagerTest {
     when(client.getShardCount()).thenReturn(2);
     when(server.getClient()).thenReturn(client);
     when(server.getDatabaseClient()).thenReturn(client);
-    when(server.isDurable()).thenReturn(true);
+    when(server.isNotDurable()).thenReturn(true);
 
     final PartitionManager partitionManager = new PartitionManager(server, common);
 
-    ComObject cobj = new ComObject();
-    ComArray array = cobj.putArray(ComObject.Tag.SIZES, ComObject.Type.OBJECT_TYPE);
-    ComObject size0Obj = new ComObject();
+    ComObject cobj = new ComObject(1);
+    ComArray array = cobj.putArray(ComObject.Tag.SIZES, ComObject.Type.OBJECT_TYPE, 2);
+    ComObject size0Obj = new ComObject(3);
     size0Obj.put(ComObject.Tag.SHARD, 0);
     size0Obj.put(ComObject.Tag.SIZE, (long)10);
     size0Obj.put(ComObject.Tag.RAW_SIZE, (long)10);
     array.add(size0Obj);
 
-    ComObject size1Obj = new ComObject();
+    ComObject size1Obj = new ComObject(3);
     size1Obj.put(ComObject.Tag.SHARD, 0);
     size1Obj.put(ComObject.Tag.SIZE, (long)0);
     size1Obj.put(ComObject.Tag.RAW_SIZE, (long)0);
@@ -144,15 +137,15 @@ public class PartitionManagerTest {
           return bytes0;
         });
 
-    cobj = new ComObject();
-    array = cobj.putArray(ComObject.Tag.SIZES, ComObject.Type.OBJECT_TYPE);
-    size0Obj = new ComObject();
+    cobj = new ComObject(1);
+    array = cobj.putArray(ComObject.Tag.SIZES, ComObject.Type.OBJECT_TYPE, 2);
+    size0Obj = new ComObject(3);
     size0Obj.put(ComObject.Tag.SHARD, 0);
     size0Obj.put(ComObject.Tag.SIZE, (long)0);
     size0Obj.put(ComObject.Tag.RAW_SIZE, (long)0);
     array.add(size0Obj);
 
-    size1Obj = new ComObject();
+    size1Obj = new ComObject(3);
     size1Obj.put(ComObject.Tag.SHARD, 0);
     size1Obj.put(ComObject.Tag.SIZE, (long)0);
     size1Obj.put(ComObject.Tag.RAW_SIZE, (long)0);
@@ -163,8 +156,8 @@ public class PartitionManagerTest {
         bytes1
     );
 
-    cobj = new ComObject();
-    array = cobj.putArray(ComObject.Tag.KEYS, ComObject.Type.BYTE_ARRAY_TYPE);
+    cobj = new ComObject(1);
+    array = cobj.putArray(ComObject.Tag.KEYS, ComObject.Type.BYTE_ARRAY_TYPE, 1);
     array.add(DatabaseCommon.serializeKey(tableSchema, "_primarykey", keys.get(4)));
     bytes1 = cobj.serialize();
     when(client.send(   eq("PartitionManager:getKeyAtOffset"), eq(0), eq((long)0), (ComObject) anyObject(), eq(DatabaseClient.Replica.MASTER))).thenAnswer(
@@ -256,10 +249,9 @@ public class PartitionManagerTest {
     when(server.getReplicationFactor()).thenReturn(1);
     when(server.getShard()).thenReturn(1);
     when(server.useUnsafe()).thenReturn(true);
-    when(server.isDurable()).thenReturn(true);
 
     DatabaseCommon common = TestUtils.createCommon(tableSchema);
-    common.setIsDurable(true);
+    common.setIsNotDurable(false);
     JsonNode node = new ObjectMapper().readTree(" { \"shards\" : [\n" +
         "    {\n" +
         "      \"replicas\": [\n" +
@@ -308,15 +300,15 @@ public class PartitionManagerTest {
     final PartitionManager partitionManager = new PartitionManager(server, common);
     partitionManager.setBatchOverride(1);
 
-    ComObject cobj = new ComObject();
-    ComArray array = cobj.putArray(ComObject.Tag.SIZES, ComObject.Type.OBJECT_TYPE);
-    ComObject size0Obj = new ComObject();
+    ComObject cobj = new ComObject(1);
+    ComArray array = cobj.putArray(ComObject.Tag.SIZES, ComObject.Type.OBJECT_TYPE, 2);
+    ComObject size0Obj = new ComObject(3);
     size0Obj.put(ComObject.Tag.SHARD, 0);
     size0Obj.put(ComObject.Tag.SIZE, (long)10);
     size0Obj.put(ComObject.Tag.RAW_SIZE, (long)10);
     array.add(size0Obj);
 
-    ComObject size1Obj = new ComObject();
+    ComObject size1Obj = new ComObject(3);
     size1Obj.put(ComObject.Tag.SHARD, 0);
     size1Obj.put(ComObject.Tag.SIZE, (long)0);
     size1Obj.put(ComObject.Tag.RAW_SIZE, (long)0);
@@ -332,15 +324,15 @@ public class PartitionManagerTest {
           }
         });
 
-    cobj = new ComObject();
-    array = cobj.putArray(ComObject.Tag.SIZES, ComObject.Type.OBJECT_TYPE);
-    size0Obj = new ComObject();
+    cobj = new ComObject(1);
+    array = cobj.putArray(ComObject.Tag.SIZES, ComObject.Type.OBJECT_TYPE, 2);
+    size0Obj = new ComObject(3);
     size0Obj.put(ComObject.Tag.SHARD, 0);
     size0Obj.put(ComObject.Tag.SIZE, (long)0);
     size0Obj.put(ComObject.Tag.RAW_SIZE, (long)0);
     array.add(size0Obj);
 
-    size1Obj = new ComObject();
+    size1Obj = new ComObject(3);
     size1Obj.put(ComObject.Tag.SHARD, 0);
     size1Obj.put(ComObject.Tag.SIZE, (long)0);
     size1Obj.put(ComObject.Tag.RAW_SIZE, (long)0);
@@ -351,8 +343,8 @@ public class PartitionManagerTest {
         bytes1
     );
 
-    cobj = new ComObject();
-    array = cobj.putArray(ComObject.Tag.KEYS, ComObject.Type.BYTE_ARRAY_TYPE);
+    cobj = new ComObject(1);
+    array = cobj.putArray(ComObject.Tag.KEYS, ComObject.Type.BYTE_ARRAY_TYPE, 1);
     array.add(DatabaseCommon.serializeKey(tableSchema, "_primarykey", keys.get(4)));
     bytes1 = cobj.serialize();
     when(client.send(   eq("PartitionManager:getKeyAtOffset"), eq(0), eq((long)0), (ComObject) anyObject(), eq(DatabaseClient.Replica.MASTER))).thenAnswer(
@@ -500,7 +492,7 @@ public class PartitionManagerTest {
           });
 
 
-      ComObject cobj = new ComObject();
+      ComObject cobj = new ComObject(1);
       cobj.put(ComObject.Tag.SIZE, (long) 10);
       byte[] bytes0 = cobj.serialize();
 
@@ -592,7 +584,6 @@ public class PartitionManagerTest {
 
       when(server.getCommon()).thenReturn(common);
       when(server.useUnsafe()).thenReturn(true);
-      when(server.isDurable()).thenReturn(true);
 
       Indices indices = new Indices();
       indices.addIndex(tableSchema, indexSchema.getName(), indexSchema.getComparators());
@@ -634,7 +625,7 @@ public class PartitionManagerTest {
       partitionManagers[shard] = new PartitionManager(server, common);
     }
 
-    ComObject cobj = new ComObject();
+    ComObject cobj = new ComObject(1);
     //cobj.put(ComObject.Tag.SIZE, (long)10);
     byte[] bytes0 = cobj.serialize();
     when(client.send(   eq("PartitionManager:getPartitionSize"), anyInt(), eq((long)0), (ComObject) anyObject(), eq(DatabaseClient.Replica.MASTER))).thenAnswer(
@@ -652,7 +643,7 @@ public class PartitionManagerTest {
 //        bytes1
 //    );
 
-    cobj = new ComObject();
+    cobj = new ComObject(1);
 //    ComArray array = cobj.putArray(ComObject.Tag.KEYS, ComObject.Type.BYTE_ARRAY_TYPE);
 //    array.add(DatabaseCommon.serializeKey(tableSchema, "_primarykey", keys.get(4)));
 //    bytes1 = cobj.serialize();

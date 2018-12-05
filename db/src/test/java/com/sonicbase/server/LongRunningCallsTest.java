@@ -25,14 +25,14 @@ public class LongRunningCallsTest {
     String configStr = IOUtils.toString(DatabaseServerTest.class.getResourceAsStream("/config/config-1-local.yaml"), "utf-8");
     Config config = new Config(configStr);
     DatabaseServer server = new DatabaseServer();
-    server.setConfig(config, "test", "localhost", 9010, true, new AtomicBoolean(), new AtomicBoolean(), "gc.log");
+    server.setConfig(config, "test", "localhost", 9010, true, new AtomicBoolean(), new AtomicBoolean(), "gc.log", false);
     server.setRecovered(true);
 
     DatabaseClient client = mock(DatabaseClient.class);
     server.setDatabaseClient(client);
 
     LongRunningCalls calls = server.getLongRunningCommands();
-    ComObject cobj = new ComObject();
+    ComObject cobj = new ComObject(2);
     cobj.put(ComObject.Tag.METHOD, "echo");
     cobj.put(ComObject.Tag.COUNT, 1);
     calls.addCommand(calls.createSingleCommand(cobj.serialize()));

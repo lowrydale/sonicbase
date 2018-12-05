@@ -57,45 +57,46 @@ public class RecordImpl implements Record {
         for (int i = 0; i < array.getArray().size(); i++) {
           ComObject parm = (ComObject) array.getArray().get(i);
           String fieldName = parm.getString(ComObject.Tag.FIELD_NAME);
-          Map<Integer, Object> fields = parm.getMap();
-          for (Map.Entry<Integer, Object> field : fields.entrySet()) {
-            if (field.getKey() == ComObject.Tag.STRING_VALUE.tag) {
+          int[] tags = parm.getMap().getTags();
+          Object[] values = parm.getMap().getValues();
+          for (int j = 0; j < parm.getMap().getPos(); j++) {
+            if (tags[j] == ComObject.Tag.STRING_VALUE.tag) {
               this.fieldMap.put(fieldName, parm.getString(ComObject.Tag.STRING_VALUE));
             }
-            else if (field.getKey() == ComObject.Tag.LONG_VALUE.tag) {
+            else if (tags[j] == ComObject.Tag.LONG_VALUE.tag) {
               fieldMap.put(fieldName, parm.getLong(ComObject.Tag.LONG_VALUE));
             }
-            else if (field.getKey() == ComObject.Tag.INT_VALUE.tag) {
+            else if (tags[j] == ComObject.Tag.INT_VALUE.tag) {
               fieldMap.put(fieldName, parm.getInt(ComObject.Tag.INT_VALUE));
             }
-            else if (field.getKey() == ComObject.Tag.BOOLEAN_VALUE.tag) {
+            else if (tags[j] == ComObject.Tag.BOOLEAN_VALUE.tag) {
               fieldMap.put(fieldName, parm.getBoolean(ComObject.Tag.BOOLEAN_VALUE));
             }
-            else if (field.getKey() == ComObject.Tag.TIME_VALUE.tag) {
+            else if (tags[j] == ComObject.Tag.TIME_VALUE.tag) {
               fieldMap.put(fieldName, parm.getTime(ComObject.Tag.TIME_VALUE));
             }
-            else if (field.getKey() == ComObject.Tag.DATE_VALUE.tag) {
+            else if (tags[j] == ComObject.Tag.DATE_VALUE.tag) {
               fieldMap.put(fieldName, parm.getDate(ComObject.Tag.DATE_VALUE));
             }
-            else if (field.getKey() == ComObject.Tag.TIMESTAMP_VALUE.tag) {
+            else if (tags[j] == ComObject.Tag.TIMESTAMP_VALUE.tag) {
               fieldMap.put(fieldName, parm.getTimestamp(ComObject.Tag.TIMESTAMP_VALUE));
             }
-            else if (field.getKey() == ComObject.Tag.FLOAT_VALUE.tag) {
+            else if (tags[j] == ComObject.Tag.FLOAT_VALUE.tag) {
               fieldMap.put(fieldName, parm.getFloat(ComObject.Tag.FLOAT_VALUE));
             }
-            else if (field.getKey() == ComObject.Tag.DOUBLE_VALUE.tag) {
+            else if (tags[j] == ComObject.Tag.DOUBLE_VALUE.tag) {
               fieldMap.put(fieldName, parm.getDouble(ComObject.Tag.DOUBLE_VALUE));
             }
-            else if (field.getKey() == ComObject.Tag.BIG_DECIMAL_VALUE.tag) {
+            else if (tags[j] == ComObject.Tag.BIG_DECIMAL_VALUE.tag) {
               fieldMap.put(fieldName, parm.getBigDecimal(ComObject.Tag.BIG_DECIMAL_VALUE));
             }
-            else if (field.getKey() == ComObject.Tag.BYTE_VALUE.tag) {
+            else if (tags[j] == ComObject.Tag.BYTE_VALUE.tag) {
               fieldMap.put(fieldName, parm.getByte(ComObject.Tag.BYTE_VALUE));
             }
-            else if (field.getKey() == ComObject.Tag.SHORT_VALUE.tag) {
+            else if (tags[j] == ComObject.Tag.SHORT_VALUE.tag) {
               fieldMap.put(fieldName, parm.getShort(ComObject.Tag.SHORT_VALUE));
             }
-            else if (field.getKey() == ComObject.Tag.BYTE_ARRAY_VALUE.tag) {
+            else if (tags[j] == ComObject.Tag.BYTE_ARRAY_VALUE.tag) {
               fieldMap.put(fieldName, parm.getByteArray(ComObject.Tag.BYTE_ARRAY_VALUE));
             }
           }
@@ -105,7 +106,7 @@ public class RecordImpl implements Record {
   }
 
   public ComObject serialize() {
-    ComObject ret = new ComObject();
+    ComObject ret = new ComObject(3);
     if (tableSchema != null) {
       byte[] bytes = record.serialize(common, serializationNumber);
       ret.put(ComObject.Tag.RECORD_BYTES, bytes);
@@ -113,9 +114,9 @@ public class RecordImpl implements Record {
       ret.put(ComObject.Tag.DB_NAME, dbName);
     }
     else {
-      ComArray array = ret.putArray(ComObject.Tag.FIELDS, ComObject.Type.OBJECT_TYPE);
+      ComArray array = ret.putArray(ComObject.Tag.FIELDS, ComObject.Type.OBJECT_TYPE, fieldMap.size());
       for (Map.Entry<String, Object> field : fieldMap.entrySet()) {
-        ComObject parm = new ComObject();
+        ComObject parm = new ComObject(2);
         parm.put(ComObject.Tag.FIELD_NAME, field.getKey());
         Object value = field.getValue();
         if (value instanceof String) {

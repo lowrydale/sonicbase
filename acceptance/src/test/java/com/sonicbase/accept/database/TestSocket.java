@@ -26,7 +26,7 @@ public class TestSocket {
     for (int i = 0; i < 20; i++) {
       List<DatabaseSocketClient.Request> requests = new ArrayList<>();
       DatabaseSocketClient.Request request = new DatabaseSocketClient.Request();
-      ComObject cobj = new ComObject();
+      ComObject cobj = new ComObject(2);
       cobj.put(ComObject.Tag.COUNT, 10);
       cobj.put(ComObject.Tag.METHOD, "echo");
       request.setBody(cobj.serialize());

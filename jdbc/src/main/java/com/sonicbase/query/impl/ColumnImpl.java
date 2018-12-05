@@ -100,7 +100,7 @@ public class ColumnImpl extends ExpressionImpl {
         }
       }
       else {
-        ComObject cobj = new ComObject();
+        ComObject cobj = new ComObject(4);
         if (columnName != null) {
           cobj.put(ComObject.Tag.COLUMN_NAME, columnName);
         }

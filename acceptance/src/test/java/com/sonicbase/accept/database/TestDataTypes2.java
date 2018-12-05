@@ -61,7 +61,7 @@ public class TestDataTypes2 {
     List<Future> futures = new ArrayList<>();
     for (int i = 0; i < dbServers.length; i++) {
       dbServers[i] = new DatabaseServer();
-      dbServers[i].setConfig(config, "4-servers", "localhost", 9010 + (50 * i), true, new AtomicBoolean(true), new AtomicBoolean(true),null);
+      dbServers[i].setConfig(config, "4-servers", "localhost", 9010 + (50 * i), true, new AtomicBoolean(true), new AtomicBoolean(true),null, false);
       dbServers[i].setRole(role);
     }
     for (Future future : futures) {
@@ -140,7 +140,7 @@ public class TestDataTypes2 {
 
   @Test
   public void testComObject() {
-    ComObject cobj = new ComObject();
+    ComObject cobj = new ComObject(3);
     long duration = 40404022;
     cobj.put(ComObject.Tag.DB_NAME,"db");
     cobj.put(ComObject.Tag.ID, 100);

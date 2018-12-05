@@ -48,7 +48,7 @@ public class TestSnapshotManager {
         //          String role = "primaryMaster";
 
         dbServers[i] = new com.sonicbase.server.DatabaseServer();
-        dbServers[i].setConfig(config, "4-servers", "localhost", 9010 + (50 * i), true, new AtomicBoolean(true), new AtomicBoolean(true), null);
+        dbServers[i].setConfig(config, "4-servers", "localhost", 9010 + (50 * i), true, new AtomicBoolean(true), new AtomicBoolean(true), null, false);
         dbServers[i].setRole(role);
 
         //          return null;
@@ -286,7 +286,7 @@ public class TestSnapshotManager {
         //          String role = "primaryMaster";
 
         dbServers[i] = new com.sonicbase.server.DatabaseServer();
-        dbServers[i].setConfig(config, "4-servers", "localhost", 9010 + (50 * i), true, new AtomicBoolean(true), new AtomicBoolean(true),null);
+        dbServers[i].setConfig(config, "4-servers", "localhost", 9010 + (50 * i), true, new AtomicBoolean(true), new AtomicBoolean(true),null, false);
         dbServers[i].setRole(role);
         //        }
         //      }));
@@ -390,7 +390,7 @@ public class TestSnapshotManager {
         //          String role = "primaryMaster";
 
         dbServers[i] = new com.sonicbase.server.DatabaseServer();
-        dbServers[i].setConfig(config, "4-servers", "localhost", 9010 + (50 * i), true, new AtomicBoolean(true), new AtomicBoolean(true),null);
+        dbServers[i].setConfig(config, "4-servers", "localhost", 9010 + (50 * i), true, new AtomicBoolean(true), new AtomicBoolean(true),null, false);
         dbServers[i].setRole(role);
         //          return null;
         //        }
@@ -604,7 +604,7 @@ public class TestSnapshotManager {
         //          String role = "primaryMaster";
 
         dbServers[i] = new com.sonicbase.server.DatabaseServer();
-        dbServers[i].setConfig(config, "4-servers", "localhost", 9010 + (50 * i), true, new AtomicBoolean(true),new AtomicBoolean(true), null);
+        dbServers[i].setConfig(config, "4-servers", "localhost", 9010 + (50 * i), true, new AtomicBoolean(true),new AtomicBoolean(true), null, false);
         dbServers[i].setRole(role);
         //          return null;
         //        }

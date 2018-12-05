@@ -65,7 +65,7 @@ public class InsertStatementHandler implements StatementHandler {
   }
 
   public static void setBatch(ThreadLocal<List<InsertRequest>> batch) {
-    InsertStatementHandler.batch = batch;
+    InsertStatementHandler.batch.set(batch.get());
   }
 
   @Override
@@ -531,7 +531,7 @@ public class InsertStatementHandler implements StatementHandler {
       int tableId = client.getCommon().getTables(dbName).get(tableName).getTableId();
       int indexId = client.getCommon().getTables(dbName).get(tableName).getIndices().get(keyInfo.indexSchema.getName()).getIndexId();
       ComObject cobj = serializeInsertKey(client, client.getCommon(), 0, dbName, 0, tableId, indexId, tableName, keyInfo, primaryKeyIndexName,
-          primaryKey, record, keyRecord, ignore);
+          primaryKey, record, keyRecord, ignore, 6);
 
       byte[] keyRecordBytes = keyRecord.serialize(SERIALIZATION_VERSION);
       cobj.put(ComObject.Tag.KEY_RECORD_BYTES, keyRecordBytes);
@@ -554,8 +554,8 @@ public class InsertStatementHandler implements StatementHandler {
 
   public static ComObject serializeInsertKey(DatabaseClient client, DatabaseCommon common, int insertId, String dbName, int originalOffset, int tableId, int indexId,
                                              String tableName, KeyInfo keyInfo,
-                                             String primaryKeyIndexName, Object[] primaryKey, Record record, KeyRecord keyRecord, boolean ignore) {
-    ComObject cobj = new ComObject();
+                                             String primaryKeyIndexName, Object[] primaryKey, Record record, KeyRecord keyRecord, boolean ignore, int additionalFields) {
+    ComObject cobj = new ComObject(10 + additionalFields);
     cobj.put(ComObject.Tag.SERIALIZATION_VERSION, SERIALIZATION_VERSION);
     cobj.put(ComObject.Tag.TABLE_ID, tableId);
     cobj.put(ComObject.Tag.INDEX_ID, indexId);
@@ -587,7 +587,7 @@ public class InsertStatementHandler implements StatementHandler {
                                    int schemaRetryCount) {
     int tableId = client.getCommon().getTables(dbName).get(tableName).getTableId();
     int indexId = client.getCommon().getTables(dbName).get(tableName).getIndices().get(keyInfo.indexSchema.getName()).getIndexId();
-    ComObject cobj = serializeInsertKeyWithRecord(0, dbName, 0, tableId, indexId, tableName, keyInfo, record, ignore);
+    ComObject cobj = serializeInsertKeyWithRecord(0, dbName, 0, tableId, indexId, tableName, keyInfo, record, ignore, 6);
     cobj.put(ComObject.Tag.DB_NAME, dbName);
     if (schemaRetryCount < 2) {
       cobj.put(ComObject.Tag.SCHEMA_VERSION, client.getCommon().getSchemaVersion());
@@ -622,8 +622,8 @@ public class InsertStatementHandler implements StatementHandler {
   }
 
   private ComObject serializeInsertKeyWithRecord(int insertId, String dbName, int originalOffset, int tableId, int indexId, String tableName,
-                                                 KeyInfo keyInfo, Record record, boolean ignore) {
-    ComObject cobj = new ComObject();
+                                                 KeyInfo keyInfo, Record record, boolean ignore, int additionalFields) {
+    ComObject cobj = new ComObject(8 + additionalFields);
     cobj.put(ComObject.Tag.SERIALIZATION_VERSION, SERIALIZATION_VERSION);
     cobj.put(ComObject.Tag.ORIGINAL_OFFSET, originalOffset);
     cobj.put(ComObject.Tag.ID, (long)insertId);
@@ -780,7 +780,7 @@ public class InsertStatementHandler implements StatementHandler {
 
   private int doInsertWithSelect(String dbName, InsertStatementImpl insertStatement) {
 
-    ComObject cobj = new ComObject();
+    ComObject cobj = new ComObject(7);
     cobj.put(ComObject.Tag.DB_NAME, dbName);
     cobj.put(ComObject.Tag.SCHEMA_VERSION, client.getCommon().getSchemaVersion());
     cobj.put(ComObject.Tag.METHOD, "UpdateManager:insertWithSelect");
@@ -803,7 +803,7 @@ public class InsertStatementHandler implements StatementHandler {
   private void removeInsertKey(List<ComObject> cobjs, int originalOffset) {
     for (ComObject cobj : cobjs) {
       ComArray array = cobj.getArray(ComObject.Tag.INSERT_OBJECTS);
-      ComArray newArray = new ComArray(ComObject.Type.OBJECT_TYPE);
+      ComArray newArray = new ComArray(ComObject.Type.OBJECT_TYPE, array.getArray().size());
       for (int i = 0; i < array.getArray().size(); i++) {
         ComObject innerObj = (ComObject) array.getArray().get(i);
         if (innerObj.getInt(ComObject.Tag.ORIGINAL_OFFSET) != originalOffset) {
@@ -1000,7 +1000,7 @@ public class InsertStatementHandler implements StatementHandler {
       withRecordProcessed.add(new ArrayList<>());
       processed.add(new ArrayList<>());
 
-      final ComObject cobj1 = new ComObject();
+      final ComObject cobj1 = new ComObject(10);
       cobj1.put(ComObject.Tag.DB_NAME, dbName);
       if (schemaRetryCount < 2) {
         cobj1.put(ComObject.Tag.SCHEMA_VERSION, client.getCommon().getSchemaVersion());
@@ -1010,10 +1010,10 @@ public class InsertStatementHandler implements StatementHandler {
       cobj1.put(ComObject.Tag.IS_COMMITTING, client.isCommitting());
       cobj1.put(ComObject.Tag.TRANSACTION_ID, client.getTransactionId());
 
-      cobj1.putArray(ComObject.Tag.INSERT_OBJECTS, ComObject.Type.OBJECT_TYPE);
+      cobj1.putArray(ComObject.Tag.INSERT_OBJECTS, ComObject.Type.OBJECT_TYPE, withRecordPrepared.size());
       cobjs1.add(cobj1);
 
-      final ComObject cobj2 = new ComObject();
+      final ComObject cobj2 = new ComObject(10);
       cobj2.put(ComObject.Tag.DB_NAME, dbName);
       if (schemaRetryCount < 2) {
         cobj2.put(ComObject.Tag.SCHEMA_VERSION, client.getCommon().getSchemaVersion());
@@ -1022,21 +1022,21 @@ public class InsertStatementHandler implements StatementHandler {
       cobj2.put(ComObject.Tag.IS_EXCPLICITE_TRANS, client.isExplicitTrans());
       cobj2.put(ComObject.Tag.IS_COMMITTING, client.isCommitting());
       cobj2.put(ComObject.Tag.TRANSACTION_ID, client.getTransactionId());
-      cobj2.putArray(ComObject.Tag.INSERT_OBJECTS, ComObject.Type.OBJECT_TYPE);
+      cobj2.putArray(ComObject.Tag.INSERT_OBJECTS, ComObject.Type.OBJECT_TYPE, preparedKeys.size());
       cobjs2.add(cobj2);
 
     }
     synchronized (mutex) {
       for (PreparedInsert insert : withRecordPrepared) {
         ComObject obj = serializeInsertKeyWithRecord(insert.insertId, insert.dbName, insert.originalOffset, insert.tableId,
-            insert.indexId, insert.tableName, insert.keyInfo, insert.record, insert.ignore);
+            insert.indexId, insert.tableName, insert.keyInfo, insert.record, insert.ignore, 0);
         cobjs1.get(insert.keyInfo.shard).getArray(ComObject.Tag.INSERT_OBJECTS).getArray().add(obj);
         withRecordProcessed.get(insert.keyInfo.shard).add(insert);
       }
       for (PreparedInsert insert : preparedKeys) {
         ComObject obj = serializeInsertKey(client, client.getCommon(), insert.insertId, insert.dbName, insert.originalOffset, insert.tableId,
             insert.indexId, insert.tableName, insert.keyInfo,
-            insert.primaryKeyIndexName, insert.primaryKey, insert.record, insert.keyRecord, insert.ignore);
+            insert.primaryKeyIndexName, insert.primaryKey, insert.record, insert.keyRecord, insert.ignore, 0);
         cobjs2.get(insert.keyInfo.shard).getArray(ComObject.Tag.INSERT_OBJECTS).getArray().add(obj);
         processed.get(insert.keyInfo.shard).add(insert);
       }
@@ -1174,7 +1174,7 @@ public class InsertStatementHandler implements StatementHandler {
       final int offset = i;
       futures.add(client.getExecutor().submit((Callable) () -> {
         if (cobjs2.get(offset).getArray(ComObject.Tag.INSERT_OBJECTS).getArray().isEmpty()) {
-          return new ComObject();
+          return new ComObject(2);
         }
         byte[] ret = client.send("UpdateManager:batchInsertIndexEntryByKey", offset, 0, cobjs2.get(offset),
             DatabaseClient.Replica.DEF);
@@ -1201,7 +1201,7 @@ public class InsertStatementHandler implements StatementHandler {
       final int offset = i;
       futures.add(client.getExecutor().submit(() -> {
         if (cobjs1.get(offset).getArray(ComObject.Tag.INSERT_OBJECTS).getArray().isEmpty()) {
-          return new ComObject();
+          return new ComObject(2);
         }
         byte[] ret = client.send("UpdateManager:batchInsertIndexEntryByKeyWithRecord", offset, 0,
             cobjs1.get(offset), DatabaseClient.Replica.DEF);

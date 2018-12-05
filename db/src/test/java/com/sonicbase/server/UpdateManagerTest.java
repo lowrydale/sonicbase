@@ -1,6 +1,5 @@
 package com.sonicbase.server;
 
-import com.codahale.metrics.Timer;
 import com.fasterxml.jackson.databind.JsonNode;
 import com.fasterxml.jackson.databind.ObjectMapper;
 import com.fasterxml.jackson.databind.node.ArrayNode;
@@ -48,8 +47,6 @@ import java.util.concurrent.atomic.AtomicLong;
 import static com.sonicbase.client.DatabaseClient.SERIALIZATION_VERSION;
 import static com.sonicbase.client.InsertStatementHandler.BATCH_STATUS_FAILED;
 import static com.sonicbase.client.InsertStatementHandler.BATCH_STATUS_SUCCCESS;
-import static com.sonicbase.server.DatabaseServer.*;
-import static com.sonicbase.server.MonitorManagerImpl.METRICS;
 import static org.mockito.Matchers.*;
 import static org.mockito.Mockito.doAnswer;
 import static org.mockito.Mockito.mock;
@@ -146,7 +143,10 @@ public class UpdateManagerTest {
 
     keys = TestUtils.createKeys(10);
 
-    updateManager = new UpdateManager(server);
+    updateManager = new UpdateManager(server){
+      void throttle() throws InterruptedException {
+      }
+    };
     updateManager.initStreamManager();
 
     client = mock(DatabaseClient.class);
@@ -178,7 +178,7 @@ public class UpdateManagerTest {
 
       ComObject cobj = InsertStatementHandler.serializeInsertKey(client, common, 0, "test", 0, tableId,
           indexId, "table1", keyInfo, indexSchema.getName(),
-          keys.get(j), null, keyRecord, false);
+          keys.get(j), null, keyRecord, false, 8);
 
       byte[] keyRecordBytes = keyRecord.serialize(SERIALIZATION_VERSION);
       cobj.put(ComObject.Tag.KEY_RECORD_BYTES, keyRecordBytes);
@@ -212,7 +212,7 @@ public class UpdateManagerTest {
 
       byte[] primaryKeyBytes = DatabaseCommon.serializeKey(tableSchema, indexSchema.getName(), keys.get(j));
 
-      ComObject cobj = new ComObject();
+      ComObject cobj = new ComObject(13);
       cobj.put(ComObject.Tag.RECORD_BYTES, records[j]);
       cobj.put(ComObject.Tag.KEY_BYTES, primaryKeyBytes);
 
@@ -236,7 +236,7 @@ public class UpdateManagerTest {
     }
     //test delete
     for (int j = 0; j < 4; j++) {
-      ComObject cobj = new ComObject();
+      ComObject cobj = new ComObject(11);
       cobj.put(ComObject.Tag.SERIALIZATION_VERSION, DatabaseClient.SERIALIZATION_VERSION);
       cobj.put(ComObject.Tag.KEY_BYTES, DatabaseCommon.serializeKey(tableSchema, indexSchema.getName(), keys.get(j)));
       cobj.put(ComObject.Tag.SCHEMA_VERSION, 1000);
@@ -272,7 +272,7 @@ public class UpdateManagerTest {
 
       byte[] primaryKeyBytes = DatabaseCommon.serializeKey(tableSchema, indexSchema.getName(), keys.get(j));
 
-      ComObject cobj = new ComObject();
+      ComObject cobj = new ComObject(13);
       cobj.put(ComObject.Tag.RECORD_BYTES, records[j]);
       cobj.put(ComObject.Tag.KEY_BYTES, primaryKeyBytes);
 
@@ -296,7 +296,7 @@ public class UpdateManagerTest {
     }
 
     for (int j = 0; j < 4; j++) {
-      ComObject cobj = new ComObject();
+      ComObject cobj = new ComObject(12);
       cobj.put(ComObject.Tag.DB_NAME, "test");
       cobj.put(ComObject.Tag.SCHEMA_VERSION, 1000);
 
@@ -326,7 +326,7 @@ public class UpdateManagerTest {
     }
 
     //test truncate
-    ComObject cobj = new ComObject();
+    ComObject cobj = new ComObject(4);
     cobj.put(ComObject.Tag.DB_NAME, "test");
     cobj.put(ComObject.Tag.SCHEMA_VERSION, 1000);
     cobj.put(ComObject.Tag.TABLE_NAME, tableSchema.getName());
@@ -523,7 +523,7 @@ public class UpdateManagerTest {
 
     TestUtils.createStringIndexSchema(tableSchema);
 
-    ComObject cobj = new ComObject();
+    ComObject cobj = new ComObject(3);
     cobj.put(ComObject.Tag.DB_NAME, "test");
     cobj.put(ComObject.Tag.TABLE_NAME, "table1");
     cobj.put(ComObject.Tag.INDEX_NAME, "stringIndex");
@@ -609,7 +609,7 @@ public class UpdateManagerTest {
 
     assertEquals(stringIndex.size(), 1);
 
-    ComObject cobj = new ComObject();
+    ComObject cobj = new ComObject(3);
     cobj.put(ComObject.Tag.DB_NAME, "test");
     cobj.put(ComObject.Tag.TABLE_NAME, "table1");
     cobj.put(ComObject.Tag.INDEX_NAME, "stringIndex");
@@ -627,7 +627,7 @@ public class UpdateManagerTest {
           }
         });
 
-    cobj = new ComObject();
+    cobj = new ComObject(9);
     cobj.put(ComObject.Tag.DB_NAME, "test");
     cobj.put(ComObject.Tag.SCHEMA_VERSION, 1000);
     cobj.put(ComObject.Tag.PRIMARY_KEY_BYTES, DatabaseCommon.serializeKey(tableSchema, indexSchema.getName(), keys.get(0)));
@@ -704,7 +704,7 @@ public class UpdateManagerTest {
 
     assertEquals(stringIndex.size(), 1);
 
-    ComObject cobj = new ComObject();
+    ComObject cobj = new ComObject(3);
     cobj.put(ComObject.Tag.DB_NAME, "test");
     cobj.put(ComObject.Tag.TABLE_NAME, "table1");
     cobj.put(ComObject.Tag.INDEX_NAME, "stringIndex");
@@ -722,7 +722,7 @@ public class UpdateManagerTest {
           }
         });
 
-    cobj = new ComObject();
+    cobj = new ComObject(14);
     cobj.put(ComObject.Tag.DB_NAME, "test");
     cobj.put(ComObject.Tag.SCHEMA_VERSION, 1000);
     cobj.put(ComObject.Tag.TABLE_NAME, "table1");
@@ -803,7 +803,7 @@ public class UpdateManagerTest {
 
     ComObject cobj = InsertStatementHandler.serializeInsertKey(client, common, 0, "test", 0, tableId,
         indexId, "table1", keyInfo, indexSchema.getName(),
-        keys.get(9), null, keyRecord, false);
+        keys.get(9), null, keyRecord, false, 8);
 
     byte[] keyRecordBytes = keyRecord.serialize(SERIALIZATION_VERSION);
     cobj.put(ComObject.Tag.KEY_RECORD_BYTES, keyRecordBytes);
@@ -879,7 +879,7 @@ public class UpdateManagerTest {
       assertNull(index.get(keys.get(j)));
     }
 
-    cobj = new ComObject();
+    cobj = new ComObject(5);
     cobj.put(ComObject.Tag.DB_NAME, "test");
     cobj.put(ComObject.Tag.SCHEMA_VERSION, 1000);
     cobj.put(ComObject.Tag.TRANSACTION_ID, 1L);
@@ -916,7 +916,7 @@ public class UpdateManagerTest {
 
       ComObject cobj = InsertStatementHandler.serializeInsertKey(client, common, 0, "test", 0, tableId,
           indexId, "table1", keyInfo, indexSchema.getName(),
-          keys.get(j), null, keyRecord, false);
+          keys.get(j), null, keyRecord, false, 8);
 
       byte[] keyRecordBytes = keyRecord.serialize(SERIALIZATION_VERSION);
       cobj.put(ComObject.Tag.KEY_RECORD_BYTES, keyRecordBytes);
@@ -936,7 +936,7 @@ public class UpdateManagerTest {
       assertNull(index.get(keys.get(j)));
     }
 
-    ComObject cobj = new ComObject();
+    ComObject cobj = new ComObject(6);
     cobj.put(ComObject.Tag.DB_NAME, "test");
     cobj.put(ComObject.Tag.SCHEMA_VERSION, 1000);
     cobj.put(ComObject.Tag.TRANSACTION_ID, 1L);
@@ -974,10 +974,10 @@ public class UpdateManagerTest {
     when(client.send(anyString(), anyInt(), anyInt(), anyObject(), anyObject())).thenAnswer(new Answer() {
       @Override
       public Object answer(InvocationOnMock invocationOnMock) {
-        ComObject retObj = new ComObject();
-        ComArray array = retObj.putArray(ComObject.Tag.KEYS, ComObject.Type.BYTE_ARRAY_TYPE);
-        array = retObj.putArray(ComObject.Tag.KEY_RECORDS, ComObject.Type.BYTE_ARRAY_TYPE);
-        array = retObj.putArray(ComObject.Tag.RECORDS, ComObject.Type.BYTE_ARRAY_TYPE);
+        ComObject retObj = new ComObject(5);
+        ComArray array = retObj.putArray(ComObject.Tag.KEYS, ComObject.Type.BYTE_ARRAY_TYPE, records.length);
+        array = retObj.putArray(ComObject.Tag.KEY_RECORDS, ComObject.Type.BYTE_ARRAY_TYPE, records.length);
+        array = retObj.putArray(ComObject.Tag.RECORDS, ComObject.Type.BYTE_ARRAY_TYPE, records.length);
 
         for (int i = 0; i < records.length; i++) {
           byte[] bytes = records[i];
@@ -1005,7 +1005,7 @@ public class UpdateManagerTest {
       }
     }
 
-    ComObject cobj = new ComObject();
+    ComObject cobj = new ComObject(7);
     cobj.put(ComObject.Tag.DB_NAME, "test");
     cobj.put(ComObject.Tag.SCHEMA_VERSION, client.getCommon().getSchemaVersion());
     cobj.put(ComObject.Tag.METHOD, "UpdateManager:insertWithSelect");

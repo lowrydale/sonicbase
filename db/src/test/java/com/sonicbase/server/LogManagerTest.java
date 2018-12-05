@@ -8,7 +8,6 @@ import com.sonicbase.client.DatabaseClient;
 import com.sonicbase.common.*;
 import com.sonicbase.index.Indices;
 import com.sonicbase.query.DatabaseException;
-import com.sonicbase.util.TestUtils;
 import org.mockito.invocation.InvocationOnMock;
 import org.mockito.stubbing.Answer;
 import org.testng.annotations.BeforeClass;
@@ -37,7 +36,6 @@ public class LogManagerTest {
   @BeforeClass
   public void beforeClass() throws IOException {
     server = mock(DatabaseServer.class);
-    when(server.isDurable()).thenReturn(true);
     when(server.getDataDir()).thenReturn("/tmp/database");
 
     FileUtils.deleteDirectory(new File("/tmp/database"));
@@ -81,7 +79,7 @@ public class LogManagerTest {
     FileUtils.deleteDirectory(new File("/tmp/database"));
     com.sonicbase.server.LogManager logManager = new com.sonicbase.server.LogManager(server, new File("/tmp/database"));
 
-    ComObject cobj = new ComObject();
+    ComObject cobj = new ComObject(4);
     cobj.put(ComObject.Tag.DB_NAME, "__none__");
     cobj.put(ComObject.Tag.SCHEMA_VERSION, 1000);
     cobj.put(ComObject.Tag.METHOD, "DatabaseServer:updateServersConfig");
@@ -124,7 +122,7 @@ public class LogManagerTest {
     FileUtils.deleteDirectory(new File("/tmp/database"));
     LogManager logManager = new LogManager(server, new File("/tmp/database"));
 
-    ComObject cobj = new ComObject();
+    ComObject cobj = new ComObject(4);
     cobj.put(ComObject.Tag.DB_NAME, "__none__");
     cobj.put(ComObject.Tag.SCHEMA_VERSION, 1000);
     cobj.put(ComObject.Tag.METHOD, "DatabaseServer:updateServersConfig");
@@ -144,7 +142,7 @@ public class LogManagerTest {
     FileUtils.deleteDirectory(new File("/tmp/database"));
     LogManager logManager = new LogManager(server, new File("/tmp/database"));
 
-    ComObject cobj = new ComObject();
+    ComObject cobj = new ComObject(4);
     cobj.put(ComObject.Tag.DB_NAME, "__none__");
     cobj.put(ComObject.Tag.SCHEMA_VERSION, 1000);
     cobj.put(ComObject.Tag.METHOD, "DatabaseServer:updateServersConfig");
@@ -168,7 +166,7 @@ public class LogManagerTest {
     FileUtils.deleteDirectory(new File("/tmp/database"));
     LogManager logManager = new LogManager(server, new File("/tmp/database"));
 
-    ComObject cobj = new ComObject();
+    ComObject cobj = new ComObject(4);
     cobj.put(ComObject.Tag.DB_NAME, "__none__");
     cobj.put(ComObject.Tag.SCHEMA_VERSION, 1000);
     cobj.put(ComObject.Tag.METHOD, "DatabaseServer:updateServersConfig");
@@ -196,7 +194,7 @@ public class LogManagerTest {
     FileUtils.deleteDirectory(new File("/tmp/database"));
     LogManager logManager = new LogManager(server, new File("/tmp/database"));
 
-    ComObject cobj = new ComObject();
+    ComObject cobj = new ComObject(4);
     cobj.put(ComObject.Tag.DB_NAME, "__none__");
     cobj.put(ComObject.Tag.SCHEMA_VERSION, 1000);
     cobj.put(ComObject.Tag.METHOD, "DatabaseServer:updateServersConfig");
@@ -208,7 +206,7 @@ public class LogManagerTest {
 
     assertTrue(0 != org.apache.commons.io.FileUtils.sizeOfDirectory(new File("/tmp/database/0/0/peer-1")));
 
-    cobj = new ComObject();
+    cobj = new ComObject(1);
     cobj.put(ComObject.Tag.REPLICA, 1);
     ComObject retObj = logManager.sendLogsToPeer(cobj, false);
     ComArray array = retObj.getArray(ComObject.Tag.FILENAMES);

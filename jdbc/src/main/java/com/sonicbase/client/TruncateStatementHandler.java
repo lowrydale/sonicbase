@@ -34,7 +34,7 @@ public class TruncateStatementHandler implements StatementHandler {
 
   public static void doTruncateTable(DatabaseClient client, String dbName, String table, int schemaRetryCount) {
 
-    ComObject cobj = new ComObject();
+    ComObject cobj = new ComObject(5);
     cobj.put(ComObject.Tag.DB_NAME, dbName);
     if (schemaRetryCount < 2) {
       cobj.put(ComObject.Tag.SCHEMA_VERSION, client.getCommon().getSchemaVersion());

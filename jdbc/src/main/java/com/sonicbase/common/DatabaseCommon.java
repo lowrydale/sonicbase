@@ -36,6 +36,7 @@ public class DatabaseCommon {
   private static final String UTF_8_STR = "utf-8";
   private static final String SCHEMA_BIN_STR = "schema.bin";
   private static final Logger logger = LoggerFactory.getLogger(DatabaseCommon.class);
+  public static final int MAX_KEY_LEN = 64 * 1024;
 
   private int shard = -1;
   private int replica = -1;
@@ -49,7 +50,7 @@ public class DatabaseCommon {
   private final Lock internalWriteLock = internalReadWriteLock.writeLock();
   private int schemaVersion;
   private boolean haveProLicense;
-  private boolean durable;
+  private boolean notDurable;
 
   public Lock getSchemaReadLock(String dbName) {
     return schemaReadLock.computeIfAbsent(dbName, k -> {
@@ -85,7 +86,7 @@ public class DatabaseCommon {
   }
 
   public TableSchema getTableSchema(String dbName, String tableName, String dataDir) {
-    if (durable) {
+    if (notDurable) {
       return getTables(dbName).get(tableName);
     }
 
@@ -105,7 +106,8 @@ public class DatabaseCommon {
         SONICBASE_SCHEMA_STR + File.separator + dbName);
     File tableDir = new File(file, tableName + File.separator + "table");
     try {
-      loadTableSchema(dbSchema, tableDir);
+      Set<String> newTableNames = new HashSet<>();
+      loadTableSchema(dbSchema, tableDir, newTableNames);
     }
     catch (IOException e) {
       throw new DatabaseException(e);
@@ -114,7 +116,7 @@ public class DatabaseCommon {
   }
 
   public void loadSchema(String dataDir) {
-    if (!durable) {
+    if (notDurable) {
       return;
     }
     try {
@@ -141,10 +143,18 @@ public class DatabaseCommon {
           }
           File file = new File(dataDir, SNAPSHOT_STR + File.separator + shard + File.separator + replica +
               File.separator + SONICBASE_SCHEMA_STR + File.separator + dbName);
+          Set<String> newTableNames = new HashSet<>();
           File[] tableNames = file.listFiles();
           if (tableNames != null) {
             for (File tableFile : tableNames) {
-              loadTableSchema(dbSchema, tableFile);
+              loadTableSchema(dbSchema, tableFile, newTableNames);
+            }
+          }
+          //remove tables that no longer exist
+          for (TableSchema tableSchema : dbSchema.getTables().values()) {
+            if (!newTableNames.contains(tableSchema.getName())) {
+              dbSchema.getTablesById().remove(tableSchema.getTableId());
+              dbSchema.getTables().remove(tableSchema.getName());
             }
           }
         }
@@ -161,7 +171,7 @@ public class DatabaseCommon {
     }
   }
 
-  private void loadTableSchema(Schema dbSchema, File tableFile) throws IOException {
+  private void loadTableSchema(Schema dbSchema, File tableFile, Set<String> newTableNames) throws IOException {
     String tableName = tableFile.getName();
     TableSchema previousTableSchema = dbSchema.getTables().get(tableName);
     File tableDir = new File(tableFile + "/table");
@@ -174,17 +184,18 @@ public class DatabaseCommon {
         short serializationVersion = in.readShort();
         try {
           tableSchema.deserialize(in, serializationVersion);
-          TableSchema existingSchema = dbSchema.getTables().get(tableSchema.getName());
-          existingSchema.getIndexesById().clear();
-          existingSchema.getIndices().clear(); //ignore indices in the table will read index files
+//          TableSchema existingSchema = dbSchema.getTables().get(tableSchema.getName());
+//          existingSchema.getIndexesById().clear();
+//          existingSchema.getIndices().clear(); //ignore indices in the table will read index files
 
-          dbSchema.getTables().put(tableSchema.getName(), tableSchema);
-          dbSchema.getTablesById().put(tableSchema.getTableId(), tableSchema);
           File indicesDir = new File(tableFile, File.separator + "indices");
           if (indicesDir.exists()) {
             File[] indices = indicesDir.listFiles();
             loadIndicesForTableSchema(previousTableSchema, tableSchema, indices);
           }
+          newTableNames.add(tableSchema.getName());
+          dbSchema.getTables().put(tableSchema.getName(), tableSchema);
+          dbSchema.getTablesById().put(tableSchema.getTableId(), tableSchema);
         }
         catch (Exception e) {
           throw new DatabaseException("Error deserializing tableSchema: file=" + tableSchemaFile.getAbsolutePath());
@@ -249,7 +260,7 @@ public class DatabaseCommon {
   }
 
   public void saveSchema(String dataDir) {
-    if (!durable) {
+    if (notDurable) {
       return;
     }
     try {
@@ -402,46 +413,69 @@ public class DatabaseCommon {
     return 0;
   }
 
-  public static Object[] deserializeKey(TableSchema tableSchema, byte[] bytes) throws EOFException {
-    return deserializeKey(tableSchema, new DataInputStream(new ByteArrayInputStream(bytes)));
+  public static Object[] deserializeKey(TableSchema tableSchema, DataInputStream in) throws IOException {
+    byte[] tmp = new byte[20];
+    int[] offset = new int[]{0};
+
+    long serializationVersion = Varint.readSignedVarLong(in);
+    DataUtils.writeSignedVarLong(serializationVersion, tmp, offset);
+    int serSize = offset[0];
+    int size = in.readInt();
+
+    byte[] bytes = new byte[size];
+    in.read(bytes, serSize + 4, bytes.length - (serSize + 4));
+    offset[0] = 0;
+    DataUtils.writeSignedVarLong(serializationVersion, bytes, offset);
+    DataUtils.intToBytes(size, bytes, offset[0]);
+    return deserializeKey(tableSchema, bytes);
   }
 
-  public static Object[] deserializeKey(TableSchema tableSchema, DataInputStream in) throws EOFException {
+   public static Object[] deserializeKey(TableSchema tableSchema, byte[] bytes) throws EOFException {
 
     int indexId = -1;
     try {
-      Varint.readSignedVarLong(in); // serializationVersion
-      Varint.readSignedVarLong(in);
-      indexId = (int) Varint.readSignedVarLong(in);
+      int[] offset = new int[]{0};
+      long serializationVersion = DataUtils.readSignedVarLong(bytes, offset); // serializationVersion
+      offset[0] += 4;// size
+      DataUtils.readSignedVarLong(bytes, offset);
+
+      indexId = (int) DataUtils.readSignedVarLong(bytes, offset);
       IndexSchema indexSchema = tableSchema.getIndexesById().get(indexId);
       int[] columns = indexSchema.getFieldOffsets();
-      int keyLength = (int) Varint.readSignedVarLong(in);
+      int keyLength = (int) DataUtils.readSignedVarLong(bytes, offset);
       Object[] fields = new Object[keyLength];
       for (int i = 0; i < keyLength; i++) {
-        if (in.readBoolean()) {
+        if (bytes[offset[0]++] != 0) {
           switch (tableSchema.getFields().get(columns[i]).getType()) {
             case BIGINT:
-              fields[i] = Varint.readSignedVarLong(in);
+              fields[i] = DataUtils.readSignedVarLong(bytes, offset);
               break;
             case INTEGER:
-              fields[i] = (int) Varint.readSignedVarLong(in);
+              fields[i] = (int) DataUtils.readSignedVarLong(bytes, offset);
               break;
             case SMALLINT:
-              fields[i] = (short) Varint.readSignedVarLong(in);
+              fields[i] = (short) DataUtils.readSignedVarLong(bytes, offset);
               break;
             case TINYINT:
-              fields[i] = in.readByte();
+              fields[i] = bytes[offset[0]++];
               break;
             case FLOAT:
-            case DOUBLE:
-              fields[i] = in.readDouble();
-              break;
-            case REAL:
-              fields[i] = in.readFloat();
-              break;
+            case DOUBLE: {
+              long value = DataUtils.bytesToLong(bytes, offset[0]);
+              offset[0] += 8;
+              fields[i] = Double.longBitsToDouble(value);
+            }
+            break;
+            case REAL: {
+              int value = DataUtils.bytesToInt(bytes, offset[0]);
+              offset[0] += 4;
+              fields[i] = Float.intBitsToFloat(value);
+            }
+            break;
             case BOOLEAN:
             case BIT:
-              fields[i] = in.readBoolean();
+              int ch = bytes[offset[0]++];
+              fields[i] = (ch != 0);
               break;
             case CHAR:
             case NCHAR:
@@ -451,58 +485,70 @@ public class DatabaseCommon {
             case CLOB:
             case NCLOB:
             case NVARCHAR: {
-              int len = (int) Varint.readSignedVarLong(in);
-              byte[] bytes = new byte[len];
-              in.read(bytes);
-              fields[i] = bytes;
+              int len = (int) DataUtils.readSignedVarLong(bytes, offset);
+              byte[] currBytes = new byte[len];
+              System.arraycopy(bytes, offset[0], currBytes, 0, len);
+              fields[i] = currBytes;
+              offset[0] += len;
             }
               break;
             case LONGVARBINARY:
             case VARBINARY:
             case BLOB: {
-              int len = (int) Varint.readSignedVarLong(in);
-              byte[] data = new byte[len];
-              in.readFully(data);
-              fields[i] = data;
+              int len = (int) DataUtils.readSignedVarLong(bytes, offset);
+              byte[] currBytes = new byte[len];
+              System.arraycopy(bytes, offset[0], currBytes, 0, len);
+              fields[i] = currBytes;
+              offset[0] += len;
             }
               break;
             case NUMERIC: {
-              int len = (int) Varint.readSignedVarLong(in);
-              byte[] buffer = new byte[len];
-              in.readFully(buffer);
-              String str = new String(buffer, UTF_8_STR);
+              int len = (int) DataUtils.readSignedVarLong(bytes, offset);
+              byte[] currBytes = new byte[len];
+              System.arraycopy(bytes, offset[0], currBytes, 0, len);
+              fields[i] = currBytes;
+              offset[0] += len;
+              String str = new String(currBytes, UTF_8_STR);
               fields[i] = new BigDecimal(str);
             }
               break;
             case DECIMAL: {
-              int len = (int) Varint.readSignedVarLong(in);
-              byte[] buffer = new byte[len];
-              in.readFully(buffer);
-              String str = new String(buffer, UTF_8_STR);
+              int len = (int) DataUtils.readSignedVarLong(bytes, offset);
+              byte[] currBytes = new byte[len];
+              System.arraycopy(bytes, offset[0], currBytes, 0, len);
+              fields[i] = currBytes;
+              offset[0] += len;
+              String str = new String(currBytes, UTF_8_STR);
               fields[i] = new BigDecimal(str);
             }
               break;
             case DATE: {
-              int len = (int) Varint.readSignedVarLong(in);
-              byte[] buffer = new byte[len];
-              in.readFully(buffer);
-              String str = new String(buffer, UTF_8_STR);
+              int len = (int) DataUtils.readSignedVarLong(bytes, offset);
+              byte[] currBytes = new byte[len];
+              System.arraycopy(bytes, offset[0], currBytes, 0, len);
+              fields[i] = currBytes;
+              offset[0] += len;
+              String str = new String(currBytes, UTF_8_STR);
               fields[i] = Date.valueOf(str);
             }
               break;
             case TIME: {
-              int len = (int) Varint.readSignedVarLong(in);
-              byte[] buffer = new byte[len];
-              in.readFully(buffer);
-              String str = new String(buffer, UTF_8_STR);
+              int len = (int) DataUtils.readSignedVarLong(bytes, offset);
+              byte[] currBytes = new byte[len];
+              System.arraycopy(bytes, offset[0], currBytes, 0, len);
+              fields[i] = currBytes;
+              offset[0] += len;
+              String str = new String(currBytes, UTF_8_STR);
               fields[i] = Time.valueOf(str);
             }
               break;
             case TIMESTAMP: {
-              int len = (int) Varint.readSignedVarLong(in);
-              byte[] buffer = new byte[len];
-              in.readFully(buffer);
-              String str = new String(buffer, UTF_8_STR);
+              int len = (int) DataUtils.readSignedVarLong(bytes, offset);
+              byte[] currBytes = new byte[len];
+              System.arraycopy(bytes, offset[0], currBytes, 0, len);
+              fields[i] = currBytes;
+              offset[0] += len;
+              String str = new String(currBytes, UTF_8_STR);
               fields[i] = Timestamp.valueOf(str);
             }
               break;
@@ -510,9 +556,6 @@ public class DatabaseCommon {
         }
       }
       return fields;
-    }
-    catch (EOFException e) {
-      throw e;
     }
     catch (IOException e) {
       throw new DatabaseException(e);
@@ -525,6 +568,7 @@ public class DatabaseCommon {
   public static DataType.Type[] deserializeKeyPrep(TableSchema tableSchema, byte[] bytes) throws IOException {
     DataInputStream in = new DataInputStream(new ByteArrayInputStream(bytes));
     Varint.readSignedVarLong(in); // serializationVersion
+    in.readInt();//size
     Varint.readSignedVarLong(in);
     int indexId = (int) Varint.readSignedVarLong(in);
     IndexSchema indexSchema = tableSchema.getIndexesById().get(indexId);
@@ -545,6 +589,7 @@ public class DatabaseCommon {
   public static Object[] deserializeKey(DataType.Type[] types, DataInputStream in) throws EOFException {
     try {
       Varint.readSignedVarLong(in); // serializationVersion
+      in.readInt();
       Varint.readSignedVarLong(in);
       Varint.readSignedVarLong(in); //indexId
       int keyLength = (int) Varint.readSignedVarLong(in);
@@ -653,6 +698,7 @@ public class DatabaseCommon {
       ByteArrayOutputStream bytesOut = new ByteArrayOutputStream();
       DataOutputStream out = new DataOutputStream(bytesOut);
       Varint.writeSignedVarLong(SERIALIZATION_VERSION, out);
+      out.writeInt(0); //size, will set later
       Varint.writeSignedVarLong(tableSchema.getTableId(), out);
       Varint.writeSignedVarLong(tableSchema.getIndices().get(indexName).getIndexId(), out);
       IndexSchema indexSchema = tableSchema.getIndices().get(indexName);
@@ -758,11 +804,35 @@ public class DatabaseCommon {
         }
       }
       out.close();
-      return bytesOut.toByteArray();
+
+      byte[] ret = bytesOut.toByteArray();
+
+      int[] offset = new int[]{serializationVersionLen};
+      DataUtils.intToBytes(ret.length, ret, offset[0]);
+
+      if (ret.length > MAX_KEY_LEN) {
+        throw new DatabaseException("Key too large: max=64k, table=" + tableSchema.getName() + ", index=" + indexName);
+      }
+      return ret;
     }
     catch (IOException e) {
       throw new DatabaseException(e);
     }
+  }
+
+  private static int serializationVersionLen;
+
+  static {
+    int[] offset = new int[]{0};
+    byte[] tmp = new byte[20];
+    try {
+      DataUtils.writeSignedVarLong(SERIALIZATION_VERSION, tmp, offset);
+      serializationVersionLen = offset[0];
+    }
+    catch (IOException e) {
+      logger.error("Error initializing serialization version len");
+    }
+
   }
 
   public static Object[] deserializeTypedKey(byte[] bytes) {
@@ -1234,7 +1304,7 @@ public class DatabaseCommon {
   }
 
   public void saveServersConfig(String dataDir) throws IOException {
-    if (!durable) {
+    if (notDurable) {
       return;
     }
     try {
@@ -1306,7 +1376,7 @@ public class DatabaseCommon {
   }
 
   public List<String> getDbNames(String dataDir) {
-    if (!durable) {
+    if (notDurable) {
       return new ArrayList<>(getDatabases().keySet());
     }
     File file = new File(dataDir, SNAPSHOT_STR + File.separator + shard + File.separator + replica);
@@ -1335,7 +1405,7 @@ public class DatabaseCommon {
     }
   }
 
-  public void setIsDurable(boolean durable) {
-    this.durable = durable;
+  public void setIsNotDurable(boolean notDurable) {
+    this.notDurable = notDurable;
   }
 }

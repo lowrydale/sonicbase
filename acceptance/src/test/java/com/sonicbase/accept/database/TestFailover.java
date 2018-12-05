@@ -71,7 +71,7 @@ public class TestFailover {
         int replica = i % 2;
 
         dbServers[shard][replica] = new DatabaseServer();
-        dbServers[shard][replica].setConfig(config, "4-servers", "localhost", 9010 + (50 * i), true, new AtomicBoolean(true), new AtomicBoolean(true),null);
+        dbServers[shard][replica].setConfig(config, "4-servers", "localhost", 9010 + (50 * i), true, new AtomicBoolean(true), new AtomicBoolean(true),null, false);
         dbServers[shard][replica].setRole(role);
         //          return null;
         //        }
@@ -164,7 +164,7 @@ public class TestFailover {
       //    stmt.executeUpdate();
 
       while (true) {
-        ComObject cobj = new ComObject();
+        ComObject cobj = new ComObject(1);
         cobj.put(ComObject.Tag.METHOD, "DatabaseServer:areAllLongRunningCommandsComplete");
         byte[] bytes = ((ConnectionProxy) conn).getDatabaseClient().sendToMaster(cobj);
         ComObject retObj = new ComObject(bytes);
@@ -260,7 +260,7 @@ public class TestFailover {
       assertTrue(client.getCommon().getServersConfig().getShards()[1].getReplicas()[1].isDead());
       assertFalse(client.getCommon().getServersConfig().getShards()[1].getReplicas()[0].isDead());
 
-      ComObject cobj = new ComObject();
+      ComObject cobj = new ComObject(3);
       cobj.put(ComObject.Tag.DB_NAME, "__none__");
       cobj.put(ComObject.Tag.SCHEMA_VERSION, client.getCommon().getSchemaVersion());
       cobj.put(ComObject.Tag.METHOD, "testWrite");

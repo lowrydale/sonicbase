@@ -1,7 +1,6 @@
 package com.sonicbase.accept.server;
 
 import com.fasterxml.jackson.databind.ObjectMapper;
-import com.fasterxml.jackson.databind.node.ObjectNode;
 import com.sonicbase.client.DatabaseClient;
 import com.sonicbase.common.ComObject;
 import com.sonicbase.common.Config;
@@ -22,8 +21,6 @@ import com.sonicbase.server.ProServer;
 import org.apache.commons.io.FileUtils;
 import org.apache.commons.io.IOUtils;
 import org.apache.commons.lang.exception.ExceptionUtils;
-import org.h2.command.Prepared;
-import org.python.antlr.base.stmt;
 import org.testng.annotations.AfterClass;
 import org.testng.annotations.BeforeClass;
 import org.testng.annotations.DataProvider;
@@ -33,7 +30,6 @@ import org.yaml.snakeyaml.Yaml;
 import javax.crypto.*;
 import java.io.BufferedInputStream;
 import java.io.File;
-import java.io.FileInputStream;
 import java.security.InvalidKeyException;
 import java.security.Key;
 import java.sql.*;
@@ -103,7 +99,7 @@ public class TestDatabase {
         //          String role = "primaryMaster";
 
         dbServers[i] = new DatabaseServer();
-        dbServers[i].setConfig(config, "4-servers", "localhost", 9010 + (50 * i), true, new AtomicBoolean(true), new AtomicBoolean(true),null);
+        dbServers[i].setConfig(config, "4-servers", "localhost", 9010 + (50 * i), true, new AtomicBoolean(true), new AtomicBoolean(true),null, false);
         dbServers[i].setRole(role);
 
 //        if (shard == 0) {
@@ -161,7 +157,7 @@ public class TestDatabase {
       clusterClient.setPageSize(3);
 
       embedded = new EmbeddedDatabase();
-      embedded.setDurability(System.getProperty("user.home") + "/db-data.embedded");
+      embedded.enableDurability(System.getProperty("user.home") + "/db-data.embedded");
       embedded.setUseUnsafe(false);
       embedded.purge();
       embedded.start();
@@ -240,6 +236,10 @@ public class TestDatabase {
         }
       }
 
+      File dir = new File(System.getProperty("user.home"), "/db/backup");
+      FileUtils.deleteDirectory(dir);
+      dir.mkdirs();
+
       clusterClient.startBackup();
       while (true) {
         Thread.sleep(1000);
@@ -277,7 +277,7 @@ public class TestDatabase {
         server.shutdownRepartitioner();
       }
 
-      ComObject cobj = new ComObject();
+      ComObject cobj = new ComObject(3);
       cobj.put(ComObject.Tag.DB_NAME, "test");
       cobj.put(ComObject.Tag.SCHEMA_VERSION, clusterClient.getCommon().getSchemaVersion());
       cobj.put(ComObject.Tag.METHOD, "DeleteManager:forceDeletes");
@@ -477,7 +477,7 @@ public class TestDatabase {
     //    stmt.executeUpdate();
 
     while (true) {
-      ComObject cobj = new ComObject();
+      ComObject cobj = new ComObject(1);
       cobj.put(ComObject.Tag.METHOD, "DatabaseServer:areAllLongRunningCommandsComplete");
       byte[] bytes = ((ConnectionProxy) conn).getDatabaseClient().sendToMaster(cobj);
       ComObject retObj = new ComObject(bytes);

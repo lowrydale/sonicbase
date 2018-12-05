@@ -249,7 +249,7 @@ public class MasterManager {
     try {
       if (electedMaster != -1) {
         logger.info("Elected master: shard={}, replica={}", shard, electedMaster);
-        ComObject cobj = new ComObject();
+        ComObject cobj = new ComObject(4);
         cobj.put(ComObject.Tag.DB_NAME, NONE_STR);
         cobj.put(ComObject.Tag.SCHEMA_VERSION, server.getCommon().getSchemaVersion());
         cobj.put(ComObject.Tag.SHARD, shard);
@@ -258,7 +258,7 @@ public class MasterManager {
 
         server.getDatabaseClient().sendToMaster("MasterManager:promoteToMasterAndPushSchema", cobj);
 
-        cobj = new ComObject();
+        cobj = new ComObject(4);
         cobj.put(ComObject.Tag.DB_NAME, NONE_STR);
         cobj.put(ComObject.Tag.SCHEMA_VERSION, server.getCommon().getSchemaVersion());
         cobj.put(ComObject.Tag.SHARD, shard);
@@ -308,7 +308,7 @@ public class MasterManager {
     for (int shard = 0; shard < server.getShardCount(); shard++) {
       final int localShard = shard;
       futures.add(server.getExecutor().submit((Callable) () -> {
-        ComObject cobj1 = new ComObject();
+        ComObject cobj1 = new ComObject(5);
         cobj1.put(ComObject.Tag.DB_NAME, NONE_STR);
         cobj1.put(ComObject.Tag.SCHEMA_VERSION, server.getCommon().getSchemaVersion());
         cobj1.put(ComObject.Tag.METHOD, "MasterManager:promoteToMaster");
@@ -345,7 +345,7 @@ public class MasterManager {
     else {
       logger.info("candidate master is healthy, accepting: shard={}, candidateMaster={}", requestedMasterShard, requestedMasterReplica);
     }
-    ComObject retObj = new ComObject();
+    ComObject retObj = new ComObject(1);
     retObj.put(ComObject.Tag.SELECTED_MASTE_REPLICA, requestedMasterReplica);
     return retObj;
   }
@@ -370,7 +370,7 @@ public class MasterManager {
         server.checkHealthOfServer(monitorShards[i], monitorReplicas[i], isHealthy);
 
         if (isHealthy.get()) {
-          ComObject cobj = new ComObject();
+          ComObject cobj = new ComObject(3);
           cobj.put(ComObject.Tag.DB_NAME, NONE_STR);
           cobj.put(ComObject.Tag.SCHEMA_VERSION, server.getCommon().getSchemaVersion());
           cobj.put(ComObject.Tag.METHOD, "DatabaseServer:getSchema");
@@ -479,7 +479,7 @@ public class MasterManager {
 
           logger.info("ElectNewMaster, electing new: nextMonitor={}, shard={}, replica={}",
               nextMonitor.get(), shard, j);
-          ComObject cobj = new ComObject();
+          ComObject cobj = new ComObject(5);
           cobj.put(ComObject.Tag.DB_NAME, "__non__");
           cobj.put(ComObject.Tag.SCHEMA_VERSION, server.getCommon().getSchemaVersion());
           cobj.put(ComObject.Tag.METHOD, "MasterManager:electNewMaster");

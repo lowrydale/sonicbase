@@ -200,23 +200,23 @@ public class SelectStatementHandler implements StatementHandler {
 
   public void doServerSetSelect(String dbName, String[] tableNames, SetOperation setOperation, ResultSetImpl ret,
                                 boolean restrictToThisServer, StoredProcedureContextImpl procedureContext) throws IOException {
-    ComObject cobj = new ComObject();
-    ComArray array = cobj.putArray(ComObject.Tag.SELECT_STATEMENTS, ComObject.Type.BYTE_ARRAY_TYPE);
+    ComObject cobj = new ComObject(9);
+    ComArray array = cobj.putArray(ComObject.Tag.SELECT_STATEMENTS, ComObject.Type.BYTE_ARRAY_TYPE, setOperation.getSelectStatements().length);
     for (int i = 0; i < setOperation.getSelectStatements().length; i++) {
       setOperation.getSelectStatements()[i].setTableNames(new String[]{setOperation.getSelectStatements()[i].getFromTable()});
       array.add(setOperation.getSelectStatements()[i].serialize());
     }
     if (setOperation.getOrderBy() != null) {
-      ComArray orderByArray = cobj.putArray(ComObject.Tag.ORDER_BY_EXPRESSIONS, ComObject.Type.BYTE_ARRAY_TYPE);
+      ComArray orderByArray = cobj.putArray(ComObject.Tag.ORDER_BY_EXPRESSIONS, ComObject.Type.BYTE_ARRAY_TYPE, setOperation.getOrderBy().length);
       for (int i = 0; i < setOperation.getOrderBy().length; i++) {
         orderByArray.add(setOperation.getOrderBy()[i].serialize());
       }
     }
-    ComArray tablesArray = cobj.putArray(ComObject.Tag.TABLES, ComObject.Type.STRING_TYPE);
+    ComArray tablesArray = cobj.putArray(ComObject.Tag.TABLES, ComObject.Type.STRING_TYPE, tableNames.length);
     for (int i = 0; i < tableNames.length; i++) {
       tablesArray.add(tableNames[i]);
     }
-    ComArray strArray = cobj.putArray(ComObject.Tag.OPERATIONS, ComObject.Type.STRING_TYPE);
+    ComArray strArray = cobj.putArray(ComObject.Tag.OPERATIONS, ComObject.Type.STRING_TYPE, setOperation.getOperations().length);
     for (int i = 0; i < setOperation.getOperations().length; i++) {
       strArray.add(setOperation.getOperations()[i]);
     }

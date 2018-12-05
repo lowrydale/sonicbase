@@ -88,27 +88,11 @@ public class Record {
   }
 
   public static void setDbViewFlags(byte[] bytes, short dbViewFlag) {
-    ByteArrayOutputStream bytesOut = new ByteArrayOutputStream();
-    DataOutputStream out = new DataOutputStream(bytesOut);
-    try {
-      out.writeShort(dbViewFlag);
-      System.arraycopy(bytesOut.toByteArray(), 0, bytes, 2 + 8 + 8 + 2 + 4, 2);
-    }
-    catch (IOException e) {
-      throw new DatabaseException(e);
-    }
+    DataUtils.shortToBytes(dbViewFlag, bytes, 2 + 8 + 8 + 2 + 4);
   }
 
   public static void setDbViewNumber(byte[] bytes, int schemaVersion) {
-    ByteArrayOutputStream bytesOut = new ByteArrayOutputStream();
-    DataOutputStream out = new DataOutputStream(bytesOut);
-    try {
-      out.writeInt(schemaVersion);
-      System.arraycopy(bytesOut.toByteArray(), 0, bytes,  2 + 8 + 8 + 2, 4);
-    }
-    catch (IOException e) {
-      throw new DatabaseException(e);
-    }
+    DataUtils.intToBytes(schemaVersion, bytes, 2 + 8 + 8 + 2);
   }
 
   public static int getDbViewNumber(byte[] bytes) {

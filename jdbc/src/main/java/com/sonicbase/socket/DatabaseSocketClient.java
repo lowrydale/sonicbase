@@ -79,7 +79,7 @@ public class DatabaseSocketClient {
           latch.countDown();
         }
         catch (Exception e) {
-          logger.error("Error connecting to server: host={}, port={}", host, port);
+          logger.warn("Error connecting to server: host={}, port={}", host, port);
         }
       });
       thread.start();

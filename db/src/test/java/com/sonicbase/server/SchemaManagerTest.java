@@ -13,6 +13,7 @@ import com.sonicbase.schema.FieldSchema;
 import com.sonicbase.schema.TableSchema;
 import org.mockito.invocation.InvocationOnMock;
 import org.mockito.stubbing.Answer;
+import org.testng.annotations.BeforeClass;
 import org.testng.annotations.Test;
 
 import java.io.ByteArrayOutputStream;
@@ -23,15 +24,21 @@ import java.util.ArrayList;
 import java.util.List;
 
 import static org.mockito.Matchers.*;
+import static org.mockito.Mockito.doAnswer;
 import static org.mockito.Mockito.mock;
 import static org.mockito.Mockito.when;
 import static org.testng.Assert.*;
 
 public class SchemaManagerTest {
 
+  @BeforeClass
+  public void beforeClass() {
+    System.setProperty("log4j.configuration", "test-log4j.xml");
+  }
+
   @Test
   public void testCreateDatabase() {
-    ComObject cobj = new ComObject();
+    ComObject cobj = new ComObject(3);
     cobj.put(ComObject.Tag.DB_NAME, "test");
     cobj.put(ComObject.Tag.SCHEMA_VERSION, 1000);
     cobj.put(ComObject.Tag.MASTER_SLAVE, "master");
@@ -70,7 +77,7 @@ public class SchemaManagerTest {
 
   @Test
   public void testCreateTableDropTable() throws IOException {
-    ComObject cobj = new ComObject();
+    ComObject cobj = new ComObject(3);
     cobj.put(ComObject.Tag.DB_NAME, "test");
     cobj.put(ComObject.Tag.SCHEMA_VERSION, 1000);
     cobj.put(ComObject.Tag.MASTER_SLAVE, "master");
@@ -110,7 +117,7 @@ public class SchemaManagerTest {
 
     byte[] schemaBytes = server.getCommon().serializeSchema(DatabaseClient.SERIALIZATION_VERSION);
 
-    cobj = new ComObject();
+    cobj = new ComObject(4);
     cobj.put(ComObject.Tag.DB_NAME, "test");
     cobj.put(ComObject.Tag.SCHEMA_VERSION, 1000);
     cobj.put(ComObject.Tag.MASTER_SLAVE, "master");
@@ -121,7 +128,7 @@ public class SchemaManagerTest {
 
     assertFalse(common.getTables("test").containsKey("table1"));
 
-    cobj = new ComObject();
+    cobj = new ComObject(5);
     cobj.put(ComObject.Tag.SCHEMA_BYTES, schemaBytes);
     cobj.put(ComObject.Tag.TABLE_NAME, "table1");
     cobj.put(ComObject.Tag.DB_NAME, "test");
@@ -165,7 +172,7 @@ public class SchemaManagerTest {
     createTableStatement.setFields(fields);
     createTableStatement.setPrimaryKey(primaryKey);
 
-    cobj = new ComObject();
+    cobj = new ComObject(4);
     cobj.put(ComObject.Tag.DB_NAME, "test");
     cobj.put(ComObject.Tag.SCHEMA_VERSION, 1000);
     cobj.put(ComObject.Tag.CREATE_TABLE_STATEMENT, createTableStatement.serialize());
@@ -179,7 +186,7 @@ public class SchemaManagerTest {
 
   @Test
   public void testCreateIndexDropIndex() throws IOException {
-    ComObject cobj = new ComObject();
+    ComObject cobj = new ComObject(3);
     cobj.put(ComObject.Tag.DB_NAME, "test");
     cobj.put(ComObject.Tag.SCHEMA_VERSION, 1000);
     cobj.put(ComObject.Tag.MASTER_SLAVE, "master");
@@ -218,7 +225,7 @@ public class SchemaManagerTest {
 
     createTable(cobj, server, common, client);
 
-    cobj = new ComObject();
+    cobj = new ComObject(6);
     cobj.put(ComObject.Tag.DB_NAME, "test");
     cobj.put(ComObject.Tag.SCHEMA_VERSION, 1000);
     cobj.put(ComObject.Tag.MASTER_SLAVE, "master");
@@ -235,7 +242,7 @@ public class SchemaManagerTest {
 
     assertTrue(common.getTables("test").get("table1").getIndices().containsKey("index1"));
 
-    cobj = new ComObject();
+    cobj = new ComObject(5);
     cobj.put(ComObject.Tag.DB_NAME, "test");
     cobj.put(ComObject.Tag.SCHEMA_VERSION, client.getCommon().getSchemaVersion());
     cobj.put(ComObject.Tag.TABLE_NAME, "table1");
@@ -250,13 +257,13 @@ public class SchemaManagerTest {
     byte[] schemaBytes2 = server.getCommon().serializeSchema(DatabaseClient.SERIALIZATION_VERSION);
     server.getCommon().setSchemaVersion(1);
 
-    cobj = new ComObject();
+    cobj = new ComObject(4);
     cobj.put(ComObject.Tag.DB_NAME, "test");
     cobj.put(ComObject.Tag.SCHEMA_VERSION, server.getCommon().getSchemaVersion());
     cobj.put(ComObject.Tag.SCHEMA_BYTES, schemaBytes);
     cobj.put(ComObject.Tag.TABLE_NAME, "table1");
 
-    ComArray array = cobj.putArray(ComObject.Tag.INDICES, ComObject.Type.STRING_TYPE);
+    ComArray array = cobj.putArray(ComObject.Tag.INDICES, ComObject.Type.STRING_TYPE, 1);
     array.add("index1");
     cobj.put(ComObject.Tag.MASTER_SLAVE, "slave");
 
@@ -266,13 +273,13 @@ public class SchemaManagerTest {
     assertTrue(common.getTables("test").get("table1").getIndices().containsKey("index1"));
 
 
-    cobj = new ComObject();
+    cobj = new ComObject(4);
     cobj.put(ComObject.Tag.SCHEMA_BYTES, schemaBytes2);
     cobj.put(ComObject.Tag.DB_NAME, "test");
     cobj.put(ComObject.Tag.SCHEMA_VERSION, server.getCommon().getSchemaVersion());
     cobj.put(ComObject.Tag.TABLE_NAME, "table1");
 
-    array = cobj.putArray(ComObject.Tag.INDICES, ComObject.Type.STRING_TYPE);
+    array = cobj.putArray(ComObject.Tag.INDICES, ComObject.Type.STRING_TYPE, 1);
     array.add("index1");
     cobj.put(ComObject.Tag.MASTER_SLAVE, "slave");
 
@@ -283,7 +290,7 @@ public class SchemaManagerTest {
 
   @Test
   public void testAddDropColumn() throws IOException {
-    ComObject cobj = new ComObject();
+    ComObject cobj = new ComObject(3);
     cobj.put(ComObject.Tag.DB_NAME, "test");
     cobj.put(ComObject.Tag.SCHEMA_VERSION, 1000);
     cobj.put(ComObject.Tag.MASTER_SLAVE, "master");
@@ -321,7 +328,7 @@ public class SchemaManagerTest {
 
     createTable(cobj, server, common, client);
 
-    cobj = new ComObject();
+    cobj = new ComObject(5);
     cobj.put(ComObject.Tag.DB_NAME, "test");
     cobj.put(ComObject.Tag.SCHEMA_VERSION, 1000);
     cobj.put(ComObject.Tag.TABLE_NAME, "table1");
@@ -338,7 +345,7 @@ public class SchemaManagerTest {
 
     byte[] schemaBytes = server.getCommon().serializeSchema(DatabaseClient.SERIALIZATION_VERSION);
 
-    cobj = new ComObject();
+    cobj = new ComObject(6);
     cobj.put(ComObject.Tag.DB_NAME, "test");
     cobj.put(ComObject.Tag.SCHEMA_VERSION, client.getCommon().getSchemaVersion());
     cobj.put(ComObject.Tag.TABLE_NAME, "table1");
@@ -356,7 +363,7 @@ public class SchemaManagerTest {
 
     schemaBytes = server.getCommon().serializeSchema(DatabaseClient.SERIALIZATION_VERSION);
 
-    cobj = new ComObject();
+    cobj = new ComObject(5);
     cobj.put(ComObject.Tag.DB_NAME, "test");
     cobj.put(ComObject.Tag.SCHEMA_VERSION, 1000);
     cobj.put(ComObject.Tag.TABLE_NAME, "table1");
@@ -373,7 +380,7 @@ public class SchemaManagerTest {
 
     byte[] schemaBytes2 = server.getCommon().serializeSchema(DatabaseClient.SERIALIZATION_VERSION);
 
-    cobj = new ComObject();
+    cobj = new ComObject(12);
     cobj.put(ComObject.Tag.DB_NAME, "test");
     cobj.put(ComObject.Tag.SCHEMA_BYTES, schemaBytes);
     cobj.put(ComObject.Tag.SCHEMA_VERSION, 1000);
@@ -410,7 +417,7 @@ public class SchemaManagerTest {
 
   @Test
   public void testReconcileSchema() throws IOException {
-    ComObject cobj = new ComObject();
+    ComObject cobj = new ComObject(3);
     cobj.put(ComObject.Tag.DB_NAME, "test");
     cobj.put(ComObject.Tag.SCHEMA_VERSION, 1000);
     cobj.put(ComObject.Tag.MASTER_SLAVE, "master");
@@ -422,14 +429,19 @@ public class SchemaManagerTest {
     FileUtils.deleteDirectory(new File("/tmp/database"));
     when(server.getShardCount()).thenReturn(1);
     when(server.getReplicationFactor()).thenReturn(2);
-    when(server.isDurable()).thenReturn(true);
+//    doAnswer(new Answer() {
+//      @Override
+//      public Object answer(InvocationOnMock invocationOnMock) throws Throwable {
+//        return null;
+//      }
+//    }).when(server).pushSchema());
 
     SnapshotManager snapshotManager = new SnapshotManager(server);
     when(server.getSnapshotManager()).thenReturn(snapshotManager);
     final SchemaManager schemaManager = new SchemaManager(server);
 
     DatabaseCommon common = new DatabaseCommon();
-    common.setIsDurable(true);
+    common.setIsNotDurable(false);
     when(server.getCommon()).thenReturn(common);
     DatabaseClient client = mock(DatabaseClient.class);
     when(client.getCommon()).thenReturn(common);
@@ -461,7 +473,7 @@ public class SchemaManagerTest {
 
     createTable(cobj, server, common, client);
 
-    cobj = new ComObject();
+    cobj = new ComObject(6);
     cobj.put(ComObject.Tag.DB_NAME, "test");
     cobj.put(ComObject.Tag.SCHEMA_VERSION, 1000);
     cobj.put(ComObject.Tag.MASTER_SLAVE, "master");
@@ -473,7 +485,7 @@ public class SchemaManagerTest {
 
     when(client.send(eq("PartitionManager:getIndexCounts"), anyInt(), anyLong(), any(ComObject.class),
         eq(DatabaseClient.Replica.MASTER))).thenReturn(
-        new ComObject().serialize()
+        new ComObject(1).serialize()
     );
 
     schemaManager.createIndex(cobj, false);
@@ -516,7 +528,7 @@ public class SchemaManagerTest {
     TableSchema.serializeIndexSchema(out, common.getTables("test").get("table1"),
         common.getTables("test").get("table1").getIndices().get("index1"));
     byte[] indexSchema = bytesOut.toByteArray();
-    ComObject schemaRet = new ComObject();
+    ComObject schemaRet = new ComObject(1);
     schemaRet.put(ComObject.Tag.INDEX_SCHEMA, indexSchema);
 
     when(client.send(eq("SchemaManager:getIndexSchema"), anyInt(), anyLong(), any(ComObject.class),

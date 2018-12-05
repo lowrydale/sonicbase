@@ -32,10 +32,10 @@ public class TestLongRunningCommands {
 
     com.sonicbase.server.DatabaseServer server = new com.sonicbase.server.DatabaseServer();
     try {
-      server.setConfig(config, "4-servers", "localhost", 9010, true, new AtomicBoolean(true), new AtomicBoolean(true), null);
+      server.setConfig(config, "4-servers", "localhost", 9010, true, new AtomicBoolean(true), new AtomicBoolean(true), null, false);
       server.shutdownRepartitioner();
 
-      ComObject cobj = new ComObject();
+      ComObject cobj = new ComObject(2);
       cobj.put(ComObject.Tag.METHOD, "echo");
       cobj.put(ComObject.Tag.COUNT, 10);
       LongRunningCalls.SingleCommand command = server.getLongRunningCommands().createSingleCommand(cobj.serialize());
@@ -78,7 +78,7 @@ public class TestLongRunningCommands {
 
       assertEquals(server.getLongRunningCommands().getCommandCount(), 0);
 
-      cobj = new ComObject();
+      cobj = new ComObject(3);
       cobj.put(ComObject.Tag.DB_NAME, "__none__");
       cobj.put(ComObject.Tag.SCHEMA_VERSION, 1L);
       cobj.put(ComObject.Tag.METHOD, "block");
@@ -95,7 +95,7 @@ public class TestLongRunningCommands {
 
     try {
       server = new DatabaseServer();
-      server.setConfig(config, "4-servers", "localhost", 9010, true, new AtomicBoolean(true), new AtomicBoolean(true), null);
+      server.setConfig(config, "4-servers", "localhost", 9010, true, new AtomicBoolean(true), new AtomicBoolean(true), null, false);
       server.shutdownRepartitioner();
 
       Thread.sleep(1000);

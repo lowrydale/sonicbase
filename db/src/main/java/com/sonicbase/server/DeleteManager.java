@@ -13,6 +13,7 @@ import org.slf4j.LoggerFactory;
 
 import java.io.*;
 import java.nio.file.Files;
+import java.nio.file.StandardCopyOption;
 import java.util.*;
 import java.util.concurrent.*;
 import java.util.concurrent.atomic.AtomicBoolean;
@@ -32,12 +33,12 @@ public class DeleteManager {
 
   private final com.sonicbase.server.DatabaseServer databaseServer;
   private final ThreadPoolExecutor executor;
-  private final ThreadPoolExecutor fileExecutor;
+  private ThreadPoolExecutor fileExecutor;
   private Thread mainThread;
   private final ThreadPoolExecutor freeExecutor;
   private boolean shutdown;
   private final LinkedBlockingQueue<Object> toFree = new LinkedBlockingQueue<>();
-  private final Thread freeThread;
+  private Thread freeThread;
   private final AtomicLong countRead = new AtomicLong();
 
   DeleteManager(final DatabaseServer databaseServer) {
@@ -78,6 +79,10 @@ public class DeleteManager {
     }
   }
 
+  public DatabaseServer getServer() {
+    return databaseServer;
+  }
+
   public static class DeleteRequest {
     private final Object[] key;
 
@@ -91,8 +96,8 @@ public class DeleteManager {
   }
 
   private void saveDeletes(String dbName, String tableName, String indexName,
-                           List<DeleteRequest> deleteRequests) {
-    if (!databaseServer.isDurable()) {
+                           List<DeleteRequest> deleteRequests, int saveAsVersion) {
+    if (databaseServer.isNotDurable()) {
       final Index index = databaseServer.getIndices().get(dbName).getIndices().get(tableName).get(indexName);
 
       IndexSchema indexSchema = databaseServer.getCommon().getTables(dbName).get(tableName).getIndices().get(indexName);
@@ -101,6 +106,7 @@ public class DeleteManager {
         if (value != null) {
           try {
             byte[][] content = databaseServer.getAddressMap().fromUnsafeToRecords(value);
+            //todo: not sure we want to do this
             processRecords(indexSchema, index, request.getKey(), content, value);
           }
           catch (Exception e) {
@@ -114,9 +120,13 @@ public class DeleteManager {
     try {
       String dateStr = DateUtils.toString(new Date(System.currentTimeMillis()));
       Random rand = new Random(System.currentTimeMillis());
-      File file = new File(getReplicaRoot(), dateStr + "-" + System.nanoTime() + "-" +  rand.nextInt(50000) + ".bin");
-      while (file.exists()) {
-        file = new File(getReplicaRoot(), dateStr + "-" + System.nanoTime() + "-" +  rand.nextInt(50000) + ".bin");
+      File file = null;
+      getReplicaRoot().mkdirs();
+      while (true) {
+        file = new File(getReplicaRoot(), dateStr + "-" + System.nanoTime() + "-" +  rand.nextInt(50000) + ".bin.in-process");
+        if (file.createNewFile()) {
+          break;
+        }
       }
       file.getParentFile().mkdirs();
       AtomicLong count = databaseServer.getStats().get(METRIC_SAVE_DELETE).getCount();
@@ -126,14 +136,32 @@ public class DeleteManager {
         out.writeUTF(dbName);
         out.writeUTF(tableName);
         out.writeUTF(indexName);
-        out.writeInt(databaseServer.getCommon().getSchemaVersion() + 1);
+        out.writeInt(saveAsVersion);
+        out.writeInt(deleteRequests.size());
+
         for (DeleteRequest key : deleteRequests) {
           byte[] bytes = DatabaseCommon.serializeKey(tableSchema, indexName, key.getKey());
           out.writeInt(bytes.length);
+
           out.write(bytes);
           count.incrementAndGet();
         }
         out.writeInt(0);
+      }
+      File newFile = null;
+      while (true) {
+        try {
+          if (!file.exists()) {
+            logger.error("Deletes temp file doesn't exist: filename={}", file.getAbsolutePath());
+            break;
+          }
+          newFile = new File(getReplicaRoot(), dateStr + "-" + System.nanoTime() + "-" +  rand.nextInt(50000) + ".bin");
+          Files.move(file.toPath(), newFile.toPath(), StandardCopyOption.ATOMIC_MOVE);
+          break;
+        }
+        catch (Exception e) {
+          logger.error("Error renaming deletes file: src={}, dest={}", file.getAbsolutePath(), newFile.getAbsolutePath(), e);
+        }
       }
     }
     catch (Exception e) {
@@ -143,43 +171,55 @@ public class DeleteManager {
 
   private boolean doDeletes(boolean ignoreVersion, File file) {
     try {
+      long fileLen = file.length();
       File dir = getReplicaRoot();
       if (dir.exists()) {
         logger.debug("DeleteManager deleting file - begin: file={}", file.getAbsolutePath());
         List<Future> futures = new ArrayList<>();
-        if (doDeletesForStream(ignoreVersion, file, futures)) {
-          return true;
+        try {
+          if (doDeletesForStream(ignoreVersion, file, fileLen, futures)) {
+            return true;
+          }
         }
+        finally {
+          for (Future future : futures) {
+            future.get();
+          }
+        }
+
         if (file.exists()) {
-          Files.delete(file.toPath());
+          if (file.getName().contains("in-process")) {
+            logger.error("Name of file deleting includes in-process: file={}", file.getAbsolutePath());
+          }
+          else {
+            Files.delete(file.toPath());
+          }
         }
-        logger.debug("DeleteManager deleting file - end: file={}", file.getAbsolutePath());
+        logger.debug("DeleteManager deleting file - finished: file={}", file.getAbsolutePath());
       }
     }
     catch (Exception e) {
-      logger.error(ERROR_PERFORMING_DELETES_STR, e);
+      logger.error("Error performing deletes: file={}", file.getAbsolutePath(), e);
     }
     return false;
   }
 
-  private boolean doDeletesForStream(boolean ignoreVersion, File file, List<Future> futures) throws FileNotFoundException, InterruptedException, ExecutionException {
-    InputStream countIn = new LogManager.ByteCounterStream(new FileInputStream(file), countRead);
-    try (DataInputStream in = new DataInputStream(new BufferedInputStream(countIn))) {
-      if (doDeletesProcessStream(ignoreVersion, futures, in)) {
+  private boolean doDeletesForStream(boolean ignoreVersion, File file, long fileLen, List<Future> futures) throws FileNotFoundException, InterruptedException, ExecutionException {
+    AtomicLong countRead = new AtomicLong();
+    try (DataInputStream in = new DataInputStream(new LogManager.ByteCounterStream(new BufferedInputStream(new FileInputStream(file)), countRead))) {
+      if (doDeletesProcessStream(ignoreVersion, futures, in, file, fileLen, countRead)) {
         return true;
       }
     }
     catch (Exception e) {
-      logger.error(ERROR_PERFORMING_DELETES_STR, e);
+      logger.error("Error performing deletes: file={}", file.getAbsolutePath(), e);
     }
 
-    for (Future future : futures) {
-      future.get();
-    }
+    this.countRead.addAndGet(countRead.get());
     return false;
   }
 
-  private boolean doDeletesProcessStream(boolean ignoreVersion, List<Future> futures, DataInputStream in) throws IOException {
+  private boolean doDeletesProcessStream(boolean ignoreVersion, List<Future> futures, DataInputStream in, File file, long fileLen, AtomicLong countRead) throws IOException {
     long serializationVersion = Varint.readSignedVarLong(in);
     String dbName = in.readUTF();
     String tableName = in.readUTF();
@@ -194,19 +234,29 @@ public class DeleteManager {
     }
 
     long schemaVersionToDeleteAt = in.readInt();
-    if (!ignoreVersion && schemaVersionToDeleteAt > databaseServer.getCommon().getSchemaVersion()) {
+    if (!ignoreVersion && schemaVersionToDeleteAt > databaseServer.getSchemaVersion()) {
       return true;
     }
+    int keyCountInFile = in.readInt();
     final Index index = databaseServer.getIndices().get(dbName).getIndices().get(tableName).get(indexName);
     List<Object[]> batch = new ArrayList<>();
     int errorsInARow = 0;
+    byte[] keyBuffer = new byte[100];
+    int keyCountRead = 0;
     while (!shutdown) {
-      ProcessKey processKey = new ProcessKey(futures, serializationVersion, in, tableSchema, indexSchema, index, batch, errorsInARow).invoke();
+      ProcessKey processKey = new ProcessKey(dbName, futures, serializationVersion, in,
+          tableSchema, indexSchema, index, batch, keyBuffer, errorsInARow, file, fileLen, countRead).invoke();
       batch = processKey.getBatch();
+      keyBuffer = processKey.getKeyBuffer();
       errorsInARow = processKey.getErrorsInARow();
       if (processKey.is()) {
         break;
       }
+      keyCountRead++;
+    }
+    if (keyCountRead != keyCountInFile) {
+      logger.error("Incorrect key count read: countInFile={}, countRead={}, db={}, table={}, index={}",
+          keyCountInFile, keyCountRead, dbName, tableName, indexName);
     }
     processBatch(futures, indexSchema, index, batch);
     return false;
@@ -280,19 +330,21 @@ public class DeleteManager {
   }
   public void start() {
 
-    mainThread = new Thread(() -> {
-      while (!shutdown) {
-        try {
-          if (processFilesForDeletes()) {
-            break;
+    if (mainThread == null) {
+      mainThread = new Thread(() -> {
+        while (!shutdown) {
+          try {
+            if (processFilesForDeletes()) {
+              break;
+            }
+          }
+          catch (Exception e) {
+            logger.error("Error procesing deletes file", e);
           }
         }
-        catch (Exception e) {
-          logger.error("Error procesing deletes file", e);
-        }
-      }
-    }, "SonicBase Deletion Thread");
-    mainThread.start();
+      }, "SonicBase Deletion Thread");
+      mainThread.start();
+    }
   }
 
   private boolean processFilesForDeletes() {
@@ -312,12 +364,14 @@ public class DeleteManager {
         }
         else {
           long begin = System.currentTimeMillis();
+
           List<Future> futures = new ArrayList<>();
           for (int i = 0; i < files.length; i++) {
+            if (files[i].getName().contains("in-process")) {
+              continue;
+            }
             final int offset = i;
-            futures.add(fileExecutor.submit((Callable) () -> {
-              return doDeletes(false, files[offset]);
-            }));
+            futures.add(fileExecutor.submit((Callable) () -> doDeletes(false, files[offset])));
           }
           int countSkipped = 0;
           for (int i = 0; i < futures.size(); i++) {
@@ -356,12 +410,16 @@ public class DeleteManager {
       if (freeThread != null) {
         freeThread.interrupt();
         freeThread.join();
+        freeThread = null;
       }
       if (mainThread != null) {
         mainThread.interrupt();
         mainThread.join();
+        mainThread = null;
 
       }
+      fileExecutor.shutdownNow();
+      fileExecutor = null;
     }
     catch (InterruptedException e) {
       Thread.currentThread().interrupt();
@@ -378,14 +436,25 @@ public class DeleteManager {
     return (double)countRead.get() / (double)totalBytes;
   }
 
+
   void saveDeletesForRecords(String dbName, String tableName, String indexName, long sequence0, long sequence1,
                              List<DeleteRequest> keysToDeleteExpanded) {
-    saveDeletes(dbName, tableName, indexName, keysToDeleteExpanded);
+    saveDeletes(dbName, tableName, indexName, keysToDeleteExpanded, databaseServer.getCommon().getSchemaVersion() + 1);
+  }
+
+  void saveDeletesForRecords(String dbName, String tableName, String indexName, long sequence0, long sequence1,
+                             List<DeleteRequest> keysToDeleteExpanded, int saveAsVersion) {
+    saveDeletes(dbName, tableName, indexName, keysToDeleteExpanded, saveAsVersion);
   }
 
   void saveDeletesForKeyRecords(String dbName, String tableName, String indexName, long sequence0, long sequence1,
                                 List<DeleteRequest> keysToDeleteExpanded) {
-    saveDeletes(dbName, tableName, indexName, keysToDeleteExpanded);
+    saveDeletes(dbName, tableName, indexName, keysToDeleteExpanded, databaseServer.getCommon().getSchemaVersion() + 1);
+  }
+
+  void saveDeletesForKeyRecords(String dbName, String tableName, String indexName, long sequence0, long sequence1,
+                                List<DeleteRequest> keysToDeleteExpanded, int saveAsVersion) {
+    saveDeletes(dbName, tableName, indexName, keysToDeleteExpanded, saveAsVersion);
   }
 
   static class DeleteRequestForKeyRecord extends DeleteRequest {
@@ -432,6 +501,9 @@ public class DeleteManager {
         }
         List<Future> futures = new ArrayList<>();
         for (final File file : files) {
+          if (file.getName().contains("in-process")) {
+            continue;
+          }
           futures.add(localExecutor.submit((Callable) () -> {
             doDeletes(true, file);
             return null;
@@ -454,6 +526,11 @@ public class DeleteManager {
 
   private class ProcessKey {
     private final long serializationVersion;
+    private final String dbName;
+    private final File file;
+    private final AtomicLong countRead;
+    private final long fileLen;
+    private byte[] keyBuffer;
     private boolean myResult;
     private final List<Future> futures;
     private final DataInputStream in;
@@ -463,8 +540,9 @@ public class DeleteManager {
     private List<Object[]> batch;
     private int errorsInARow;
 
-    ProcessKey(List<Future> futures, long serializationVersion, DataInputStream in, TableSchema tableSchema, IndexSchema indexSchema,
-               Index index, List<Object[]> batch, int errorsInARow) {
+    ProcessKey(String dbName, List<Future> futures, long serializationVersion, DataInputStream in, TableSchema tableSchema, IndexSchema indexSchema,
+               Index index, List<Object[]> batch, byte[] keyBuffer, int errorsInARow, File file, long fileLen, AtomicLong countRead) {
+      this.dbName = dbName;
       this.futures = futures;
       this.serializationVersion = serializationVersion;
       this.in = in;
@@ -472,7 +550,11 @@ public class DeleteManager {
       this.indexSchema = indexSchema;
       this.index = index;
       this.batch = batch;
+      this.keyBuffer = keyBuffer;
       this.errorsInARow = errorsInARow;
+      this.file = file;
+      this.fileLen = fileLen;
+      this.countRead = countRead;
     }
 
     boolean is() {
@@ -487,10 +569,15 @@ public class DeleteManager {
       return errorsInARow;
     }
 
+    public byte[] getKeyBuffer() {
+      return keyBuffer;
+    }
+
     public ProcessKey invoke() {
       Object[] key = null;
+      boolean finishedRead = false;
       try {
-        if (serializationVersion == SERIALIZATION_VERSION_28) {
+        if (serializationVersion <= SERIALIZATION_VERSION_28) {
           key = DatabaseCommon.deserializeKey(tableSchema, in);
         }
         else {
@@ -499,9 +586,29 @@ public class DeleteManager {
             myResult = true;
             return this;
           }
-          byte[] bytes = new byte[len];
-          in.readFully(bytes);
-          key = DatabaseCommon.deserializeKey(tableSchema, bytes);
+          if (countRead.get() >= fileLen) {
+            logger.info("read past end of file: file={}, fileLen={}, countRead={}",
+                file.getAbsolutePath(), file.length(), countRead.get());
+            myResult = true;
+            return this;
+          }
+
+          if (len > DatabaseCommon.MAX_KEY_LEN) {
+            logger.error("DeleteManager.processKey, Key too large: max={}, len={}, db={}, table={}, index={}, file={}, fileLen={}, countRead={}",
+                DatabaseCommon.MAX_KEY_LEN, len, dbName, tableSchema.getName(), indexSchema.getName(), file.getAbsolutePath(),
+                file.length(), countRead.get());
+            myResult = true;
+            return this;
+          }
+
+          if (len > keyBuffer.length) {
+            keyBuffer = allocBuffer(len);
+            logger.debug("reading greater than keyBuffer: len={}, db={}, table={}, index={}, file={}",
+                len, dbName, tableSchema.getName(), indexSchema.getName(), file.getAbsolutePath());
+          }
+          in.read(keyBuffer, 0, len);
+          finishedRead = true;
+          key = DatabaseCommon.deserializeKey(tableSchema, keyBuffer);
         }
         errorsInARow = 0;
         batch.add(key);
@@ -514,14 +621,20 @@ public class DeleteManager {
           myResult = true;
           return this;
         }
-        logger.error("Error deserializing key: " + ((errorsInARow > 20) ? " aborting" : ""), e);
-        if (errorsInARow++ > 20) {
+        logger.error("Error deserializing key: state={}, db={}, table={}, index={}, file={}",
+            ((errorsInARow > 20) ? " aborting" : "continuing"), dbName, tableSchema.getName(), indexSchema.getName(),
+            file.getAbsolutePath(), e);
+        if (!finishedRead || errorsInARow++ > 20) {
           myResult = true;
           return this;
         }
       }
       myResult = false;
       return this;
+    }
+
+    private byte[] allocBuffer(int len) {
+      return new byte[len];
     }
   }
 }

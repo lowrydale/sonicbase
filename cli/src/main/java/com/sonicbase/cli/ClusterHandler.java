@@ -277,7 +277,7 @@ public class ClusterHandler {
         final Config.Replica replica = replicas.get(j);
         final AtomicBoolean ok2 = new AtomicBoolean();
         while (!ok2.get()) {
-          final ComObject cobj = new ComObject();
+          final ComObject cobj = new ComObject(3);
           cobj.put(ComObject.Tag.DB_NAME, NONE_STR);
           cobj.put(ComObject.Tag.SCHEMA_VERSION, 1);
           cobj.put(ComObject.Tag.METHOD, DATABASE_SERVER_HEALTH_CHECK_STR);
@@ -296,7 +296,7 @@ public class ClusterHandler {
               }
             }
             catch (Exception e) {
-              ComObject cobj1 = new ComObject();
+              ComObject cobj1 = new ComObject(3);
               cobj1.put(ComObject.Tag.DB_NAME, NONE_STR);
               cobj1.put(ComObject.Tag.SCHEMA_VERSION, 1);
               cobj1.put(ComObject.Tag.METHOD, DATABASE_SERVER_GET_RECOVER_PROGRESS_STR);
@@ -339,7 +339,7 @@ public class ClusterHandler {
         }
       }
     }
-    ComObject cobj = new ComObject();
+    ComObject cobj = new ComObject(1);
     cli.getConn().sendToMaster("MonitorManager:initMonitoringTables", cobj);
     cli.getConn().sendToMaster("OSStatsManager:initMonitoringTables", cobj);
 
@@ -390,7 +390,7 @@ public class ClusterHandler {
         final Config.Replica replicaDict = replicas.get(j);
         final AtomicBoolean ok2 = new AtomicBoolean();
         while (!ok2.get()) {
-          final ComObject cobj = new ComObject();
+          final ComObject cobj = new ComObject(3);
           cobj.put(ComObject.Tag.DB_NAME, NONE_STR);
           cobj.put(ComObject.Tag.SCHEMA_VERSION, 1);
           cobj.put(ComObject.Tag.METHOD, DATABASE_SERVER_HEALTH_CHECK_STR);
@@ -409,7 +409,7 @@ public class ClusterHandler {
               }
             }
             catch (Exception e) {
-              ComObject pcobj = new ComObject();
+              ComObject pcobj = new ComObject(3);
               pcobj.put(ComObject.Tag.DB_NAME, NONE_STR);
               pcobj.put(ComObject.Tag.SCHEMA_VERSION, cli.getConn().getSchemaVersion());
               pcobj.put(ComObject.Tag.METHOD, DATABASE_SERVER_GET_RECOVER_PROGRESS_STR);
@@ -450,7 +450,7 @@ public class ClusterHandler {
         }
       }
     }
-    ComObject cobj = new ComObject();
+    ComObject cobj = new ComObject(1);
     for (int shard = 0; shard < cli.getConn().getShardCount(); shard++) {
       cli.getConn().send("MonitorManager:initConnection", shard, replica, cobj, ConnectionProxy.Replica.SPECIFIED);
       cli.getConn().send("OSStatsManager:initConnection", shard, replica, cobj, ConnectionProxy.Replica.SPECIFIED);
@@ -482,7 +482,7 @@ public class ClusterHandler {
   }
 
   private static Boolean getReloadStatus(ConnectionProxy conn, int shard, int replica) {
-    ComObject cobj = new ComObject();
+    ComObject cobj = new ComObject(2);
     cobj.put(ComObject.Tag.DB_NAME, NONE_STR);
     cobj.put(ComObject.Tag.SCHEMA_VERSION, conn.getSchemaVersion());
     byte[] bytes = conn.send("DatabaseServer:isServerReloadFinished", shard, replica, cobj, ConnectionProxy.Replica.SPECIFIED);
@@ -588,7 +588,7 @@ public class ClusterHandler {
 
 
   private static void reloadServer(Cli cli, String cluster, ConnectionProxy conn, int shard, int replica) throws InterruptedException {
-    ComObject cobj = new ComObject();
+    ComObject cobj = new ComObject(2);
     cobj.put(ComObject.Tag.DB_NAME, NONE_STR);
     cobj.put(ComObject.Tag.SCHEMA_VERSION, conn.getSchemaVersion());
     conn.send("DatabaseServer:reloadServer", shard, replica, cobj, ConnectionProxy.Replica.SPECIFIED);
@@ -948,7 +948,7 @@ public class ClusterHandler {
 
     monitorServerStartupProgress(cli, shard, replica, currReplica);
 
-    ComObject cobj = new ComObject();
+    ComObject cobj = new ComObject(1);
     cli.getConn().send("MonitorManager:initConnection", shard, replica, cobj, ConnectionProxy.Replica.SPECIFIED);
     cli.getConn().send("OSStatsManager:initConnection", shard, replica, cobj, ConnectionProxy.Replica.SPECIFIED);
     cli.getConn().send("StreamManager:initConnection", shard, replica, cobj, ConnectionProxy.Replica.SPECIFIED);
@@ -957,7 +957,7 @@ public class ClusterHandler {
   private static void monitorServerStartupProgress(Cli cli, int shard, int replica, Config.Replica currReplica) throws InterruptedException {
     final AtomicBoolean ok = new AtomicBoolean();
     while (!ok.get()) {
-      final ComObject cobj = new ComObject();
+      final ComObject cobj = new ComObject(3);
       cobj.put(ComObject.Tag.DB_NAME, NONE_STR);
       cobj.put(ComObject.Tag.SCHEMA_VERSION, 1);
       cobj.put(ComObject.Tag.METHOD, DATABASE_SERVER_HEALTH_CHECK_STR);
@@ -975,7 +975,7 @@ public class ClusterHandler {
           }
         }
         catch (Exception e) {
-          ComObject cobj1 = new ComObject();
+          ComObject cobj1 = new ComObject(3);
           cobj1.put(ComObject.Tag.DB_NAME, NONE_STR);
           cobj1.put(ComObject.Tag.SCHEMA_VERSION, 1);
           cobj1.put(ComObject.Tag.METHOD, DATABASE_SERVER_GET_RECOVER_PROGRESS_STR);
@@ -1050,7 +1050,7 @@ public class ClusterHandler {
       try {
         cli.getConn().syncSchema();
 
-        ComObject cobj = new ComObject();
+        ComObject cobj = new ComObject(4);
         cobj.put(ComObject.Tag.DB_NAME, NONE_STR);
         cobj.put(ComObject.Tag.SCHEMA_VERSION, cli.getConn().getSchemaVersion());
         cobj.put(ComObject.Tag.METHOD, "DatabaseServer:promoteEntireReplicaToMaster");
@@ -1069,7 +1069,7 @@ public class ClusterHandler {
       try {
         cli.getConn().syncSchema();
 
-        ComObject cobj = new ComObject();
+        ComObject cobj = new ComObject(4);
         cobj.put(ComObject.Tag.DB_NAME, NONE_STR);
         cobj.put(ComObject.Tag.SCHEMA_VERSION, cli.getConn().getSchemaVersion());
         cobj.put(ComObject.Tag.METHOD, "DatabaseServer:markReplicaAlive");
@@ -1088,7 +1088,7 @@ public class ClusterHandler {
       try {
         cli.getConn().syncSchema();
 
-        ComObject cobj = new ComObject();
+        ComObject cobj = new ComObject(4);
         cobj.put(ComObject.Tag.DB_NAME, NONE_STR);
         cobj.put(ComObject.Tag.SCHEMA_VERSION, cli.getConn().getSchemaVersion());
         cobj.put(ComObject.Tag.METHOD, "DatabaseServer:markReplicaDead");
@@ -1110,7 +1110,7 @@ public class ClusterHandler {
 
     cli.initConnection();
 
-    ComObject cobj = new ComObject();
+    ComObject cobj = new ComObject(2);
     cobj.put(ComObject.Tag.DB_NAME, NONE_STR);
     cobj.put(ComObject.Tag.SCHEMA_VERSION, cli.getConn().getSchemaVersion());
     byte[] bytes = cli.getConn().send("DatabaseServer:disableServer", shard, replica, cobj, ConnectionProxy.Replica.SPECIFIED);
@@ -1126,7 +1126,7 @@ public class ClusterHandler {
 
     cli.initConnection();
 
-    ComObject cobj = new ComObject();
+    ComObject cobj = new ComObject(2);
     cobj.put(ComObject.Tag.DB_NAME, NONE_STR);
     cobj.put(ComObject.Tag.SCHEMA_VERSION, cli.getConn().getSchemaVersion());
     byte[] bytes = cli.getConn().send("DatabaseServer:enableServer", shard, replica, cobj, ConnectionProxy.Replica.SPECIFIED);

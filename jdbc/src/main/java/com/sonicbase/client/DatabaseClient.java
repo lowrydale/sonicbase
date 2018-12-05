@@ -171,6 +171,7 @@ public class DatabaseClient {
   private static final Set<String> parallelVerbs = new HashSet<>();
   private String cluster;
   private ClientStatsHandler clientStatsHandler = new ClientStatsHandler();
+  private AtomicBoolean shutdownStatsRecorderThreads = new AtomicBoolean();
 
   public Server[][] getServersArray() {
     return servers;
@@ -219,7 +220,7 @@ public class DatabaseClient {
       this.common = common;
     }
     else {
-      this.common.setIsDurable(false);
+      this.common.setIsNotDurable(true);
     }
 
     if (shard != 0 && replica != 0) {
@@ -241,7 +242,7 @@ public class DatabaseClient {
           sharedClients.put(cluster, sharedClient);
 
           Thread statsRecorderThread = ThreadUtil.createThread(new ClientStatsHandler.QueryStatsRecorder(
-              sharedClient, cluster), "SonicBase Stats Recorder - cluster=" + cluster);
+              sharedClient, cluster, shutdownStatsRecorderThreads), "SonicBase Stats Recorder - cluster=" + cluster);
           statsRecorderThread.start();
           statsRecorderThreads.put(getCluster(), statsRecorderThread);
         }
@@ -373,7 +374,7 @@ public class DatabaseClient {
       }
 
       try {
-        ComObject cobj = new ComObject();
+        ComObject cobj = new ComObject(3);
         cobj.put(ComObject.Tag.DB_NAME, dbName);
         if (schemaRetryCount < 2) {
           cobj.put(ComObject.Tag.SCHEMA_VERSION, common.getSchemaVersion());
@@ -403,7 +404,7 @@ public class DatabaseClient {
   public void rollback(String dbName) {
 
     int schemaRetryCount = 0;
-    ComObject cobj = new ComObject();
+    ComObject cobj = new ComObject(3);
     cobj.put(ComObject.Tag.DB_NAME, dbName);
     if (schemaRetryCount < 2) {
       cobj.put(ComObject.Tag.SCHEMA_VERSION, common.getSchemaVersion());
@@ -428,7 +429,7 @@ public class DatabaseClient {
   public void createDatabase(String dbName) {
     dbName = dbName.toLowerCase();
 
-    ComObject cobj = new ComObject();
+    ComObject cobj = new ComObject(6);
     cobj.put(ComObject.Tag.DB_NAME, dbName);
     cobj.put(ComObject.Tag.SCHEMA_VERSION, common.getSchemaVersion());
     cobj.put(ComObject.Tag.METHOD, "SchemaManager:createDatabase");
@@ -461,6 +462,7 @@ public class DatabaseClient {
     }
     if (shouldShutdown) {
       logger.info("Shutting down shared client");
+      shutdownStatsRecorderThreads.set(true);
       for (Thread thread : statsRecorderThreads.values()) {
         thread.interrupt();
         try {
@@ -500,7 +502,7 @@ public class DatabaseClient {
 
   public ReconfigureResults reconfigureCluster() {
 
-    ComObject cobj = new ComObject();
+    ComObject cobj = new ComObject(3);
     cobj.put(ComObject.Tag.DB_NAME, NONE_STR);
     cobj.put(ComObject.Tag.SCHEMA_VERSION, common.getSchemaVersion());
     cobj.put(ComObject.Tag.METHOD, "DatabaseServer:healthCheck");
@@ -509,7 +511,7 @@ public class DatabaseClient {
       byte[] bytes = sendToMaster(cobj);
       ComObject retObj = new ComObject(bytes);
       if (retObj.getString(ComObject.Tag.STATUS).equals("{\"status\" : \"ok\"}")) {
-        ComObject rcobj = new ComObject();
+        ComObject rcobj = new ComObject(3);
         rcobj.put(ComObject.Tag.DB_NAME, NONE_STR);
         rcobj.put(ComObject.Tag.SCHEMA_VERSION, common.getSchemaVersion());
         rcobj.put(ComObject.Tag.METHOD, "DatabaseServer:reconfigureCluster");
@@ -632,7 +634,7 @@ public class DatabaseClient {
         throw new DatabaseException(SHUTTING_DOWN_STR);
       }
 
-      ComObject cobj = new ComObject();
+      ComObject cobj = new ComObject(2);
       cobj.put(ComObject.Tag.DB_NAME, NONE_STR);
       cobj.put(ComObject.Tag.SCHEMA_VERSION, common.getSchemaVersion());
       try {
@@ -803,7 +805,7 @@ public class DatabaseClient {
         throw new DatabaseException(SHUTTING_DOWN_STR);
       }
 
-      ComObject cobj = new ComObject();
+      ComObject cobj = new ComObject(3);
       cobj.put(ComObject.Tag.DB_NAME, NONE_STR);
       cobj.put(ComObject.Tag.SCHEMA_VERSION, common.getSchemaVersion());
       cobj.put(ComObject.Tag.METHOD, DATABASE_SERVER_GET_SCHEMA_STR);
@@ -1016,7 +1018,7 @@ public class DatabaseClient {
   }
 
   private void queueForOtherServer(ComObject body, int shard, int authUser, Server[] replicas) {
-    ComObject header = new ComObject();
+    ComObject header = new ComObject(2);
     header.put(ComObject.Tag.METHOD, body.getString(ComObject.Tag.METHOD));
     header.put(ComObject.Tag.REPLICA, authUser);
     body.put(ComObject.Tag.HEADER, header);
@@ -1155,7 +1157,7 @@ public class DatabaseClient {
       body.put(ComObject.Tag.METHOD, methodStr);
     }
     if (body == null) {
-      body = new ComObject();
+      body = new ComObject(2);
     }
     return body;
   }
@@ -1217,7 +1219,7 @@ public class DatabaseClient {
 
   public boolean isBackupComplete() {
     try {
-      ComObject cobj = new ComObject();
+      ComObject cobj = new ComObject(2);
       cobj.put(ComObject.Tag.DB_NAME, NONE_STR);
       cobj.put(ComObject.Tag.SCHEMA_VERSION, common.getSchemaVersion());
       byte[] ret = send("BackupManager:isEntireBackupComplete", 0, 0, cobj, DatabaseClient.Replica.MASTER);
@@ -1231,7 +1233,7 @@ public class DatabaseClient {
 
   public boolean isRestoreComplete() {
     try {
-      ComObject cobj = new ComObject();
+      ComObject cobj = new ComObject(2);
       cobj.put(ComObject.Tag.DB_NAME, NONE_STR);
       cobj.put(ComObject.Tag.SCHEMA_VERSION, common.getSchemaVersion());
       byte[] ret = send("BackupManager:isEntireRestoreComplete", 0, 0, cobj, DatabaseClient.Replica.MASTER);
@@ -1245,7 +1247,7 @@ public class DatabaseClient {
 
   public void startRestore(String subDir) {
     try {
-      ComObject cobj = new ComObject();
+      ComObject cobj = new ComObject(3);
       cobj.put(ComObject.Tag.DB_NAME, NONE_STR);
       cobj.put(ComObject.Tag.SCHEMA_VERSION, common.getSchemaVersion());
       cobj.put(ComObject.Tag.DIRECTORY, subDir);
@@ -1257,7 +1259,7 @@ public class DatabaseClient {
   }
 
   public void startBackup() {
-    ComObject cobj = new ComObject();
+    ComObject cobj = new ComObject(2);
     cobj.put(ComObject.Tag.DB_NAME, NONE_STR);
     cobj.put(ComObject.Tag.SCHEMA_VERSION, common.getSchemaVersion());
     send("BackupManager:startBackup", 0, 0, cobj, DatabaseClient.Replica.MASTER);
@@ -1519,7 +1521,7 @@ public class DatabaseClient {
         id = nextId.getAndIncrement();
       }
       else {
-        ComObject cobj = new ComObject();
+        ComObject cobj = new ComObject(2);
         cobj.put(ComObject.Tag.DB_NAME, dbName);
         cobj.put(ComObject.Tag.SCHEMA_VERSION, common.getSchemaVersion());
         byte[] ret = sendToMaster("DatabaseServer:allocateRecordIds", cobj);
@@ -1541,7 +1543,7 @@ public class DatabaseClient {
   }
 
   public boolean isRepartitioningComplete(String dbName) {
-    ComObject cobj = new ComObject();
+    ComObject cobj = new ComObject(2);
     cobj.put(ComObject.Tag.DB_NAME, dbName);
     cobj.put(ComObject.Tag.SCHEMA_VERSION, common.getSchemaVersion());
     byte[] bytes = sendToMaster("PartitionManager:isRepartitioningComplete", cobj);
@@ -1554,7 +1556,7 @@ public class DatabaseClient {
   }
 
   public long getPartitionSize(String dbName, int shard, int replica, String tableName, String indexName) {
-    ComObject cobj = new ComObject();
+    ComObject cobj = new ComObject(4);
     cobj.put(ComObject.Tag.DB_NAME, dbName);
     cobj.put(ComObject.Tag.SCHEMA_VERSION, common.getSchemaVersion());
     cobj.put(ComObject.Tag.TABLE_NAME, tableName);
@@ -1583,7 +1585,7 @@ public class DatabaseClient {
   }
 
   void doSyncSchema() {
-    ComObject cobj = new ComObject();
+    ComObject cobj = new ComObject(2);
     cobj.put(ComObject.Tag.DB_NAME, NONE_STR);
     cobj.put(ComObject.Tag.SCHEMA_VERSION, common.getSchemaVersion());
     byte[] ret = getSchemaFromMaster(cobj);
@@ -1654,7 +1656,7 @@ public class DatabaseClient {
   public void getConfig() {
     try {
       long authUser = rand.nextLong();
-      ComObject cobj = new ComObject();
+      ComObject cobj = new ComObject(2);
       cobj.put(ComObject.Tag.DB_NAME, NONE_STR);
       cobj.put(ComObject.Tag.SCHEMA_VERSION, common.getSchemaVersion());
 
@@ -1668,7 +1670,7 @@ public class DatabaseClient {
   }
 
   public void beginRebalance(String dbName) {
-    ComObject cobj = new ComObject();
+    ComObject cobj = new ComObject(3);
     cobj.put(ComObject.Tag.DB_NAME, dbName);
     cobj.put(ComObject.Tag.SCHEMA_VERSION, common.getSchemaVersion());
     cobj.put(ComObject.Tag.FORCE, false);
@@ -1711,7 +1713,7 @@ public class DatabaseClient {
     public HandleDeadOnWriteVerb invoke() {
       try {
         if (writeVerbs.contains(method)) {
-          ComObject header = new ComObject();
+          ComObject header = new ComObject(2);
           header.put(ComObject.Tag.METHOD, body.getString(ComObject.Tag.METHOD));
           header.put(ComObject.Tag.REPLICA, authUser);
           body.put(ComObject.Tag.HEADER, header);

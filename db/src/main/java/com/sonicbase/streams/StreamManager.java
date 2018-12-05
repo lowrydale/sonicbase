@@ -304,7 +304,7 @@ public class StreamManager {
 
   public ComObject isStreamingStarted(ComObject cobj, boolean replayedCommand) {
     boolean started = isStreamingStarted();
-    ComObject retObj = new ComObject();
+    ComObject retObj = new ComObject(1);
     retObj.put(ComObject.Tag.IS_STARTED, started);
     return retObj;
   }
@@ -561,8 +561,8 @@ public class StreamManager {
       return;
     }
 
-    ComObject cobj = new ComObject();
-    ComArray array = cobj.putArray(ComObject.Tag.MESSAGES, ComObject.Type.STRING_TYPE);
+    ComObject cobj = new ComObject(2);
+    ComArray array = cobj.putArray(ComObject.Tag.MESSAGES, ComObject.Type.STRING_TYPE, messages.size());
     for (Message msg : messages) {
       array.add(msg.getBody());
     }

@@ -81,12 +81,19 @@ public class BulkImportManager {
 
   @SuppressWarnings("squid:S1172") // cobj and replayedCommand are required
   public ComObject getBulkImportProgressOnServer(ComObject cobj, boolean replayedCommand) {
-    ComObject retObj = new ComObject();
+    ComObject retObj = new ComObject(1);
 
-    ComArray array = retObj.putArray(ComObject.Tag.STATUSES, ComObject.Type.OBJECT_TYPE);
+    int count = 0;
     for (String dbName : server.getDbNames(server.getDataDir())) {
       for (String tableName : server.getCommon().getTables(dbName).keySet()) {
-        ComObject currObj = new ComObject();
+        count++;
+      }
+    }
+
+    ComArray array = retObj.putArray(ComObject.Tag.STATUSES, ComObject.Type.OBJECT_TYPE, count);
+    for (String dbName : server.getDbNames(server.getDataDir())) {
+      for (String tableName : server.getCommon().getTables(dbName).keySet()) {
+        ComObject currObj = new ComObject(11);
         currObj.put(ComObject.Tag.DB_NAME, dbName);
         currObj.put(ComObject.Tag.TABLE_NAME, tableName);
 
@@ -167,7 +174,7 @@ public class BulkImportManager {
       return null;
     }
 
-    ComObject retObj = new ComObject();
+    ComObject retObj = new ComObject(1);
     if (countBulkImportRunning.get() >= 1) {
       retObj.put(ComObject.Tag.ACCEPTED, false);
     }
@@ -644,7 +651,7 @@ public class BulkImportManager {
     preProcessFinished.put(dbName + ":" + tableName, false);
     preProcessException.remove(dbName + ":" + tableName);
 
-    ComObject retObj = new ComObject();
+    ComObject retObj = new ComObject(1);
     if (!cobj.getBoolean(ComObject.Tag.SHOULD_PROCESS)) {
       logger.info("coordinateBulkImportForTable - begin. Not processing: db={}, table={}", dbName, tableName);
       preProcessFinished.put(dbName + ":" + tableName, true);
@@ -961,10 +968,17 @@ public class BulkImportManager {
       cobj.remove(ComObject.Tag.LOWER_KEY);
       cobj.remove(ComObject.Tag.NEXT_KEY);
 
-      ComArray keyArray = cobj.putArray(ComObject.Tag.KEYS, ComObject.Type.BYTE_ARRAY_TYPE);
       if (keyOffset != 0) {
         cobj.put(ComObject.Tag.LOWER_KEY, DatabaseCommon.serializeKey(tableSchema, indexSchema.getName(), keys[keyOffset]));
       }
+      int count = 0;
+      for (int j = 0; j < BULK_IMPORT_THREAD_COUNT_PER_SERVER; j++) {
+        if (keys[keyOffset] == null) {
+          break;
+        }
+        count++;
+      }
+      ComArray keyArray = cobj.putArray(ComObject.Tag.KEYS, ComObject.Type.BYTE_ARRAY_TYPE, count);
       for (int j = 0; j < BULK_IMPORT_THREAD_COUNT_PER_SERVER; j++) {
         if (keys[keyOffset] == null) {
           break;
@@ -1151,7 +1165,7 @@ public class BulkImportManager {
     ConcurrentHashMap<String, ConcurrentHashMap<String, BulkImportStatus>> bulkImportStatus = new ConcurrentHashMap<>();
 
     try {
-      ComObject cobj = new ComObject();
+      ComObject cobj = new ComObject(1);
       cobj.put(ComObject.Tag.METHOD, "BulkImportManager:getBulkImportProgressOnServer");
       for (final String tableName : server.getCommon().getTables(dbName).keySet()) {
         ConcurrentHashMap<String, BulkImportStatus> tableStatus = null;
@@ -1336,8 +1350,8 @@ public class BulkImportManager {
 
     ConcurrentHashMap<String, ConcurrentHashMap<String, BulkImportStatus>> bulkImportStatus = getBulkImportStatus(dbName);
 
-    ComObject retObj = new ComObject();
-    ComArray array = retObj.putArray(ComObject.Tag.PROGRESS_ARRAY, ComObject.Type.OBJECT_TYPE);
+    ComObject retObj = new ComObject(1);
+    ComArray array = retObj.putArray(ComObject.Tag.PROGRESS_ARRAY, ComObject.Type.OBJECT_TYPE, bulkImportStatus.size());
     for (Map.Entry<String, ConcurrentHashMap<String, BulkImportStatus>> entry : bulkImportStatus.entrySet()) {
       if (entry.getKey().startsWith(dbName + ":")) {
         String tableName = entry.getKey();
@@ -1388,7 +1402,7 @@ public class BulkImportManager {
   private void getBulkImportStatsSetReturn(ComArray array, String tableName, long countExpected, long countProcessed,
                                            boolean finished, String exception, long preProcessCountExpected,
                                            long preProcessCountProcessed, boolean preProcessFinished, String preProcessEx) {
-    ComObject serverObj = new ComObject();
+    ComObject serverObj = new ComObject(9);
     serverObj.put(ComObject.Tag.TABLE_NAME, tableName);
     serverObj.put(ComObject.Tag.EXPECTED_COUNT, countExpected);
     serverObj.put(ComObject.Tag.COUNT_LONG, countProcessed);

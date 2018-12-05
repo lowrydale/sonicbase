@@ -117,35 +117,6 @@ public class Schema {
     return tables;
   }
 
-  public RecordIndexPartition[] getRecordIndexPartitions() {
-    return currRecordIndexPartitions;
-  }
-
-  public void initRecordsById(int shardCount, int partitionCountForRecordIndex) {
-    if (currRecordIndexPartitions == null) {
-      RecordIndexPartition[] partitions = new RecordIndexPartition[partitionCountForRecordIndex];
-      for (int i = 0; i < partitionCountForRecordIndex; i++) {
-        RecordIndexPartition partition = new RecordIndexPartition();
-        partition.setShardOwning(i % shardCount);
-        partitions[i] = partition;
-      }
-      this.currRecordIndexPartitions = partitions;
-    }
-  }
-
-  public void reshardRecordIndex(RecordIndexPartition[] currPartitions) {
-    synchronized (schemaMutex) {
-      this.lastRecordIndexPartitions = this.currRecordIndexPartitions;
-      this.currRecordIndexPartitions = currPartitions;
-    }
-  }
-
-  public void deleteLastRecordIndex() {
-    synchronized (schemaMutex) {
-      lastRecordIndexPartitions = null;
-    }
-  }
-
   public Object getSchemaLock() {
     return schemaMutex;
   }

@@ -41,7 +41,7 @@ public class CreateIndexStatementHandlerTest {
     when(client.sendToMaster(eq("SchemaManager:createIndex"), anyObject())).thenAnswer(
         (Answer) invocationOnMock -> {
           called.set(true);
-          ComObject ret = new ComObject();
+          ComObject ret = new ComObject(2);
           ret.put(ComObject.Tag.SCHEMA_BYTES, common.serializeSchema((short) 1000));
           return ret.serialize();
         });

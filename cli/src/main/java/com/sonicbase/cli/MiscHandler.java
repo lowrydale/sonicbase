@@ -47,14 +47,14 @@ class MiscHandler {
   }
 
   void stopStreaming() {
-    ComObject cobj = new ComObject();
+    ComObject cobj = new ComObject(1);
     for (int shard = 0; shard < cli.getConn().getShardCount(); shard++) {
       cli.getConn().send("StreamManager:stopStreaming", shard, 0, cobj, ConnectionProxy.Replica.ALL);
     }
   }
 
   void startStreaming() {
-    ComObject cobj = new ComObject();
+    ComObject cobj = new ComObject(1);
     for (int shard = 0; shard < cli.getConn().getShardCount(); shard++) {
       cli.getConn().send("StreamManager:startStreaming", shard, 0, cobj, ConnectionProxy.Replica.ALL);
     }

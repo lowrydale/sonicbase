@@ -64,7 +64,7 @@ public class TestSchema {
     for (int i = 0; i < dbServers.length; i++) {
 
       dbServers[i] = new com.sonicbase.server.DatabaseServer();
-      dbServers[i].setConfig(config, "4-servers", "localhost", 9010 + (50 * i), true, new AtomicBoolean(true), new AtomicBoolean(true),null);
+      dbServers[i].setConfig(config, "4-servers", "localhost", 9010 + (50 * i), true, new AtomicBoolean(true), new AtomicBoolean(true),null, false);
       dbServers[i].setRole(role);
     }
     for (Future future : futures) {

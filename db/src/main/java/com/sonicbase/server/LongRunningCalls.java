@@ -45,7 +45,7 @@ public class LongRunningCalls {
   public void load() {
     try {
       synchronized (this) {
-        if (!server.isDurable()) {
+        if (server.isNotDurable()) {
           if (bytesForEmbedded == null) {
             return;
           }
@@ -86,7 +86,7 @@ public class LongRunningCalls {
   public void save() {
     try {
       synchronized (this) {
-        if (!server.isDurable()) {
+        if (server.isNotDurable()) {
           ByteArrayOutputStream bytesOut = new ByteArrayOutputStream();
           try (DataOutputStream out = new DataOutputStream(bytesOut)) {
             serialize(out);
@@ -123,7 +123,7 @@ public class LongRunningCalls {
   }
 
   private void deleteFile(File file) {
-    if (!server.isDurable()) {
+    if (server.isNotDurable()) {
       return;
     }
     try {
@@ -135,7 +135,7 @@ public class LongRunningCalls {
   }
 
   private void deleteOldFiles() {
-    if (!server.isDurable()) {
+    if (server.isNotDurable()) {
       return;
     }
     File dataRootDir = getReplicaRoot();

@@ -1,10 +1,41 @@
 package com.sonicbase.accept.server;
 
+import com.sonicbase.common.DataUtils;
+import com.sonicbase.util.Varint;
 import org.testng.annotations.Test;
 
 import java.io.*;
 
+import static org.testng.Assert.assertEquals;
+
 public class TestDataUtils {
+
+
+  @Test
+  public void testVarInt() throws IOException {
+    byte[] bytes = new byte[100];
+    int[] offset = new int[]{0};
+    DataUtils.writeSignedVarLong(100, bytes, offset);
+
+    offset[0] = 0;
+    assertEquals(DataUtils.readSignedVarLong(bytes, offset), 100);
+
+    offset[0] = 0;
+    DataUtils.writeSignedVarLong(1000000000000000001L, bytes, offset);
+
+    offset[0] = 0;
+    assertEquals(DataUtils.readSignedVarLong(bytes, offset), 1000000000000000001L);
+
+
+    ByteArrayOutputStream bytesOut = new ByteArrayOutputStream();
+    DataOutputStream out = new DataOutputStream(bytesOut);
+
+    Varint.writeSignedVarLong(1000000000000000001L, out);
+    byte[] varBytes = bytesOut.toByteArray();
+
+    offset[0] = 0;
+    assertEquals(DataUtils.readSignedVarLong(bytes, offset), 1000000000000000001L);
+  }
 
 
   public static int bytesToInt(byte[] bytes, int offset) {

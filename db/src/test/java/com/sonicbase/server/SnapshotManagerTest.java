@@ -1,10 +1,5 @@
 package com.sonicbase.server;
 
-import com.codahale.metrics.Timer;
-import com.fasterxml.jackson.databind.JsonNode;
-import com.fasterxml.jackson.databind.ObjectMapper;
-import com.fasterxml.jackson.databind.node.ArrayNode;
-import com.fasterxml.jackson.databind.node.ObjectNode;
 import com.sonicbase.client.DatabaseClient;
 import com.sonicbase.common.Config;
 import com.sonicbase.common.DatabaseCommon;
@@ -25,10 +20,6 @@ import java.util.List;
 import java.util.Map;
 import java.util.concurrent.atomic.AtomicInteger;
 
-import static com.sonicbase.server.DatabaseServer.*;
-import static com.sonicbase.server.DatabaseServer.METRIC_DELETE;
-import static com.sonicbase.server.DatabaseServer.METRIC_UPDATE;
-import static com.sonicbase.server.MonitorManagerImpl.METRICS;
 import static org.mockito.Matchers.anyString;
 import static org.mockito.Mockito.mock;
 import static org.mockito.Mockito.when;
@@ -52,7 +43,6 @@ public class SnapshotManagerTest {
 
   @Test
   public void test() throws Exception {
-    when(server.isDurable()).thenReturn(true);
     AddressMap addressMap = new AddressMap(server);
     when(server.getAddressMap()).thenReturn(addressMap);
     when(server.getBatchRepartCount()).thenReturn(new AtomicInteger(0));
@@ -111,7 +101,6 @@ public class SnapshotManagerTest {
 
   @Test
   public void testDeleteIndexSchema() throws IOException {
-    when(server.isDurable()).thenReturn(true);
     when(server.getDataDir()).thenReturn("/tmp/database");
     FileUtils.deleteDirectory(new File("/tmp/database"));
 
@@ -130,7 +119,6 @@ public class SnapshotManagerTest {
 
   @Test
   public void testDeleteTableSchema() throws IOException {
-    when(server.isDurable()).thenReturn(true);
     when(server.getDataDir()).thenReturn("/tmp/database");
     FileUtils.deleteDirectory(new File("/tmp/database"));
 
@@ -148,7 +136,6 @@ public class SnapshotManagerTest {
 
   @Test
   public void testDeleteDbSchema() throws IOException {
-    when(server.isDurable()).thenReturn(true);
     when(server.getDataDir()).thenReturn("/tmp/database");
     FileUtils.deleteDirectory(new File("/tmp/database"));
 

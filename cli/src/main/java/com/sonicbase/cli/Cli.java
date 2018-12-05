@@ -794,7 +794,7 @@ public class Cli {
         final int replica = j;
         getExecutor().submit((Callable) () -> {
           Config.Replica replicaObj = replicas.get(replica);
-          ComObject cobj = new ComObject();
+          ComObject cobj = new ComObject(3);
           cobj.put(ComObject.Tag.DB_NAME, "__none__");
           cobj.put(ComObject.Tag.SCHEMA_VERSION, 1);
           cobj.put(ComObject.Tag.METHOD, "DatabaseServer:healthCheck");
@@ -886,7 +886,7 @@ public class Cli {
         final int replica = j;
         futures.add(executor.submit(() -> {
           try {
-            ComObject cobj = new ComObject();
+            ComObject cobj = new ComObject(2);
             cobj.put(ComObject.Tag.DB_NAME, currDbName);
             cobj.put(ComObject.Tag.SCHEMA_VERSION, conn.getSchemaVersion());
             byte[] ret = conn.send("MonitorManager:getOSStats", shard, replica, cobj, ConnectionProxy.Replica.SPECIFIED);
@@ -950,7 +950,7 @@ public class Cli {
       else {
         if (isWindows()) {
           println(GETTING_FILE_STR + installDir + filename + " " + dir.getAbsolutePath());
-          ComObject cobj = new ComObject();
+          ComObject cobj = new ComObject(3);
           cobj.put(ComObject.Tag.DB_NAME, currDbName);
           cobj.put(ComObject.Tag.SCHEMA_VERSION, 1);
           cobj.put(ComObject.Tag.FILENAME, filename);
@@ -1084,7 +1084,7 @@ public class Cli {
       return;
     }
 
-    ComObject cobj = new ComObject();
+    ComObject cobj = new ComObject(2);
     cobj.put(ComObject.Tag.DB_NAME, currDbName);
     cobj.put(ComObject.Tag.SCHEMA_VERSION, conn.getSchemaVersion());
     conn.send("PartitionManager:beginRebalance", 0, 0, cobj, ConnectionProxy.Replica.MASTER);

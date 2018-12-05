@@ -32,7 +32,7 @@ public class ExecuteStatementHandler implements StatementHandler {
       throw new DatabaseException("invalid execute parameter: parm=" + execute.getName());
     }
 
-    ComObject cobj = new ComObject();
+    ComObject cobj = new ComObject(2);
     cobj.put(ComObject.Tag.SQL, sqlToUse);
     cobj.put(ComObject.Tag.DB_NAME, dbName);
 

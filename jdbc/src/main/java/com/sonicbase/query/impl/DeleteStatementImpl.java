@@ -223,7 +223,7 @@ public class DeleteStatementImpl extends StatementImpl implements DeleteStatemen
     }
 
     private void doDeleteIndexEntry(byte[] primaryKeyBytes, Record record) {
-      ComObject cobj = new ComObject();
+      ComObject cobj = new ComObject(11);
       cobj.put(ComObject.Tag.DB_NAME, dbName);
       if (schemaRetryCount < 2) {
         cobj.put(ComObject.Tag.SCHEMA_VERSION, client.getCommon().getSchemaVersion());
@@ -245,7 +245,7 @@ public class DeleteStatementImpl extends StatementImpl implements DeleteStatemen
     }
 
     private void doDeleteRecord(IndexSchema indexSchema, byte[] bytes, List<Integer> selectedShards) {
-      ComObject cobj = new ComObject();
+      ComObject cobj = new ComObject(12);
       cobj.put(ComObject.Tag.SERIALIZATION_VERSION, DatabaseClient.SERIALIZATION_VERSION);
       cobj.put(ComObject.Tag.KEY_BYTES, bytes);
       if (schemaRetryCount < 2) {

@@ -1,3 +1,10 @@
+1.2.19
+fixed reading of in-process deletes file
+logstash enhancements
+fixed rebalancer for large clusters
+performance optimizations
+memory optimizations
+
 1.2.18
 open sourced pro version
 integrated Logstash

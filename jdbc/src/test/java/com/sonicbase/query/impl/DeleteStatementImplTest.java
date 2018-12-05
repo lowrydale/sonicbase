@@ -53,10 +53,10 @@ public class DeleteStatementImplTest {
     final AtomicBoolean calledLookup = new AtomicBoolean();
     when(client.send(eq("ReadManager:indexLookup"), anyInt(), anyInt(), anyObject(), anyObject())).thenAnswer(invocationOnMock -> {
       calledLookup.set(true);
-      ComObject retObj = new ComObject();
-      ComArray array = retObj.putArray(ComObject.Tag.KEYS, ComObject.Type.BYTE_ARRAY_TYPE);
-      array = retObj.putArray(ComObject.Tag.KEY_RECORDS, ComObject.Type.BYTE_ARRAY_TYPE);
-      array = retObj.putArray(ComObject.Tag.RECORDS, ComObject.Type.BYTE_ARRAY_TYPE);
+      ComObject retObj = new ComObject(5);
+      ComArray array = retObj.putArray(ComObject.Tag.KEYS, ComObject.Type.BYTE_ARRAY_TYPE, records.length);
+      array = retObj.putArray(ComObject.Tag.KEY_RECORDS, ComObject.Type.BYTE_ARRAY_TYPE, records.length);
+      array = retObj.putArray(ComObject.Tag.RECORDS, ComObject.Type.BYTE_ARRAY_TYPE, records.length);
 
       for (int i = 0; i < records.length; i++) {
         byte[] bytes = records[i];

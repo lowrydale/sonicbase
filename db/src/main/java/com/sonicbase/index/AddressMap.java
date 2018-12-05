@@ -464,28 +464,30 @@ public class AddressMap {
         recordsLen += record.length;
       }
 
-      byte[] bytes = new byte[8 + 4 + (4 * records.length) + recordsLen];
+      int len = 8 + 4 + (4 * records.length) + recordsLen;
+
+      if (len > 1000000000) {
+        throw new DatabaseException("Invalid allocation: size=" + len);
+      }
+
+      long address = unsafe.allocateMemory(len);
+
+
       int offset = 0;
-      DataUtils.longToBytes(updateTime, bytes, offset); //update time
+      DataUtils.longToAddress(updateTime, address + offset, unsafe); //update time
       offset += 8;
-      DataUtils.intToBytes(records.length, bytes, offset);
+      DataUtils.intToAddress(records.length, address + offset, unsafe);
       offset += 4;
       for (byte[] record : records) {
-        DataUtils.intToBytes(record.length, bytes, offset);
+        DataUtils.intToAddress(record.length, address + offset, unsafe);
         offset += 4;
-        System.arraycopy(record, 0, bytes, offset, record.length);
+
+        for (int i = 0; i < record.length; i++) {
+          unsafe.putByte(address + offset + i, record[i]);
+        }
         offset += record.length;
       }
 
-      if (bytes.length > 1000000000) {
-        throw new DatabaseException("Invalid allocation: size=" + bytes.length);
-      }
-
-      long address = unsafe.allocateMemory(bytes.length);
-
-      for (int i = 0; i < bytes.length; i++) {
-        unsafe.putByte(address + i, bytes[i]);
-      }
       return address;
     }
   }
@@ -537,26 +539,51 @@ public class AddressMap {
     }
     else {
       long innerAddress = (long)address;
-      byte[] bytes = new byte[4 + (4 * records.length) + recordsLen];
-      int offset = 0; //update time
-      DataUtils.intToBytes(records.length, bytes, offset);
-      offset += 4;
-      for (byte[] record : records) {
-        DataUtils.intToBytes(record.length, bytes, offset);
-        offset += 4;
-        System.arraycopy(record, 0, bytes, offset, record.length);
-        offset += record.length;
+      int len = 8 + 4 + (4 * records.length) + recordsLen;
+
+      if (len > 1000000000) {
+        throw new DatabaseException("Invalid allocation: size=" + len);
       }
 
       long seconds = (System.currentTimeMillis() - TIME_2017) / 1000;
 
-      offset = 0;
-      DataUtils.longToAddress(seconds, innerAddress + offset, unsafe);
-      offset += 8; //update time
+      int offset = 0;
+      DataUtils.longToAddress(seconds, innerAddress + offset, unsafe); //update time
+      offset += 8;
+      DataUtils.intToAddress(records.length, innerAddress + offset, unsafe);
+      offset += 4;
+      for (byte[] record : records) {
+        DataUtils.intToAddress(record.length, innerAddress + offset, unsafe);
+        offset += 4;
 
-      for (int i = 0; i < bytes.length; i++) {
-        unsafe.putByte(innerAddress + offset + i, bytes[i]);
+        for (int i = 0; i < record.length; i++) {
+          unsafe.putByte(innerAddress + offset + i, record[i]);
+        }
+        offset += record.length;
       }
+
+
+//      long innerAddress = (long)address;
+//      byte[] bytes = new byte[4 + (4 * records.length) + recordsLen];
+//      int offset = 0; //update time
+//      DataUtils.intToBytes(records.length, bytes, offset);
+//      offset += 4;
+//      for (byte[] record : records) {
+//        DataUtils.intToBytes(record.length, bytes, offset);
+//        offset += 4;
+//        System.arraycopy(record, 0, bytes, offset, record.length);
+//        offset += record.length;
+//      }
+//
+//      long seconds = (System.currentTimeMillis() - TIME_2017) / 1000;
+//
+//      offset = 0;
+//      DataUtils.longToAddress(seconds, innerAddress + offset, unsafe);
+//      offset += 8; //update time
+//
+//      for (int i = 0; i < bytes.length; i++) {
+//        unsafe.putByte(innerAddress + offset + i, bytes[i]);
+//      }
     }
   }
 

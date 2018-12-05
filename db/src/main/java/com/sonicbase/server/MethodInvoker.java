@@ -2,6 +2,7 @@ package com.sonicbase.server;
 
 import com.sonicbase.common.*;
 import com.sonicbase.query.DatabaseException;
+import javafx.scene.chart.PieChart;
 import org.apache.commons.lang.exception.ExceptionUtils;
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
@@ -130,11 +131,6 @@ public class MethodInvoker {
       long sequence0 = logRequest == null ? logSequence0 : logRequest.getSequences0()[0];
       long sequence1 = logRequest == null ? logSequence1 : logRequest.getSequences1()[0];
 
-      ComObject newMessage = new ComObject(requestBytes);
-      if (logRequest != null) {
-        newMessage.put(ComObject.Tag.SEQUENCE_0, sequence0);
-        newMessage.put(ComObject.Tag.SEQUENCE_1, sequence1);
-      }
       if (!server.onlyQueueCommands() || !enableQueuing) {
         ret = doInvokeMethod(replayedCommand, handlerTime, request, methodStr, existingSequence0, sequence0, sequence1);
       }
@@ -174,7 +170,12 @@ public class MethodInvoker {
     if (e.getMessage() != null && e.getMessage().contains("Shutdown in progress")) {
       throw new DatabaseException(e);
     }
-    logger.error("Error handling command: method=" + new ComObject(requestBytes).getString(ComObject.Tag.METHOD), e);
+    try {
+      logger.error("Error handling command: method=" + new ComObject(requestBytes).getString(ComObject.Tag.METHOD), e);
+    }
+    catch (Exception e1) {
+      throw new DatabaseException(e);
+    }
     throw new DatabaseException(e);
   }
 

@@ -56,7 +56,7 @@ public class TestNoKey {
         //          String role = "primaryMaster";
 
         dbServers[i] = new DatabaseServer();
-        dbServers[i].setConfig(config, "4-servers", "localhost", 9010 + (50 * i), true, new AtomicBoolean(true), new AtomicBoolean(true),null);
+        dbServers[i].setConfig(config, "4-servers", "localhost", 9010 + (50 * i), true, new AtomicBoolean(true), new AtomicBoolean(true),null, false);
         dbServers[i].setRole(role);
 
         //          return null;
@@ -115,7 +115,7 @@ public class TestNoKey {
       }
 
       while (true) {
-        ComObject cobj = new ComObject();
+        ComObject cobj = new ComObject(1);
         cobj.put(ComObject.Tag.METHOD, "DatabaseServer:areAllLongRunningCommandsComplete");
         byte[] bytes = ((ConnectionProxy) conn).getDatabaseClient().sendToMaster(cobj);
         ComObject retObj = new ComObject(bytes);

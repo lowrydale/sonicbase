@@ -3,29 +3,30 @@ package com.sonicbase.common;
 import com.sonicbase.client.DatabaseClient;
 import com.sonicbase.query.DatabaseException;
 import com.sonicbase.util.Varint;
-import org.slf4j.Logger;
-import org.slf4j.LoggerFactory;
 
-import java.io.*;
+import java.io.ByteArrayOutputStream;
+import java.io.DataOutputStream;
 import java.math.BigDecimal;
 import java.sql.Date;
 import java.sql.Time;
 import java.sql.Timestamp;
-import java.util.*;
+import java.util.HashMap;
+import java.util.Iterator;
+import java.util.Map;
 
-import static com.sonicbase.common.ComObject.Type.*;
+import static com.sonicbase.common.ComObjectOld.Type.*;
+
 
 @ExcludeRename
 @SuppressWarnings({"squid:S1168", "squid:S00107"})
 // I prefer to return null instead of an empty array
 // I don't know a good way to reduce the parameter count
-public class ComObject {
-  private static final Logger logger = LoggerFactory.getLogger(ComObject.class);
+public class ComObjectOld {
 
   private static final String UTF_8_STR = "utf-8";
-  static final java.util.Map<Integer, DynamicType> typesByTag = new HashMap<>();
-  static final java.util.Map<Integer, DynamicTag> tagsByTag = new HashMap<>();
-  private Map map;
+  static final Map<Integer, DynamicType> typesByTag = new HashMap<>();
+  static final Map<Integer, DynamicTag> tagsByTag = new HashMap<>();
+  private Map<Integer, Object> map;
 
   public static class DynamicType {
     final int tag;
@@ -300,139 +301,40 @@ public class ComObject {
     return tagsByTag.get(tag).tagEnum;
   }
 
-  ComObject() {
+  public ComObjectOld(int size) {
+    map = new HashMap<>(size);
+    put(ComObjectOld.Tag.SERIALIZATION_VERSION, (short) DatabaseClient.SERIALIZATION_VERSION);
   }
 
-  public ComObject(int size) {
-    this.map = new Map(size + 4);
-    put(ComObject.Tag.SERIALIZATION_VERSION, (short) DatabaseClient.SERIALIZATION_VERSION);
+  ComObjectOld() {
   }
 
-  public ComObject(byte[] bytes) {
-    deserialize(bytes, new int[]{0});
-  }
-
-  public ComObject(byte[] bytes, int[] offset) {
+  public ComObjectOld(byte[] bytes, int[] offset) {
     deserialize(bytes, offset);
   }
 
-  public class Map {
-    private int[] tags;
-    private Object[] values;
-    private int pos;
-    private boolean isOptimized = false;
-    //private Entry keyEntry = new Entry();
-
-    public Map(int size) {
-      tags = new int[size];
-      values = new Object[size];
-      pos = 0;
-    }
-
-    public int[] getTags() {
-      return tags;
-    }
-
-    public Object[] getValues() {
-      return values;
-    }
-
-    public int getPos() {
-      return pos;
-    }
-
-    public Object get(int tag) {
-      //optimizeIfNeeded();
-
-      for (int i = 0; i < pos; i++) {
-        if (tags[i] == tag) {
-          return values[i];
-        }
-      }
-      return null;
-    }
-
-//    private void optimizeIfNeeded() {
-//      if (pos != array.length) {
-//        throw new DatabaseException("Map not full: expected=" + array.length + ", actual=" + pos);
-//      }
-//      if (!isOptimized) {
-//        Arrays.sort(array, Comparator.comparingInt(o -> o.tag));
-//        isOptimized = true;
-//      }
-//    }
-
-    public void put(int tag, Object value) {
-      if (pos == tags.length) {
-        if (logger.isDebugEnabled()) {
-          logger.error("Map entry out of bounds: tag={}, len={}", tag, pos);
-        }
-        int[] newTags = new int[tags.length * 2];
-        System.arraycopy(tags, 0, newTags, 0, pos);
-        tags = newTags;
-
-        Object[] newValues = new Object[values.length * 2];
-        System.arraycopy(values, 0, newValues, 0, pos);
-        values = newValues;
-      }
-      for (int i = 0; i < pos; i++) {
-        if (tags[i] == tag) {
-          values[i] = value;
-          return;
-        }
-      }
-      tags[pos] = tag;
-      values[pos] = value;
-      pos++;
-    }
-
-    public boolean containsKey(int tag) {
-      return map.get(tag) != null;
-    }
+  public ComObjectOld(byte[] bytes) {
+    deserialize(bytes, new int[]{0});
   }
-
-  public class Entry {
-    private int tag;
-    private Object value;
-
-    public Entry() {
-    }
-
-    public Entry(int tag, Object value) {
-      this.tag = tag;
-      this.value = value;
-    }
-
-    public Entry(int tag) {
-      this.tag = tag;
-    }
-
-    public int getTag() {
-      return tag;
-    }
-  }
-
-  public Map getMap() {
-    //map.optimizeIfNeeded();
-    return map;
-  }
-
 
   public String toString() {
     StringBuilder builder = new StringBuilder();
-    for (int i = 0; i < map.pos; i++) {
-      int tag = map.tags[i];
-      Object value = map.values[i];
-      builder.append("[").append(ComObject.getTag(tag).name()).append("=").append(value).append("]");
+    for (Object entry : map.entrySet()) {
+      Map.Entry<Integer, Object> entryObj = (Map.Entry<Integer, Object>) entry;
+      builder.append("[").append(ComObjectOld.getTag( entryObj.getKey()).name()).append("=").append(entryObj.getValue()).append("]");
     }
     return builder.toString();
+  }
+
+  public Map<Integer, Object> getMap() {
+    return map;
   }
 
   public boolean containsTag(Tag tag) {
     return map.containsKey(tag.tag);
   }
 
-  public void put(Tag tag, ComObject value) {
+  public void put(Tag tag, ComObjectOld value) {
     map.put(tag.tag, value);
   }
 
@@ -521,8 +423,8 @@ public class ComObject {
     return (byte[])map.get(tag.tag);
   }
 
-  public ComObject getObject(Tag tag) {
-    return (ComObject)map.get(tag.tag);
+  public ComObjectOld getObject(Tag tag) {
+    return (ComObjectOld)map.get(tag.tag);
   }
 
   public Time getTime(Tag tag) {
@@ -545,49 +447,45 @@ public class ComObject {
     return (byte)map.get(tag.tag);
   }
 
-  public ComArray putArray(Tag tag, Type nestedType, int size) {
-    ComArray ret = new ComArray(nestedType, size);
+  public ComObjectOld putObject(Tag tag, int size) {
+    ComObjectOld cobj = new ComObjectOld(size);
+    cobj.remove(Tag.SERIALIZATION_VERSION);
+    map.put(tag.tag, cobj);
+    return cobj;
+  }
+
+  public ComArrayOld putArray(Tag tag, Type nestedType, int size) {
+    ComArrayOld ret = new ComArrayOld(nestedType, size);
     map.put(tag.tag, ret);
     return ret;
   }
 
-  public ComArray putArray(Tag tag, ComArray newArray) {
+  public ComArrayOld putArray(Tag tag, ComArrayOld newArray) {
     map.put(tag.tag, newArray);
     return newArray;
   }
 
-  public ComArray getArray(Tag tag) {
-    return (ComArray)map.get(tag.tag);
+
+
+  public ComArrayOld getArray(Tag tag) {
+    return (ComArrayOld)map.get(tag.tag);
   }
 
   public void remove(Tag tag) {
-    for (int i = 0; i < map.pos; i++) {
-      if (map.tags[i] == tag.tag) {
-        map.tags[i] = map.tags[map.pos - 1];
-        map.values[i] = map.values[map.pos - 1];
-        map.pos--;
-        map.isOptimized = false;
-        return;
-      }
-    }
+    map.remove(tag.tag);
   }
 
   public void deserialize(byte[] bytes, int[] offset) {
+
     try {
       int count = (int) DataUtils.readSignedVarLong(bytes, offset);
-      map = new Map(count + 4);
+      map = new HashMap<>(count + 4);
       for (int i = 0; i < count; i++) {
         int tag = (int) DataUtils.readSignedVarLong(bytes, offset);
         int typeTag = (int) DataUtils.readSignedVarLong(bytes, offset);
-        DynamicType type = typesByTag.get(typeTag);
-        if (tag == Tag.MESSAGES.tag) {
-          System.out.println("found");
-        }
+        ComObjectOld.DynamicType type = typesByTag.get(typeTag);
 
         Object value = null;
-        if (type == null) {
-          throw new DatabaseException("Error deserializing object: tag=" +  tag + ", typeTag=" +  typeTag);
-        }
         if (type.tag == INT_TYPE.tag) {
           value = (int) DataUtils.readSignedVarLong(bytes, offset);
         }
@@ -598,9 +496,10 @@ public class ComObject {
           value = DataUtils.readSignedVarLong(bytes, offset);
         }
         else if (type.tag == STRING_TYPE.tag) {
-          int len = (int) DataUtils.readSignedVarLong(bytes, offset);
-          value = new String(bytes, offset[0], len, UTF_8_STR);
-          offset[0] += len;
+//          int len = (int) DataUtils.readSignedVarLong(bytes, offset);
+//          value = new String(bytes, offset[0], len, UTF_8_STR);
+//          offset[0] += len;
+          value = DataUtils.bytesToUTF(bytes, offset);
         }
         else if (type.tag == BOOLEAN_TYPE.tag) {
           value = 1 == bytes[offset[0]++];
@@ -613,10 +512,10 @@ public class ComObject {
           value = b;
         }
         else if (type.tag == ARRAY_TYPE.tag) {
-          value = new ComArray(bytes, offset);
+          value = new ComArrayOld(bytes, offset);
         }
         else if (type.tag == OBJECT_TYPE.tag) {
-          value = new ComObject(bytes, offset);
+          value = new ComObjectOld(bytes, offset);
         }
         else if (type.tag == TINY_INT_TYPE.tag) {
           value = bytes[offset[0]++];
@@ -663,21 +562,29 @@ public class ComObject {
   }
 
   public byte[] serialize() {
-    ByteArrayOutputStream bytesOut = new ByteArrayOutputStream();
-    try (DataOutputStream out = new DataOutputStream(bytesOut)) {
-      Varint.writeSignedVarLong(map.pos, out);
-      for (int i = 0; i < map.pos; i++) {
-        doSerialize(out, map.tags[i], map.values[i]);
+    try {
+      ByteArrayOutputStream bytesOut = new ByteArrayOutputStream();
+      DataOutputStream out = new DataOutputStream(bytesOut);
+      Varint.writeSignedVarLong(map.size(), out);
+      Iterator<Map.Entry<Integer, Object>> iterator = map.entrySet().iterator();
+      while (iterator.hasNext()) {
+        doSerialize(out, iterator);
       }
+
+      out.close();
+      return bytesOut.toByteArray();
     }
     catch (Exception e) {
       throw new DatabaseException(e);
     }
-    return bytesOut.toByteArray();
   }
 
-  private void doSerialize(DataOutputStream out, int tag, Object value) {
+  private void doSerialize(DataOutputStream out, Iterator<Map.Entry<Integer, Object>> iterator) {
+    int tag = -1;
     try {
+      Map.Entry<Integer, Object> entry = iterator.next();
+      tag = entry.getKey();
+      Object value = entry.getValue();
       DynamicTag tagObj = tagsByTag.get(tag);
       if (tagObj == null) {
         throw new DatabaseException("Tag not defined: tag=" + tag);
@@ -710,9 +617,10 @@ public class ComObject {
         }
       }
       else if (tagObj.type.tag == STRING_TYPE.tag) {
-        byte[] bytes = ((String) value).getBytes(UTF_8_STR);
-        Varint.writeSignedVarLong(bytes.length, out);
-        out.write(bytes);
+//        byte[] bytes = ((String) value).getBytes(UTF_8_STR);
+//        Varint.writeSignedVarLong(bytes.length, out);
+//        out.write(bytes);
+        out.writeUTF(((String)value));
       }
       else if (tagObj.type.tag == BOOLEAN_TYPE.tag) {
         out.writeBoolean((Boolean) value);
@@ -723,10 +631,10 @@ public class ComObject {
         out.write(bytes);
       }
       else if (tagObj.type.tag == ARRAY_TYPE.tag) {
-        ((ComArray) value).serialize(out);
+        ((ComArrayOld) value).serialize(out);
       }
       else if (tagObj.type.tag == OBJECT_TYPE.tag) {
-        out.write(((ComObject) value).serialize());
+        out.write(((ComObjectOld) value).serialize());
       }
       else if (tagObj.type.tag == TINY_INT_TYPE.tag) {
         out.write((byte) value);

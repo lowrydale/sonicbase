@@ -4,6 +4,7 @@ import com.fasterxml.jackson.databind.JsonNode;
 import com.fasterxml.jackson.databind.ObjectMapper;
 import com.fasterxml.jackson.databind.node.ObjectNode;
 import com.sonicbase.client.DatabaseClient;
+import com.sonicbase.common.ComArray;
 import com.sonicbase.common.ComObject;
 import com.sonicbase.common.Record;
 import com.sonicbase.index.Index;
@@ -12,6 +13,7 @@ import com.sonicbase.schema.FieldSchema;
 import com.sonicbase.schema.TableSchema;
 import com.sonicbase.server.DatabaseServer;
 import com.sonicbase.server.NettyServer;
+import com.sonicbase.streams.Message;
 import com.sonicbase.streams.StreamManager;
 import org.apache.commons.io.FileUtils;
 import org.apache.commons.io.IOUtils;
@@ -186,7 +188,7 @@ public class TestStreams {
       clientB = ((ConnectionProxy)connB).getDatabaseClient();
       clientB.syncSchema();
 
-      ComObject cobj = new ComObject();
+      ComObject cobj = new ComObject(1);
       ((ConnectionProxy)connA).sendToMaster("MonitorManager:initMonitoringTables", cobj);
       ((ConnectionProxy)connA).sendToMaster("OSStatsManager:initMonitoringTables", cobj);
 
@@ -209,7 +211,7 @@ public class TestStreams {
         }
       }
 
-      cobj = new ComObject();
+      cobj = new ComObject(1);
       cobj.put(ComObject.Tag.METHOD, "StreamManager:startStreaming");
 
       for (int shard = 0; shard < clientA.getShardCount(); shard++) {
@@ -264,8 +266,26 @@ public class TestStreams {
   }
 
   @Test
+  public void serialize() {
+    ComObject cobj = new ComObject(2);
+    ComArray array = cobj.putArray(ComObject.Tag.MESSAGES, ComObject.Type.STRING_TYPE, 100);
+    for (int i = 0; i < 100; i++) {
+      array.add(String.valueOf(i));
+    }
+
+    byte[] bytes = cobj.serialize();
+    ComObject retObj = new ComObject(bytes);
+    ComArray retArray = retObj.getArray(ComObject.Tag.MESSAGES);
+    for (int i = 0; i < 100; i++) {
+      assertEquals(retArray.getArray().get(i), String.valueOf(i));
+    }
+    assertEquals(retArray.getArray().size(), 100);
+  }
+
+  @Test
   public void test() throws InterruptedException, SQLException {
 
+    Thread.sleep(20_000);
 
     PreparedStatement stmt = connB.prepareStatement("select * from persons");
     ResultSet ret = stmt.executeQuery();
@@ -278,7 +298,7 @@ public class TestStreams {
     stmt = connA.prepareStatement("update persons set relatives='xxx' where id=0");
     stmt.executeUpdate();
 
-    Thread.sleep(10_000);
+    Thread.sleep(20_000);
 
     stmt = connB.prepareStatement("select * from persons");
     ret = stmt.executeQuery();

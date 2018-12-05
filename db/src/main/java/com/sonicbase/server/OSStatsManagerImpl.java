@@ -143,7 +143,7 @@ public class OSStatsManagerImpl {
         try {
           int healthyShards = 0;
           for (int i = 0; i < server.getShardCount(); i++) {
-            cobj = new ComObject();
+            cobj = new ComObject(1);
             server.getClient().send("DatabaseServer:healthCheck", i, 0, cobj, DatabaseClient.Replica.DEF);
             healthyShards++;
           }
@@ -476,10 +476,14 @@ public class OSStatsManagerImpl {
       }
     }
 
-    int pos = cpuLine.indexOf("%id");
-    int pos2 = cpuLine.lastIndexOf(" ", pos);
-    ret.cpu = 100d - Double.valueOf(cpuLine.substring(pos2, pos).trim());
-
+    try {
+      int pos = cpuLine.indexOf("%id");
+      int pos2 = cpuLine.lastIndexOf(" ", pos);
+      ret.cpu = 100d - Double.valueOf(cpuLine.substring(pos2, pos).trim());
+    }
+    catch (Exception e) {
+      logger.warn("Error getting linux cpu stats: line={}", cpuLine, e);
+    }
     ret.diskAvail = getDiskAvailable()[1];
   }
 
@@ -810,7 +814,7 @@ public class OSStatsManagerImpl {
       while (!shutdown && ch != null);
     }
     catch (Exception e) {
-      logger.error("Error getting java mem stats: line=" + line);
+      logger.warn("Error getting java mem stats: line=" + line);
     }
   }
 
@@ -1229,7 +1233,7 @@ public class OSStatsManagerImpl {
   public ComObject getOSStats(ComObject cobj, boolean replayedCommand) {
     try {
       OSStatsManagerImpl.OSStats stats = doGetOSStats();
-      ComObject retObj = new ComObject();
+      ComObject retObj = new ComObject(9);
       retObj.put(ComObject.Tag.RES_GIG, stats.resGig);
       retObj.put(ComObject.Tag.CPU, stats.cpu);
       retObj.put(ComObject.Tag.JAVA_MEM_MIN, stats.javaMemMin);

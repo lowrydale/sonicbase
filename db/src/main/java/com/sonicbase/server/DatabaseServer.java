@@ -133,7 +133,7 @@ public class DatabaseServer {
   private String gcLog;
   private Thread reloadServerThread;
   private boolean isServerRoloadRunning;
-  private boolean durable = true;
+  private boolean notDurable = true;
   private boolean unsafe;
   private Object connMutex = new Object();
   private ConnectionProxy sysConnection;
@@ -274,8 +274,8 @@ public class DatabaseServer {
 //                snapshot.get95thPercentile(), snapshot.get99thPercentile(), snapshot.get999thPercentile(), snapshot.getMax());
 //
 //          }
-          ComObject cobj = new ComObject();
-          ComArray array = cobj.putArray(ComObject.Tag.STATS, ComObject.Type.OBJECT_TYPE);
+          ComObject cobj = new ComObject(3);
+          ComArray array = cobj.putArray(ComObject.Tag.STATS, ComObject.Type.OBJECT_TYPE, stats.size());
           StringBuilder builder = new StringBuilder();
           boolean first = true;
           for (Map.Entry<String, SimpleStats> entry : stats.entrySet()) {
@@ -287,7 +287,7 @@ public class DatabaseServer {
             }
             builder.append(entry.getKey()).append("Rate").append("=").append((double)entry.getValue().count.get() / ((double)System.currentTimeMillis() - entry.getValue().begin) * 1000f);
 
-            ComObject innerObj = new ComObject();
+            ComObject innerObj = new ComObject(2);
             innerObj.put(ComObject.Tag.NAME,  entry.getKey() + "Rate");
             innerObj.put(ComObject.Tag.RATE, (double)entry.getValue().count.get() / ((double)System.currentTimeMillis() - entry.getValue().begin) * 1000f);
             array.add(innerObj);
@@ -337,18 +337,18 @@ public class DatabaseServer {
   public void setConfig(
       final Config config, String cluster, String host, int port, AtomicBoolean isRunning,
       AtomicBoolean isRecovered, String gclog, String xmx) {
-    setConfig(config, cluster, host, port, false, isRunning, isRecovered, gclog, xmx, true, false);
+    setConfig(config, cluster, host, port, false, isRunning, isRecovered, gclog, xmx, false, false);
   }
 
   public void setConfig(
       final Config config, String cluster, String host, int port,
-      boolean unitTest, AtomicBoolean isRunning, AtomicBoolean isRecovered, String gclog) {
-    setConfig(config, cluster, host, port, unitTest, isRunning, isRecovered, gclog, null, true, false);
+      boolean unitTest, AtomicBoolean isRunning, AtomicBoolean isRecovered, String gclog, boolean nonDurable) {
+    setConfig(config, cluster, host, port, unitTest, isRunning, isRecovered, gclog, null, nonDurable, false);
   }
 
   public void setConfig(
       final Config config, String cluster, String host, int port,
-      boolean unitTest, AtomicBoolean isRunning, AtomicBoolean isRecovered, String gclog, String xmx, boolean durable, boolean disablePro) {
+      boolean unitTest, AtomicBoolean isRunning, AtomicBoolean isRecovered, String gclog, String xmx, boolean notDurable, boolean disablePro) {
     this.isRunning = isRunning;
     this.isRecovered = isRecovered;
     this.config = config;
@@ -357,7 +357,7 @@ public class DatabaseServer {
     this.port = port;
     this.xmx = xmx;
     this.gcLog = gclog;
-    this.durable = durable;
+    this.notDurable = notDurable;
     this.unsafe = config.getBoolean(USE_UNSAFE_STR) == null ? true : config.getBoolean(USE_UNSAFE_STR);
 
     this.dataDir = config.getString("dataDirectory");
@@ -385,7 +385,7 @@ public class DatabaseServer {
     this.masterAddress = firstServer.getString(PRIVATE_ADDRESS_STR);
     this.masterPort = firstServer.getInt("port");
 
-    common.setIsDurable(durable);
+    common.setIsNotDurable(notDurable);
     if (firstServer.getString(PRIVATE_ADDRESS_STR).equals(host) &&
         firstServer.getInt("port") == port) {
       this.shard = 0;
@@ -808,7 +808,7 @@ public class DatabaseServer {
 
   private void prepareToComeAlive(int localShard, int localReplica, AtomicBoolean isHealthy, boolean changed) {
     if (changed && isHealthy.get()) {
-      ComObject cobj = new ComObject();
+      ComObject cobj = new ComObject(3);
       cobj.put(ComObject.Tag.DB_NAME, NONE_STR);
       cobj.put(ComObject.Tag.SCHEMA_VERSION, common.getSchemaVersion());
       cobj.put(ComObject.Tag.METHOD, "DatabaseServer:prepareToComeAlive");
@@ -879,7 +879,7 @@ public class DatabaseServer {
     isHealthy.set(false);
     Thread checkThread = ThreadUtil.createThread(() -> {
         try {
-          ComObject cobj = new ComObject();
+          ComObject cobj = new ComObject(3);
           cobj.put(ComObject.Tag.DB_NAME, NONE_STR);
           cobj.put(ComObject.Tag.SCHEMA_VERSION, common.getSchemaVersion());
           cobj.put(ComObject.Tag.METHOD, "DatabaseServer:healthCheck");
@@ -962,7 +962,7 @@ public class DatabaseServer {
 
   @SuppressWarnings("squid:S1172") // cobj and replayedCommand are required
   public ComObject getRecoverProgress(ComObject cobj, boolean replayedCommand) {
-    ComObject retObj = new ComObject();
+    ComObject retObj = new ComObject(7);
     if (waitingForServersToStart) {
       retObj.put(ComObject.Tag.PERCENT_COMPLETE, 0d);
       retObj.put(ComObject.Tag.STAGE, "waitingForServersToStart");
@@ -1094,7 +1094,7 @@ public class DatabaseServer {
     return null;
   }
 
-  public ComObject executeProcedurePrimary(final ComObject cobj, boolean replayedCommand) {
+  public ComObject executeProcedurePrimary(ComObject cobj, boolean replayedCommand) {
     ThreadPoolExecutor localExecutor = null;
     try {
       if (!common.haveProLicense()) {
@@ -1127,7 +1127,10 @@ public class DatabaseServer {
       context.setParameters(parms);
       procedure.init(context);
 
-      cobj.put(ComObject.Tag.ID, storedProcedureId);
+      byte[] bytes = cobj.serialize(); // serialize to get more fields
+      final ComObject cobj2 = new ComObject(bytes);
+
+      cobj2.put(ComObject.Tag.ID, storedProcedureId);
 
       localExecutor = ThreadUtil.createExecutor(shardCount, "SonicBase executeProcedurePrimary Thread");
       // call all shards
@@ -1135,7 +1138,7 @@ public class DatabaseServer {
       for (int i = 0; i < shardCount; i++) {
         final int localShard = i;
         futures.add(localExecutor.submit((Callable) () -> getDatabaseClient().send(
-            "DatabaseServer:executeProcedure", localShard, 0, cobj, DatabaseClient.Replica.DEF)));
+            "DatabaseServer:executeProcedure", localShard, 0, cobj2, DatabaseClient.Replica.DEF)));
       }
 
       List<StoredProcedureResponse> responses = new ArrayList<>();
@@ -1220,16 +1223,16 @@ public class DatabaseServer {
     return proServer;
   }
 
-  public boolean isDurable() {
-    return durable;
+  public boolean isNotDurable() {
+    return notDurable;
   }
 
   public boolean shouldUseUnsafe() {
     return unsafe;
   }
 
-  public void setDurable(boolean durable) {
-    this.durable = durable;
+  public void setNotDurable(boolean notDurable) {
+    this.notDurable = notDurable;
   }
 
   public StreamManager getStreamManager() {
@@ -1450,7 +1453,7 @@ public class DatabaseServer {
   }
 
   public ComObject areAllLongRunningCommandsComplete(ComObject cobj, boolean replayedCommand) {
-    ComObject retObj = new ComObject();
+    ComObject retObj = new ComObject(2);
     if (longRunningCommands.getCommandCount() == 0) {
       retObj.put(ComObject.Tag.IS_COMPLETE, true);
     }
@@ -1469,9 +1472,9 @@ public class DatabaseServer {
   public ComObject getDbNames(ComObject cobj, boolean replayedCommand) {
 
     try {
-      ComObject retObj = new ComObject();
+      ComObject retObj = new ComObject(1);
       List<String> dbNames = getDbNames(getDataDir());
-      ComArray array = retObj.putArray(ComObject.Tag.DB_NAMES, ComObject.Type.STRING_TYPE);
+      ComArray array = retObj.putArray(ComObject.Tag.DB_NAMES, ComObject.Type.STRING_TYPE, dbNames.size());
       for (String dbName : dbNames) {
         array.add(dbName);
       }
@@ -1558,7 +1561,7 @@ public class DatabaseServer {
 
   void syncDbNames() {
     logger.info("Syncing database names: shard={}, replica={}", shard, replica);
-    ComObject cobj = new ComObject();
+    ComObject cobj = new ComObject(2);
     cobj.put(ComObject.Tag.DB_NAME, NONE_STR);
     cobj.put(ComObject.Tag.SCHEMA_VERSION, common.getSchemaVersion());
     byte[] ret = getDatabaseClient().send("DatabaseServer:getDbNames", 0, 0, cobj,
@@ -1746,7 +1749,7 @@ public class DatabaseServer {
 
   void pushIndexSchema(String dbName, int schemaVersion, TableSchema tableSchema, IndexSchema indexSchema) {
     try {
-      ComObject cobj = new ComObject();
+      ComObject cobj = new ComObject(6);
       cobj.put(ComObject.Tag.DB_NAME, dbName);
       cobj.put(ComObject.Tag.SCHEMA_VERSION, schemaVersion);
       cobj.put(ComObject.Tag.METHOD, "DatabaseServer:updateIndexSchema");
@@ -1785,7 +1788,7 @@ public class DatabaseServer {
 
   public void pushSchema() {
     try {
-      ComObject cobj = new ComObject();
+      ComObject cobj = new ComObject(4);
       cobj.put(ComObject.Tag.DB_NAME, NONE_STR);
       cobj.put(ComObject.Tag.SCHEMA_VERSION, common.getSchemaVersion());
       cobj.put(ComObject.Tag.METHOD, "DatabaseServer:updateSchema");
@@ -1822,7 +1825,7 @@ public class DatabaseServer {
   }
 
   private ComObject doHealthCheck() {
-    ComObject retObj = new ComObject();
+    ComObject retObj = new ComObject(1);
     retObj.put(ComObject.Tag.STATUS, STATUS_OK_STR);
     return retObj;
   }
@@ -1854,7 +1857,7 @@ public class DatabaseServer {
           continue;
         }
         try {
-          ComObject cobj = new ComObject();
+          ComObject cobj = new ComObject(4);
           cobj.put(ComObject.Tag.DB_NAME, NONE_STR);
           cobj.put(ComObject.Tag.SCHEMA_VERSION, common.getSchemaVersion());
           cobj.put(ComObject.Tag.METHOD, "DatabaseServer:updateServersConfig");
@@ -1944,7 +1947,7 @@ public class DatabaseServer {
     try {
       logger.info("prepareToComeAlive");
 
-      ComObject pcobj = new ComObject();
+      ComObject pcobj = new ComObject(3);
       pcobj.put(ComObject.Tag.DB_NAME, NONE_STR);
       pcobj.put(ComObject.Tag.SCHEMA_VERSION, common.getSchemaVersion());
       pcobj.put(ComObject.Tag.METHOD, "LogManager:pushMaxSequenceNum");
@@ -1952,7 +1955,7 @@ public class DatabaseServer {
           true);
 
       if (shard == 0) {
-        pcobj = new ComObject();
+        pcobj = new ComObject(3);
         pcobj.put(ComObject.Tag.DB_NAME, NONE_STR);
         pcobj.put(ComObject.Tag.SCHEMA_VERSION, common.getSchemaVersion());
         pcobj.put(ComObject.Tag.METHOD, "DatabaseServer:pushMaxRecordId");
@@ -1988,14 +1991,14 @@ public class DatabaseServer {
     try {
 
       if (cobj.getBoolean(ComObject.Tag.FORCE) != null && cobj.getBoolean(ComObject.Tag.FORCE)) {
-        final ComObject cobj2 = new ComObject();
+        final ComObject cobj2 = new ComObject(3);
         cobj2.put(ComObject.Tag.DB_NAME, NONE_STR);
         cobj2.put(ComObject.Tag.SCHEMA_VERSION, common.getSchemaVersion());
         cobj2.put(ComObject.Tag.METHOD, "DatabaseServer:getSchema");
 
         doGetSchema(cobj2);
       }
-      ComObject retObj = new ComObject();
+      ComObject retObj = new ComObject(1);
       retObj.put(ComObject.Tag.SCHEMA_BYTES, common.serializeSchema(serializationVersionNumber));
       return retObj;
     }
@@ -2063,7 +2066,7 @@ public class DatabaseServer {
     short serializationVersionNumber = cobj.getShort(ComObject.Tag.SERIALIZATION_VERSION);
     try {
       byte[] bytes = common.serializeConfig(serializationVersionNumber);
-      ComObject retObj = new ComObject();
+      ComObject retObj = new ComObject(1);
       retObj.put(ComObject.Tag.CONFIG_BYTES, bytes);
       return retObj;
     }
@@ -2088,7 +2091,7 @@ public class DatabaseServer {
 
         updateManager.truncateAllForSingleServerTruncate();
 
-        ComObject rcobj = new ComObject();
+        ComObject rcobj = new ComObject(4);
         rcobj.put(ComObject.Tag.DB_NAME, "__none__");
         rcobj.put(ComObject.Tag.SCHEMA_VERSION, getCommon().getSchemaVersion());
         byte[] bytes = getClient().send("DatabaseServer:prepareSourceForServerReload", getShard(), 0, rcobj, DatabaseClient.Replica.MASTER);
@@ -2111,7 +2114,7 @@ public class DatabaseServer {
         throw new DatabaseException(e);
       }
       finally {
-        ComObject rcobj = new ComObject();
+        ComObject rcobj = new ComObject(2);
         rcobj.put(ComObject.Tag.DB_NAME, "__none__");
         rcobj.put(ComObject.Tag.SCHEMA_VERSION, getCommon().getSchemaVersion());
         byte[] bytes = getClient().send("DatabaseServer:finishServerReloadForSource", getShard(),
@@ -2149,7 +2152,7 @@ public class DatabaseServer {
       }
       try (FileInputStream fileIn = new FileInputStream(file)) {
         String ret = IOUtils.toString(fileIn, "utf-8");
-        ComObject retObj = new ComObject();
+        ComObject retObj = new ComObject(1);
         retObj.put(ComObject.Tag.FILE_CONTENT, ret);
         return retObj;
       }
@@ -2170,7 +2173,7 @@ public class DatabaseServer {
         IOUtils.copy(in, out);
       }
       byte[] bytes = localOut.toByteArray();
-      ComObject retObj = new ComObject();
+      ComObject retObj = new ComObject(1);
       retObj.put(ComObject.Tag.BINARY_FILE_CONTENT, bytes);
 
       return retObj;
@@ -2182,7 +2185,7 @@ public class DatabaseServer {
 
 
   public ComObject isServerReloadFinished(ComObject cobj, boolean replayedCommand) {
-    ComObject retObj = new ComObject();
+    ComObject retObj = new ComObject(1);
     retObj.put(ComObject.Tag.IS_COMPLETE, !isServerRoloadRunning);
 
     return retObj;
@@ -2192,7 +2195,7 @@ public class DatabaseServer {
     for (Object obj : files.getArray()) {
       String filename = (String) obj;
       try {
-        ComObject cobj = new ComObject();
+        ComObject cobj = new ComObject(3);
         cobj.put(ComObject.Tag.DB_NAME, "__none__");
         cobj.put(ComObject.Tag.SCHEMA_VERSION, getCommon().getSchemaVersion());
         cobj.put(ComObject.Tag.FILENAME, filename);
@@ -2267,8 +2270,8 @@ public class DatabaseServer {
       deleteManager.getFiles(files);
       longRunningCommands.getFiles(files);
 
-      ComObject retObj = new ComObject();
-      ComArray array = retObj.putArray(ComObject.Tag.FILENAMES, ComObject.Type.STRING_TYPE);
+      ComObject retObj = new ComObject(1);
+      ComArray array = retObj.putArray(ComObject.Tag.FILENAMES, ComObject.Type.STRING_TYPE, files.size());
       for (String filename : files) {
         array.add(filename);
       }
@@ -2307,7 +2310,7 @@ public class DatabaseServer {
       ServersConfig.Shard[] newShards = newConfig.getShards();
 
       int count = newShards.length - oldShards.length;
-      ComObject retObj = new ComObject();
+      ComObject retObj = new ComObject(1);
       retObj.put(ComObject.Tag.COUNT, count);
 
       return retObj;
@@ -2329,14 +2332,14 @@ public class DatabaseServer {
       long nextId;
       long maxId;
       synchronized (nextIdLock) {
-        if (!durable) {
+        if (!notDurable) {
           if (maxRecordId == null) {
             nextId = 1;
-            maxRecordId = maxId = 100000;
+            maxRecordId = maxId = 1000000;
           }
           else {
             nextId = maxRecordId + 1;
-            maxRecordId += 100000;
+            maxRecordId += 1000000;
             maxId = maxRecordId;
           }
         }
@@ -2345,13 +2348,13 @@ public class DatabaseServer {
           file.getParentFile().mkdirs();
           if (!file.exists()) {
             nextId = 1;
-            maxId = 100000;
+            maxId = 1000000;
           }
           else {
             try (BufferedReader reader = new BufferedReader(new InputStreamReader(new FileInputStream(file)))) {
               maxId = Long.valueOf(reader.readLine());
               nextId = maxId + 1;
-              maxId += 100000;
+              maxId += 1000000;
             }
             if (file.exists()) {
               Files.delete(file.toPath());
@@ -2367,7 +2370,7 @@ public class DatabaseServer {
 
       logger.info("Requesting next record id - finished: nextId={}, maxId={}", nextId, maxId);
 
-      ComObject retObj = new ComObject();
+      ComObject retObj = new ComObject(2);
       retObj.put(ComObject.Tag.NEXT_ID, nextId);
       retObj.put(ComObject.Tag.MAX_ID, maxId);
       return retObj;
@@ -2380,7 +2383,7 @@ public class DatabaseServer {
   public ComObject pushMaxRecordId(ComObject cobj, boolean replayedCommand) {
     try {
       synchronized (nextIdLock) {
-        if (!durable) {
+        if (!notDurable) {
           long maxId = maxRecordId == null ? 0 : maxRecordId;
           pushMaxRecordId(NONE_STR, maxId);
         }
@@ -2403,7 +2406,7 @@ public class DatabaseServer {
   }
 
   protected void pushMaxRecordId(String dbName, long maxId) {
-    ComObject cobj = new ComObject();
+    ComObject cobj = new ComObject(3);
     cobj.put(ComObject.Tag.DB_NAME, dbName);
     cobj.put(ComObject.Tag.SCHEMA_VERSION, common.getSchemaVersion());
     cobj.put(ComObject.Tag.MAX_ID, maxId);
@@ -2430,7 +2433,7 @@ public class DatabaseServer {
     try {
       logger.info("setMaxRecordId - begin");
       synchronized (nextIdLock) {
-        if (!durable) {
+        if (!notDurable) {
           maxRecordId = maxId;
         }
         else {

@@ -60,7 +60,7 @@ public class PartitionUtils {
       for (int i = 0; i < client.getShardCount(); i++) {
         final int shard = i;
         futures.add(client.getExecutor().submit((Callable) () -> {
-          ComObject cobj = new ComObject();
+          ComObject cobj = new ComObject(2);
           cobj.put(ComObject.Tag.DB_NAME, dbName);
           cobj.put(ComObject.Tag.SCHEMA_VERSION, client.getCommon().getSchemaVersion());
           byte[] response = client.send("PartitionManager:getIndexCounts", shard, 0, cobj, DatabaseClient.Replica.MASTER);

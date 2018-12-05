@@ -28,7 +28,7 @@ public class DropStatementHandler implements StatementHandler {
       String table = drop.getName().getName().toLowerCase();
       TruncateStatementHandler.doTruncateTable(client, dbName, table, schemaRetryCount);
 
-      ComObject cobj = new ComObject();
+      ComObject cobj = new ComObject(5);
       cobj.put(ComObject.Tag.DB_NAME, dbName);
       cobj.put(ComObject.Tag.SCHEMA_VERSION, client.getCommon().getSchemaVersion());
       cobj.put(ComObject.Tag.METHOD, "SchemaManager:dropTable");
@@ -43,7 +43,7 @@ public class DropStatementHandler implements StatementHandler {
       String indexName = drop.getName().getName().toLowerCase();
       String tableName = drop.getName().getSchemaName().toLowerCase();
 
-      ComObject cobj = new ComObject();
+      ComObject cobj = new ComObject(6);
       cobj.put(ComObject.Tag.DB_NAME, dbName);
       cobj.put(ComObject.Tag.SCHEMA_VERSION, client.getCommon().getSchemaVersion());
       cobj.put(ComObject.Tag.METHOD, "SchemaManager:dropIndex");
@@ -63,7 +63,7 @@ public class DropStatementHandler implements StatementHandler {
       if (!localDbName.equals(dbName)) {
         throw new DatabaseException("must be using same db as dropping: usingName=" + dbName + ", droppingName=" + localDbName);
       }
-      ComObject cobj = new ComObject();
+      ComObject cobj = new ComObject(4);
       cobj.put(ComObject.Tag.DB_NAME, dbName);
       cobj.put(ComObject.Tag.SCHEMA_VERSION, client.getCommon().getSchemaVersion());
       cobj.put(ComObject.Tag.METHOD, "SchemaManager:dropDatabase");

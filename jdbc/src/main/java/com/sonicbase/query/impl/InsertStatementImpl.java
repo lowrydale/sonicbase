@@ -68,7 +68,7 @@ public class InsertStatementImpl extends StatementImpl implements InsertStatemen
 
     cobj.put(ComObject.Tag.TABLE_NAME, tableName);
 
-    ComArray columnsArray = cobj.putArray(ComObject.Tag.COLUMNS, ComObject.Type.STRING_TYPE);
+    ComArray columnsArray = cobj.putArray(ComObject.Tag.COLUMNS, ComObject.Type.STRING_TYPE, columnNames.size());
     for (String column : columnNames) {
       columnsArray.add(column);
     }

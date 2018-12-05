@@ -68,7 +68,7 @@ public class TestDatabaseAdvanced {
     for (int i = 0; i < dbServers.length; i++) {
 
       dbServers[i] = new DatabaseServer();
-      dbServers[i].setConfig(config, "4-servers", "localhost", 9010 + (50 * i), true, new AtomicBoolean(true), new AtomicBoolean(true),null);
+      dbServers[i].setConfig(config, "4-servers", "localhost", 9010 + (50 * i), true, new AtomicBoolean(true), new AtomicBoolean(true),null, false);
       dbServers[i].setRole(role);
     }
     for (Future future : futures) {
@@ -252,7 +252,7 @@ public class TestDatabaseAdvanced {
     File snapshotDir = new File(System.getProperty("user.home"), "db/snapshot/1/1");
     FileUtils.deleteDirectory(snapshotDir);
 
-    ComObject cobj = new ComObject();
+    ComObject cobj = new ComObject(1);
     client.send("DatabaseServer:disableServer", 1, 1, cobj, DatabaseClient.Replica.SPECIFIED);
     client.send("DatabaseServer:reloadServer", 1, 1, cobj, DatabaseClient.Replica.SPECIFIED);
 

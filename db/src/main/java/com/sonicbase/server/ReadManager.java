@@ -128,7 +128,7 @@ public class ReadManager {
     }
 
 
-    ComObject retObj = new ComObject();
+    ComObject retObj = new ComObject(1);
     retObj.put(ComObject.Tag.COUNT_LONG, count);
     return retObj;
   }
@@ -221,7 +221,7 @@ public class ReadManager {
       indexLookup.setCurrOffset(new AtomicLong());
       indexLookup.setCountReturned(new AtomicLong());
 
-      ComObject retObj = new ComObject();
+      ComObject retObj = new ComObject(2);
       retObj.put(ComObject.Tag.SERIALIZATION_VERSION, DatabaseClient.SERIALIZATION_VERSION);
 
       int leftOperatorId = cobj.getInt(ComObject.Tag.LEFT_OPERATOR);
@@ -238,7 +238,7 @@ public class ReadManager {
       boolean singleValue = cobj.getBoolean(ComObject.Tag.SINGLE_VALUE);
 
       ComArray keys = cobj.getArray(ComObject.Tag.KEYS);
-      ComArray retKeysArray = retObj.putArray(ComObject.Tag.RET_KEYS, ComObject.Type.OBJECT_TYPE);
+      ComArray retKeysArray = retObj.putArray(ComObject.Tag.RET_KEYS, ComObject.Type.OBJECT_TYPE, keys.getArray().size());
       for (Object keyObj : keys.getArray()) {
         batchIndexLookupForKey(indexLookup, indexName, tableSchema, indexSchema, singleValue, retKeysArray,
             (ComObject) keyObj);
@@ -280,20 +280,20 @@ public class ReadManager {
     indexLookup.setKeys(returnKeys);
     indexLookup.lookup();
 
-    ComObject retEntry = new ComObject();
+    ComObject retEntry = new ComObject(5);
     retKeysArray.add(retEntry);
     retEntry.put(ComObject.Tag.OFFSET, offset);
     retEntry.put(ComObject.Tag.KEY_COUNT, retKeyRecords.size());
 
-    ComArray keysArray = retEntry.putArray(ComObject.Tag.KEY_RECORDS, ComObject.Type.BYTE_ARRAY_TYPE);
+    ComArray keysArray = retEntry.putArray(ComObject.Tag.KEY_RECORDS, ComObject.Type.BYTE_ARRAY_TYPE, retKeyRecords.size());
     for (byte[] currKey : retKeyRecords) {
       keysArray.add(currKey);
     }
-    keysArray = retEntry.putArray(ComObject.Tag.KEYS, ComObject.Type.BYTE_ARRAY_TYPE);
+    keysArray = retEntry.putArray(ComObject.Tag.KEYS, ComObject.Type.BYTE_ARRAY_TYPE, retKeys.size());
     for (Object[] currKey : retKeys) {
       keysArray.add(DatabaseCommon.serializeKey(tableSchema, indexName, currKey));
     }
-    ComArray retRecordsArray = retEntry.putArray(ComObject.Tag.RECORDS, ComObject.Type.BYTE_ARRAY_TYPE);
+    ComArray retRecordsArray = retEntry.putArray(ComObject.Tag.RECORDS, ComObject.Type.BYTE_ARRAY_TYPE, retRecords.size());
     if (retRecords.isEmpty()) {
       logger.error("Record not found: key=" + DatabaseCommon.keyToString(leftKey));
     }
@@ -470,26 +470,26 @@ public class ReadManager {
                                     GroupByContext groupContext, AtomicLong currOffset, AtomicLong countReturned,
                                     Map.Entry<Object[], Object> entry, List<byte[]> retKeyRecords,
                                     List<Object[]> retKeys, List<byte[]> retRecords) throws IOException {
-    ComObject retObj = new ComObject();
+    ComObject retObj = new ComObject(8);
     if (entry != null) {
       retObj.put(ComObject.Tag.KEY_BYTES, DatabaseCommon.serializeKey(tableSchema, indexName, entry.getKey()));
     }
-    ComArray array = retObj.putArray(ComObject.Tag.KEYS, ComObject.Type.BYTE_ARRAY_TYPE);
+    ComArray array = retObj.putArray(ComObject.Tag.KEYS, ComObject.Type.BYTE_ARRAY_TYPE, retKeys.size());
     for (Object[] key : retKeys) {
       array.add(DatabaseCommon.serializeKey(tableSchema, indexName, key));
     }
-    array = retObj.putArray(ComObject.Tag.KEY_RECORDS, ComObject.Type.BYTE_ARRAY_TYPE);
+    array = retObj.putArray(ComObject.Tag.KEY_RECORDS, ComObject.Type.BYTE_ARRAY_TYPE, retKeyRecords.size());
     for (byte[] key : retKeyRecords) {
       array.add(key);
     }
-    array = retObj.putArray(ComObject.Tag.RECORDS, ComObject.Type.BYTE_ARRAY_TYPE);
+    array = retObj.putArray(ComObject.Tag.RECORDS, ComObject.Type.BYTE_ARRAY_TYPE, retRecords.size());
     for (int i = 0; i < retRecords.size(); i++) {
       byte[] bytes = retRecords.get(i);
       array.add(bytes);
     }
 
     if (counters != null) {
-      array = retObj.putArray(ComObject.Tag.COUNTERS, ComObject.Type.BYTE_ARRAY_TYPE);
+      array = retObj.putArray(ComObject.Tag.COUNTERS, ComObject.Type.BYTE_ARRAY_TYPE, counters.length);
       for (int i = 0; i < counters.length; i++) {
         array.add(counters[i].serialize());
       }
@@ -728,7 +728,7 @@ public class ReadManager {
 
   private ComObject serverSelectProcessResponse(ComObject cobj, SelectStatementImpl.Explain explain, SelectStatementImpl select, Offset offset, Limit limit,
                                                 byte[][][] records) {
-    ComObject retObj = new ComObject();
+    ComObject retObj = new ComObject(5);
     select.setIsOnServer(false);
     retObj.put(ComObject.Tag.LEGACY_SELECT_STATEMENT, select.serialize());
 
@@ -741,7 +741,13 @@ public class ReadManager {
       countReturned = cobj.getLong(ComObject.Tag.COUNT_RETURNED);
     }
     if (records != null) {
-      ComArray tableArray = retObj.putArray(ComObject.Tag.TABLE_RECORDS, ComObject.Type.ARRAY_TYPE);
+      int count = 0;
+      for (byte[][] tableRecords : records) {
+        for (byte[] record : tableRecords) {
+          count++;
+        }
+      }
+      ComArray tableArray = retObj.putArray(ComObject.Tag.TABLE_RECORDS, ComObject.Type.ARRAY_TYPE, count);
       ServerSelectProcessRecordsForResponse serverSelectProcessRecordsForResponse = new ServerSelectProcessRecordsForResponse(
           offset, limit, records, currOffset, countReturned, tableArray).invoke();
       currOffset = serverSelectProcessRecordsForResponse.getCurrOffset();
@@ -764,7 +770,7 @@ public class ReadManager {
     if (currCount < count) {
       // exhausted results
 
-      ComObject retObj = new ComObject();
+      ComObject retObj = new ComObject(4);
       select.setIsOnServer(false);
       retObj.put(ComObject.Tag.LEGACY_SELECT_STATEMENT, select.serialize());
 
@@ -776,7 +782,14 @@ public class ReadManager {
       if (cobj.getLong(ComObject.Tag.COUNT_RETURNED) != null) {
         countReturned = cobj.getLong(ComObject.Tag.COUNT_RETURNED);
       }
-      ComArray tableArray = retObj.putArray(ComObject.Tag.TABLE_RECORDS, ComObject.Type.ARRAY_TYPE);
+      int recordCount = 0;
+      for (ExpressionImpl.CachedRecord[] tableRecords : results) {
+        for (ExpressionImpl.CachedRecord record : tableRecords) {
+          recordCount++;
+        }
+      }
+
+      ComArray tableArray = retObj.putArray(ComObject.Tag.TABLE_RECORDS, ComObject.Type.ARRAY_TYPE, recordCount);
 
       DoProcessServerSelectResults doProcessServerSelectResults = new DoProcessServerSelectResults(offset, limit,
           results, currOffset, countReturned, tableArray).invoke();
@@ -864,7 +877,7 @@ public class ReadManager {
 
   private ComObject processServerSetSelectResults(long serverSelectPageNumber, DiskBasedResultSet diskResults,
                                                   byte[][][] records) {
-    ComObject retObj = new ComObject();
+    ComObject retObj = new ComObject(5);
 
     retObj.put(ComObject.Tag.RESULT_SET_ID, diskResults.getResultSetId());
     retObj.put(ComObject.Tag.SERVER_SELECT_PAGE_NUMBER, serverSelectPageNumber + 1);
@@ -872,9 +885,9 @@ public class ReadManager {
     retObj.put(ComObject.Tag.REPLICA, server.getReplica());
 
     if (records != null) {
-      ComArray tableArray = retObj.putArray(ComObject.Tag.TABLE_RECORDS, ComObject.Type.ARRAY_TYPE);
+      ComArray tableArray = retObj.putArray(ComObject.Tag.TABLE_RECORDS, ComObject.Type.ARRAY_TYPE, records.length);
       for (byte[][] tableRecords : records) {
-        ComArray recordArray = tableArray.addArray(ComObject.Type.BYTE_ARRAY_TYPE);
+        ComArray recordArray = tableArray.addArray(ComObject.Type.BYTE_ARRAY_TYPE, tableRecords.length);
 
         for (int i = 0; i < tableRecords.length; i++) {
           byte[] record = tableRecords[i];
@@ -1205,18 +1218,18 @@ public class ReadManager {
       AtomicLong currOffset, String indexName, TableSchema tableSchema, Counter[] counters, GroupByContext groupByContext,
       Map.Entry<Object[], Object> entry, List<byte[]> retRecords) throws IOException {
     ComArray countersArray;
-    ComObject retObj = new ComObject();
+    ComObject retObj = new ComObject(5);
     if (entry != null) {
       retObj.put(ComObject.Tag.KEY_BYTES, DatabaseCommon.serializeKey(tableSchema, indexName, entry.getKey()));
     }
 
-    ComArray records = retObj.putArray(ComObject.Tag.RECORDS, ComObject.Type.BYTE_ARRAY_TYPE);
+    ComArray records = retObj.putArray(ComObject.Tag.RECORDS, ComObject.Type.BYTE_ARRAY_TYPE, retRecords.size());
     for (byte[] record : retRecords) {
       records.add(record);
     }
 
     if (counters != null) {
-      countersArray = retObj.putArray(ComObject.Tag.COUNTERS, ComObject.Type.BYTE_ARRAY_TYPE);
+      countersArray = retObj.putArray(ComObject.Tag.COUNTERS, ComObject.Type.BYTE_ARRAY_TYPE, counters.length);
       for (int i = 0; i < counters.length; i++) {
         countersArray.add(counters[i].serialize());
       }
@@ -1303,7 +1316,7 @@ public class ReadManager {
   }
 
   private ComObject evaluateCounterProcessResponse(Counter counter, byte[] maxKey, byte[] minKey) throws IOException {
-    ComObject retObj = new ComObject();
+    ComObject retObj = new ComObject(3);
     if (minKey != null) {
       retObj.put(ComObject.Tag.MIN_KEY, minKey);
     }
@@ -1355,7 +1368,7 @@ public class ReadManager {
         doEvaluateCounter(new Record(dbName, server.getCommon(), records[0]), counter, minKeyBytes,
             tableSchema.getFieldOffset(columnName));
       }
-      ComObject retObj = new ComObject();
+      ComObject retObj = new ComObject(1);
       retObj.put(ComObject.Tag.LEGACY_COUNTER, counter.serialize());
       return retObj;
     }
@@ -1460,7 +1473,7 @@ public class ReadManager {
             break outer;
           }
           if (recordArray == null) {
-            recordArray = tableArray.addArray(ComObject.Type.BYTE_ARRAY_TYPE);
+            recordArray = tableArray.addArray(ComObject.Type.BYTE_ARRAY_TYPE, tableRecords.length);
           }
           currOffset++;
           countReturned++;
@@ -1517,7 +1530,7 @@ public class ReadManager {
           return true;
         }
         if (recordArray == null) {
-          recordArray = tableArray.addArray(ComObject.Type.BYTE_ARRAY_TYPE);
+          recordArray = tableArray.addArray(ComObject.Type.BYTE_ARRAY_TYPE, tableRecords.length);
         }
         currOffset++;
         countReturned++;

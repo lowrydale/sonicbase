@@ -284,7 +284,7 @@ public class MonitorManagerImpl {
         }
       }
       queryIdToStr.put(retId, sql);
-      ComObject retObj = new ComObject();
+      ComObject retObj = new ComObject(1);
       retObj.put(ComObject.Tag.ID, retId);
       return retObj;
     }

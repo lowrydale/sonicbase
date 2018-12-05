@@ -58,10 +58,10 @@ public class InExpressionImplTest {
       final AtomicBoolean calledLookup = new AtomicBoolean();
       when(client.send(eq("ReadManager:batchIndexLookup"), anyInt(), anyInt(), anyObject(), anyObject())).thenAnswer(invocationOnMock -> {
         calledLookup.set(true);
-        ComObject retObj = new ComObject();
-        ComArray array = retObj.putArray(ComObject.Tag.KEYS, ComObject.Type.BYTE_ARRAY_TYPE);
-        array = retObj.putArray(ComObject.Tag.KEY_RECORDS, ComObject.Type.BYTE_ARRAY_TYPE);
-        array = retObj.putArray(ComObject.Tag.RECORDS, ComObject.Type.BYTE_ARRAY_TYPE);
+        ComObject retObj = new ComObject(6);
+        ComArray array = retObj.putArray(ComObject.Tag.KEYS, ComObject.Type.BYTE_ARRAY_TYPE, records.length);
+        array = retObj.putArray(ComObject.Tag.KEY_RECORDS, ComObject.Type.BYTE_ARRAY_TYPE, records.length);
+        array = retObj.putArray(ComObject.Tag.RECORDS, ComObject.Type.BYTE_ARRAY_TYPE, records.length);
 
         for (int i = 0; i < records.length; i++) {
           byte[] bytes = records[i];
@@ -71,7 +71,7 @@ public class InExpressionImplTest {
         retObj.put(ComObject.Tag.CURR_OFFSET, records.length);
         retObj.put(ComObject.Tag.COUNT_RETURNED, records.length);
 
-        retObj.putArray(ComObject.Tag.RET_KEYS, ComObject.Type.OBJECT_TYPE);
+        retObj.putArray(ComObject.Tag.RET_KEYS, ComObject.Type.OBJECT_TYPE, 1);
 
         return retObj.serialize();
       });

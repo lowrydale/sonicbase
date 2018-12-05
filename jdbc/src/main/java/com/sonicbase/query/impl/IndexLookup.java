@@ -398,7 +398,7 @@ public class IndexLookup {
   }
 
   private ComObject buildRequest(ExpressionImpl expression, Expression topLevelExpression, Object[] localLeftValue) throws IOException {
-    ComObject cobj = new ComObject();
+    ComObject cobj = new ComObject(32);
     DatabaseClient client = expression.getClient();
     cobj.put(ComObject.Tag.DB_NAME, expression.dbName);
     if (schemaRetryCount < 2) {
@@ -457,11 +457,11 @@ public class IndexLookup {
       cobj.put(ComObject.Tag.RIGHT_OPERATOR, rightOp.getId());
     }
 
-    ComArray columnArray = cobj.putArray(ComObject.Tag.COLUMN_OFFSETS, ComObject.Type.INT_TYPE);
+    ComArray columnArray = cobj.putArray(ComObject.Tag.COLUMN_OFFSETS, ComObject.Type.INT_TYPE, expression.getColumns() == null ? 0 : expression.getColumns().size());
     ExpressionImpl.writeColumns(tableSchema, expression.getColumns(), columnArray);
 
     if (expression.getCounters() != null) {
-      ComArray array = cobj.putArray(ComObject.Tag.COUNTERS, ComObject.Type.BYTE_ARRAY_TYPE);
+      ComArray array = cobj.putArray(ComObject.Tag.COUNTERS, ComObject.Type.BYTE_ARRAY_TYPE, expression.getCounters().length);
       for (int i = 0; i < expression.getCounters().length; i++) {
         array.add(expression.getCounters()[i].serialize());
       }
@@ -488,7 +488,7 @@ public class IndexLookup {
 
   private void prepareOrderByExpressions(ExpressionImpl expression, ComObject cobj) throws IOException {
     if (expression.getOrderByExpressions() != null) {
-      ComArray array = cobj.putArray(ComObject.Tag.ORDER_BY_EXPRESSIONS, ComObject.Type.BYTE_ARRAY_TYPE);
+      ComArray array = cobj.putArray(ComObject.Tag.ORDER_BY_EXPRESSIONS, ComObject.Type.BYTE_ARRAY_TYPE, expression.getOrderByExpressions().size());
       for (int j = 0; j < expression.getOrderByExpressions().size(); j++) {
         OrderByExpressionImpl orderByExpression = expression.getOrderByExpressions().get(j);
         byte[] bytes = orderByExpression.serialize();

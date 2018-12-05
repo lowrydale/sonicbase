@@ -612,8 +612,8 @@ public class BulkImportManagerTest {
     Config config = new Config(configStr);
     when(server.getConfig()).thenReturn(config);
 
-    ComObject cobj = new ComObject();
-    ComArray keyArray = cobj.putArray(ComObject.Tag.KEYS, ComObject.Type.BYTE_ARRAY_TYPE);
+    ComObject cobj = new ComObject(5);
+    ComArray keyArray = cobj.putArray(ComObject.Tag.KEYS, ComObject.Type.BYTE_ARRAY_TYPE, 1);
     cobj.put(ComObject.Tag.LOWER_KEY, DatabaseCommon.serializeKey(tableSchema, indexSchema.getName(), keys.get(0)));
     keyArray.add(DatabaseCommon.serializeKey(tableSchema, indexSchema.getName(), keys.get(0)));
 
@@ -678,8 +678,8 @@ public class BulkImportManagerTest {
     Config config = new Config(configStr);
     when(server.getConfig()).thenReturn(config);
 
-    ComObject cobj = new ComObject();
-    ComArray keyArray = cobj.putArray(ComObject.Tag.KEYS, ComObject.Type.BYTE_ARRAY_TYPE);
+    ComObject cobj = new ComObject(9);
+    ComArray keyArray = cobj.putArray(ComObject.Tag.KEYS, ComObject.Type.BYTE_ARRAY_TYPE, 1);
     cobj.put(ComObject.Tag.LOWER_KEY, DatabaseCommon.serializeKey(tableSchema, indexSchema.getName(), keys.get(0)));
     keyArray.add(DatabaseCommon.serializeKey(tableSchema, indexSchema.getName(), keys.get(0)));
 
@@ -739,8 +739,8 @@ public class BulkImportManagerTest {
     Config config = new Config(configStr);
     when(server.getConfig()).thenReturn(config);
 
-    ComObject cobj = new ComObject();
-    ComArray keyArray = cobj.putArray(ComObject.Tag.KEYS, ComObject.Type.BYTE_ARRAY_TYPE);
+    ComObject cobj = new ComObject(10);
+    ComArray keyArray = cobj.putArray(ComObject.Tag.KEYS, ComObject.Type.BYTE_ARRAY_TYPE, 1);
     cobj.put(ComObject.Tag.LOWER_KEY, DatabaseCommon.serializeKey(tableSchema, indexSchema.getName(), keys.get(0)));
     keyArray.add(DatabaseCommon.serializeKey(tableSchema, indexSchema.getName(), keys.get(0)));
 
@@ -794,8 +794,8 @@ public class BulkImportManagerTest {
     Config config = new Config(configStr);
     when(server.getConfig()).thenReturn(config);
 
-    ComObject cobj = new ComObject();
-    ComArray keyArray = cobj.putArray(ComObject.Tag.KEYS, ComObject.Type.BYTE_ARRAY_TYPE);
+    ComObject cobj = new ComObject(10);
+    ComArray keyArray = cobj.putArray(ComObject.Tag.KEYS, ComObject.Type.BYTE_ARRAY_TYPE, 1);
     cobj.put(ComObject.Tag.LOWER_KEY, DatabaseCommon.serializeKey(tableSchema, indexSchema.getName(), keys.get(0)));
     keyArray.add(DatabaseCommon.serializeKey(tableSchema, indexSchema.getName(), keys.get(0)));
 
@@ -852,8 +852,8 @@ public class BulkImportManagerTest {
     Config config = new Config(configStr);
     when(server.getConfig()).thenReturn(config);
 
-    ComObject cobj = new ComObject();
-    ComArray keyArray = cobj.putArray(ComObject.Tag.KEYS, ComObject.Type.BYTE_ARRAY_TYPE);
+    ComObject cobj = new ComObject(9);
+    ComArray keyArray = cobj.putArray(ComObject.Tag.KEYS, ComObject.Type.BYTE_ARRAY_TYPE, 1);
     cobj.put(ComObject.Tag.LOWER_KEY, DatabaseCommon.serializeKey(tableSchema, indexSchema.getName(), keys.get(0)));
     keyArray.add(DatabaseCommon.serializeKey(tableSchema, indexSchema.getName(), keys.get(0)));
 

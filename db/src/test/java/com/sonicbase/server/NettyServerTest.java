@@ -29,7 +29,7 @@ public class NettyServerTest {
 
     List<DatabaseSocketClient.Request> requests = new ArrayList<>();
     DatabaseSocketClient.Request request = new DatabaseSocketClient.Request();
-    ComObject cobj = new ComObject();
+    ComObject cobj = new ComObject(2);
     cobj.put(ComObject.Tag.COUNT, 10);
     cobj.put(ComObject.Tag.METHOD, "echo");
     request.setBody(cobj.serialize());
@@ -41,7 +41,7 @@ public class NettyServerTest {
 
     requests = new ArrayList<>();
     request = new DatabaseSocketClient.Request();
-    cobj = new ComObject();
+    cobj = new ComObject(2);
     cobj.put(ComObject.Tag.COUNT, 10);
     cobj.put(ComObject.Tag.METHOD, "echo");
     request.setBody(cobj.serialize());
@@ -52,7 +52,7 @@ public class NettyServerTest {
     retObj = new ComObject(response);
     assertEquals((int) retObj.getInt(ComObject.Tag.COUNT), 10);
 
-    cobj = new ComObject();
+    cobj = new ComObject(2);
     cobj.put(ComObject.Tag.COUNT, 10);
     cobj.put(ComObject.Tag.METHOD, "echo");
     DatabaseSocketClient client = new DatabaseSocketClient();

@@ -487,7 +487,7 @@ public class BackupManagerImpl {
 
     backupException = null;
 
-    ComObject ret = new ComObject();
+    ComObject ret = new ComObject(1);
     ret.put(ComObject.Tag.REPLICA, server.getReplica());
     return ret;
   }
@@ -517,7 +517,7 @@ public class BackupManagerImpl {
         final int finalI = i;
         final int finalJ = j;
         futures.add(server.getExecutor().submit((Callable) () -> {
-          ComObject cobj = new ComObject();
+          ComObject cobj = new ComObject(2);
           cobj.put(ComObject.Tag.DB_NAME, "__none__");
           cobj.put(ComObject.Tag.SCHEMA_VERSION, server.getCommon().getSchemaVersion());
 
@@ -567,7 +567,7 @@ public class BackupManagerImpl {
         error = ExceptionUtils.getFullStackTrace(e);
       }
     }
-    ComObject retObj = new ComObject();
+    ComObject retObj = new ComObject(2);
     double percent = destSize == 0 || srcSize == 0 ? 0d : (double)destSize / (double)srcSize;
     percent = Math.min(percent, 01.0d);
     retObj.put(ComObject.Tag.PERCENT_COMPLETE, percent);
@@ -610,7 +610,7 @@ public class BackupManagerImpl {
       backupException = e;
     }
     long endDest = System.currentTimeMillis();
-    ComObject retObj = new ComObject();
+    ComObject retObj = new ComObject(3);
     retObj.put(ComObject.Tag.SOURCE_SIZE, srcSize);
     retObj.put(ComObject.Tag.DEST_SIZE, destSize);
     if (backupException != null) {
@@ -641,7 +641,7 @@ public class BackupManagerImpl {
           final int finalI = i;
           final int finalJ = j;
           futures.add(server.getExecutor().submit((Callable) () -> {
-            ComObject cobj = new ComObject();
+            ComObject cobj = new ComObject(2);
             cobj.put(ComObject.Tag.DB_NAME, "__none__");
             cobj.put(ComObject.Tag.SCHEMA_VERSION, server.getCommon().getSchemaVersion());
 
@@ -693,7 +693,7 @@ public class BackupManagerImpl {
       }
       srcSize *= (double)server.getReplicationFactor();
 
-      ComObject retObj = new ComObject();
+      ComObject retObj = new ComObject(3);
       double percent = destSize == 0 || srcSize == 0 ? 0d : (double)destSize / (double)srcSize;
       percent = Math.min(percent, 01.0d);
       retObj.put(ComObject.Tag.PERCENT_COMPLETE, percent);
@@ -730,7 +730,7 @@ public class BackupManagerImpl {
       logger.error("Error getting restore sizes", e);
       restoreException = e;
     }
-    ComObject retObj = new ComObject();
+    ComObject retObj = new ComObject(3);
     retObj.put(ComObject.Tag.SOURCE_SIZE, srcSize);
     retObj.put(ComObject.Tag.DEST_SIZE, destSize);
     if (restoreException != null) {
@@ -910,7 +910,7 @@ public class BackupManagerImpl {
 
   public ComObject isBackupComplete(ComObject cobj, boolean replayedCommand) {
     try {
-      ComObject retObj = new ComObject();
+      ComObject retObj = new ComObject(1);
       retObj.put(ComObject.Tag.IS_COMPLETE, isBackupComplete);
       return retObj;
     }
@@ -963,7 +963,7 @@ public class BackupManagerImpl {
       if (finalBackupException != null) {
         throw new DatabaseException("Error performing backup", finalBackupException);
       }
-      ComObject retObj = new ComObject();
+      ComObject retObj = new ComObject(1);
       retObj.put(ComObject.Tag.IS_COMPLETE, !doingBackup);
 
       return retObj;
@@ -1054,7 +1054,7 @@ public class BackupManagerImpl {
   }
 
   public ComObject getLastBackupDir(ComObject cobj, boolean replayedCommand) {
-    ComObject retObj = new ComObject();
+    ComObject retObj = new ComObject(1);
     if (lastBackupDir != null) {
       retObj.put(ComObject.Tag.DIRECTORY, lastBackupDir);
     }
@@ -1071,7 +1071,7 @@ public class BackupManagerImpl {
 
       logger.info("Backup Master - prepareForBackup - begin");
       // tell all servers to pause snapshot and slice the queue
-      ComObject cobj = new ComObject();
+      ComObject cobj = new ComObject(2);
       cobj.put(ComObject.Tag.DB_NAME, "__none__");
       cobj.put(ComObject.Tag.SCHEMA_VERSION, server.getCommon().getSchemaVersion());
       byte[][] ret = server.getDatabaseClient().sendToAllShards("BackupManager:prepareForBackup",
@@ -1123,7 +1123,7 @@ public class BackupManagerImpl {
 
       logger.info("Backup Master - finishBackup - begin");
 
-      ComObject fcobj = new ComObject();
+      ComObject fcobj = new ComObject(7);
       fcobj.put(ComObject.Tag.DB_NAME, "__none__");
       fcobj.put(ComObject.Tag.SCHEMA_VERSION, server.getCommon().getSchemaVersion());
       fcobj.put(ComObject.Tag.METHOD, "BackupManager:finishBackup");
@@ -1176,7 +1176,7 @@ public class BackupManagerImpl {
 
   private void waitForBackupToComplete(int[] masters) throws InterruptedException {
     while (!server.getShutdown()) {
-      ComObject iscobj = new ComObject();
+      ComObject iscobj = new ComObject(2);
       iscobj.put(ComObject.Tag.DB_NAME, "__none__");
       iscobj.put(ComObject.Tag.SCHEMA_VERSION, server.getCommon().getSchemaVersion());
 
@@ -1212,7 +1212,7 @@ public class BackupManagerImpl {
 
     logger.info("Backup Master - doBackupFileSystem - begin");
 
-    ComObject docobj = new ComObject();
+    ComObject docobj = new ComObject(4);
     docobj.put(ComObject.Tag.DB_NAME, "__none__");
     docobj.put(ComObject.Tag.SCHEMA_VERSION, server.getCommon().getSchemaVersion());
     docobj.put(ComObject.Tag.DIRECTORY, directory);
@@ -1233,7 +1233,7 @@ public class BackupManagerImpl {
     //    tell all servers to upload with a specific root directory
     logger.info("Backup Master - doBackupAWS - begin");
 
-    ComObject docobj = new ComObject();
+    ComObject docobj = new ComObject(5);
     docobj.put(ComObject.Tag.DB_NAME, "__none__");
     docobj.put(ComObject.Tag.SCHEMA_VERSION, server.getCommon().getSchemaVersion());
     docobj.put(ComObject.Tag.SUB_DIRECTORY, subDirectory);
@@ -1448,7 +1448,7 @@ public class BackupManagerImpl {
 
   public ComObject isRestoreComplete(ComObject cobj, boolean replayedCommand) {
     try {
-      ComObject retObj = new ComObject();
+      ComObject retObj = new ComObject(1);
       retObj.put(ComObject.Tag.IS_COMPLETE, isRestoreComplete);
       return retObj;
     }
@@ -1459,7 +1459,7 @@ public class BackupManagerImpl {
 
   public ComObject isFileRestoreComplete(ComObject cobj, boolean replayedCommand) {
     try {
-      ComObject retObj = new ComObject();
+      ComObject retObj = new ComObject(1);
       retObj.put(ComObject.Tag.IS_COMPLETE, finishedRestoreFileCopy);
       return retObj;
     }
@@ -1495,7 +1495,7 @@ public class BackupManagerImpl {
       if (finalRestoreException != null) {
         throw new DatabaseException("Error restoring backup", finalRestoreException);
       }
-      ComObject retObj = new ComObject();
+      ComObject retObj = new ComObject(1);
       retObj.put(ComObject.Tag.IS_COMPLETE, !doingRestore);
 
       return retObj;
@@ -1584,7 +1584,7 @@ public class BackupManagerImpl {
 
       // delete snapshots and logs
       // enter recovery mode (block commands)
-      ComObject cobj = new ComObject();
+      ComObject cobj = new ComObject(2);
       cobj.put(ComObject.Tag.DB_NAME, "__none__");
       cobj.put(ComObject.Tag.SCHEMA_VERSION, server.getCommon().getSchemaVersion());
       byte[][] ret = server.getDatabaseClient().sendToAllShards("BackupManager:prepareForRestore", 0,
@@ -1599,7 +1599,7 @@ public class BackupManagerImpl {
 
       waitForRestoreToComplete("BackupManager:isFileRestoreComplete");
 
-      cobj = new ComObject();
+      cobj = new ComObject(2);
       cobj.put(ComObject.Tag.DB_NAME, "__none__");
       cobj.put(ComObject.Tag.SCHEMA_VERSION, server.getCommon().getSchemaVersion());
       server.getDatabaseClient().sendToAllShards("BackupManager:prepareDataFromRestore", 0, cobj,
@@ -1617,7 +1617,7 @@ public class BackupManagerImpl {
       }
       server.pushSchema();
 
-      cobj = new ComObject();
+      cobj = new ComObject(2);
       cobj.put(ComObject.Tag.DB_NAME, "__none__");
       cobj.put(ComObject.Tag.SCHEMA_VERSION, server.getCommon().getSchemaVersion());
 
@@ -1634,7 +1634,7 @@ public class BackupManagerImpl {
           Thread.sleep(1000);
         }
       }
-      cobj = new ComObject();
+      cobj = new ComObject(2);
       cobj.put(ComObject.Tag.DB_NAME, "test");
       cobj.put(ComObject.Tag.SCHEMA_VERSION, server.getClient().getCommon().getSchemaVersion());
       server.getClient().sendToAllShards("DeleteManager:forceDeletes", 0, cobj, DatabaseClient.Replica.ALL);
@@ -1655,7 +1655,7 @@ public class BackupManagerImpl {
   private void waitForRestoreToComplete(String verb) throws InterruptedException {
     ComObject cobj;
     while (!server.getShutdown()) {
-      cobj = new ComObject();
+      cobj = new ComObject(2);
       cobj.put(ComObject.Tag.DB_NAME, "__none__");
       cobj.put(ComObject.Tag.SCHEMA_VERSION, server.getCommon().getSchemaVersion());
 
@@ -1691,7 +1691,7 @@ public class BackupManagerImpl {
     byte[][] ret;// if fileSystem
     //    tell all servers to copy files to backup directory with a specific root directory
     String directory = (String) backupConfig.get("directory");
-    cobj = new ComObject();
+    cobj = new ComObject(4);
     cobj.put(ComObject.Tag.DB_NAME, "__none__");
     cobj.put(ComObject.Tag.SCHEMA_VERSION, server.getCommon().getSchemaVersion());
     cobj.put(ComObject.Tag.DIRECTORY, directory);
@@ -1707,7 +1707,7 @@ public class BackupManagerImpl {
 
     String bucket = (String) backupConfig.get("bucket");
     String prefix = (String) backupConfig.get("prefix");
-    cobj = new ComObject();
+    cobj = new ComObject(5);
     cobj.put(ComObject.Tag.DB_NAME, "__none__");
     cobj.put(ComObject.Tag.SCHEMA_VERSION, server.getCommon().getSchemaVersion());
     cobj.put(ComObject.Tag.BUCKET, bucket);

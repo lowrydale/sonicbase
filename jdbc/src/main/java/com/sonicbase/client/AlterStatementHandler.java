@@ -39,7 +39,7 @@ public class AlterStatementHandler implements StatementHandler {
 
   private void doDropColumn(String dbName, String tableName, String columnName) {
 
-    ComObject cobj = new ComObject();
+    ComObject cobj = new ComObject(5);
     cobj.put(ComObject.Tag.DB_NAME, dbName);
     cobj.put(ComObject.Tag.SCHEMA_VERSION, client.getCommon().getSchemaVersion());
     cobj.put(ComObject.Tag.TABLE_NAME, tableName);
@@ -52,7 +52,7 @@ public class AlterStatementHandler implements StatementHandler {
 
   private void doAddColumn(String dbName, String tableName, String columnName, ColDataType type) {
 
-    ComObject cobj = new ComObject();
+    ComObject cobj = new ComObject(6);
     cobj.put(ComObject.Tag.DB_NAME, dbName);
     cobj.put(ComObject.Tag.SCHEMA_VERSION, client.getCommon().getSchemaVersion());
     cobj.put(ComObject.Tag.TABLE_NAME, tableName);

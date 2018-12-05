@@ -76,11 +76,15 @@ public class ClientStatsHandler {
     private final String cluster;
     private final DatabaseClient client;
     private final Long sleepOverride;
-    public QueryStatsRecorder(DatabaseClient client, String cluster) {
+    private AtomicBoolean shutdownStatsRecorderThreads;
+
+    public QueryStatsRecorder(DatabaseClient client, String cluster, AtomicBoolean shutdownStatsRecorderThreads) {
       this.client = client;
       this.cluster = cluster;
       sleepOverride = null;
+      this.shutdownStatsRecorderThreads = shutdownStatsRecorderThreads;
     }
+
     public QueryStatsRecorder(DatabaseClient client, String cluster, long sleepOverride) {
       this.client = client;
       this.cluster = cluster;
@@ -89,7 +93,7 @@ public class ClientStatsHandler {
 
     @Override
     public void run() {
-      while (!client.getShutdown()) {
+      while (!shutdownStatsRecorderThreads.get()) {
         try {
           doRecordStats();
         }
@@ -116,12 +120,12 @@ public class ClientStatsHandler {
         return;
       }
 
-      ComObject cobj = new ComObject();
-      ComArray array = cobj.putArray(ComObject.Tag.HISTOGRAM_SNAPSHOT, ComObject.Type.OBJECT_TYPE);
-
       if (registeredQueries.get(cluster) == null) {
         return;
       }
+      ComObject cobj = new ComObject(1);
+      ComArray array = cobj.putArray(ComObject.Tag.HISTOGRAM_SNAPSHOT, ComObject.Type.OBJECT_TYPE, registeredQueries.get(cluster).size());
+
       for (HistogramEntry entry : registeredQueries.get(cluster).values()) {
         if (entry.getHistogram() == null || entry.getHistogram().getCount() == 0) {
           continue;
@@ -148,7 +152,7 @@ public class ClientStatsHandler {
     }
 
     private void addSnapshotObj(ComArray array, HistogramEntry entry) throws IOException {
-      ComObject snapshotObj = new ComObject();
+      ComObject snapshotObj = new ComObject(10);
       snapshotObj.put(ComObject.Tag.DB_NAME, entry.getDbName());
       snapshotObj.put(ComObject.Tag.ID, entry.getQueryId());
       if (!entry.getMaxedLatencies().get()) {
@@ -259,7 +263,7 @@ public class ClientStatsHandler {
         return retEntry;
       }
 
-      ComObject cobj = new ComObject();
+      ComObject cobj = new ComObject(3);
       cobj.put(ComObject.Tag.METHOD, "MonitorManager:registerQueryForStats");
       cobj.put(ComObject.Tag.DB_NAME, dbName);
       cobj.put(ComObject.Tag.SQL, sql);

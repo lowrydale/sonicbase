@@ -59,7 +59,7 @@ class BackupHandler {
       cli.println("complete");
     }
     else {
-      ComObject cobj = new ComObject();
+      ComObject cobj = new ComObject(2);
       cobj.put(ComObject.Tag.DB_NAME, "__none__");
       cobj.put(ComObject.Tag.SCHEMA_VERSION, cli.getConn().getSchemaVersion());
       ComObject retObj = new ComObject(cli.getConn().sendToMaster("BackupManager:getBackupStatus", cobj));
@@ -85,7 +85,7 @@ class BackupHandler {
       cli.println("complete");
     }
     else {
-      ComObject cobj = new ComObject();
+      ComObject cobj = new ComObject(2);
       cobj.put(ComObject.Tag.DB_NAME, "__none__");
       cobj.put(ComObject.Tag.SCHEMA_VERSION, cli.getConn().getSchemaVersion());
       ComObject retObj = new ComObject(cli.getConn().sendToMaster("BackupManager:getRestoreStatus", cobj));

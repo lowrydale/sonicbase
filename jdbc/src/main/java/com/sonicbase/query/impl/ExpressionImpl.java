@@ -159,7 +159,7 @@ public class ExpressionImpl implements Expression {
           procedureContext, schemaRetryCount);
     }
     else {
-      ComObject cobj = new ComObject();
+      ComObject cobj = new ComObject(3);
       cobj.put(ComObject.Tag.LEGACY_COUNTER, counter.serialize());
       cobj.put(ComObject.Tag.DB_NAME, dbName);
       cobj.put(ComObject.Tag.SCHEMA_VERSION, common.getSchemaVersion());
@@ -349,7 +349,7 @@ public class ExpressionImpl implements Expression {
   private static Counter getCounterValue(DatabaseCommon common, DatabaseClient client, String dbName, Counter counter,
                                          byte[] keyBytes,
                                          boolean isMin) throws IOException {
-    ComObject cobj = new ComObject();
+    ComObject cobj = new ComObject(4);
     cobj.put(ComObject.Tag.LEGACY_COUNTER, counter.serialize());
     if (isMin) {
       cobj.put(ComObject.Tag.MIN_KEY, keyBytes);
@@ -1166,20 +1166,20 @@ public class ExpressionImpl implements Expression {
       usedIndex.set(indexSchema.getName());
 
       try {
-        ComObject cobj = new ComObject();
+        ComObject cobj = new ComObject(9);
         cobj.put(ComObject.Tag.SERIALIZATION_VERSION, DatabaseClient.SERIALIZATION_VERSION);
         cobj.put(ComObject.Tag.TABLE_NAME, tableSchema.getName());
         cobj.put(ComObject.Tag.INDEX_NAME, indexSchema.getName());
         cobj.put(ComObject.Tag.LEFT_OPERATOR, operator.getId());
 
-        ComArray columnArray = cobj.putArray(ComObject.Tag.COLUMN_OFFSETS, ComObject.Type.INT_TYPE);
+        ComArray columnArray = cobj.putArray(ComObject.Tag.COLUMN_OFFSETS, ComObject.Type.INT_TYPE, columns == null ? 0 : columns.size());
         writeColumns(tableSchema, columns, columnArray);
 
         int subCount = srcValues.size();
 
         boolean writingLongs = markSingleValueOrNot(srcValues, cobj);
 
-        ComArray keys = cobj.putArray(ComObject.Tag.KEYS, ComObject.Type.OBJECT_TYPE);
+        ComArray keys = cobj.putArray(ComObject.Tag.KEYS, ComObject.Type.OBJECT_TYPE, subCount);
 
         putKeysInComObject(tableSchema, indexSchema, srcValues, subCount, writingLongs, keys);
 
@@ -1218,7 +1218,7 @@ public class ExpressionImpl implements Expression {
   private static void putKeysInComObject(TableSchema tableSchema, IndexSchema indexSchema,
                                          List<IdEntry> srcValues, int subCount, boolean writingLongs, ComArray keys) {
     for (int k = 0; k < subCount; k++) {
-      ComObject key = new ComObject();
+      ComObject key = new ComObject(2);
       keys.add(key);
 
       IdEntry entry = srcValues.get(k);
@@ -1887,7 +1887,7 @@ public class ExpressionImpl implements Expression {
     }
 
     public PrepareTableScanCall invoke() throws IOException {
-      cobj = new ComObject();
+      cobj = new ComObject(16);
       cobj.put(ComObject.Tag.TABLE_ID, tableSchema.getTableId());
       if (parms != null) {
         cobj.put(ComObject.Tag.PARMS, parms.serialize());
@@ -1897,7 +1897,7 @@ public class ExpressionImpl implements Expression {
             (ExpressionImpl) expression.getTopLevelExpression()));
       }
       if (orderByExpressions != null) {
-        ComArray array = cobj.putArray(ComObject.Tag.ORDER_BY_EXPRESSIONS, ComObject.Type.BYTE_ARRAY_TYPE);
+        ComArray array = cobj.putArray(ComObject.Tag.ORDER_BY_EXPRESSIONS, ComObject.Type.BYTE_ARRAY_TYPE, orderByExpressions.size());
         for (int j = 0; j < orderByExpressions.size(); j++) {
           OrderByExpressionImpl orderByExpression = orderByExpressions.get(j);
           array.add(orderByExpression.serialize());
@@ -1932,7 +1932,7 @@ public class ExpressionImpl implements Expression {
 
       prepareColumnsForTableScan();
 
-      ComArray columnArray = cobj.putArray(ComObject.Tag.COLUMN_OFFSETS, ComObject.Type.INT_TYPE);
+      ComArray columnArray = cobj.putArray(ComObject.Tag.COLUMN_OFFSETS, ComObject.Type.INT_TYPE, columns.size());
       writeColumns(tableSchema, columns, columnArray);
 
       prepareCountersForTableScan();
@@ -1951,7 +1951,7 @@ public class ExpressionImpl implements Expression {
 
     private void prepareCountersForTableScan() throws IOException {
       if (counters != null) {
-        ComArray array = cobj.putArray(ComObject.Tag.COUNTERS, ComObject.Type.BYTE_ARRAY_TYPE);
+        ComArray array = cobj.putArray(ComObject.Tag.COUNTERS, ComObject.Type.BYTE_ARRAY_TYPE, counters.length);
         for (int i = 0; i < counters.length; i++) {
           array.add(counters[i].serialize());
         }

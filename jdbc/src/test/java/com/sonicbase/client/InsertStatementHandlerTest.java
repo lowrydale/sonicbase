@@ -38,14 +38,14 @@ public class InsertStatementHandlerTest {
     AtomicBoolean calledWithRecord = new AtomicBoolean();
     when(client.send(eq("UpdateManager:insertIndexEntryByKeyWithRecord"), anyInt(), anyInt(), anyObject(), anyObject())).thenAnswer(
         (Answer) invocationOnMock ->{ calledWithRecord.set(true);
-        ComObject ret = new ComObject();
+        ComObject ret = new ComObject(1);
         ret.put(ComObject.Tag.COUNT, 1);
         return ret.serialize();});
 
     AtomicBoolean calledWithoutRecord = new AtomicBoolean();
     when(client.send(eq("UpdateManager:insertIndexEntryByKey"), anyInt(), anyInt(), anyObject(), anyObject())).thenAnswer(
         (Answer) invocationOnMock ->{ calledWithoutRecord.set(true);
-          ComObject ret = new ComObject();
+          ComObject ret = new ComObject(1);
           ret.put(ComObject.Tag.COUNT, 1);
           return ret.serialize();});
 

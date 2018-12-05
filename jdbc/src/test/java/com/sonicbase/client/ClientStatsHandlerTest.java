@@ -33,7 +33,7 @@ public class ClientStatsHandlerTest {
     ClientStatsHandler handler = new ClientStatsHandler() {
       public byte[] sendToMasterOnSharedClient(ComObject cobj, DatabaseClient sharedClient) {
         called.set(true);
-        ComObject retObj = new ComObject();
+        ComObject retObj = new ComObject(1);
         retObj.put(ComObject.Tag.ID, 100_000);
         return retObj.serialize();
       }

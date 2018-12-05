@@ -12,7 +12,7 @@ public class EmbeddedApplication {
     EmbeddedDatabase db = new EmbeddedDatabase();
     try {
       db.setUseUnsafe(false);
-      db.setDurability(System.getProperty("user.home") + "/db-data.embedded");
+      db.enableDurability(System.getProperty("user.home") + "/db-data.embedded");
       db.purge();
       db.start();
 

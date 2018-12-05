@@ -54,7 +54,7 @@ public class CreateTableStatementHandlerTest {
     when(client.sendToMaster(eq("SchemaManager:createTable"), anyObject())).thenAnswer(
         invocationOnMock -> {
           called.set(true);
-          ComObject ret = new ComObject();
+          ComObject ret = new ComObject(1);
           ret.put(ComObject.Tag.SCHEMA_BYTES, common.serializeSchema((short) 1000));
           return ret.serialize();
         });

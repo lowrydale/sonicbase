@@ -87,7 +87,7 @@ public class TestLongManagerLostEntries {
 
     for (int i = 0; i < dbServers.length; i++) {
       dbServers[i] = new MonitorServer();
-      dbServers[i].setConfig(config, "4-servers", "localhost", 9010 + (50 * i), true, new AtomicBoolean(true), new AtomicBoolean(true),null);
+      dbServers[i].setConfig(config, "4-servers", "localhost", 9010 + (50 * i), true, new AtomicBoolean(true), new AtomicBoolean(true),null, false);
       dbServers[i].setRole(role);
     }
 
@@ -117,7 +117,7 @@ public class TestLongManagerLostEntries {
         if (i % 10_000 == 0) {
           System.out.println("upsert progress: count=" + i);
         }
-        ComObject cobj = new ComObject();
+        ComObject cobj = new ComObject(2);
         cobj.put(ComObject.Tag.COUNT, i);
         cobj.put(ComObject.Tag.METHOD, "echoWrite");
         requests.add(logManager.logRequest(cobj.serialize(), true, "echoWrite", (long) i, (long) i, timeLogging));

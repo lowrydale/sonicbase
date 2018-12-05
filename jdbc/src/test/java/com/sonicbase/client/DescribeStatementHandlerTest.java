@@ -213,7 +213,7 @@ public class DescribeStatementHandlerTest {
       when(client.send(eq("OSStatsManager:getOSStats"), anyInt(), anyInt(), anyObject(), eq(DatabaseClient.Replica.SPECIFIED))).thenAnswer(new Answer(){
         @Override
         public Object answer(InvocationOnMock invocationOnMock) throws Throwable {
-          ComObject retObj = new ComObject();
+          ComObject retObj = new ComObject(10);
           retObj.put(ComObject.Tag.RES_GIG, 40d);
           retObj.put(ComObject.Tag.CPU, 80d);
           retObj.put(ComObject.Tag.JAVA_MEM_MIN, 30d);
@@ -300,7 +300,7 @@ public class DescribeStatementHandlerTest {
     when(client.send(eq("DatabaseServer:getSchema"), anyInt(), anyInt(), anyObject(), anyObject())).thenAnswer(new Answer(){
       @Override
       public Object answer(InvocationOnMock invocationOnMock) throws Throwable {
-        ComObject retObj = new ComObject();
+        ComObject retObj = new ComObject(2);
         Object[] args = invocationOnMock.getArguments();
         if ((int)args[1] == 0 && (long)args[2] == 0) {
           common.setSchemaVersion(100);

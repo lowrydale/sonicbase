@@ -728,7 +728,7 @@ public class ResultSetImpl implements ResultSet {
   public void close() {
 
     if (selectStatement != null && selectStatement.isServerSelect()) {
-      ComObject cobj = new ComObject();
+      ComObject cobj = new ComObject(4);
       cobj.put(ComObject.Tag.DB_NAME, dbName);
       cobj.put(ComObject.Tag.SCHEMA_VERSION, databaseClient.getCommon().getSchemaVersion());
       cobj.put(ComObject.Tag.METHOD, "ReadManager:serverSelectDelete");
@@ -1910,7 +1910,7 @@ public class ResultSetImpl implements ResultSet {
     int schemaRetryCount = 0;
     while (true) {
       try {
-        ComObject cobj = new ComObject();
+        ComObject cobj = new ComObject(6);
         cobj.put(ComObject.Tag.LEGACY_SELECT_STATEMENT, selectStatement.serialize());
         cobj.put(ComObject.Tag.SCHEMA_VERSION, databaseClient.getCommon().getSchemaVersion());
         cobj.put(ComObject.Tag.DB_NAME, dbName);

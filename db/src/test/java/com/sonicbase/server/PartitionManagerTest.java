@@ -588,7 +588,16 @@ public class PartitionManagerTest {
       Indices indices = new Indices();
       indices.addIndex(tableSchema, indexSchema.getName(), indexSchema.getComparators());
       Index index = indices.getIndices().get(tableSchema.getName()).get(indexSchema.getName());
-      when(server.getIndex(anyString(), anyString(), anyString())).thenReturn(index);
+      when(server.getIndex(anyString(), eq("table1"), anyString())).thenAnswer(new Answer(){
+        @Override
+        public Object answer(InvocationOnMock invocationOnMock) throws Throwable {
+          Object[] args = invocationOnMock.getArguments();
+          if (!((String)args[1]).equalsIgnoreCase("table1")) {
+            throw new DatabaseException("wrong index");
+          }
+          return index;
+        }
+      });
       allIndices.add(index);
       if (shard == shardCount - 1) {
         lastIndex = index;
@@ -820,7 +829,7 @@ public class PartitionManagerTest {
         //assertEquals(index.size(), countPerShard, "shard=" + i);
         System.out.println("pass=" + i + ", shard=" + j + ", count=" + index.size());
         if (i == 3) {
-          assertTrue(index.size() > countPerShard * 2 - 32 && index.size() < countPerShard * 2 + 32);
+          assertTrue(index.size() > countPerShard * 2 - 162 && index.size() < countPerShard * 2 + 162);
         }
         else if (i == 5) {
           assertTrue(index.size() > countPerShard * 2 + 50 && index.size() < countPerShard * 2 + 92);

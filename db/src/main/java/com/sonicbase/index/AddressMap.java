@@ -56,7 +56,7 @@ public class AddressMap {
 
   public AddressMap(DatabaseServer server) {
     this.server = server;
-    this.useUnsafe = server.shouldUseUnsafe();
+    this.useUnsafe = true;//server.shouldUseUnsafe();
     for (int i = 0; i < mutexes.length; i++) {
       mutexes[i] = new Object();
     }

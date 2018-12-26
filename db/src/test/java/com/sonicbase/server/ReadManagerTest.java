@@ -26,6 +26,8 @@ import net.sf.jsqlparser.schema.Column;
 import net.sf.jsqlparser.statement.Statement;
 import net.sf.jsqlparser.statement.select.*;
 import org.apache.commons.collections.map.HashedMap;
+import org.mockito.invocation.InvocationOnMock;
+import org.mockito.stubbing.Answer;
 import org.testng.annotations.Test;
 
 import java.io.IOException;
@@ -509,10 +511,6 @@ public class ReadManagerTest {
     retObj.put(ComObject.Tag.CURR_OFFSET, (long)records.length);
     retObj.put(ComObject.Tag.COUNT_RETURNED, (long)records.length);
 
-    when(client.send(   anyString(), anyInt(), anyInt(), (ComObject) anyObject(), eq(DatabaseClient.Replica.DEF))).thenReturn(
-        retObj.serialize()
-    );
-
     String sql = "select field1 from table1 where field1 < 700 intersect select field1 from table1 where field1 > 500";
     CCJSqlParserManager parser = new CCJSqlParserManager();
     Statement statement = parser.parse(new StringReader(sql));
@@ -578,6 +576,17 @@ public class ReadManagerTest {
     cobj.put(ComObject.Tag.RESULT_SET_ID, setOperation.getResultSetId());
 
     ReadManager readManager = new ReadManager(server);
+
+    Map<String, DatabaseServer.SimpleStats> stats = DatabaseServer.initStats();
+    when(server.getStats()).thenReturn(stats);
+
+    when(client.send(   eq("ReadManager:indexLookup"), anyInt(), anyInt(), (ComObject) anyObject(), eq(DatabaseClient.Replica.DEF))).thenAnswer(
+        (Answer) invocationOnMock -> {
+          Object[] args = invocationOnMock.getArguments();
+          //retObj.serialize()
+          return readManager.indexLookup((ComObject)args[3], false).serialize();
+        }
+    );
 
     retObj = readManager.serverSetSelect(cobj, false);
 

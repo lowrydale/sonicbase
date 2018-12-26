@@ -65,7 +65,7 @@ public class BenchmarkRangeQuery {
 
         //test insert
         try {
-          Thread[] threads = new Thread[64];
+          Thread[] threads = new Thread[32];
           for (int i = 0; i < threads.length; i++) {
             threads[i] = new Thread(() -> {
               while (!shutdown) {

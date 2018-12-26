@@ -676,15 +676,15 @@ public class PartitionManager extends Thread {
       TableSchema.Partition[] partitions = indexSchema.getCurrPartitions();
       Object[] minKey = null;
       Object[] maxKey = null;
-      if (databaseServer.getShard() == 0) {
+      //if (databaseServer.getShard() == 0) {
         if (index.firstEntry() != null) {
           minKey = index.firstEntry().getKey();
         }
-      }
-      else {
-        minKey = partitions[databaseServer.getShard() - 1].getUpperKey();
-      }
-      maxKey = partitions[databaseServer.getShard()].getUpperKey();
+//      }
+//      else {
+//        minKey = partitions[databaseServer.getShard() - 1].getUpperKey();
+//      }
+      //maxKey = partitions[databaseServer.getShard()].getUpperKey();
 
       List<Object[]> keys = index.getKeyAtOffset(offsets, minKey, maxKey);
 
@@ -734,24 +734,21 @@ public class PartitionManager extends Thread {
     if (dbName == null || tableName == null || indexName == null) {
       logger.error("getPartitionSize: parm is null: db={}, table={}, index={}", dbName, tableName, indexName);
     }
-    Indices tables = databaseServer.getIndices(dbName);
-    if (tables == null) {
-      logger.error("getPartitionSize: tables is null, db={}, table={}, index={}", dbName, tableName, indexName);
+    Index index = databaseServer.getIndex(dbName, tableName, indexName);
+    if (index == null) {
+      logger.error("getPartitionSize: index is null, db={}, table={}, index={}", dbName, tableName, indexName);
       return null;
     }
-    ConcurrentHashMap<String, Index> localIndices = tables.getIndices().get(tableName);
-    if (localIndices == null) {
-      logger.error("getPartitionSize: indices is null, db={}, table={}, index={}", dbName, tableName, indexName);
-      return null;
-    }
-    Index index = localIndices.get(indexName);
     TableSchema tableSchema = common.getTables(dbName).get(tableName);
     IndexSchema indexSchema = common.getTables(dbName).get(tableName).getIndices().get(indexName);
+
+    int thisShard = databaseServer.getShard();
+    int shard = thisShard;
 
     ComObject retObj = new ComObject(1);
     TableSchema.Partition[] partitions = indexSchema.getCurrPartitions();
     ComArray array = retObj.putArray(ComObject.Tag.SIZES, ComObject.Type.OBJECT_TYPE, databaseServer.getShardCount());
-    for (int shard = 0; shard < databaseServer.getShardCount(); shard++) {
+//    for (int shard = 0; shard < databaseServer.getShardCount(); shard++) {
       Object[] minKey = null;
       Object[] maxKey = null;
       if (shard == 0) {
@@ -767,7 +764,7 @@ public class PartitionManager extends Thread {
       long size = 0;
       long rawSize = 0;
       if (shard == 0 || minKey != null) {
-        size = index.getSize(minKey, maxKey);
+        size = index.anticipatedSize();//index.size();//index.getSize(minKey, maxKey);
         rawSize = index.size();
       }
 
@@ -782,7 +779,7 @@ public class PartitionManager extends Thread {
       sizeObj.put(ComObject.Tag.MIN_KEY, DatabaseCommon.serializeKey(tableSchema, indexSchema.getName(), minKey));
       sizeObj.put(ComObject.Tag.MAX_KEY, DatabaseCommon.serializeKey(tableSchema, indexSchema.getName(), maxKey));
       array.add(sizeObj);
-    }
+//    }
     return retObj;
   }
 
@@ -1433,10 +1430,10 @@ public class PartitionManager extends Thread {
               false, context.tableSchema, context.indexName, null,
               BinaryExpression.Operator.EQUAL, null,
               entry.key, null);
-          ProcessEntry processEntry = new ProcessEntry(context.index, context.indexSchema, countDeleted, entry, content, shard,
-              selectedShards).invoke();
+          ProcessEntry processEntry = new ProcessEntry(context.index, context.indexSchema, countDeleted, entry, content,
+              shard, selectedShards).invoke();
           content = processEntry.getContent();
-          shard = processEntry.getShard();
+          shard = selectedShards.get(0);
 
           enqueueMoveRequest(context, moveRequests, lists, entry, content, shard);
           consecutiveErrors = 0;
@@ -2219,7 +2216,8 @@ public class PartitionManager extends Thread {
       });
     }
 
-    private List<Object[]> getKeyAtOffset(String dbName, int shard, String tableName, String indexName,
+    private List<Object[]>
+    getKeyAtOffset(String dbName, int shard, String tableName, String indexName,
                                           List<OffsetEntry> offsets) throws IOException {
       logger.info("getKeyAtOffset: db={}, shard={}, table={}, index={}, offsetCount={}", dbName, shard, tableName,
           indexName, offsets.size());
@@ -2241,6 +2239,7 @@ public class PartitionManager extends Thread {
             ", table=" + tableName + INDEX_STR + indexName);
       }
 
+      StringBuilder builder = new StringBuilder();
       ComObject retObj = new ComObject(ret);
       ComArray keyArray = retObj.getArray(ComObject.Tag.KEYS);
       List<Object[]> keys = new ArrayList<>();
@@ -2248,11 +2247,12 @@ public class PartitionManager extends Thread {
         for (int i = 0; i < keyArray.getArray().size(); i++) {
           Object[] key = DatabaseCommon.deserializeKey(common.getTables(dbName).get(tableName), (byte[]) keyArray.getArray().get(i));
           keys.add(key);
+          builder.append(DatabaseCommon.keyToString(key)).append(",");
         }
       }
 
-      logger.info("getKeyAtOffset finished: db={}, shard={}, table={}, index={}, duration={}", dbName, shard,
-          tableName, indexName, (System.currentTimeMillis() - localBegin));
+      logger.info("getKeyAtOffset finished: db={}, shard={}, table={}, index={}, keys={}, duration={}", dbName, shard,
+          tableName, indexName, builder.toString(), (System.currentTimeMillis() - localBegin));
       return keys;
     }
   }
@@ -2293,6 +2293,16 @@ public class PartitionManager extends Thread {
         currIdx++;
       }
     }
+    StringBuilder builder = new StringBuilder();
+    for (final Map.Entry<Integer, List<OffsetEntry>> entry : shards.entrySet()) {
+      builder.append("shard=").append(entry.getKey()).append(",");
+      for (OffsetEntry offset : entry.getValue()) {
+        builder.append(offset.offset).append(":").append(offset.partitionOffset).append(",");
+      }
+    }
+
+    logger.info("Calculated offsets: offsets={}", builder.toString());
+
     ThreadPoolExecutor executor = ThreadUtil.createExecutor(newPartitions.size(),
         "SonicBase CalculatePartitions Thread");
     try {
@@ -2319,7 +2329,7 @@ public class PartitionManager extends Thread {
         }
       }
       newPartitions.get(newPartitions.size() - 1).setUnboundUpper(true);
-      StringBuilder builder = new StringBuilder();
+      builder = new StringBuilder();
       for (int i = 0; i < newPartitions.size(); i++) {
         TableSchema.Partition partition = newPartitions.get(i);
         Object[] key = partition.getUpperKey();

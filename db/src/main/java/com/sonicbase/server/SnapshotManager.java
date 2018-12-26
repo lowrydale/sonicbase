@@ -680,8 +680,13 @@ public class SnapshotManager {
           }
         }
 
-        writeRecords(dbName, deleteIfOlder, lastLogged, tableEntry, indexEntry, fieldOffsets, subBegin, savedCount,
-            outStreams, key, bucket, records, updateTime);
+        try {
+          writeRecords(dbName, deleteIfOlder, lastLogged, tableEntry, indexEntry, fieldOffsets, subBegin, savedCount,
+              outStreams, key, bucket, records, updateTime);
+        }
+        catch (IOException e) {
+          throw new DatabaseException(e);
+        }
 
         server.getStats().get(METRIC_SNAPSHOT_WRITE).getCount().incrementAndGet();
         return true;

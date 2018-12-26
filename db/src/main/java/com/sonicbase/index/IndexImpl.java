@@ -1,35 +1,34 @@
+/* © 2018 by Intellectual Reserve, Inc. All rights reserved. */
 package com.sonicbase.index;
 
-import java.io.IOException;
 import java.util.List;
 import java.util.Map;
 
 public interface IndexImpl {
-  void clear();
 
-  Object get(Object[] key);
+  Object put(Object[] key, Object value);
 
-  Object put(Object[] key, Object id);
+  Object get(Object[] startKey);
 
   Object remove(Object[] key);
 
-  Map.Entry<Object[], Object> ceilingEntry(Object[] key);
+  int tailBlock(Object[] startKey, int count, boolean first, Object[][] keys, Object[] values);
 
-  List<Map.Entry<Object[], Object>> equalsEntries(Object[] key);
-
-  Map.Entry<Object[], Object> floorEntry(Object[] key);
-
-  Map.Entry<Object[], Object> lowerEntry(Object[] key);
+  int headBlock(Object[] startKey, int count, boolean first, Object[][] keys, Object[] values);
 
   Map.Entry<Object[], Object> higherEntry(Object[] key);
 
-  Iterable<Object> values();
+  Map.Entry<Object[], Object> lowerEntry(Object[] key);
 
-  boolean visitTailMap(Object[] key, Index.Visitor visitor) throws IOException;
+  Map.Entry<Object[], Object> floorEntry(Object[] key);
 
-  boolean visitHeadMap(Object[] key, Index.Visitor visitor) throws IOException;
+  List<Map.Entry<Object[], Object>> equalsEntries(Object[] key);
+
+  Map.Entry<Object[], Object> ceilingEntry(Object[] key);
 
   Map.Entry<Object[], Object> lastEntry();
 
   Map.Entry<Object[], Object> firstEntry();
+
+  void clear();
 }

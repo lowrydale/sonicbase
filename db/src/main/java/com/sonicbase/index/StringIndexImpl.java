@@ -112,25 +112,37 @@ public class StringIndexImpl implements IndexImpl {
     return stringSkipIndex.values();
   }
 
-
-  public boolean visitTailMap(Object[] key, Index.Visitor visitor) throws IOException {
-    ConcurrentNavigableMap<byte[], Object> map = stringSkipIndex.tailMap((byte[]) key[0]);
+  public int tailBlock(Object[] key, int count, boolean first, Object[][] keys, Object[] values) {
+    ConcurrentNavigableMap<byte[], Object> map = stringSkipIndex.tailMap((byte[])key[0]);
+    int offset = 0;
     for (Map.Entry<byte[], Object> entry : map.entrySet()) {
-      if (!visitor.visit(new Object[]{entry.getKey()}, entry.getValue())) {
-        return false;
+      if (offset == 0 && !first && entry.getKey().equals((String)key[0])) {
+        continue;
+      }
+      keys[offset] = new Object[]{entry.getKey()};
+      values[offset] = entry.getValue();
+      if (offset++ >= count - 1) {
+        break;
       }
     }
-    return true;
+    return offset;
   }
 
-  public boolean visitHeadMap(Object[] key, Index.Visitor visitor) throws IOException {
+  public int headBlock(Object[] key, int count, boolean first, Object[][] keys, Object[] values) {
     ConcurrentNavigableMap<byte[], Object> map = stringSkipIndex.headMap((byte[]) key[0]).descendingMap();
+    int offset = 0;
     for (Map.Entry<byte[], Object> entry : map.entrySet()) {
-      if (!visitor.visit(new Object[]{entry.getKey()}, entry.getValue())) {
-        return false;
+      if (offset == 0 && !first && entry.getKey().equals((String)key[0])) {
+        continue;
+      }
+
+      keys[offset] = new Object[]{entry.getKey()};
+      values[offset] = entry.getValue();
+      if (offset++ >= count - 1) {
+        break;
       }
     }
-    return true;
+    return offset;
   }
 
   public Map.Entry<Object[], Object> lastEntry() {

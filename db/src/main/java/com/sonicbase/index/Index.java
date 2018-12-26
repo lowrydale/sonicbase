@@ -1,5 +1,8 @@
 package com.sonicbase.index;
 
+import com.codahale.metrics.MetricRegistry;
+import com.codahale.metrics.Snapshot;
+import com.sonicbase.client.DatabaseClient;
 import com.sonicbase.common.DatabaseCommon;
 import com.sonicbase.query.DatabaseException;
 import com.sonicbase.schema.DataType;
@@ -10,6 +13,7 @@ import org.slf4j.LoggerFactory;
 
 import java.io.IOException;
 import java.util.*;
+import java.util.concurrent.ConcurrentNavigableMap;
 import java.util.concurrent.atomic.AtomicInteger;
 import java.util.concurrent.atomic.AtomicLong;
 
@@ -19,14 +23,21 @@ import java.util.concurrent.atomic.AtomicLong;
 public class Index {
   private static final Logger logger = LoggerFactory.getLogger(Index.class);
 
-  private final Comparator[] comparators;
+  private Comparator[] comparators;
   private final Object[] mutexes = new Object[100_000];
 
   private final AtomicLong count = new AtomicLong();
-  private final IndexImpl impl;
+  private IndexImpl impl;
 
   private final AtomicLong size = new AtomicLong();
   private Comparator<Object[]> comparator = null;
+
+  private AtomicInteger countAdded = new AtomicInteger();
+  private AtomicLong beginAdded = new AtomicLong();
+
+  public Index() {
+
+  }
 
   public Index(TableSchema tableSchema, String indexName, final Comparator[] comparators) {
     this.comparators = comparators;
@@ -41,7 +52,8 @@ public class Index {
     if (fields.length == 1) {
       FieldSchema fieldSchema = tableSchema.getFields().get(tableSchema.getFieldOffset(fields[0]));
       if (fieldSchema.getType() == DataType.Type.BIGINT) {
-        impl = new LongIndexImpl(this);
+//        impl = new NativePartitionedTreeImpl(this); //new LongIndexImpl(this); //
+        impl = new LongIndexImpl(this); //
       }
       else if (fieldSchema.getType() == DataType.Type.VARCHAR) {
         impl = new StringIndexImpl(this);
@@ -105,11 +117,28 @@ public class Index {
   }
 
   public Object put(Object[] key, Object id) {
-    return impl.put(key, id);
+
+    Object ret = impl.put(key, id);
+    if (ret == null) {
+      countAdded.incrementAndGet();
+      if (System.currentTimeMillis() - beginAdded.get() > 60 * 1_000) {
+        beginAdded.set(System.currentTimeMillis());
+        countAdded.set(0);
+      }
+    }
+    return ret;
   }
 
   public Object remove(Object[] key) {
-    return impl.remove(key);
+    Object ret = impl.remove(key);
+    if (ret != null) {
+      countAdded.decrementAndGet();
+      if (System.currentTimeMillis() - beginAdded.get() > 60 * 1_000) {
+        beginAdded.set(System.currentTimeMillis());
+        countAdded.set(0);
+      }
+    }
+    return ret;
   }
 
   public long getCount() {
@@ -129,7 +158,7 @@ public class Index {
   }
 
   public interface Visitor {
-    boolean visit(Object[] key, Object value) throws IOException;
+    boolean visit(Object[] key, Object value);
   }
 
   public static class MyEntry<T, V> implements Map.Entry<T, V> {
@@ -178,10 +207,6 @@ public class Index {
     return impl.higherEntry(key);
   }
 
-  public Iterable<Object> values() {
-    return impl.values();
-  }
-
   public long getSize(final Object[] minKey, final Object[] maxKey) {
     final AtomicLong currOffset = new AtomicLong();
 
@@ -205,6 +230,17 @@ public class Index {
       return true;
     });
     return currOffset.get();
+  }
+
+  public long anticipatedSize() {
+    long size = size();
+
+    long duration = System.currentTimeMillis() - beginAdded.get();
+
+    double rate = countAdded.get() / duration * 1000d;
+
+    size += (rate * 30);
+    return size;
   }
 
   public long size() {
@@ -273,21 +309,87 @@ public class Index {
   }
 
   public boolean visitTailMap(Object[] key, Index.Visitor visitor) {
-    try {
-      return impl.visitTailMap(key, visitor);
+    int blockSize = DatabaseClient.SELECT_PAGE_SIZE;
+    Object[][] keys = new Object[blockSize][];
+    Object[] values = new Object[blockSize];
+
+//    Map.Entry<Object[], Object> last = impl.lastEntry();
+
+    int countRet = impl.tailBlock(key, blockSize, true, keys, values);
+    for (int i = 0; i < countRet; i++) {
+      if (!visitor.visit(keys[i], values[i])) {
+        return false;
+      }
     }
-    catch (IOException e) {
-      throw new DatabaseException(e);
+
+//    long begin = System.currentTimeMillis();
+//    int count = 0;
+    while (countRet >= blockSize) {
+      countRet = impl.tailBlock(keys[keys.length - 1], blockSize, false, keys, values);
+      for (int i = 0; i < countRet; i++) {
+//        if (count++ % 10_000 == 0) {
+//          logger.info("progress: count={}, rate={}", count, (double)count / (System.currentTimeMillis() - begin) * 1000d);
+//        }
+        if (!visitor.visit(keys[i], values[i])) {
+          return false;
+        }
+      }
+//      if (countRet > 0 && (long)last.getKey()[0] < (long)keys[countRet - 1][0]) {
+//        return true;
+//      }
     }
+
+
+//    ConcurrentNavigableMap<Object[], Object> map = objectSkipIndex.tailMap(key);
+//    for (Map.Entry<Object[], Object> entry : map.entrySet()) {
+//      if (!visitor.visit(entry.getKey(), entry.getValue())) {
+//        return false;
+//      }
+//    }
+    return true;
+
+
+//    try {
+//      return impl.visitTailMap(key, visitor);
+//    }
+//    catch (IOException e) {
+//      throw new DatabaseException(e);
+//    }
   }
 
   public boolean visitHeadMap(Object[] key, Index.Visitor visitor) {
-    try {
-      return impl.visitHeadMap(key, visitor);
+    int blockSize = DatabaseClient.SELECT_PAGE_SIZE;
+    Object[][] keys = new Object[blockSize][];
+    Object[] values = new Object[blockSize];
+
+//    Map.Entry<Object[], Object> first = impl.firstEntry();
+
+    int countRet = impl.headBlock(key, blockSize, true, keys, values);
+    for (int i = 0; i < countRet; i++) {
+      if (!visitor.visit(keys[i], values[i])) {
+        return false;
+      }
     }
-    catch (IOException e) {
-      throw new DatabaseException(e);
+
+    while (countRet >= blockSize) {
+      countRet = impl.headBlock(keys[keys.length - 1], blockSize, false, keys, values);
+      for (int i = 0; i < countRet; i++) {
+        if (!visitor.visit(keys[i], values[i])) {
+          return false;
+        }
+      }
+//      if (countRet > 0 && (long)first.getKey()[0] > (long)keys[countRet - 1][0]) {
+//        return true;
+//      }
     }
+    return true;
+//
+//    try {
+//      return impl.visitHeadMap(key, visitor);
+//    }
+//    catch (IOException e) {
+//      throw new DatabaseException(e);
+//    }
   }
 
   public Map.Entry<Object[], Object> lastEntry() {

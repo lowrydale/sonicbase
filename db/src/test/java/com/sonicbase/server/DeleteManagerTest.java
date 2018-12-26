@@ -151,7 +151,9 @@ public class DeleteManagerTest {
       for (int i = begin; i < end; i++) {
         DeleteManager.DeleteRequest request = new DeleteManager.DeleteRequest(keys.get(i));
         requests.add(request);
-        deleted.add(i);
+        synchronized (deleted) {
+          deleted.add(i);
+        }
       }
       deleteManager.saveDeletesForRecords("test", tableSchema.getName(), indexSchema.getName(),
           1000, 1000, requests, 0);

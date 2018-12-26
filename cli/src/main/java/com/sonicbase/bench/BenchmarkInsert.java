@@ -313,7 +313,7 @@ public class BenchmarkInsert {
                         }
 
                         thisDuration = 0;
-                        if (true) {
+                        if (false) {
                           try (Connection conn = cpds.getConnection()) {
                             long currBegin = 0;
                             try (PreparedStatement stmt = conn.prepareStatement("insert into Memberships (personId, personId2, membershipName, resortId) VALUES (?, ?, ?, ?)")) {

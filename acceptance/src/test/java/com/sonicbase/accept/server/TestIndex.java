@@ -198,7 +198,7 @@ public class TestIndex {
     Index index = new Index(tableSchema, indexSchema.getName(), indexSchema.getComparators());
 
     for (int i = 0; i < 10; i++) {
-      index.put(new Object[]{(long)i}, i + 100);
+      index.put(new Object[]{(long)i}, (long)(i + 100));
     }
     Map.Entry<Object[], Object>[] ret = new Map.Entry[3];
 //    index.higherEntries(new Object[]{(long)2}, ret);

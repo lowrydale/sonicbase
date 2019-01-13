@@ -53,7 +53,7 @@ public class IndexLookupWithExpressionTest {
     indexLookup.retRecords = new ArrayList<>();
     indexLookup.retKeyRecords = new ArrayList<>();
 
-    indexLookup.index = new Index(tableSchema, indexLookup.indexSchema.getName(), indexLookup.indexSchema.getComparators());
+    indexLookup.index = new Index(9010, tableSchema, indexLookup.indexSchema.getName(), indexLookup.indexSchema.getComparators());
 
 
 
@@ -117,7 +117,7 @@ public class IndexLookupWithExpressionTest {
     indexLookup.retRecords = new ArrayList<>();
     indexLookup.retKeyRecords = new ArrayList<>();
 
-    indexLookup.index = new Index(tableSchema, indexLookup.indexSchema.getName(), indexLookup.indexSchema.getComparators());
+    indexLookup.index = new Index(9010, tableSchema, indexLookup.indexSchema.getName(), indexLookup.indexSchema.getComparators());
 
 
 

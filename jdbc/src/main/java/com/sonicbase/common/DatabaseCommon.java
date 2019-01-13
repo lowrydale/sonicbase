@@ -150,12 +150,21 @@ public class DatabaseCommon {
               loadTableSchema(dbSchema, tableFile, newTableNames);
             }
           }
+          List<Integer> tablesIdsToRemove = new ArrayList<>();
+          List<String> tableNamesToRemove = new ArrayList<>();
           //remove tables that no longer exist
           for (TableSchema tableSchema : dbSchema.getTables().values()) {
             if (!newTableNames.contains(tableSchema.getName())) {
-              dbSchema.getTablesById().remove(tableSchema.getTableId());
-              dbSchema.getTables().remove(tableSchema.getName());
+              tablesIdsToRemove.add(tableSchema.getTableId());
+              tableNamesToRemove.add(tableSchema.getName());
             }
+          }
+          //getting concurrentModifactionException if don't in above loop even though that should never happen
+          for (int i : tablesIdsToRemove) {
+            dbSchema.getTablesById().remove(i);
+          }
+          for (String s : tableNamesToRemove) {
+            dbSchema.getTables().remove(s);
           }
         }
       }

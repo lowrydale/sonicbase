@@ -22,7 +22,7 @@ import static org.testng.Assert.assertEquals;
 
 public class TestRebalance {
 
-  @Test(enabled=false)
+  @Test
   public void testBasics() throws Exception {
     String configStr = IOUtils.toString(new BufferedInputStream(getClass().getResourceAsStream("/config/config-4-servers.yaml")), "utf-8");
     Config config = new Config(configStr);

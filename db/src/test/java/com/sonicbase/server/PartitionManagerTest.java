@@ -30,12 +30,14 @@ import java.util.Map;
 import java.util.concurrent.*;
 import java.util.concurrent.atomic.AtomicBoolean;
 import java.util.concurrent.atomic.AtomicInteger;
+import java.util.concurrent.atomic.AtomicLong;
 import java.util.concurrent.atomic.AtomicReference;
 
 import static org.mockito.Matchers.*;
 import static org.mockito.Mockito.*;
 import static org.testng.Assert.assertEquals;
 import static org.testng.Assert.assertTrue;
+import static org.testng.Assert.fail;
 
 public class PartitionManagerTest {
 
@@ -86,7 +88,7 @@ public class PartitionManagerTest {
     when(server.useUnsafe()).thenReturn(true);
 
     Indices indices = new Indices();
-    indices.addIndex(tableSchema, indexSchema.getName(), indexSchema.getComparators());
+    indices.addIndex(server.getPort(), tableSchema, indexSchema.getName(), indexSchema.getComparators());
     Index index = indices.getIndices().get(tableSchema.getName()).get(indexSchema.getName());
     when(server.getIndex(anyString(), anyString(), anyString())).thenReturn(index);
 
@@ -270,7 +272,7 @@ public class PartitionManagerTest {
     when(server.getCommon()).thenReturn(common);
 
     Indices indices = new Indices();
-    indices.addIndex(tableSchema, indexSchema.getName(), indexSchema.getComparators());
+    indices.addIndex(server.getPort(), tableSchema, indexSchema.getName(), indexSchema.getComparators());
     Index index = indices.getIndices().get(tableSchema.getName()).get(indexSchema.getName());
     when(server.getIndex(anyString(), anyString(), anyString())).thenReturn(index);
 
@@ -454,7 +456,7 @@ public class PartitionManagerTest {
     byte[][] records = TestUtils.createRecords(common, tableSchema, 10);
 
     Indices indices = new Indices();
-    indices.addIndex(tableSchema, indexSchema.getName(), indexSchema.getComparators());
+    indices.addIndex(server.getPort(), tableSchema, indexSchema.getName(), indexSchema.getComparators());
     Index index = indices.getIndices().get(tableSchema.getName()).get(indexSchema.getName());
     when(server.getIndex(anyString(), anyString(), anyString())).thenReturn(index);
 
@@ -547,7 +549,7 @@ public class PartitionManagerTest {
     when(client.getShardCount()).thenReturn(shardCount);
 
     final List<Object[]> keys = new ArrayList<>();
-    for (int i = 0; i < totalRecordCount * 4; i++) {
+    for (long i = 2306398204483007890L; i < 2306398204483007890L + totalRecordCount * 4; i++) {
       Object[] fieldArray = new Object[1];
       fieldArray[0] = (long)i;
       keys.add(fieldArray);
@@ -586,9 +588,18 @@ public class PartitionManagerTest {
       when(server.useUnsafe()).thenReturn(true);
 
       Indices indices = new Indices();
-      indices.addIndex(tableSchema, indexSchema.getName(), indexSchema.getComparators());
+      indices.addIndex(server.getPort(), tableSchema, indexSchema.getName(), indexSchema.getComparators());
       Index index = indices.getIndices().get(tableSchema.getName()).get(indexSchema.getName());
-      when(server.getIndex(anyString(), anyString(), anyString())).thenReturn(index);
+      when(server.getIndex(anyString(), eq("table1"), anyString())).thenAnswer(new Answer(){
+        @Override
+        public Object answer(InvocationOnMock invocationOnMock) throws Throwable {
+          Object[] args = invocationOnMock.getArguments();
+          if (!((String)args[1]).equalsIgnoreCase("table1")) {
+            throw new DatabaseException("wrong index");
+          }
+          return index;
+        }
+      });
       allIndices.add(index);
       if (shard == shardCount - 1) {
         lastIndex = index;
@@ -723,7 +734,7 @@ public class PartitionManagerTest {
                 synchronized (index.getMutex(request1.getKey())) {
                   Object obj = index.remove(request1.getKey());
                   if (obj != null) {
-                    servers[(Integer)args[1]].getAddressMap().freeUnsafeIds(obj);
+                    servers[(Integer)args[1]].getAddressMap().delayedFreeUnsafeIds(obj);
                   }
                 }
               }
@@ -778,6 +789,7 @@ public class PartitionManagerTest {
     List<String> toRebalance = new ArrayList<>();
     toRebalance.add("table1 _primarykey");
 
+    int countAdded = 0;
     for (int i = 0; i < 6 ; i++) {
 
       if (i == 2) {
@@ -787,7 +799,10 @@ public class PartitionManagerTest {
           lastIndex.put(key, address);
           lastIndex.addAndGetCount(1);
         }
-        totalRecordCount *= 2;
+        for (int j = 0; j < shardCount; j++) {
+          Index index = servers[j].getIndices().get("test").getIndices().get(tableSchema.getName()).get(indexSchema.getName());
+          countAdded += index.size();
+        }
       }
 
       if (i == 4) {
@@ -820,16 +835,53 @@ public class PartitionManagerTest {
         //assertEquals(index.size(), countPerShard, "shard=" + i);
         System.out.println("pass=" + i + ", shard=" + j + ", count=" + index.size());
         if (i == 3) {
-          assertTrue(index.size() > countPerShard * 2 - 32 && index.size() < countPerShard * 2 + 32);
+//          System.out.println(index.size());
+          assertTrue(index.size() > countPerShard * 2 - 162 && index.size() < countPerShard * 2 + 162);
         }
         else if (i == 5) {
-          assertTrue(index.size() > countPerShard * 2 + 50 && index.size() < countPerShard * 2 + 92);
+//          System.out.println(index.size());
+          assertTrue(index.size() > countPerShard * 2 - 50 && index.size() < countPerShard * 2 + 92);
         }
         else if (i == 1) {
+//          System.out.println(index.size());
           assertTrue(index.size() > countPerShard - 32 && index.size() < countPerShard + 32);
         }
       }
     }
+
+    partitionManagers[0].beginRebalance("test", toRebalance);
+
+    while (true) {
+      ComObject retObj = partitionManagers[0].isRepartitioningComplete(null, false);
+      if (retObj.getBoolean(ComObject.Tag.FINISHED)) {
+        break;
+      }
+      Thread.sleep(1000);
+    }
+
+    if (exception.get() != null) {
+      throw exception.get();
+    }
+
+    final AtomicInteger count = new AtomicInteger();
+    final AtomicLong lastKey = new AtomicLong();
+    for (int j = 0; j < shardCount; j++) {
+      Index index = servers[j].getIndices().get("test").getIndices().get(tableSchema.getName()).get(indexSchema.getName());
+
+      index.visitTailMap(new Object[]{2306398204483007890L}, new Index.Visitor() {
+        @Override
+        public boolean visit(Object[] key, Object value) {
+          if (lastKey.get() != 0 && (long)key[0] < lastKey.get()) {
+            fail();
+          }
+          lastKey.set((long)key[0]);
+          assertEquals((long)key[0], 2306398204483007890L + count.get());
+          count.incrementAndGet();
+          return true;
+        }
+      });
+    }
+    assertEquals(count.get(), countAdded);
 
     assertTrue(calledMoveIndexEntries.get());
   }

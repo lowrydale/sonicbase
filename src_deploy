@@ -1,0 +1,23 @@
+#rm acceptance/hs_err*
+#rm -rf acceptance/target
+#rm -rf acceptance/db-data
+
+#rm cli/hs_err*
+#rm -rf cli/target
+#rm -rf cli/db-data
+
+#rm db/hs_err*
+#rm -rf db/target
+#rm -rf db/db-data
+
+#rm embedded/hs_err*
+#rm -rf embedded/target
+#rm -rf embedded/db-data
+
+#rm jdbc/hs_err*
+#rm -rf jdbc/target
+#rm -rf jdbc/db-data
+
+#rm hs_err*
+
+rsync -rvlLt --exclude=.idea --exclude=.git --exclude=hs_err* --exclude=target --exclude=db-data --exclude=WindowsTerminal --exclude=result-sets --exclude=web-old * ec2-user@$1:sonicbase_src

@@ -1,6 +1,5 @@
 package com.sonicbase.server;
 
-import com.codahale.metrics.Timer;
 import com.fasterxml.jackson.databind.JsonNode;
 import com.fasterxml.jackson.databind.ObjectMapper;
 import com.fasterxml.jackson.databind.node.ArrayNode;
@@ -25,7 +24,7 @@ import net.sf.jsqlparser.parser.CCJSqlParserManager;
 import net.sf.jsqlparser.schema.Column;
 import net.sf.jsqlparser.statement.Statement;
 import net.sf.jsqlparser.statement.select.*;
-import org.apache.commons.collections.map.HashedMap;
+import org.mockito.stubbing.Answer;
 import org.testng.annotations.Test;
 
 import java.io.IOException;
@@ -37,8 +36,6 @@ import java.util.List;
 import java.util.Map;
 import java.util.concurrent.atomic.AtomicInteger;
 
-import static com.sonicbase.server.DatabaseServer.METRIC_READ;
-import static com.sonicbase.server.MonitorManagerImpl.METRICS;
 import static org.mockito.Matchers.*;
 import static org.mockito.Mockito.mock;
 import static org.mockito.Mockito.when;
@@ -62,7 +59,7 @@ public class ReadManagerTest {
 
     when(server.getCommon()).thenReturn(common);
 
-    Index index = new Index(tableSchema, indexSchema.getName(), indexSchema.getComparators());
+    Index index = new Index(9010, tableSchema, indexSchema.getName(), indexSchema.getComparators());
     when(server.getIndex(anyString(), anyString(), anyString())).thenReturn(index);
 
 
@@ -146,7 +143,7 @@ public class ReadManagerTest {
 
     when(server.getCommon()).thenReturn(common);
 
-    Index index = new Index(tableSchema, indexSchema.getName(), indexSchema.getComparators());
+    Index index = new Index(9010, tableSchema, indexSchema.getName(), indexSchema.getComparators());
     when(server.getIndex(anyString(), anyString(), anyString())).thenReturn(index);
 
 
@@ -232,7 +229,7 @@ public class ReadManagerTest {
 
     when(server.getCommon()).thenReturn(common);
 
-    Index index = new Index(tableSchema, indexSchema.getName(), indexSchema.getComparators());
+    Index index = new Index(9010, tableSchema, indexSchema.getName(), indexSchema.getComparators());
     when(server.getIndex(anyString(), anyString(), anyString())).thenReturn(index);
 
 
@@ -296,7 +293,7 @@ public class ReadManagerTest {
 
     when(server.getCommon()).thenReturn(common);
 
-    Index index = new Index(tableSchema, indexSchema.getName(), indexSchema.getComparators());
+    Index index = new Index(9010, tableSchema, indexSchema.getName(), indexSchema.getComparators());
     when(server.getIndex(anyString(), anyString(), anyString())).thenReturn(index);
 
 
@@ -378,7 +375,7 @@ public class ReadManagerTest {
     common.setServersConfig(serversConfig);
     when(server.getCommon()).thenReturn(common);
 
-    Index index = new Index(tableSchema, indexSchema.getName(), indexSchema.getComparators());
+    Index index = new Index(9010, tableSchema, indexSchema.getName(), indexSchema.getComparators());
     when(server.getIndex(anyString(), anyString(), anyString())).thenReturn(index);
 
 
@@ -482,7 +479,7 @@ public class ReadManagerTest {
     common.setServersConfig(serversConfig);
     when(server.getCommon()).thenReturn(common);
 
-    Index index = new Index(tableSchema, indexSchema.getName(), indexSchema.getComparators());
+    Index index = new Index(9010, tableSchema, indexSchema.getName(), indexSchema.getComparators());
     when(server.getIndex(anyString(), anyString(), anyString())).thenReturn(index);
 
 
@@ -508,10 +505,6 @@ public class ReadManagerTest {
     }
     retObj.put(ComObject.Tag.CURR_OFFSET, (long)records.length);
     retObj.put(ComObject.Tag.COUNT_RETURNED, (long)records.length);
-
-    when(client.send(   anyString(), anyInt(), anyInt(), (ComObject) anyObject(), eq(DatabaseClient.Replica.DEF))).thenReturn(
-        retObj.serialize()
-    );
 
     String sql = "select field1 from table1 where field1 < 700 intersect select field1 from table1 where field1 > 500";
     CCJSqlParserManager parser = new CCJSqlParserManager();
@@ -578,6 +571,17 @@ public class ReadManagerTest {
     cobj.put(ComObject.Tag.RESULT_SET_ID, setOperation.getResultSetId());
 
     ReadManager readManager = new ReadManager(server);
+
+    Map<String, DatabaseServer.SimpleStats> stats = DatabaseServer.initStats();
+    when(server.getStats()).thenReturn(stats);
+
+    when(client.send(   eq("ReadManager:indexLookup"), anyInt(), anyInt(), (ComObject) anyObject(), eq(DatabaseClient.Replica.DEF))).thenAnswer(
+        (Answer) invocationOnMock -> {
+          Object[] args = invocationOnMock.getArguments();
+          //retObj.serialize()
+          return readManager.indexLookup((ComObject)args[3], false).serialize();
+        }
+    );
 
     retObj = readManager.serverSetSelect(cobj, false);
 

@@ -161,6 +161,23 @@ public class TestDatabaseAdvanced {
       }
     }
 
+    for (int i = 0; i < recordCount; i++) {
+      stmt = conn.prepareStatement("insert into persons (id, id2, id3, id4, num, socialSecurityNumber, relatives, restricted, gender) VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?)");
+      stmt.setLong(1, i + 100);
+      stmt.setLong(2, (i + 100) % 2);
+      stmt.setLong(3, i + 100 + recordCount);
+      stmt.setLong(4, (i + 100) % 3);
+      stmt.setDouble(5, (i + 100) * 0.5);
+      stmt.setString(6, "ssN-933-28-" + (i % 4));
+      stmt.setString(7, "12345678901,12345678901|12345678901,12345678901,12345678901,12345678901|12345678901");
+      stmt.setBoolean(8, false);
+      stmt.setString(9, "m");
+      int count = stmt.executeUpdate();
+      assertEquals(count, 1);
+      ids.add((long) (i + 100));
+    }
+
+
     for (int i = 0; i < 4; i++) {
       stmt = conn.prepareStatement("insert into persons (id, id2, id3, id4, id5, num, socialSecurityNumber, relatives, restricted, gender) VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?)");
       stmt.setLong(1, i);
@@ -189,22 +206,6 @@ public class TestDatabaseAdvanced {
       stmt.setString(8, "m");
       assertEquals(stmt.executeUpdate(), 1);
       ids.add((long) i);
-    }
-
-    for (int i = 0; i < recordCount; i++) {
-      stmt = conn.prepareStatement("insert into persons (id, id2, id3, id4, num, socialSecurityNumber, relatives, restricted, gender) VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?)");
-      stmt.setLong(1, i + 100);
-      stmt.setLong(2, (i + 100) % 2);
-      stmt.setLong(3, i + 100 + recordCount);
-      stmt.setLong(4, (i + 100) % 3);
-      stmt.setDouble(5, (i + 100) * 0.5);
-      stmt.setString(6, "ssN-933-28-" + (i % 4));
-      stmt.setString(7, "12345678901,12345678901|12345678901,12345678901,12345678901,12345678901|12345678901");
-      stmt.setBoolean(8, false);
-      stmt.setString(9, "m");
-      int count = stmt.executeUpdate();
-      assertEquals(count, 1);
-      ids.add((long) (i + 100));
     }
 
     for (int i = 0; i < 1000; i++) {

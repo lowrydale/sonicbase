@@ -2,7 +2,6 @@ package com.sonicbase.server;
 
 import com.sonicbase.common.*;
 import com.sonicbase.query.DatabaseException;
-import javafx.scene.chart.PieChart;
 import org.apache.commons.lang.exception.ExceptionUtils;
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;

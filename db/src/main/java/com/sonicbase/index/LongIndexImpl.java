@@ -1,6 +1,5 @@
 package com.sonicbase.index;
 
-import java.io.IOException;
 import java.util.ArrayList;
 import java.util.List;
 import java.util.Map;
@@ -99,29 +98,37 @@ public class LongIndexImpl implements IndexImpl {
     return new Index.MyEntry<>(new Object[]{entry.getKey()}, entry.getValue());
   }
 
-  public Iterable<Object> values() {
-    return longSkipIndex.values();
-  }
-
-
-  public boolean visitTailMap(Object[] key, Index.Visitor visitor) throws IOException {
+  public int tailBlock(Object[] key, int count, boolean first, Object[][] keys, long[] values) {
     ConcurrentNavigableMap<Long, Object> map = longSkipIndex.tailMap((long) key[0]);
+    int offset = 0;
     for (Map.Entry<Long, Object> entry : map.entrySet()) {
-      if (!visitor.visit(new Object[]{entry.getKey()}, entry.getValue())) {
-        return false;
+      if (offset == 0 && !first && entry.getKey() == (long)key[0]) {
+        continue;
+      }
+      keys[offset] = new Object[]{entry.getKey()};
+      values[offset] = (long)entry.getValue();
+      if (offset++ >= count - 1) {
+        break;
       }
     }
-    return true;
+    return offset;
   }
 
-  public boolean visitHeadMap(Object[] key, Index.Visitor visitor) throws IOException {
+  public int headBlock(Object[] key, int count, boolean first, Object[][] keys, long[] values) {
     ConcurrentNavigableMap<Long, Object> map = longSkipIndex.headMap((long) key[0]).descendingMap();
+    int offset = 0;
     for (Map.Entry<Long, Object> entry : map.entrySet()) {
-      if (!visitor.visit(new Object[]{entry.getKey()}, entry.getValue())) {
-        return false;
+      if (offset == 0 && !first && entry.getKey() == (long)key[0]) {
+        continue;
+      }
+
+      keys[offset] = new Object[]{entry.getKey()};
+      values[offset] = (long)entry.getValue();
+      if (offset++ >= count - 1) {
+        break;
       }
     }
-    return true;
+    return offset;
   }
 
   public Map.Entry<Object[], Object> lastEntry() {

@@ -1,6 +1,5 @@
 package com.sonicbase.index;
 
-import java.io.IOException;
 import java.util.*;
 import java.util.concurrent.ConcurrentNavigableMap;
 import java.util.concurrent.ConcurrentSkipListMap;
@@ -12,11 +11,11 @@ public class ObjectIndexImpl implements IndexImpl {
   private final Index index;
 
   private final ConcurrentSkipListMap<Object[], Object> objectSkipIndex;
+  private final Comparator<Object[]> comparator;
 
   ObjectIndexImpl(Index index, Comparator[] comparators) {
     this.index = index;
-    //don't make this a lambda
-    objectSkipIndex = new ConcurrentSkipListMap<>((o1, o2) -> {
+    this.comparator = (o1, o2) -> {
       int keyLen = (o1.length <= o2.length) ? o1.length : o2.length;
       for (int i = 0; i < keyLen; i++) {
         int value = comparators[i].compare(o1[i], o2[i]);
@@ -25,7 +24,9 @@ public class ObjectIndexImpl implements IndexImpl {
         }
       }
       return 0;
-    });
+    };
+    //don't make this a lambda
+    objectSkipIndex = new ConcurrentSkipListMap<>(comparator);
   }
 
   public void clear() {
@@ -132,30 +133,39 @@ public class ObjectIndexImpl implements IndexImpl {
     return new Index.MyEntry<>(entry.getKey(), entry.getValue());
   }
 
-  public Iterable<Object> values() {
-    return objectSkipIndex.values();
-  }
-
-
-  public boolean visitTailMap(Object[] key, Index.Visitor visitor) throws IOException {
+  public int tailBlock(Object[] key, int count, boolean first, Object[][] keys, long[] values) {
     ConcurrentNavigableMap<Object[], Object> map = objectSkipIndex.tailMap(key);
+    int offset = 0;
     for (Map.Entry<Object[], Object> entry : map.entrySet()) {
-      if (!visitor.visit(entry.getKey(), entry.getValue())) {
-        return false;
+      if (offset == 0 && !first && comparator.compare(entry.getKey(), key) == 0) {
+        continue;
+      }
+
+      keys[offset] = entry.getKey();
+      values[offset] = (long)entry.getValue();
+      if (offset++ >= count - 1) {
+        break;
       }
     }
-    return true;
+    return offset;
   }
 
-  public boolean visitHeadMap(Object[] key, Index.Visitor visitor) throws IOException {
+  public int headBlock(Object[] key, int count, boolean first, Object[][] keys, long[] values) {
     ConcurrentNavigableMap<Object[], Object> map = objectSkipIndex.headMap(key).descendingMap();
+    int offset = 0;
     for (Map.Entry<Object[], Object> entry : map.entrySet()) {
-      if (!visitor.visit(entry.getKey(), entry.getValue())) {
-        return false;
+      if (offset == 0 && !first && comparator.compare(entry.getKey(), key) == 0) {
+        continue;
+      }
+      keys[offset] = entry.getKey();
+      values[offset] = (long)entry.getValue();
+      if (offset++ >= count - 1) {
+        break;
       }
     }
-    return true;
+    return offset;
   }
+
 
   public Map.Entry<Object[], Object> lastEntry() {
     Map.Entry<Object[], Object> entry = objectSkipIndex.lastEntry();

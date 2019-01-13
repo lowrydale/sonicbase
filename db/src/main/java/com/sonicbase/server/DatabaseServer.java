@@ -227,6 +227,10 @@ public class DatabaseServer {
     }
   }
 
+  public ReadManager getReadManager() {
+    return readManager;
+  }
+
   private class AggregateStats {
     private double rate;
     private long timeRegistered;

@@ -56,6 +56,10 @@ rsync -rvlLt $HOME/Dropbox/sonicbase-config/* $HOME/sonicbase/config
 rsync -rvlLt db/src/main/resources/log4j.xml $HOME/sonicbase/config
 rsync -rvlLt db/src/main/resources/cli-log4j.xml $HOME/sonicbase/config
 rsync -rvlLt win $HOME/sonicbase/lib
+mkdir $HOME/sonicbase/lib/linux
+rsync -rvlLt native/PartitionedAvlTree/linux/*.so $HOME/sonicbase/lib/linux
+mkdir $HOME/sonicbase/lib/mac
+rsync -rvlLt native/PartitionedAvlTree/mac/*.so $HOME/sonicbase/lib/mac
 cd scripts
 rsync -rvlLt get-distribution $HOME/sonicbase/bin
 rsync -rvlLt get-df $HOME/sonicbase/bin

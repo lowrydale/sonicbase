@@ -63,8 +63,9 @@ public class SnapshotManagerTest {
     when(server.getCommon()).thenReturn(common);
     when(server.getConfig()).thenReturn(config);
     when(server.getSchemaManager()).thenReturn(mock(SchemaManager.class));
+    when(server.getLogManager()).thenReturn(mock(LogManager.class));
 
-    Index index = new Index(tableSchema, indexSchema.getName(), indexSchema.getComparators());
+    Index index = new Index(9010, tableSchema, indexSchema.getName(), indexSchema.getComparators());
     when(server.getIndex(anyString(), anyString(), anyString())).thenReturn(index);
 
 

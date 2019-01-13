@@ -22,6 +22,7 @@ import java.io.EOFException;
 import java.io.IOException;
 import java.util.*;
 import java.util.concurrent.Callable;
+import java.util.concurrent.ConcurrentLinkedQueue;
 import java.util.concurrent.Future;
 import java.util.concurrent.ThreadPoolExecutor;
 import java.util.concurrent.atomic.AtomicInteger;
@@ -153,12 +154,12 @@ public class ReadManager {
     while (entry != null) {
       byte[][] records = null;
       Object[] key = entry.getKey();
-      synchronized (index.getMutex(key)) {
-        Object value = index.get(key);
+      //synchronized (index.getMutex(key)) {
+        Object value = entry.getValue();//index.get(key);
         if (value != null && !value.equals(0L)) {
           records = server.getAddressMap().fromUnsafeToRecords(value);
         }
-      }
+      //}
       for (byte[] bytes : records) {
         count = doCountForRecord(dbName, expression, parms, countColumn, count, tableSchema, countColumnOffset, bytes);
       }
@@ -191,6 +192,26 @@ public class ReadManager {
       }
     }
     return count;
+  }
+
+  public ComObject traverseIndex(ComObject cobj, boolean replayedCommand) {
+    String db = "db";
+    String tableName = "persons";
+    String indexName = "_primarykey";
+    if (cobj != null) {
+      db = cobj.getString(ComObject.Tag.DB_NAME);
+      tableName = cobj.getString(ComObject.Tag.TABLE_NAME);
+      indexName = cobj.getString(ComObject.Tag.INDEX_NAME);
+    }
+    IndexSchema indexSchema = server.getCommon().getDatabases().get(db).getTables().get(tableName).getIndices().get(indexName);
+    for (TableSchema.Partition partition : indexSchema.getCurrPartitions()) {
+      if (partition.getUpperKey() == null) {
+        continue;
+      }
+      logger.info("shard={}, upperKey={}", server.getShard(), DatabaseCommon.keyToString(partition.getUpperKey()));
+    }
+    Index index = server.getIndex(db, tableName, indexName);
+    return index.traverseIndex(server);
   }
 
   @SchemaReadLock
@@ -323,6 +344,9 @@ public class ReadManager {
   }
 
   ComObject indexLookup(ComObject cobj, StoredProcedureContextImpl procedureContext) {
+    int count = 0;
+    Index index = null;
+    Object[][] cachedKeys = null;
     try {
       Integer schemaVersion = cobj.getInt(ComObject.Tag.SCHEMA_VERSION);
       if (schemaVersion != null && schemaVersion < server.getSchemaVersion()) {
@@ -350,8 +374,10 @@ public class ReadManager {
         indexLookup = new IndexLookupOneKey(server);
       }
 
+
       indexLookup.setProcedureContext(procedureContext);
-      indexLookup.setCount(cobj.getInt(ComObject.Tag.COUNT));
+      count = cobj.getInt(ComObject.Tag.COUNT);
+      indexLookup.setCount(count);
       indexLookup.setIsExplicitTrans(cobj.getBoolean(ComObject.Tag.IS_EXCPLICITE_TRANS));
       indexLookup.setIsCommiting(cobj.getBoolean(ComObject.Tag.IS_COMMITTING));
       indexLookup.setTransactionId(cobj.getLong(ComObject.Tag.TRANSACTION_ID));
@@ -410,8 +436,8 @@ public class ReadManager {
       SetOffsetLimit setOffsetLimit = new SetOffsetLimit(cobj, indexLookup).invoke();
       AtomicLong currOffset = setOffsetLimit.getCurrOffset();
       AtomicLong countReturned = setOffsetLimit.getCountReturned();
-
-      Index index = server.getIndex(dbName, tableSchema.getName(), indexName);
+      indexLookup.setCountReturned(countReturned);
+      index = server.getIndex(dbName, tableSchema.getName(), indexName);
       Map.Entry<Object[], Object> entry = null;
       indexLookup.setIndex(index);
 
@@ -419,9 +445,9 @@ public class ReadManager {
 
       List<byte[]> retKeyRecords = new ArrayList<>();
       indexLookup.setRetKeyRecords(retKeyRecords);
-      List<Object[]> retKeys = new ArrayList<>();
+      List<Object[]> retKeys = new ArrayList<>(count);
       indexLookup.setRetKeys(retKeys);
-      List<byte[]> retRecords = new ArrayList<>();
+      List<byte[]> retRecords = new ArrayList<>(count);
       indexLookup.setRetRecords(retRecords);
 
       List<Object[]> excludeKeys = new ArrayList<>();
@@ -1289,12 +1315,12 @@ public class ReadManager {
     if (entry != null) {
       byte[][] records = null;
       Object[] key = entry.getKey();
-      synchronized (index.getMutex(key)) {
-        Object unsafeAddress = index.get(key);
+      //synchronized (index.getMutex(key)) {
+        Object unsafeAddress = entry.getValue();//index.get(key);
         if (unsafeAddress != null && !unsafeAddress.equals(0L)) {
           records = server.getAddressMap().fromUnsafeToRecords(unsafeAddress);
         }
-      }
+      //}
       if (records != null) {
         if (isPrimaryKey) {
           maxKey = DatabaseCommon.serializeKey(tableSchema, indexName, entry.getKey());
@@ -1357,7 +1383,7 @@ public class ReadManager {
       Index index = server.getIndex(dbName, tableName, indexName);
       byte[][] records = null;
       synchronized (index.getMutex(key)) {
-        Object unsafeAddress = index.get(key);
+        Object unsafeAddress =  index.get(key);
         if (unsafeAddress != null) {
           if (!unsafeAddress.equals(0L)) {
             records = server.getAddressMap().fromUnsafeToRecords(unsafeAddress);

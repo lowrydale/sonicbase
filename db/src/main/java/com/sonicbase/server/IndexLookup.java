@@ -212,7 +212,7 @@ public abstract class IndexLookup {
   public abstract Map.Entry<Object[], Object> lookup();
 
   byte[][] processViewFlags(long viewVersion, byte[][] records) {
-    List<byte[]> remaining = new ArrayList<>();
+    List<byte[]> remaining = new ArrayList<>(count);
     if (records != null) {
       for (byte[] bytes : records) {
         processViewFlags(viewVersion, remaining, bytes);

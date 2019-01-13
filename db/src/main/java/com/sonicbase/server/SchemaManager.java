@@ -111,7 +111,7 @@ public class SchemaManager {
   void addAllIndices(String dbName) {
     for (TableSchema table : server.getCommon().getTables(dbName).values()) {
       for (IndexSchema index : table.getIndices().values()) {
-        server.getIndices(dbName).addIndex(table, index.getName(), index.getComparators());
+        server.getIndices(dbName).addIndex(server.getPort(), table, index.getName(), index.getComparators());
       }
     }
   }
@@ -120,7 +120,7 @@ public class SchemaManager {
       String dbName, TableSchema tableSchema, String indexName, String[] currFields) {
     Comparator[] comparators = tableSchema.getComparators(currFields);
 
-    server.getIndices(dbName).addIndex(tableSchema, indexName, comparators);
+    server.getIndices(dbName).addIndex(server.getPort(), tableSchema, indexName, comparators);
   }
 
   @SchemaWriteLock

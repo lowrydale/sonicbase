@@ -88,7 +88,7 @@ public class DeleteManagerTest {
     when(server.getCommon()).thenReturn(common);
 
     Indices indices = new Indices();
-    indices.addIndex(tableSchema, indexSchema.getName(), indexSchema.getComparators());
+    indices.addIndex(server.getPort(), tableSchema, indexSchema.getName(), indexSchema.getComparators());
     Index index = indices.getIndices().get(tableSchema.getName()).get(indexSchema.getName());
     when(server.getIndex(anyString(), anyString(), anyString())).thenReturn(index);
 
@@ -151,7 +151,9 @@ public class DeleteManagerTest {
       for (int i = begin; i < end; i++) {
         DeleteManager.DeleteRequest request = new DeleteManager.DeleteRequest(keys.get(i));
         requests.add(request);
-        deleted.add(i);
+        synchronized (deleted) {
+          deleted.add(i);
+        }
       }
       deleteManager.saveDeletesForRecords("test", tableSchema.getName(), indexSchema.getName(),
           1000, 1000, requests, 0);

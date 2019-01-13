@@ -43,8 +43,8 @@ public class DatabaseClient {
   public static final short SERIALIZATION_VERSION_20 = 20;
   public static final short SERIALIZATION_VERSION_19 = 19;
 
-  public static final int SELECT_PAGE_SIZE = 1000;
-  public static final int OPTIMIZED_RANGE_PAGE_SIZE = 4_000;
+  public static final int SELECT_PAGE_SIZE = 256;
+  public static final int OPTIMIZED_RANGE_PAGE_SIZE = 4096;
   private static final String SHUTTING_DOWN_STR = "Shutting down";
   private static final String NONE_STR = "__none__";
   private static final String DATABASE_SERVER_GET_SCHEMA_STR = "DatabaseServer:getSchema";
@@ -1564,7 +1564,7 @@ public class DatabaseClient {
     byte[] bytes = send("PartitionManager:getPartitionSize", shard, replica, cobj, DatabaseClient.Replica.SPECIFIED);
     ComObject retObj = new ComObject(bytes);
     ComArray array = retObj.getArray(ComObject.Tag.SIZES);
-    return ((ComObject)array.getArray().get(shard)).getLong(ComObject.Tag.SIZE);
+    return ((ComObject)array.getArray().get(0)).getLong(ComObject.Tag.SIZE);
   }
 
   public void syncSchema(Integer serverVersion) {

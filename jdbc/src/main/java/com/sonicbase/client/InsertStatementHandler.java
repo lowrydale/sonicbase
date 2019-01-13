@@ -481,20 +481,21 @@ public class InsertStatementHandler implements StatementHandler {
       nonTransId = client.allocateId(dbName);
     }
 
-    List<PreparedInsert> inserts = prepareInsert(request, completed, recordId, nonTransId, new AtomicInteger());
-    List<PreparedInsert> insertsWithRecords = new ArrayList<>();
-    List<PreparedInsert> insertsWithKey = new ArrayList<>();
-    for (PreparedInsert insert : inserts) {
-      if (insert.keyInfo.indexSchema.isPrimaryKey()) {
-        insertsWithRecords.add(insert);
-      }
-      else {
-        insertsWithKey.add(insert);
-      }
-    }
 
     while (true) {
       try {
+        List<PreparedInsert> inserts = prepareInsert(request, completed, recordId, nonTransId, new AtomicInteger());
+        List<PreparedInsert> insertsWithRecords = new ArrayList<>();
+        List<PreparedInsert> insertsWithKey = new ArrayList<>();
+        for (PreparedInsert insert : inserts) {
+          if (insert.keyInfo.indexSchema.isPrimaryKey()) {
+            insertsWithRecords.add(insert);
+          }
+          else {
+            insertsWithKey.add(insert);
+          }
+        }
+
         for (int i = 0; i < insertsWithRecords.size(); i++) {
           PreparedInsert insert = insertsWithRecords.get(i);
           insertKeyWithRecord(dbName, insertStatement.getTableName(), insert.keyInfo, insert.record, insertStatement.isIgnore(), schemaRetryCount);

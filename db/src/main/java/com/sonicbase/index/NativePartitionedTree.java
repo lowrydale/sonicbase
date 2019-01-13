@@ -16,17 +16,21 @@ public class NativePartitionedTree {
 
   public native byte[] tailBlock(long indexId, byte[] startKey, int count, boolean first);
 
+  public native long[] tailBlockArray(long indexId, byte[] startKey, int count, boolean first);
+
+  public native long[] headBlockArray(long indexId, byte[] startKey, int count, boolean first);
+
   public native byte[] tailBlockBytes(long indexId, byte[] startKey, int count, boolean first);
 
   public native byte[] headBlock(long indexId, byte[] startKey, int count, boolean first);
 
-  public native byte[] higherEntry(long indexId, byte[] key);
+  public native long[] higherEntry(long indexId, long key);
 
   public native byte[] lowerEntry(long indexId, byte[] key);
 
   public native byte[] floorEntry(long indexId, byte[] key);
 
-  public native byte[] ceilingEntry(long indexId, byte[] key);
+  public native long[] ceilingEntry(long indexId, long key);
 
   public native byte[] lastEntry2(long indexId);
 

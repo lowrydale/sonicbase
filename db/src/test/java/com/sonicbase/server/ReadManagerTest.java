@@ -1,6 +1,5 @@
 package com.sonicbase.server;
 
-import com.codahale.metrics.Timer;
 import com.fasterxml.jackson.databind.JsonNode;
 import com.fasterxml.jackson.databind.ObjectMapper;
 import com.fasterxml.jackson.databind.node.ArrayNode;
@@ -25,8 +24,6 @@ import net.sf.jsqlparser.parser.CCJSqlParserManager;
 import net.sf.jsqlparser.schema.Column;
 import net.sf.jsqlparser.statement.Statement;
 import net.sf.jsqlparser.statement.select.*;
-import org.apache.commons.collections.map.HashedMap;
-import org.mockito.invocation.InvocationOnMock;
 import org.mockito.stubbing.Answer;
 import org.testng.annotations.Test;
 
@@ -39,8 +36,6 @@ import java.util.List;
 import java.util.Map;
 import java.util.concurrent.atomic.AtomicInteger;
 
-import static com.sonicbase.server.DatabaseServer.METRIC_READ;
-import static com.sonicbase.server.MonitorManagerImpl.METRICS;
 import static org.mockito.Matchers.*;
 import static org.mockito.Mockito.mock;
 import static org.mockito.Mockito.when;
@@ -64,7 +59,7 @@ public class ReadManagerTest {
 
     when(server.getCommon()).thenReturn(common);
 
-    Index index = new Index(tableSchema, indexSchema.getName(), indexSchema.getComparators());
+    Index index = new Index(9010, tableSchema, indexSchema.getName(), indexSchema.getComparators());
     when(server.getIndex(anyString(), anyString(), anyString())).thenReturn(index);
 
 
@@ -148,7 +143,7 @@ public class ReadManagerTest {
 
     when(server.getCommon()).thenReturn(common);
 
-    Index index = new Index(tableSchema, indexSchema.getName(), indexSchema.getComparators());
+    Index index = new Index(9010, tableSchema, indexSchema.getName(), indexSchema.getComparators());
     when(server.getIndex(anyString(), anyString(), anyString())).thenReturn(index);
 
 
@@ -234,7 +229,7 @@ public class ReadManagerTest {
 
     when(server.getCommon()).thenReturn(common);
 
-    Index index = new Index(tableSchema, indexSchema.getName(), indexSchema.getComparators());
+    Index index = new Index(9010, tableSchema, indexSchema.getName(), indexSchema.getComparators());
     when(server.getIndex(anyString(), anyString(), anyString())).thenReturn(index);
 
 
@@ -298,7 +293,7 @@ public class ReadManagerTest {
 
     when(server.getCommon()).thenReturn(common);
 
-    Index index = new Index(tableSchema, indexSchema.getName(), indexSchema.getComparators());
+    Index index = new Index(9010, tableSchema, indexSchema.getName(), indexSchema.getComparators());
     when(server.getIndex(anyString(), anyString(), anyString())).thenReturn(index);
 
 
@@ -380,7 +375,7 @@ public class ReadManagerTest {
     common.setServersConfig(serversConfig);
     when(server.getCommon()).thenReturn(common);
 
-    Index index = new Index(tableSchema, indexSchema.getName(), indexSchema.getComparators());
+    Index index = new Index(9010, tableSchema, indexSchema.getName(), indexSchema.getComparators());
     when(server.getIndex(anyString(), anyString(), anyString())).thenReturn(index);
 
 
@@ -484,7 +479,7 @@ public class ReadManagerTest {
     common.setServersConfig(serversConfig);
     when(server.getCommon()).thenReturn(common);
 
-    Index index = new Index(tableSchema, indexSchema.getName(), indexSchema.getComparators());
+    Index index = new Index(9010, tableSchema, indexSchema.getName(), indexSchema.getComparators());
     when(server.getIndex(anyString(), anyString(), anyString())).thenReturn(index);
 
 

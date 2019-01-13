@@ -46,6 +46,11 @@ class MiscHandler {
     this.cli = cli;
   }
 
+  void traverseIndex() {
+    ComObject cobj = new ComObject(1);
+    cli.getConn().sendToAllShards("ReadManager:traverseIndex", 0, cobj, ConnectionProxy.Replica.ALL);
+  }
+
   void stopStreaming() {
     ComObject cobj = new ComObject(1);
     for (int shard = 0; shard < cli.getConn().getShardCount(); shard++) {

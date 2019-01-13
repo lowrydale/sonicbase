@@ -107,8 +107,8 @@ public class BulkImportManagerTest {
     when(server.getCommon()).thenReturn(common);
 
     Indices indices = new Indices();
-    indices.addIndex(tableSchema, indexSchema.getName(), indexSchema.getComparators());
-    indices.addIndex(tableSchema, stringIndexSchema.getName(), stringIndexSchema.getComparators());
+    indices.addIndex(server.getPort(), tableSchema, indexSchema.getName(), indexSchema.getComparators());
+    indices.addIndex(server.getPort(), tableSchema, stringIndexSchema.getName(), stringIndexSchema.getComparators());
     index = indices.getIndices().get(tableSchema.getName()).get(indexSchema.getName());
     stringIndex = indices.getIndices().get(tableSchema.getName()).get(stringIndexSchema.getName());
     when(server.getIndex(anyString(), anyString(), eq(indexSchema.getName()))).thenReturn(index);

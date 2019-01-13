@@ -2,17 +2,16 @@ package com.sonicbase.bench;
 
 import com.codahale.metrics.MetricRegistry;
 import com.codahale.metrics.Snapshot;
-import com.fasterxml.jackson.databind.ObjectMapper;
-import com.fasterxml.jackson.databind.node.ArrayNode;
 import com.fasterxml.jackson.databind.node.JsonNodeFactory;
 import com.fasterxml.jackson.databind.node.ObjectNode;
-import org.apache.commons.io.IOUtils;
+import com.sonicbase.client.DatabaseClient;
+import com.sonicbase.jdbcdriver.ConnectionProxy;
+import com.sonicbase.schema.IndexSchema;
+import com.sonicbase.schema.TableSchema;
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
 
-import java.io.BufferedInputStream;
 import java.io.File;
-import java.io.FileInputStream;
 import java.sql.DriverManager;
 import java.sql.PreparedStatement;
 import java.sql.ResultSet;
@@ -73,7 +72,19 @@ public class BenchmarkRangeQuery {
                   PreparedStatement stmt = null;
                   ResultSet ret = null;
                   if (true) {
-                    long actualStartId = startId;
+                    DatabaseClient client = ((ConnectionProxy)conn).getDatabaseClient();
+                    client.syncSchema();
+                    IndexSchema indexSchema = client.getSchema("db").getTables().get("persons").getIndices().get("_primarykey");
+                    TableSchema.Partition[] partitions = indexSchema.getCurrPartitions();
+                    Object[][] keys = new Object[partitions.length][];
+                    keys[0] = new Object[]{0L};
+                    for (int m = 1; m < partitions.length; m++) {
+                      Object[] upperKey = partitions[m - 1].getUpperKey();
+                      keys[m] = upperKey;
+                    }
+                    int offset = shard % partitions.length;
+                    long actualStartId = (long)keys[offset][0];
+                    logger.info("starting id=" + actualStartId);
                     cycle.incrementAndGet();
                     long begin = System.nanoTime();
                     stmt = conn.prepareStatement("select persons.id1  " +
@@ -82,6 +93,8 @@ public class BenchmarkRangeQuery {
                     ret = stmt.executeQuery();
                     totalSelectDuration.addAndGet(System.nanoTime() - begin);
 
+                    long lastId = 0;
+                    int countThisPass = 0;
                     while (true) {
                       begin = System.nanoTime();
                       if (!ret.next()) {
@@ -89,9 +102,20 @@ public class BenchmarkRangeQuery {
                       }
                       totalSelectDuration.addAndGet(System.nanoTime() - begin);
 
+                      if (countThisPass == 0) {
+                        logger.info("first key returned=" + ret.getLong("id1"));
+                      }
+                      long idRead = ret.getLong("id1");
+                      if (idRead < lastId) {
+                        logger.error("key returned out of order: idRead={}, lastId={} #############################################", idRead, lastId);
+                      }
+                      lastId = idRead;
+                      countThisPass++;
                       if (readCount.incrementAndGet() % 100000 == 0) {
                         StringBuilder builder = new StringBuilder();
-                        builder.append("count=").append(readCount.get());
+                        builder.append("currKey=").append(ret.getLong("id1"));
+                        builder.append(", count=").append(readCount.get());
+                        builder.append(", countThisPass=").append(countThisPass);
                         Snapshot snapshot = LOOKUP_STATS.getSnapshot();
                         builder.append(String.format(", rate=%.2f", readCount.get() / (double) (System.currentTimeMillis() - totalBegin.get()) * 1000f));
                         builder.append(String.format(", avg=%.2f nanos", totalSelectDuration.get() / (double) readCount.get()));
@@ -102,6 +126,7 @@ public class BenchmarkRangeQuery {
                         logger.info(builder.toString());
                       }
                     }
+                    logger.info("countThisPass - finished={}", countThisPass);
                     totalSelectDuration.addAndGet(System.nanoTime() - beginNano);
                   }
 

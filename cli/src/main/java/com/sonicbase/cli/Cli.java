@@ -575,6 +575,7 @@ public class Cli {
       });
     commands.put("purge cluster", currCommand->clusterHandler.purgeCluster());
     commands.put("purge install", currCommand->miscHandler.purgeInstall());
+    commands.put("traverse index", currCommand->miscHandler.traverseIndex());
     commands.put("start streams consumers", currCommand->miscHandler.startStreaming());
     commands.put("stop streams consumers", currCommand->miscHandler.stopStreaming());
     commands.put("describe licenses", currCommand->describeHandler.describeLicenses());

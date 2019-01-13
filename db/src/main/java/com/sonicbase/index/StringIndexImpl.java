@@ -2,7 +2,6 @@ package com.sonicbase.index;
 
 import org.apache.hadoop.io.WritableComparator;
 
-import java.io.IOException;
 import java.util.ArrayList;
 import java.util.Comparator;
 import java.util.List;
@@ -112,7 +111,7 @@ public class StringIndexImpl implements IndexImpl {
     return stringSkipIndex.values();
   }
 
-  public int tailBlock(Object[] key, int count, boolean first, Object[][] keys, Object[] values) {
+  public int tailBlock(Object[] key, int count, boolean first, Object[][] keys, long[] values) {
     ConcurrentNavigableMap<byte[], Object> map = stringSkipIndex.tailMap((byte[])key[0]);
     int offset = 0;
     for (Map.Entry<byte[], Object> entry : map.entrySet()) {
@@ -120,7 +119,7 @@ public class StringIndexImpl implements IndexImpl {
         continue;
       }
       keys[offset] = new Object[]{entry.getKey()};
-      values[offset] = entry.getValue();
+      values[offset] = (long)entry.getValue();
       if (offset++ >= count - 1) {
         break;
       }
@@ -128,16 +127,16 @@ public class StringIndexImpl implements IndexImpl {
     return offset;
   }
 
-  public int headBlock(Object[] key, int count, boolean first, Object[][] keys, Object[] values) {
+  public int headBlock(Object[] key, int count, boolean first, Object[][] keys, long[] values) {
     ConcurrentNavigableMap<byte[], Object> map = stringSkipIndex.headMap((byte[]) key[0]).descendingMap();
     int offset = 0;
     for (Map.Entry<byte[], Object> entry : map.entrySet()) {
-      if (offset == 0 && !first && entry.getKey().equals((String)key[0])) {
+      if (offset == 0 && !first && 0 == index.getComparator().compare(new Object[]{entry.getKey()}, key)) {
         continue;
       }
 
       keys[offset] = new Object[]{entry.getKey()};
-      values[offset] = entry.getValue();
+      values[offset] = (long)entry.getValue();
       if (offset++ >= count - 1) {
         break;
       }

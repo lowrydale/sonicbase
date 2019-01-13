@@ -593,7 +593,7 @@ public class IndexLookup {
       }
       else {
         for (int i = 0; i < selectedShards.size(); i++) {
-          if (localShard == selectedShards.get(i)) {
+          if (nextShard == selectedShards.get(i)) {
             processFoundShard(i);
             break;
           }
@@ -764,7 +764,7 @@ public class IndexLookup {
       retKeys = ExpressionImpl.aggregateResults(retKeys, currRetKeys);
       retKeyRecords = ExpressionImpl.aggregateResults(retKeyRecords, currRetKeyRecords);
 
-      if (recordRet == null && retKeys == null &&  retKeyRecords == null) {
+      if (recordRet == null && retKeys == null && retKeyRecords == null) {
         nextKey.set(localLeftValue);
       }
 

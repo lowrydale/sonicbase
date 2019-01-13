@@ -18,6 +18,7 @@ import com.sonicbase.schema.FieldSchema;
 import com.sonicbase.schema.IndexSchema;
 import com.sonicbase.schema.TableSchema;
 import com.sonicbase.streams.StreamManager;
+import com.sonicbase.util.PartitionUtils;
 import org.apache.commons.lang.exception.ExceptionUtils;
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
@@ -220,14 +221,14 @@ public class UpdateManager {
       if (newRecords.length == 0) {
         Object obj = index.remove(key);
         if (obj != null) {
-          server.getAddressMap().freeUnsafeIds(obj);
+          server.getAddressMap().delayedFreeUnsafeIds(obj);
           index.addAndGetCount(-1);
         }
       }
       else {
         index.put(key, server.getAddressMap().toUnsafeFromKeys(newRecords));
         if (value != null) {
-          server.getAddressMap().freeUnsafeIds(value);
+          server.getAddressMap().delayedFreeUnsafeIds(value);
         }
       }
     }
@@ -1219,7 +1220,7 @@ public class UpdateManager {
       }
       index.put(primaryKey, newValue);
       if (value != null) {
-        server.getAddressMap().freeUnsafeIds(value);
+        server.getAddressMap().delayedFreeUnsafeIds(value);
       }
     }
     streamManager.publishInsertOrUpdate(cobj, dbName, tableName, bytes, existingBytes, UpdateType.UPDATE);
@@ -1393,12 +1394,12 @@ public class UpdateManager {
               MemoryOps.MemoryOp memOp = memoryOps.getOps().poll();
               index.put(key, memOp.getAddress());
               index.addAndGetCount(1);
-              server.getAddressMap().freeUnsafeIds(existingValue);
+              server.getAddressMap().delayedFreeUnsafeIds(existingValue);
             }
             else {
               MemoryOps.MemoryOp memOp = memoryOps.getOps().poll();
               index.put(key, memOp.getAddress());
-              server.getAddressMap().freeUnsafeIds(existingValue);
+              server.getAddressMap().delayedFreeUnsafeIds(existingValue);
             }
           }
           else {
@@ -1455,7 +1456,7 @@ public class UpdateManager {
     if (replaced) {
       Object address = server.getAddressMap().toUnsafeFromRecords(records);
       index.put(key, address);
-      server.getAddressMap().freeUnsafeIds(existingValue);
+      server.getAddressMap().delayedFreeUnsafeIds(existingValue);
     }
     else {
       byte[][] newRecords = new byte[records.length + 1][];
@@ -1464,7 +1465,7 @@ public class UpdateManager {
       Object address = server.getAddressMap().toUnsafeFromRecords(newRecords);
       index.put(key, address);
       index.addAndGetCount(1);
-      server.getAddressMap().freeUnsafeIds(existingValue);
+      server.getAddressMap().delayedFreeUnsafeIds(existingValue);
     }
   }
 
@@ -1498,17 +1499,24 @@ public class UpdateManager {
               boolean sameSequence = checkSameTransAndSequence.isSameSequence();
               if (!ignoreDuplicates && !sameTrans && !sameSequence) {
                 index.put(key, existingValue);
-                server.getAddressMap().freeUnsafeIds(memOp.getAddress());
+                server.getAddressMap().delayedFreeUnsafeIds(memOp.getAddress());
                 throw new UniqueConstraintViolationException("Unique constraint violated: table=" + tableName + INDEX_STR +
                     indexName + KEY_STR + DatabaseCommon.keyToString(key));
               }
               updateIndexCount(recordBytes, index, bytes[0]);
-              server.getAddressMap().freeUnsafeIds(existingValue);
+              server.getAddressMap().delayedFreeUnsafeIds(existingValue);
             }
           }
         }
       }
       else {
+        TableSchema tableSchema = server.getCommon().getDatabases().get(dbName).getTables().get(tableName);
+        List<Integer> selectedShards = PartitionUtils.findOrderedPartitionForRecord(true, false, tableSchema,
+            indexName, null, com.sonicbase.query.BinaryExpression.Operator.EQUAL, null, key, null);
+
+        if (selectedShards.get(0) != server.getShard()) {
+          throw new DatabaseException("Incorrect shard: schemaShard=" + selectedShards.get(0) + ", actualShard=" + server.getShard());
+        }
         Object newUnsafeRecords = server.getAddressMap().toUnsafeFromRecords(new byte[][]{recordBytes});
         synchronized (index.getMutex(key)) {
           Object existingValue = index.put(key, newUnsafeRecords);
@@ -1522,12 +1530,12 @@ public class UpdateManager {
             boolean sameSequence = checkSameTransAndSequence.isSameSequence();
             if (!ignoreDuplicates && !sameTrans && !sameSequence) {
               index.put(key, existingValue);
-              server.getAddressMap().freeUnsafeIds(newUnsafeRecords);
+              server.getAddressMap().delayedFreeUnsafeIds(newUnsafeRecords);
               throw new UniqueConstraintViolationException("Unique constraint violated: table=" + tableName + INDEX_STR +
                   indexName + KEY_STR + DatabaseCommon.keyToString(key));
             }
             updateIndexCount(recordBytes, index, bytes[0]);
-            server.getAddressMap().freeUnsafeIds(existingValue);
+            server.getAddressMap().delayedFreeUnsafeIds(existingValue);
           }
         }
       }
@@ -1650,7 +1658,7 @@ public class UpdateManager {
       Object value = index.remove(key);
       if (value != null) {
         bytes = server.getAddressMap().fromUnsafeToRecords(value);
-        server.getAddressMap().freeUnsafeIds(value);
+        server.getAddressMap().delayedFreeUnsafeIds(value);
         index.addAndGetCount(-1);
       }
     }
@@ -1756,7 +1764,7 @@ public class UpdateManager {
       synchronized (indexEntry.getKey()) {
         Object value = index.remove(indexEntry.getKey());
         if (value != null) {
-          server.getAddressMap().freeUnsafeIds(value);
+          server.getAddressMap().delayedFreeUnsafeIds(value);
         }
       }
       indexEntry = index.higherEntry(indexEntry.getKey());
@@ -1865,7 +1873,7 @@ public class UpdateManager {
     Object newValue = server.getAddressMap().toUnsafeFromKeys(newValues);
     index.put(key, newValue);
     if (value != null) {
-      server.getAddressMap().freeUnsafeIds(value);
+      server.getAddressMap().delayedFreeUnsafeIds(value);
     }
   }
 
@@ -1883,7 +1891,7 @@ public class UpdateManager {
     }
     value = index.remove(key);
     if (value != null) {
-      server.getAddressMap().freeUnsafeIds(value);
+      server.getAddressMap().delayedFreeUnsafeIds(value);
     }
   }
 

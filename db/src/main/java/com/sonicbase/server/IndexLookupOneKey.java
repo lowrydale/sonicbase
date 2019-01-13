@@ -2,7 +2,10 @@ package com.sonicbase.server;
 
 import com.sonicbase.client.DatabaseClient;
 import com.sonicbase.common.DatabaseCommon;
+import com.sonicbase.index.Index;
 import com.sonicbase.query.BinaryExpression;
+import org.slf4j.Logger;
+import org.slf4j.LoggerFactory;
 
 import java.util.ArrayList;
 import java.util.List;
@@ -15,6 +18,7 @@ import java.util.concurrent.atomic.AtomicInteger;
 // I prefer to return null instead of an empty array
 // I don't know a good way to reduce the parameter count
 public class IndexLookupOneKey extends IndexLookup {
+  private static final Logger logger = LoggerFactory.getLogger(IndexLookupOneKey.class);
 
   public IndexLookupOneKey(DatabaseServer server) {
     super(server);
@@ -229,7 +233,7 @@ public class IndexLookupOneKey extends IndexLookup {
       }
     }
     else {
-      entry = index.ceilingEntry(leftKey);
+      entry = new Index.MyEntry<>(leftKey, 0L);
       if (entry == null) {
         entry = index.firstEntry();
       }
@@ -591,18 +595,15 @@ public class IndexLookupOneKey extends IndexLookup {
       }
 
       public GetRecords invoke() {
-        Object[] key = currEntry.getKey();
-        synchronized (index.getMutex(key)) {
-          Object unsafeAddress = index.get(key);
-          if (keys) {
-            if (unsafeAddress != null && !unsafeAddress.equals(0L)) {
-              currKeyRecords = server.getAddressMap().fromUnsafeToKeys(unsafeAddress);
-            }
+        Object unsafeAddress = currEntry.getValue();
+        if (keys) {
+          if (unsafeAddress != null && !unsafeAddress.equals(0L)) {
+            currKeyRecords = server.getAddressMap().fromUnsafeToKeys(unsafeAddress);
           }
-          else {
-            if (unsafeAddress != null && !unsafeAddress.equals(0L)) {
-              records = server.getAddressMap().fromUnsafeToRecords(unsafeAddress);
-            }
+        }
+        else {
+          if (unsafeAddress != null && !unsafeAddress.equals(0L)) {
+            records = server.getAddressMap().fromUnsafeToRecords(unsafeAddress);
           }
         }
         return this;
@@ -700,7 +701,7 @@ public class IndexLookupOneKey extends IndexLookup {
           curr.setValue(value);
           currEntries.add(curr);
           return countRead.incrementAndGet() < count - diff;
-        });
+        }, count + 2);
         localEntries = currEntries.toArray(new Map.Entry[currEntries.size()]);
       }
       return localEntries;

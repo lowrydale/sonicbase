@@ -50,7 +50,7 @@ public class AddressMapTest {
           offset += DataUtils.addressToInt(offset, AddressMap.getUnsafe());
           offset += 4; //actualSize
 
-          addressMap.freeUnsafeIds(outerAddress);
+          addressMap.delayedFreeUnsafeIds(outerAddress);
         }
       }
       pageOffset++;

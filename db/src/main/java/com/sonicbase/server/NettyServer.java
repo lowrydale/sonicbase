@@ -56,7 +56,6 @@ public class NettyServer {
   private static final String USER_DIR = System.getProperty("user.dir");
   private static final Logger logger = LoggerFactory.getLogger(NettyServer.class);
 
-  public static final boolean ENABLE_COMPRESSION = false;
   private static final String UTF8_STR = "utf-8";
   private static final String PORT_STR = "port";
   private static final String HOST_STR = "host";
@@ -192,7 +191,7 @@ public class NettyServer {
     int uncompressedSize = body.length;
     if (DatabaseSocketClient.COMPRESS) {
       if (DatabaseSocketClient.LZO_COMPRESSION) {
-        LZ4Factory factory = LZ4Factory.fastestInstance();
+        LZ4Factory factory = LZ4Factory.nativeInstance();
 
         LZ4Compressor compressor = factory.fastCompressor();
         int maxCompressedLength = compressor.maxCompressedLength(body.length);
@@ -330,7 +329,7 @@ public class NettyServer {
     private byte[] decompressReadAsNeeded(byte[] body, int origBodyLen, int offset) throws IOException {
       if (DatabaseSocketClient.COMPRESS) {
         if (DatabaseSocketClient.LZO_COMPRESSION) {
-          LZ4Factory factory = LZ4Factory.fastestInstance();
+          LZ4Factory factory = LZ4Factory.nativeInstance();
 
           LZ4FastDecompressor decompressor = factory.fastDecompressor();
           byte[] restored = new byte[origBodyLen];

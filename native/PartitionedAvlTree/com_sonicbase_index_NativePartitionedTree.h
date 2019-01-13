@@ -65,6 +65,22 @@ JNIEXPORT jbyteArray JNICALL Java_com_sonicbase_index_NativePartitionedTree_tail
 
 /*
  * Class:     com_sonicbase_index_NativePartitionedTree
+ * Method:    tailBlockArray
+ * Signature: (J[BIZ)[J
+ */
+JNIEXPORT jlongArray JNICALL Java_com_sonicbase_index_NativePartitionedTree_tailBlockArray
+  (JNIEnv *, jobject, jlong, jbyteArray, jint, jboolean);
+
+/*
+ * Class:     com_sonicbase_index_NativePartitionedTree
+ * Method:    headBlockArray
+ * Signature: (J[BIZ)[J
+ */
+JNIEXPORT jlongArray JNICALL Java_com_sonicbase_index_NativePartitionedTree_headBlockArray
+  (JNIEnv *, jobject, jlong, jbyteArray, jint, jboolean);
+
+/*
+ * Class:     com_sonicbase_index_NativePartitionedTree
  * Method:    tailBlockBytes
  * Signature: (J[BIZ)[B
  */
@@ -82,10 +98,10 @@ JNIEXPORT jbyteArray JNICALL Java_com_sonicbase_index_NativePartitionedTree_head
 /*
  * Class:     com_sonicbase_index_NativePartitionedTree
  * Method:    higherEntry
- * Signature: (J[B)[B
+ * Signature: (JJ)[J
  */
-JNIEXPORT jbyteArray JNICALL Java_com_sonicbase_index_NativePartitionedTree_higherEntry
-  (JNIEnv *, jobject, jlong, jbyteArray);
+JNIEXPORT jlongArray JNICALL Java_com_sonicbase_index_NativePartitionedTree_higherEntry
+  (JNIEnv *, jobject, jlong, jlong);
 
 /*
  * Class:     com_sonicbase_index_NativePartitionedTree
@@ -106,10 +122,10 @@ JNIEXPORT jbyteArray JNICALL Java_com_sonicbase_index_NativePartitionedTree_floo
 /*
  * Class:     com_sonicbase_index_NativePartitionedTree
  * Method:    ceilingEntry
- * Signature: (J[B)[B
+ * Signature: (JJ)[J
  */
-JNIEXPORT jbyteArray JNICALL Java_com_sonicbase_index_NativePartitionedTree_ceilingEntry
-  (JNIEnv *, jobject, jlong, jbyteArray);
+JNIEXPORT jlongArray JNICALL Java_com_sonicbase_index_NativePartitionedTree_ceilingEntry
+  (JNIEnv *, jobject, jlong, jlong);
 
 /*
  * Class:     com_sonicbase_index_NativePartitionedTree

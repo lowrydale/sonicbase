@@ -14,10 +14,7 @@ import org.slf4j.LoggerFactory;
 import java.io.UnsupportedEncodingException;
 import java.sql.Connection;
 import java.sql.PreparedStatement;
-import java.util.ArrayList;
-import java.util.Comparator;
-import java.util.List;
-import java.util.Map;
+import java.util.*;
 import java.util.concurrent.*;
 import java.util.concurrent.atomic.AtomicInteger;
 import java.util.concurrent.atomic.AtomicLong;
@@ -244,7 +241,8 @@ public class BenchmarkInsert {
                       else {
                         if (true) {
                           try (Connection conn = cpds.getConnection()) {
-                            try (PreparedStatement stmt = conn.prepareStatement("insert into persons (id1, id2, socialSecurityNumber, relatives, restricted, gender) VALUES (?, ?, ?, ?, ?, ?)")) {
+                            //try (PreparedStatement stmt = conn.prepareStatement("insert into persons (id1, id2, socialSecurityNumber, relatives, restricted, gender) VALUES (?, ?, ?, ?, ?, ?)")) {
+                            try (PreparedStatement stmt = conn.prepareStatement("insert into persons (id1, id2, restricted, gender) VALUES ( ?, ?, ?, ?)")) {
                               for (int i1 = 0; i1 < batchSize; i1++) {
                               /*
                                create database db
@@ -254,12 +252,14 @@ public class BenchmarkInsert {
                                create table Memberships (personId BIGINT, personId2 BIGINT, membershipName VARCHAR(20), resortId BIGINT, PRIMARY KEY (personId, personId2))
                                create table Resorts (resortId BIGINT, resortName VARCHAR(20), PRIMARY KEY (resortId))
                                */
-                                stmt.setLong(1, offset1 + i1);
-                                stmt.setLong(2, (offset1 + i1 + 100) % 2);
-                                stmt.setString(3, "933-28-" + (offset1 + i1 + 1));
-                                stmt.setString(4, "12345678901,12345678901|12345678901,12345678901,12345678901,12345678901|12345678901");
-                                stmt.setBoolean(5, false);
-                                stmt.setString(6, "m");
+                                long id = offset1 + i1;
+//                                long id = Math.abs(rand.nextLong());
+                                stmt.setLong(1,  id);
+                                stmt.setLong(2, (id + 100) % 2);
+//                                stmt.setString(3, "933-28-" + (offset1 + i1 + 1));
+//                                stmt.setString(4, "12345678901,12345678901|12345678901,12345678901,12345678901,12345678901|12345678901");
+                                stmt.setBoolean(3, false);
+                                stmt.setString(4, "m");
                                 long currBegin = System.nanoTime();
                                 stmt.addBatch();
                                 thisDuration += System.nanoTime() - currBegin;

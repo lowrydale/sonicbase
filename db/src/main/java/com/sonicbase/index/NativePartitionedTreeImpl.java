@@ -1,49 +1,90 @@
 package com.sonicbase.index;
 
-import com.sonicbase.client.DatabaseClient;
-import sun.misc.Unsafe;
+import com.sonicbase.common.FileUtils;
+import com.sonicbase.query.DatabaseException;
+import com.sonicbase.server.IndexLookupOneKey;
+import org.slf4j.Logger;
+import org.slf4j.LoggerFactory;
 
 import java.io.File;
 import java.io.IOException;
-import java.lang.reflect.Field;
+import java.io.InputStream;
+import java.lang.management.ManagementFactory;
+import java.net.URL;
+import java.nio.file.Files;
 import java.util.ArrayList;
 import java.util.List;
 import java.util.Map;
-import java.util.concurrent.*;
-import java.util.concurrent.atomic.AtomicInteger;
-import java.util.concurrent.atomic.AtomicLong;
 
 public class NativePartitionedTreeImpl extends NativePartitionedTree implements IndexImpl {
+  private static final Logger logger = LoggerFactory.getLogger(NativePartitionedTreeImpl.class);
 
-  private final Object mutex = new Object();
+  private final int port;
 
-  static {
-
-    //System.load("C:/Users/lowryda/source/repos/SonicBase/x64/Release/PartitionedAvlTree.dll");
-
-    try {
-      System.load(new File(System.getProperty("user.home"), "SonicBase.so").getAbsolutePath());
-    }
-    catch (UnsatisfiedLinkError e1) {
-      try {
-        System.load("/Users/lowryda/Dropbox/git/sonicbase/native/PartitionedAvlTree/mac/SonicBase.so");
-      }
-      catch (UnsatisfiedLinkError e) {
-        try {
-          System.load("../lib/linux/SonicBase.so");
-        }
-        catch (UnsatisfiedLinkError e2) {
-          e2.printStackTrace();
-        }
-      }
-    }
+  public static boolean isWindows() {
+    return !OS.contains("cygwin") && OS.contains("win");
   }
+
+  public static boolean isCygwin() {
+    return OS.contains("cygwin");
+  }
+
+  public static boolean isMac() {
+    return OS.contains("mac");
+  }
+
+  public static boolean isUnix() {
+    return OS.contains("nux");
+  }
+
+  private static String OS = System.getProperty("os.name").toLowerCase();
 
   private final long indexId;
   private final Index index;
+  private static boolean initializedNative = false;
+  private static Object mutex = new Object();
 
+  public NativePartitionedTreeImpl(int port, Index index) {
+    try {
+      synchronized (mutex) {
+        if (!initializedNative) {
+          String libName = "";
+          String name = ManagementFactory.getRuntimeMXBean().getName();
+          String pid = name.split("@")[0];
 
-  public NativePartitionedTreeImpl(Index index) {
+          if (isWindows()) {
+            libName = "/win/SonicBase.dll";
+          }
+          else if (isCygwin()) {
+            libName = "/win/SonicBase.dll";
+          }
+          else if (isMac()) {
+            libName = "/mac/SonicBase.so";
+          }
+          else if (isUnix()) {
+            libName = "/linux/SonicBase.so";
+          }
+          URL url = NativePartitionedTreeImpl.class.getResource(libName);
+          String tmpdir = System.getProperty("java.io.tmpdir");
+          File tmpDir = new File(new File(tmpdir), "SonicBase-Native-" + port);
+          File nativeLibTmpFile = new File(tmpDir, libName);
+          FileUtils.deleteDirectory(nativeLibTmpFile.getParentFile());
+          nativeLibTmpFile.getParentFile().mkdirs();
+          try (InputStream in = url.openStream()) {
+            Files.copy(in, nativeLibTmpFile.toPath());
+          }
+          System.load(nativeLibTmpFile.getAbsolutePath());
+
+          initializedNative = true;
+        }
+      }
+    }
+    catch (IOException e) {
+      logger.error("Unable to load native library", e);
+      throw new DatabaseException(e);
+    }
+
+    this.port = port;
     this.index = index;
     this.indexId = initIndex();
   }
@@ -99,13 +140,19 @@ public class NativePartitionedTreeImpl extends NativePartitionedTree implements 
   }
 
   @Override
-  public int tailBlock(Object[] startKey, int count, boolean first, Object[][] keys, Object[] values) {
+  public int tailBlock(Object[] startKey, int count, boolean first, Object[][] keys, long[] values) {
     try {
       byte[] keyBytes = new byte[8];
       writeLong(keyBytes, (long)startKey[0]);
-
-      byte[] ret = tailBlock(indexId, keyBytes, count, first);
-      return parseResults(ret, keys, values);
+      long[] ret = tailBlockArray(indexId, keyBytes, count, first);
+      int retCount = ret.length / 2;
+      for (int i = 0; i < retCount; i++) {
+        //keys[i][0] = (Long)ret[i];// = new Object[]{ret[i]};
+        keys[i] = new Object[]{ret[i]};// = new Object[]{ret[i]};
+        values[i] = ret[i + retCount];
+      }
+      return retCount;
+      //return parseResults(ret, keys, values);
     }
     catch (Exception e) {
       throw new RuntimeException(e);
@@ -126,13 +173,19 @@ public class NativePartitionedTreeImpl extends NativePartitionedTree implements 
   }
 
   @Override
-  public int headBlock(Object[] startKey, int count, boolean first, Object[][] keys, Object[] values) {
+  public int headBlock(Object[] startKey, int count, boolean first, Object[][] keys, long[] values) {
     try {
       byte[] keyBytes = new byte[8];
       writeLong(keyBytes, (long)startKey[0]);
-
-      byte[] ret = headBlock(indexId, keyBytes, count, first);
-      return parseResults(ret, keys, values);
+      long[] ret = headBlockArray(indexId, keyBytes, count, first);
+      int retCount = ret.length / 2;
+      for (int i = 0; i < retCount; i++) {
+      //  keys[i][0] = (Long)ret[i];
+        keys[i] = new Object[]{ret[i]};
+        values[i] = ret[i + retCount];
+      }
+      return retCount;
+      //return parseResults(ret, keys, values);
     }
     catch (Exception e) {
       throw new RuntimeException(e);
@@ -141,11 +194,11 @@ public class NativePartitionedTreeImpl extends NativePartitionedTree implements 
 
   @Override
   public Map.Entry<Object[], Object> higherEntry(Object[] key) {
-    byte[] keyBytes = new byte[8];
-    writeLong(keyBytes, (long)key[0]);
-
-    byte[] ret = higherEntry(indexId, keyBytes);
-    return parseResults(ret);
+    long[] ret = higherEntry(indexId, (long)key[0]);
+    if (ret == null) {
+      return null;
+    }
+    return new Index.MyEntry(new Object[]{ret[0]}, ret[1]);
   }
 
   @Override
@@ -193,11 +246,11 @@ public class NativePartitionedTreeImpl extends NativePartitionedTree implements 
 
   @Override
   public Map.Entry<Object[], Object> ceilingEntry(Object[] key) {
-    byte[] keyBytes = new byte[8];
-    writeLong(keyBytes, (long)key[0]);
-
-    byte[] ret = ceilingEntry(indexId, keyBytes);
-    return parseResults(ret);
+    long[] ret = ceilingEntry(indexId, (long)key[0]);
+    if (ret == null) {
+      return null;
+    }
+    return new Index.MyEntry(new Object[]{ret[0]}, ret[1]);
   }
 
   @Override
@@ -222,13 +275,16 @@ public class NativePartitionedTreeImpl extends NativePartitionedTree implements 
       if (ret == null) {
         return null;
       }
-      AtomicInteger offset = new AtomicInteger();
+      int offset = 0;
       int len = readInt(ret, offset);
+      offset += 4;
       if (len == 0) {
         return null;
       }
       long key = readLong(ret, offset);
+      offset += 8;
       long value = readLong(ret, offset);
+      offset += 8;
       return new Index.MyEntry(new Object[]{key}, value);
     }
     catch (Exception e) {
@@ -237,14 +293,18 @@ public class NativePartitionedTreeImpl extends NativePartitionedTree implements 
   }
 
 
-  private int parseResults(byte[] results, Object[][] keys, Object[] values) throws IOException {
-    AtomicInteger offset = new AtomicInteger();
+  private int parseResults(byte[] results, Object[][] keys, long[] values) throws IOException {
+    int offset = 0;
     int count = readInt(results, offset);
+    offset += 4;
     long[] ret = new long[count];
     for (int i = 0; i < count; i++) {
       int len = readInt(results, offset);
+      offset += 4;
       long key = readLong(results, offset);
+      offset += 8;
       long value = readLong(results, offset);
+      offset += 8;
       keys[i] = new Object[]{key};
       values[i] = value;
       ret[i] = key;
@@ -253,16 +313,18 @@ public class NativePartitionedTreeImpl extends NativePartitionedTree implements 
   }
 
   private int parseResultsBytes(byte[] results, Object[][] keys, byte[][] values) throws IOException {
-    AtomicInteger offset = new AtomicInteger();
+    int offset = 0;
     int count = readInt(results, offset);
     long[] ret = new long[count];
     for (int i = 0; i < count; i++) {
       int len = readInt(results, offset);
+      offset += 4;
       long key = readLong(results, offset);
+      offset += 8;
       len = readInt(results, offset);
       byte[] bytes = new byte[len];
-      System.arraycopy(results, offset.get(), bytes, 0, len);
-      offset.addAndGet(len);
+      System.arraycopy(results, offset, bytes, 0, len);
+      offset += len;
       keys[i] = new Object[]{key};
       values[i] = bytes;
       ret[i] = key;
@@ -270,277 +332,27 @@ public class NativePartitionedTreeImpl extends NativePartitionedTree implements 
     return count;
   }
 
-  private List<Map.Entry<Object[], Object>> parseResultsList(byte[] results) throws IOException {
-    AtomicInteger offset = new AtomicInteger();
-    int count = readInt(results, offset);
-    List<Map.Entry<Object[], Object>> retList = new ArrayList<>();
-    for (int i = 0; i < count; i++) {
-      int len = readInt(results, offset);
-      long key = readLong(results, offset);
-      long value = readLong(results, offset);
-      Index.MyEntry<Object[], Object> entry = new Index.MyEntry<>(new Object[]{key}, value);
-      retList.add(entry);
-    }
-    return retList;
-  }
-
-  public static void main(String[] args) throws InterruptedException, ExecutionException {
-    //Thread.sleep(10000000);
-    Index index = new Index();
-    new NativePartitionedTreeImpl(index).bench();
-  }
-
-  private static int BLOCK_SIZE = DatabaseClient.SELECT_PAGE_SIZE;
-
-  private final Unsafe unsafe = getUnsafe();
-  public static Unsafe getUnsafe() {
-    try {
-      Field singleoneInstanceField = Unsafe.class.getDeclaredField("theUnsafe");
-      singleoneInstanceField.setAccessible(true);
-      return (Unsafe) singleoneInstanceField.get(null);
-    }
-    catch (Exception e) {
-      throw new RuntimeException(e);
-    }
-  }
-
-  private final Object[] mutexes = new Object[100_000];
-
-  private void bench() throws ExecutionException, InterruptedException {
-    boolean mixg = false;
-    getUnsafe();
-    for (int i = 0; i < mutexes.length; i++) {
-      mutexes[i] = new Object();
-    }
-
-    long[] indices = new long[32];
-    for (int i = 0; i < 32; i++) {
-      indices[i] = initIndex();
-    }
-    ThreadPoolExecutor executor = new ThreadPoolExecutor(1, 1, 10_000, TimeUnit.MILLISECONDS, new ArrayBlockingQueue<>(1000), new ThreadPoolExecutor.CallerRunsPolicy());
-    ThreadPoolExecutor executor2 = new ThreadPoolExecutor(128, 128, 10_000, TimeUnit.MILLISECONDS, new ArrayBlockingQueue<>(1000), new ThreadPoolExecutor.CallerRunsPolicy());
-    ThreadPoolExecutor executor3 = new ThreadPoolExecutor(24, 24, 10_000, TimeUnit.MILLISECONDS, new ArrayBlockingQueue<>(1000), new ThreadPoolExecutor.CallerRunsPolicy());
-    final AtomicInteger countInserted = new AtomicInteger();
-    final AtomicLong countRead = new AtomicLong();
-    final List<Future> futures = new ArrayList<>();
-    final AtomicLong last = new AtomicLong(System.currentTimeMillis());
-    final long begin = System.currentTimeMillis();
-
-    final AtomicLong localCountInserted = new AtomicLong();
-    List<Future> futures2 = new ArrayList<>();
-    for (int i = 0; i < 4; i++) {
-      final int offset = i;
-      futures2.add(executor3.submit((Callable) () -> {
-        for (int i1 = 0; i1 < 100_000_000; i1++) {
-          //            Object[] key = new Object[2];
-          //            key[0] = (long)i1;
-          //            key[1] = String.valueOf(i1).getBytes("utf-8");
-
-          if (i1 % 4 == offset) {
-            byte[] keyBytes = new byte[8];
-            writeLong(keyBytes, i1);
-
-            if (true) {
-              long address = unsafe.allocateMemory(75);
-              for (int l = 0; l < 75; l++) {
-                unsafe.putByte(address + l, (byte)0);
-              }
-
-              //synchronized (mutexes[(int) i1 % mutexes.length]) {
-                put(indices[0 /*currIndex*/], keyBytes, address);
-              //}
-            }
-            else {
-              putBytes(new Object[]{(long)i1}, new byte[75]);
-            }
-            //                          if (i1 % 150 == 0) {
-            //                Thread.sleep(5);
-            //              }
-            localCountInserted.incrementAndGet();
-            if (countInserted.incrementAndGet() % 1_000_000 == 0) {
-              System.out.println("insert progress: count=" + countInserted.get() + ", rate=" + ((float) countInserted.get() / (System.currentTimeMillis() - begin) * 1000f));
-            }
-          }
-        }
-        return null;
-      }));
-    }
-
-    for (int i = 0; i < 32; i++) {
-      final int currIndex = i;
-      futures.add(executor.submit((Callable) () -> {
-
-        if (true  ) {
-          futures2.add(executor2.submit((Callable) () -> {
-            try {
-              Thread.sleep(5_000);
-//          (NativePartitionedTree.this) {
-              for (int j = 0; j < (mixg ? 1000 : 100_000); j++) {
-                if (mixg) {
-                  for (int i1 = 0; i1 < localCountInserted.get() - 1000; i1++) {
-                    byte[] keyBytes = new byte[8];
-                    writeLong(keyBytes, i1);
-                    long value = get(indices[0 /*currIndex*/], keyBytes);
-                    if (value != i1) {
-                      System.out.println("key mismatch: expected=" + i1 + ", actual=" + value);
-                    }
-                    long count = countRead.addAndGet(1);
-                    //(mutex) {
-                    if (System.currentTimeMillis() - last.get() > 1_000) {
-                      last.set(System.currentTimeMillis());
-                      System.out.println("read progress: count=" + countRead.get() + ", rate=" + ((float) countRead.get() / (System.currentTimeMillis() - begin) * 1000f));
-                      System.out.flush();
-                    }
-                    //}
-                  }
-                }
-                else {
-
-                  boolean first = true;
-                  for (int i1 = 0; i1 < localCountInserted.get() - 1000000; i1 += BLOCK_SIZE) {
-                    byte[] keyBytes = new byte[8];
-                    writeLong(keyBytes, i1 - 1);
-
-                    Object[][] keys = new Object[BLOCK_SIZE + 200][];
-                    int retCount = 0;
-                    if (true) {
-                      byte[] results = tailBlock(indices[0], keyBytes, BLOCK_SIZE, first);
-                      long count = countRead.addAndGet(BLOCK_SIZE);
-                      Object[] values = new Object[BLOCK_SIZE + 200];
-                      retCount = parseResults(results, keys, values);
-                      //                    if (i1 < 1024) {
-                      for (int k = 0; k < retCount; k++) {
-//                        synchronized (mutexes[(int) ((long) keys[k][0] % mutexes.length)]) {
-//                          get(keys[k]);
-                          long address = (long)values[k];
-                          byte[] bytes = new byte[75];
-                          for (int l = 0; l < 75; l++) {
-                            bytes[l] = unsafe.getByte(address + l);
-                          }
-//                        }
-                      }
-
-                    }
-                    else {
-                      byte[][] values = new byte[BLOCK_SIZE + 200][];
-                      retCount = tailBlockBytes(new Object[]{((long)i1) - 1}, BLOCK_SIZE, first, keys, values);
-                      for (int k = 0; k < retCount; k++) {
-                        if (values[k].length != 75) {
-                          System.out.println("size mismatch");
-                        }
-                      }
-
-                    }
-                    countRead.addAndGet(retCount);
-                    for (int keyOffset = 0; keyOffset < retCount; keyOffset++) {
-                      if ((long)keys[keyOffset][0] != i1 + keyOffset) {
-                        System.out.println("key mismatch: expected=" + (i1 + keyOffset) + ", actual=" + keys[keyOffset][0]);
-                      }
-                    }
-//                    }
-                    //(mutex) {
-                    if (System.currentTimeMillis() - last.get() > 1_000) {
-                      last.set(System.currentTimeMillis());
-                      System.out.println("read progress: count=" + countRead.get() + ", rate=" + ((float) countRead.get() / (System.currentTimeMillis() - begin) * 1000f));
-                      System.out.flush();
-                    }
-                    first = false;
-                    //}
-                  }
-                }
-              }
-              for (Future future : futures2) {
-                future.get();
-              }
-              System.out.println("read progress: count=" + countRead.get() + ", rate=" + ((float) countRead.get() / (System.currentTimeMillis() - begin) * 1000f));
-              System.out.flush();
-//          }
-            }
-            catch (Exception e) {
-              e.printStackTrace();
-            }
-            return null;
-          }));
-        }
-        return null;
-      }));
-    }
-
-    for (Future future : futures) {
-      future.get();
-    }
-
-    Thread.sleep(10000000);
-//    final AtomicLong last = new AtomicLong(System.currentTimeMillis());
-//    final long begin = System.currentTimeMillis();
-//    futures = new ArrayList<>();
-//    for (int i = 0; i < 32; i++) {
-//      final int currOffset = i;
-//      futures.add(executor.submit(new Callable(){
-//        @Override
-//        public Object call() throws Exception {
-//
-////          (NativePartitionedTree.this) {
-//            for (int j = 0; j < 100; j++) {
-//              for (int i = 0; i < 3125000; i += 1000) {
-//                long value = get(indices[currOffset], i);
-//                if (value != i) {
-//                  System.out.println("key mismatch: expected=" + i + ", actual=" + value);
-//                }
-//                long count = countRead.addAndGet(1000);
-//                //(mutex) {
-//                  if ( System.currentTimeMillis() - last.get() > 1_000) {
-//                    last.set(System.currentTimeMillis());
-//                    System.out.println("read progress: count=" + countRead.get() + ", rate=" + ((float) countRead.get() / (System.currentTimeMillis() - begin) * 1000f));
-//                    System.out.flush();
-//                  }
-//                //}
-//              }
-//            }
-//          System.out.println("read progress: count=" + countRead.get() + ", rate=" + ((float) countRead.get() / (System.currentTimeMillis() - begin) * 1000f));
-//          System.out.flush();
-////          }
-//          return null;
-//        }
-//      }));
-//
+//  private List<Map.Entry<Object[], Object>> parseResultsList(byte[] results) throws IOException {
+//    AtomicInteger offset = new AtomicInteger();
+//    int count = readInt(results, offset);
+//    List<Map.Entry<Object[], Object>> retList = new ArrayList<>();
+//    for (int i = 0; i < count; i++) {
+//      int len = readInt(results, offset);
+//      long key = readLong(results, offset);
+//      long value = readLong(results, offset);
+//      Index.MyEntry<Object[], Object> entry = new Index.MyEntry<>(new Object[]{key}, value);
+//      retList.add(entry);
 //    }
-//    for (Future future : futures) {
-//      future.get();
-//    }
-    System.out.println("read progress - finished: count=" + countRead.get() + ", rate=" + ((float) countRead.get() / (System.currentTimeMillis() - begin) * 1000f));
-    System.out.flush();
+//    return retList;
+//  }
 
-    executor.shutdownNow();
-    executor2.shutdownNow();
-  }
-
-  private long[] parseResultsOld(byte[] results) throws IOException {
-    AtomicInteger offset = new AtomicInteger();
-    int count = readInt(results, offset);
-    long[] ret = new long[count];
-    for (int i = 0; i < count; i++) {
-      int len = readInt(results, offset);
-      long key = readLong(results, offset);
-      ret[i] = key;
+  public final long readLong(byte[] bytes, int offset) throws IOException {
+    long result = 0;
+    for (int i = 0; i < 8; i++) {
+      result <<= 8;
+      result |= (bytes[i + offset] & 0xFF);
     }
-    return ret;
-  }
-
-  public final long readLong(byte[] bytes, AtomicInteger offset) throws IOException {
-    long ret = bytesToLong(bytes, offset.get());
-    offset.addAndGet(8);
-    return ret;
-//    long ret = (((long)bytes[offset.get() + 0] << 56) +
-//        ((long)(bytes[offset.get() + 1] & 255) << 48) +
-//        ((long)(bytes[offset.get() + 2] & 255) << 40) +
-//        ((long)(bytes[offset.get() + 3] & 255) << 32) +
-//        ((long)(bytes[offset.get() + 4] & 255) << 24) +
-//        ((bytes[offset.get() + 5] & 255) << 16) +
-//        ((bytes[offset.get() + 6] & 255) <<  8) +
-//        ((bytes[offset.get() + 7] & 255) <<  0));
-//    offset.addAndGet(8);
-//    return ret;
+    return result;
   }
 
   public final void writeLong(byte[] bytes, long v) {
@@ -554,18 +366,11 @@ public class NativePartitionedTreeImpl extends NativePartitionedTree implements 
     bytes[7] = (byte)(v >>>  0);
   }
 
-  public final int readInt(byte[] bytes, AtomicInteger offset) throws IOException {
-    int ret = bytesToInt(bytes, offset.get());
-    offset.addAndGet(4);
-    return ret;
-//    int ch1 = bytes[offset.get()];
-//    int ch2 = bytes[offset.get() + 1];
-//    int ch3 = bytes[offset.get() + 1];
-//    int ch4 = bytes[offset.get() + 1];
-//    if ((ch1 | ch2 | ch3 | ch4) < 0)
-//      throw new EOFException();
-//    offset.addAndGet(4);
-//    return ((ch1 << 24) + (ch2 << 16) + (ch3 << 8) + (ch4 << 0));
+  public final int readInt(byte[] bytes, int offset) throws IOException {
+    return bytes[offset] << 24 |
+        (bytes[1 + offset] & 0xFF) << 16 |
+        (bytes[2 + offset] & 0xFF) << 8 |
+        (bytes[3 + offset] & 0xFF);
   }
 
   public static int bytesToInt(byte[] bytes, int offset) {
@@ -583,6 +388,5 @@ public class NativePartitionedTreeImpl extends NativePartitionedTree implements 
     }
     return result;
   }
-
 
 }

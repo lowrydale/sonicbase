@@ -1,6 +1,5 @@
 package com.sonicbase.index;
 
-import java.io.IOException;
 import java.util.*;
 import java.util.concurrent.ConcurrentNavigableMap;
 import java.util.concurrent.ConcurrentSkipListMap;
@@ -134,7 +133,7 @@ public class ObjectIndexImpl implements IndexImpl {
     return new Index.MyEntry<>(entry.getKey(), entry.getValue());
   }
 
-  public int tailBlock(Object[] key, int count, boolean first, Object[][] keys, Object[] values) {
+  public int tailBlock(Object[] key, int count, boolean first, Object[][] keys, long[] values) {
     ConcurrentNavigableMap<Object[], Object> map = objectSkipIndex.tailMap(key);
     int offset = 0;
     for (Map.Entry<Object[], Object> entry : map.entrySet()) {
@@ -143,7 +142,7 @@ public class ObjectIndexImpl implements IndexImpl {
       }
 
       keys[offset] = entry.getKey();
-      values[offset] = entry.getValue();
+      values[offset] = (long)entry.getValue();
       if (offset++ >= count - 1) {
         break;
       }
@@ -151,7 +150,7 @@ public class ObjectIndexImpl implements IndexImpl {
     return offset;
   }
 
-  public int headBlock(Object[] key, int count, boolean first, Object[][] keys, Object[] values) {
+  public int headBlock(Object[] key, int count, boolean first, Object[][] keys, long[] values) {
     ConcurrentNavigableMap<Object[], Object> map = objectSkipIndex.headMap(key).descendingMap();
     int offset = 0;
     for (Map.Entry<Object[], Object> entry : map.entrySet()) {
@@ -159,7 +158,7 @@ public class ObjectIndexImpl implements IndexImpl {
         continue;
       }
       keys[offset] = entry.getKey();
-      values[offset] = entry.getValue();
+      values[offset] = (long)entry.getValue();
       if (offset++ >= count - 1) {
         break;
       }

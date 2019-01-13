@@ -284,7 +284,8 @@ public class ComObject {
     EXPLAIN(218, STRING_TYPE),
     STATS(219, ARRAY_TYPE),
     NAME(220, STRING_TYPE),
-    RATE(221, DOUBLE_TYPE);
+    RATE(221, DOUBLE_TYPE),
+    ADD_COUNT(222, LONG_TYPE);
 
     public final int tag;
 

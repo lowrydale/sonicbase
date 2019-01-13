@@ -73,7 +73,7 @@ public class DeleteManager {
       toFree.drainTo(batch, 1000);
       freeExecutor.submit(() -> {
         for (Object currObj : batch) {
-          databaseServer.getAddressMap().freeUnsafeIds(currObj);
+          databaseServer.getAddressMap().delayedFreeUnsafeIds(currObj);
         }
       });
     }
@@ -97,9 +97,9 @@ public class DeleteManager {
 
   private void saveDeletes(String dbName, String tableName, String indexName,
                            List<DeleteRequest> deleteRequests, int saveAsVersion) {
-    if (databaseServer.isNotDurable()) {
-      final Index index = databaseServer.getIndices().get(dbName).getIndices().get(tableName).get(indexName);
+    final Index index = databaseServer.getIndices().get(dbName).getIndices().get(tableName).get(indexName);
 
+    if (databaseServer.isNotDurable()) {
       IndexSchema indexSchema = databaseServer.getCommon().getTables(dbName).get(tableName).getIndices().get(indexName);
       for (DeleteRequest request : deleteRequests) {
         Object value = index.remove(request.getKey());
@@ -121,6 +121,7 @@ public class DeleteManager {
       String dateStr = DateUtils.toString(new Date(System.currentTimeMillis()));
       Random rand = new Random(System.currentTimeMillis());
       File file = null;
+      int countToDelete = 0;
       getReplicaRoot().mkdirs();
       while (true) {
         file = new File(getReplicaRoot(), dateStr + "-" + System.nanoTime() + "-" +  rand.nextInt(50000) + ".bin.in-process");
@@ -145,9 +146,12 @@ public class DeleteManager {
 
           out.write(bytes);
           count.incrementAndGet();
+          countToDelete++;
         }
+
         out.writeInt(0);
       }
+      index.addSize(-1 * countToDelete);
       File newFile = null;
       while (true) {
         try {
@@ -271,6 +275,10 @@ public class DeleteManager {
         processValue(indexSchema, index, currKey);
       }
       doFreeMemory(toFreeBatch);
+      int countToDelete = currBatch.size();
+      //count was decremented at saveDeleteds and processValue
+      //add back half the count so we don't get a double delete count
+      index.addSize(countToDelete);
       return null;
     }));
     return batch;
@@ -278,38 +286,56 @@ public class DeleteManager {
 
   private void processValue(IndexSchema indexSchema, Index index, Object[] currKey) throws InterruptedException {
     synchronized (index.getMutex(currKey)) {
-      Object value = index.remove(currKey); // will likely delete, so go ahead and delete and re-add later if needed
-      if (value != null) {
-        byte[][] content = databaseServer.getAddressMap().fromUnsafeToRecords(value);
-        if (content != null) {
-          processRecords(indexSchema, index, currKey, content, value);
+      try {
+        Index.setIsOpForRebalance(true);
+
+        Object value = index.remove(currKey); // will likely delete, so go ahead and delete and re-add later if needed
+        if (value != null) {
+          byte[][] content = databaseServer.getAddressMap().fromUnsafeToRecords(value);
+          if (content != null) {
+            processRecords(indexSchema, index, currKey, content, value);
+          }
+          else {
+            //wasn't deleted as expected so we need to adjust the count
+            index.addSize(1);
+          }
         }
+      }
+      finally {
+        Index.setIsOpForRebalance(false);
       }
     }
   }
 
   private void processRecords(IndexSchema indexSchema, Index index, Object[] currKey, byte[][] content, Object value) throws InterruptedException {
-    if (indexSchema.isPrimaryKey()) {
-      if ((Record.DB_VIEW_FLAG_DELETING & Record.getDbViewFlags(content[0])) == 0) {
-        index.put(currKey, value);
+    try {
+      Index.setIsOpForRebalance(true);
+
+      if (indexSchema.isPrimaryKey()) {
+        if ((Record.DB_VIEW_FLAG_DELETING & Record.getDbViewFlags(content[0])) == 0) {
+          index.put(currKey, value);
+        }
+        else {
+          toFree.put(value);
+        }
       }
       else {
-        toFree.put(value);
+        if ((Record.DB_VIEW_FLAG_DELETING & KeyRecord.getDbViewFlags(content[0])) == 0) {
+          index.put(currKey, value);
+        }
+        else {
+          toFree.put(value);
+        }
       }
     }
-    else {
-      if ((Record.DB_VIEW_FLAG_DELETING & KeyRecord.getDbViewFlags(content[0])) == 0) {
-        index.put(currKey, value);
-      }
-      else {
-        toFree.put(value);
-      }
+    finally {
+      Index.setIsOpForRebalance(false);
     }
   }
 
   private void doFreeMemory(final List<Object> toFreeBatch) {
     for (Object obj : toFreeBatch) {
-      databaseServer.getAddressMap().freeUnsafeIds(obj);
+      databaseServer.getAddressMap().delayedFreeUnsafeIds(obj);
     }
   }
 

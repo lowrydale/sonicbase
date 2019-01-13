@@ -358,12 +358,25 @@ int doCompare(const struct my_node* p, const struct my_node* q) {
 //		return 1;
 //	}
 //	return 0;
-    int cmp0 = (((long)q->key[0] < (long)p->key[0]) - ((long)p->key[0] < (long)q->key[0]));
-    if (cmp0 != 0) {
-        return cmp0;
+
+
+    if (((long)p->key[0] < (long)q->key[0])) {
+    	return -1;
+   	}
+    if (((long)p->key[0] > (long)q->key[0])) {
+    	return 1;
     }
     return 0;
-//    struct sb_utf8str* str0 = (struct sb_utf8str*)p->key[1]; 
+
+
+//    int cmp0 = (((long)q->key[0] < (long)p->key[0]) - ((long)p->key[0] < (long)q->key[0]));
+//    if (cmp0 != 0) {
+//        return cmp0;
+//    }
+//    return 0;
+
+
+//    struct sb_utf8str* str0 = (struct sb_utf8str*)p->key[1];
 //    struct sb_utf8str* str1 = (struct sb_utf8str*)q->key[1]; 
 //    if (str0->len < str1->len) {
 //        return -1;
@@ -460,6 +473,7 @@ jbyteArray serializeKeyValue(JNIEnv* env, const struct my_node* p) {
     writeLong((uint8_t*)&bytes[size + 4], p->value, &offset);
 
     env->SetByteArrayRegion(ret, 0, totalBytes, bytes);
+    delete[] bytes;
     return ret;
 }
 
@@ -472,6 +486,9 @@ void** getSerializedKey(JNIEnv *env, jbyteArray jkeyBytes) {
    void ** ret = deserializeKey((uint8_t*)keyBytes, (int)keyLen);
      
    env->ReleaseByteArrayElements(jkeyBytes, keyBytes, 0);
+//   if (isCopy) {
+//   		delete[] keyBytes;
+//   }
    return ret;
 }
 
@@ -560,7 +577,7 @@ JNIEXPORT jbyteArray JNICALL Java_com_sonicbase_index_NativePartitionedTree_putB
         PartitionedMap* map = (PartitionedMap*)indexId;
 
         bool replaced = false;
-        int partition = (long)p->key[0] % PARTITION_COUNT;
+        int partition = abs((long)p->key[0] ^ ((long)p->key[0] >> 32)) % PARTITION_COUNT;
 //        if (partition != 0) {
 //            printf("partition non 0");
 //            fflush(stdout);
@@ -613,7 +630,7 @@ JNIEXPORT jlong JNICALL Java_com_sonicbase_index_NativePartitionedTree_put
         PartitionedMap* map = (PartitionedMap*)indexId;
 
         bool replaced = false;
-        int partition = (long)p->key[0] % PARTITION_COUNT;
+        int partition = abs((long)p->key[0] ^ ((long)p->key[0] >> 32)) % PARTITION_COUNT;
 //        if (partition != 0) {
 //            printf("partition non 0");
 //            fflush(stdout);
@@ -642,6 +659,358 @@ JNIEXPORT jlong JNICALL Java_com_sonicbase_index_NativePartitionedTree_put
 }
 
 
+//int nextEntries2(PartitionedMap* map, int count, int numRecordsPerPartition, int partition, void*** keys, long* values, void** currKey, bool tail) {
+//    struct my_node keyNode;
+////    keyNode.key = currKey;
+//    int currOffset = 0;
+////    kavl_itr_t(my) itr;
+//    int countReturned = 0;
+//
+//    {
+//        std::lock_guard<std::mutex> lock(map->locks[partition]);
+////        rlock lock = rlock(map->locks[partition]);
+//
+////        if (tail) {
+////            kavl_itr_find(my, map->maps[partition], &keyNode, &itr);
+////        }
+////        else {
+////            kavl_itr_find_prev(my, map->maps[partition], &keyNode, &itr);
+////        }
+//
+//		void ** lastKey = currKey;
+//        bool found = 0;
+//        do {
+//		    keyNode.key = lastKey;
+//		    kavl_itr_t(my) itr;
+//			if (tail) {
+//				kavl_itr_find(my, map->maps[partition], &keyNode, &itr);
+//			}
+//			else {
+//				kavl_itr_find_prev(my, map->maps[partition], &keyNode, &itr);
+//			}
+//
+//            const struct my_node *p = kavl_at(&itr);
+//            if (p == NULL) {
+//            	printf("at == 0\n");
+//                return countReturned;
+//            }
+//
+//			found = kavl_itr_next(my, &itr);
+//			if (!found) {
+//				return countReturned;
+//			}
+//            p = kavl_at(&itr);
+//            if (p == NULL) {
+//            	printf("at == 0\n");
+//                return countReturned;
+//            }
+//
+////            printf("found=%ld", (long)p->key[0]);
+////            fflush(stdout);
+//
+//            keys[currOffset] = p->key;
+//            values[currOffset] = p->value;
+//            currOffset++;
+//            countReturned++;
+//
+//            found = true;
+//
+//			if (lastKey == 0) {
+//				lastKey = p->key;
+//			}
+//			else {
+//				if ((long)p->key[0] == (long)lastKey[0]) {
+//					printf("returning same key");
+//				}
+//				lastKey = p->key;
+//			}
+//            if (currOffset >= numRecordsPerPartition) {
+//                break;
+//            }
+//
+////            const struct my_node *p = kavl_at(&itr);
+////            if (p == NULL) {
+////            	printf("at == 0\n");
+////                return countReturned;
+////            }
+//////            printf("found=%ld", (long)p->key[0]);
+//////            fflush(stdout);
+////
+////            keys[currOffset] = p->key;
+////            values[currOffset] = p->value;
+////            currOffset++;
+////            countReturned++;
+////
+////			if (lastKey == 0) {
+////				lastKey = p->key;
+////			}
+////			else {
+////				if ((long)p->key[0] == (long)lastKey[0]) {
+////					printf("returning same key");
+////				}
+////				lastKey = p->key;
+////			}
+////
+////            if (currOffset >= numRecordsPerPartition) {
+////                break;
+////            }
+////            if (tail) {
+////				found = kavl_itr_next(my, &itr);
+////			}
+////			else {
+////            	found = kavl_itr_prev(my, &itr);
+////		  	}
+////		  	if (!found) {
+////		  		printf("next not found");
+////		  	}
+//
+//        } while (found);
+//        printf("count returned=%d\n", countReturned);
+//    }
+//    return countReturned;
+//}
+
+ class SortedListNode {
+ 	public:
+ 	 SortedListNode *next = 0;
+ 	SortedListNode *prev = 0;
+ 	void **key = 0;
+ 	long value;
+ 	int partition;
+ };
+
+
+class SortedList {
+ 	SortedListNode *head = 0;
+ 	SortedListNode *tail = 0;
+	bool ascending = true;
+
+ 	public:
+
+ 	SortedList(bool ascending) {
+ 		this->ascending = ascending;
+ 	}
+
+	int size() {
+		int ret = 0;
+		SortedListNode *curr = head;
+		while (curr != 0) {
+			curr = curr->next;
+			ret++;
+		}
+		return ret;
+	}
+ 	void push(SortedListNode *node) {
+ 		if (ascending) {
+ 			pushAscending(node);
+ 		}
+ 		else {
+ 			pushDescending(node);
+ 		}
+	}
+
+	void pushAscending(SortedListNode *node) {
+		if (tail == 0 || head == 0) {
+			head = tail = node;
+			return;
+		}
+//	 		printf("called push: depth=%d\n", size());
+//	 		fflush(stdout);
+		SortedListNode *curr = tail;
+		SortedListNode *last = 0;
+		int compareCount = 0;
+		while (curr != 0 /*|| (!ascending && curr->next != 0)*/) {
+			compareCount++;
+			int cmp = keyCompare(node->key, curr->key);
+			if (cmp > 0) {
+				SortedListNode *next = curr->next;
+				if (next != 0) {
+					node->next = next;
+					next->prev = node;
+				}
+				if (curr == tail) {
+				  tail->next = node;
+				  node->prev = tail;
+				  tail = node;
+				}
+				curr->next = node;
+				node->prev = curr;
+//			    	if (compareCount > 1) {
+//			    		printf("compareCount=%d", compareCount);
+//			    		fflush(stdout);
+//					}
+				return;
+			}
+			else {
+				curr = curr->prev;
+			}
+		}
+
+//			    	if (compareCount > 1) {
+//			    		printf("compareCount=%d", compareCount);
+//			    		fflush(stdout);
+//					}
+
+        head->prev = node;
+        node->next = head;
+        head = node;
+ 	}
+
+	void pushDescending(SortedListNode *node) {
+		if (tail == 0 || head == 0) {
+			head = tail = node;
+// 		SortedListNode *curr = head;
+// 		while (curr != 0) {
+// 			printf(" %ld ", (long)curr->key[0]);
+// 			curr = curr->next;
+// 		}
+// 		printf(" ########## ");
+// 		fflush(stdout);
+// 		curr = tail;
+// 		while (curr != 0) {
+// 			printf(" %ld ", (long)curr->key[0]);
+// 			curr = curr->prev;
+// 		}
+// 		printf("\n");
+// 		fflush(stdout);
+			return;
+		}
+//	 		printf("called push: depth=%d\n", size());
+//	 		fflush(stdout);
+		SortedListNode *curr = head;
+ 		SortedListNode *last = 0;
+
+		int compareCount = 0;
+		while (curr != 0/*|| (!ascending && curr->next != 0)*/) {
+			compareCount++;
+			int cmp = keyCompare(node->key, curr->key);
+			if (cmp < 0) {
+				SortedListNode *prev = curr->prev;
+				if (prev != 0) {
+					node->prev = prev;
+					prev->next = node;
+
+				}
+				if (curr == head) {
+				  head->prev = node;
+				  node->next = head;
+				  head = node;
+				}
+				curr->prev = node;
+				node->next = curr;
+
+//			    	if (compareCount > 1) {
+//			    		printf("compareCount=%d", compareCount);
+//			    		fflush(stdout);
+//					}
+// 		curr = head;
+// 		while (curr != 0) {
+// 			printf(" %ld ", (long)curr->key[0]);
+// 			curr = curr->next;
+// 		}
+// 		printf(" ########## ");
+// 		fflush(stdout);
+// 		curr = tail;
+// 		while (curr != 0) {
+// 			printf(" %ld ", (long)curr->key[0]);
+// 			curr = curr->prev;
+// 		}
+// 		printf("\n");
+// 		fflush(stdout);
+				return;
+			}
+			else {
+				curr = curr->next;
+			}
+		}
+
+//			    	if (compareCount > 1) {
+//			    		printf("compareCount=%d", compareCount);
+//			    		fflush(stdout);
+//					}
+
+        tail->next = node;
+        node->prev = tail;
+        tail = node;
+
+
+ 		curr = head;
+// 		while (curr != 0) {
+// 			printf(" %ld ", (long)curr->key[0]);
+// 			curr = curr->next;
+// 		}
+// 		printf(" ########## ");
+// 		fflush(stdout);
+// 		curr = tail;
+// 		while (curr != 0) {
+// 			printf(" %ld ", (long)curr->key[0]);
+// 			curr = curr->prev;
+// 		}
+// 		printf("\n");
+// 		nfflush(stdout);
+ 	}
+
+ 	SortedListNode *pop() {
+ 		if (ascending) {
+ 			return popAscending();
+ 		}
+ 		return popDescending();
+	}
+
+	SortedListNode *popAscending() {
+ 		if (head == 0) {
+ 			return 0;
+ 		}
+
+ 		SortedListNode *ret = 0;
+
+		ret = head;
+
+		SortedListNode *next = head->next;
+
+		if (next != 0) {
+			next->prev = 0;
+		}
+
+		head = next;
+		if (next == 0) {
+			head = tail = 0;
+		}
+
+		return ret;
+	}
+
+	SortedListNode *popDescending() {
+// 		printf("pop\n");
+// 		fflush(stdout);
+ 		if (tail == 0) {
+ 			return 0;
+ 		}
+		SortedListNode *ret = tail;
+		SortedListNode *prev = tail->prev;
+
+		if (prev != 0) {
+			prev->next = 0;
+		}
+		tail = prev;
+		if (prev == 0) {
+			head = tail = 0;
+		}
+
+		return ret;
+ 	}
+
+ 	~SortedList() {
+ 		SortedListNode *curr = head;
+ 		while (curr != 0) {
+ 			SortedListNode *next = curr->next;
+ 			delete curr;
+ 			curr = next;
+ 		}
+ 	}
+ };
+
+
 int nextEntries(PartitionedMap* map, int count, int numRecordsPerPartition, int partition, void*** keys, long* values, void** currKey, bool tail) {
     struct my_node keyNode;
     keyNode.key = currKey;
@@ -662,8 +1031,11 @@ int nextEntries(PartitionedMap* map, int count, int numRecordsPerPartition, int 
 
         bool found = 0;
         do {
+
             const struct my_node *p = kavl_at(&itr);
             if (p == NULL) {
+//            	printf("at == 0\n");
+//            	fflush(stdout);
                 return countReturned;
             }
 //            printf("found=%ld", (long)p->key[0]);
@@ -671,6 +1043,7 @@ int nextEntries(PartitionedMap* map, int count, int numRecordsPerPartition, int 
 
             keys[currOffset] = p->key;
             values[currOffset] = p->value;
+            //delete p;
             currOffset++;
             countReturned++;
 
@@ -683,22 +1056,40 @@ int nextEntries(PartitionedMap* map, int count, int numRecordsPerPartition, int 
 			else {
             	found = kavl_itr_prev(my, &itr);
 		  	}
+//		  	if (!found) {
+//		  		printf("next not found");
+//            	fflush(stdout);
+//		  	}
 
         } while (found);
+//        printf("count returned=%d\n", countReturned);
     }
     return countReturned;
 }
 
 void getNextEntryFromPartition(
-        PartitionedMap* map, std::vector<PartitionResults*> currResults,
+        PartitionedMap* map, SortedList *sortedList, SortedListNode *node, std::vector<PartitionResults*> currResults,
         int count, int numRecordsPerPartition,
         PartitionResults* entry, int partition, void** currKey, jboolean first, bool tail) {
-    if (entry->count == -1 || entry->posWithinPartition == numRecordsPerPartition) {
+
+	if (entry->count == 0) {
+//        	printf("count=0\n");
+//        	fflush(stdout);
+		entry->key = 0;
+		entry->value = 0;
+		entry->partition = partition;
+		entry->posWithinPartition = 0;
+		return;
+	}
+
+    if (entry->count == -1 || entry->posWithinPartition >= entry->count) {
         entry->posWithinPartition = 0;
         entry->count = nextEntries(map, count, numRecordsPerPartition, partition, entry->keys, entry->values, currKey, tail);
 //        printf("count=%d\n", entry->count);
 //        fflush(stdout);
         if (entry->count == 0) {
+//        	printf("count=0\n");
+//        	fflush(stdout);
             entry->key = 0;
             entry->value = 0;
             entry->partition = partition;
@@ -711,14 +1102,15 @@ void getNextEntryFromPartition(
                 entry->posWithinPartition = 1;
             }
         }
-    }
-    if (entry->posWithinPartition > entry->count - 1) {
-        entry->count = 0;
-        entry->key = 0;
-        entry->value = 0;
-        entry->partition = partition;
-        entry->posWithinPartition = 0;
-        return;
+        if (entry->posWithinPartition >= entry->count) {
+//        	printf("count=0\n");
+//        	fflush(stdout);
+            entry->key = 0;
+            entry->value = 0;
+            entry->partition = partition;
+            entry->posWithinPartition = 0;
+            return;
+        }
     }
     entry->key = entry->keys[entry->posWithinPartition];
     entry->value = entry->values[entry->posWithinPartition];
@@ -726,6 +1118,12 @@ void getNextEntryFromPartition(
 //    fflush(stdout);
     entry->posWithinPartition++;
     entry->partition = partition;
+    node->key = entry->key;
+    node->value = entry->value;
+    node->partition = partition;
+	node->next = 0;
+	node->prev = 0;
+    sortedList->push(node);
 }
 
   bool partitionResultsComparator(PartitionResults* p, PartitionResults* q) {
@@ -741,39 +1139,27 @@ void getNextEntryFromPartition(
     }
     return false;
   }
-  
-bool next(PartitionedMap* map, std::vector<PartitionResults*> currResults,
-	int count, int numRecordsPerPartition, void*** keys, long* values,
-    int offset, int* posInTopLevelArray, int* retCount, bool tail) {
 
-    int partitionsChecked = 0;
+
+bool next(PartitionedMap* map, SortedList *sortedList, std::vector<PartitionResults*> currResults,
+	int count, int numRecordsPerPartition, void*** keys, long* values,
+    int* posInTopLevelArray, int* retCount, bool tail) {
+
     void** currKey = 0;
     long currValue = 0;
     int lowestPartition = 0;
-    void** lowestKey = 0;
-    for (int i = 0; i < PARTITION_COUNT; i++) {
-        if (currResults[i]->count == 0) {
-            continue;
-        }
-        if (tail) {
-            if (lowestKey == 0 || keyCompare(currResults[i]->key, lowestKey) < 0) {
-                lowestKey = currResults[i]->key;
-                lowestPartition = i;
-            }
-        }
-        else {
-            if (lowestKey == 0 || keyCompare(currResults[i]->key, lowestKey) > 0) {
-                lowestKey = currResults[i]->key;
-                lowestPartition = i;
-            }
-        }
+
+    SortedListNode *node = sortedList->pop();
+    if (node == 0) {
+    	return false;
     }
+    lowestPartition = node->partition;
 
     *posInTopLevelArray = lowestPartition;
 
-    currKey = currResults[*posInTopLevelArray]->getKey();
-    currValue = currResults[*posInTopLevelArray]->getValue();
-    getNextEntryFromPartition(map, currResults, count, numRecordsPerPartition, currResults[*posInTopLevelArray],
+    currKey = node->key;
+    currValue = node->value;
+    getNextEntryFromPartition(map, sortedList, node, currResults, count, numRecordsPerPartition, currResults[*posInTopLevelArray],
         *posInTopLevelArray, currKey, false, tail);
 
     if (currKey == 0) {
@@ -781,8 +1167,8 @@ bool next(PartitionedMap* map, std::vector<PartitionResults*> currResults,
     }
 //    printf("curr_key=%ld\n", (long)currKey[0]);
 //    fflush(stdout);
-    keys[offset] = currKey;
-    values[offset] = currValue;
+    keys[(*retCount)] = currKey;
+    values[(*retCount)] = currValue;
     (*retCount)++;
     return true;
 }
@@ -799,11 +1185,12 @@ jbyteArray tailHeadBlock(JNIEnv *env, jobject obj, jlong indexId, jbyteArray sta
    
    void** startKey = getSerializedKey(env, startKeyBytes);
 
+	SortedList sortedList(tail);
    std::vector<PartitionResults*> currResults(PARTITION_COUNT);
 
    for (int partition = 0; partition < PARTITION_COUNT; partition++) {
        currResults[partition] = new PartitionResults(numRecordsPerPartition);
-       getNextEntryFromPartition(map, currResults, count, numRecordsPerPartition, currResults[partition], partition, startKey, first, tail);
+       getNextEntryFromPartition(map, &sortedList, new SortedListNode(), currResults, count, numRecordsPerPartition, currResults[partition], partition, startKey, first, tail);
    }
 
     void*** keys = new void**[count];
@@ -811,14 +1198,14 @@ jbyteArray tailHeadBlock(JNIEnv *env, jobject obj, jlong indexId, jbyteArray sta
     int retCount = 0;
     int perPart = numRecordsPerPartition - 2;
 
-    for (int i = 0; i < PARTITION_COUNT * perPart; i++) {
-        if (!next(map, currResults, count, numRecordsPerPartition, keys, values, i, &posInTopLevelArray, &retCount, tail)) {
+    for (int i = 0; i < count; i++) {
+        if (!next(map, &sortedList, currResults, count, numRecordsPerPartition, keys, values, &posInTopLevelArray, &retCount, tail)) {
             break;
         }
     }
 
     int totalBytes = 0;
-    void** serializedKeys = new void*[count];
+    uint8_t** serializedKeys = new uint8_t*[count];
     int* serializedKeyLens = new int[count];
     for (int i = 0; i < retCount; i++) {
         int size = 0;
@@ -837,7 +1224,7 @@ jbyteArray tailHeadBlock(JNIEnv *env, jobject obj, jlong indexId, jbyteArray sta
     totalBytes += 4 + (4 * retCount) + (8 * retCount);
 
     jbyte* bytes = new jbyte[totalBytes];
-    
+
     jbyteArray ret = env->NewByteArray(totalBytes);
 
     uint8_t* lenBuffer = new uint8_t[4];
@@ -851,8 +1238,8 @@ jbyteArray tailHeadBlock(JNIEnv *env, jobject obj, jlong indexId, jbyteArray sta
         writeInt(lenBuffer, serializedKeyLens[i], &offset);
         memcpy(&bytes[totalOffset], lenBuffer, offset);
         totalOffset += offset;
-        
-        memcpy(&bytes[totalOffset], serializedKeys[i], serializedKeyLens[i]); 
+
+        memcpy(&bytes[totalOffset], serializedKeys[i], serializedKeyLens[i]);
         totalOffset += serializedKeyLens[i];
         offset = 0;
         writeLong((uint8_t*)&bytes[totalOffset], values[i], &offset);
@@ -862,9 +1249,9 @@ jbyteArray tailHeadBlock(JNIEnv *env, jobject obj, jlong indexId, jbyteArray sta
     env->SetByteArrayRegion(ret, 0, totalBytes, bytes);
 
     delete[] bytes;
-    
+
     for (int i = 0; i < retCount; i++) {
-        free(serializedKeys[i]);
+        delete serializedKeys[i];
     }
 
     delete[] keys;
@@ -881,8 +1268,91 @@ jbyteArray tailHeadBlock(JNIEnv *env, jobject obj, jlong indexId, jbyteArray sta
     }
 
     return ret;
+//	return 0;
 }
 
+jclass longClass = 0;
+
+jlongArray JNICALL tailHeadlockArray
+  (JNIEnv *env, jobject obj, jlong indexId, jbyteArray startKeyBytes, jint count, jboolean first, bool tail) {
+
+	int numRecordsPerPartition = ceil((double)count / (double)PARTITION_COUNT) + 2;
+
+    PartitionedMap* map = (PartitionedMap*)indexId;
+
+   int posInTopLevelArray = 0;
+
+   void** startKey = getSerializedKey(env, startKeyBytes);
+
+
+	SortedList sortedList(tail);
+
+   std::vector<PartitionResults*> currResults(PARTITION_COUNT);
+
+   for (int partition = 0; partition < PARTITION_COUNT; partition++) {
+       currResults[partition] = new PartitionResults(numRecordsPerPartition);
+       getNextEntryFromPartition(map, &sortedList, new SortedListNode(), currResults, count, numRecordsPerPartition, currResults[partition], partition, startKey, first, tail);
+   }
+
+
+    void*** keys = new void**[count];
+    long* values = new long[count];
+    int retCount = 0;
+    bool firstEntry = true;
+    while (retCount < count) {
+        if (!next(map, &sortedList, currResults, count, numRecordsPerPartition, keys, values, &posInTopLevelArray, &retCount, tail)) {
+            break;
+        }
+		if (firstEntry && (!first || !tail)) {
+			if (keyCompare((void**)keys[0], startKey) == 0) {
+				retCount = 0;
+			}
+			firstEntry = false;
+		}
+    }
+
+//	if (longClass == 0) {
+//        longClass = env->FindClass("[J");
+//	}
+
+//	jclass myClassArray = (*env)->FindClass(env, "[Ljava/lang/Object;");
+
+
+    jlongArray localRetKeys = env->NewLongArray(retCount * 2);
+	jlong *longKeys = new jlong[retCount * 2];
+	for (int i = 0; i < retCount; i++) {
+		longKeys[i] = (long)keys[i][0];
+	}
+
+	for (int i = retCount; i < retCount * 2; i++) {
+		longKeys[i] = values[i - retCount];
+	}
+
+	env->SetLongArrayRegion(localRetKeys, 0, retCount * 2, longKeys);
+
+	delete[] longKeys;
+    delete[] keys;
+    delete[] values;
+    delete[] startKey;
+
+    for (int i = 0; i < PARTITION_COUNT; i++) {
+        delete[] currResults[i]->keys;
+        delete[] currResults[i]->values;
+        delete currResults[i];
+    }
+
+    return localRetKeys;
+  }
+
+JNIEXPORT jlongArray JNICALL Java_com_sonicbase_index_NativePartitionedTree_headBlockArray
+  (JNIEnv *env, jobject obj, jlong indexId, jbyteArray startKeyBytes, jint count, jboolean first) {
+  return tailHeadlockArray(env, obj, indexId, startKeyBytes, count, first, false);
+}
+
+JNIEXPORT jlongArray JNICALL Java_com_sonicbase_index_NativePartitionedTree_tailBlockArray
+  (JNIEnv *env, jobject obj, jlong indexId, jbyteArray startKeyBytes, jint count, jboolean first) {
+  return tailHeadlockArray(env, obj, indexId, startKeyBytes, count, first, true);
+}
 
 int nextEntriesBytes(PartitionedMap* map, int count, int numRecordsPerPartition, int partition, void*** keys, ByteArray** values, void** currKey, bool tail) {
     struct my_node keyNode;
@@ -918,6 +1388,7 @@ int nextEntriesBytes(PartitionedMap* map, int count, int numRecordsPerPartition,
 //            memcpy(values[currOffset]->bytes, ((ByteArray*)p->value)->bytes, ((ByteArray*)p->value)->len);
 			values[currOffset]->len = ((ByteArray*)p->value)->len;
 			values[currOffset]->bytes = ((ByteArray*)p->value)->bytes;
+			//delete p;
             currOffset++;
             countReturned++;
 
@@ -1155,8 +1626,8 @@ JNIEXPORT jlong JNICALL Java_com_sonicbase_index_NativePartitionedTree_remove
 		fflush(stdout);
 	}
     long retValue = -1;
-    int partition = (long)key[0] % PARTITION_COUNT;
-    struct my_node keyNode;
+    int partition = abs(((long)key[0] ^ ((long)key[0] >> 32))) % PARTITION_COUNT;
+	struct my_node keyNode;
     keyNode.key = key;
     {
             std::lock_guard<std::mutex> lock(map->locks[partition]);
@@ -1210,7 +1681,7 @@ JNIEXPORT jlong JNICALL Java_com_sonicbase_index_NativePartitionedTree_get
 
     void** startKey = getSerializedKey(env, startKeyBytes);
     
-    int partition = (long)startKey[0] % PARTITION_COUNT;
+    int partition = abs((long)startKey[0] ^ ((long)startKey[0] >> 32)) % PARTITION_COUNT;
 
     long retValue = -1;
     struct my_node keyNode;
@@ -1224,6 +1695,7 @@ JNIEXPORT jlong JNICALL Java_com_sonicbase_index_NativePartitionedTree_get
             const struct my_node *p = kavl_at(&itr);
             if (p != 0) {
                 retValue = p->value;
+               // delete p;
             }
         }
 
@@ -1232,10 +1704,12 @@ JNIEXPORT jlong JNICALL Java_com_sonicbase_index_NativePartitionedTree_get
     return retValue;
 }
 
-JNIEXPORT jbyteArray JNICALL Java_com_sonicbase_index_NativePartitionedTree_higherEntry
-  (JNIEnv *env, jobject obj, jlong indexId, jbyteArray keyBytes) {
+JNIEXPORT jlongArray JNICALL Java_com_sonicbase_index_NativePartitionedTree_higherEntry
+  (JNIEnv *env, jobject obj, jlong indexId, jlong keyIn) {
+
     PartitionedMap* map = (PartitionedMap*)indexId;
-    void** key = getSerializedKey(env, keyBytes);
+    void** key = new void*[1];
+    key[0] = (void*) keyIn;
     struct my_node keyNode;
     keyNode.key = key;
     const struct my_node *p = 0;
@@ -1247,11 +1721,11 @@ JNIEXPORT jbyteArray JNICALL Java_com_sonicbase_index_NativePartitionedTree_high
           std::lock_guard<std::mutex> lock(map->locks[partition]);
 //          rlock lock = rlock(map->locks[partition]);
 
-            kavl_itr_find(my, map->maps[partition], &keyNode, &itr);
+            bool found = kavl_itr_find(my, map->maps[partition], &keyNode, &itr);
 
             p = kavl_at(&itr);
             if (p != NULL) {
-                if (keyCompare(p->key, key) == 0) {
+                if (found) {
                     if (kavl_itr_next(my, &itr)) {
                         p = kavl_at(&itr);
                     }
@@ -1271,10 +1745,16 @@ JNIEXPORT jbyteArray JNICALL Java_com_sonicbase_index_NativePartitionedTree_high
 
     delete[] key;
 
-    if (lowest != NULL) {
-        return serializeKeyValue(env, lowest);
-    }
-   
+	if (lowest != 0) {
+		jlongArray localRetKeys = env->NewLongArray(2);
+		jlong *longKeys = new jlong[2];
+		longKeys[0] = (long)(lowest->key)[0];
+		longKeys[1] = lowest->value;
+
+		env->SetLongArrayRegion(localRetKeys, 0, 2, longKeys);
+		delete[] longKeys;
+	   return localRetKeys;
+	}
    return 0;
 }
 
@@ -1366,10 +1846,12 @@ JNIEXPORT jbyteArray JNICALL Java_com_sonicbase_index_NativePartitionedTree_floo
    return 0;
 }
 
-JNIEXPORT jbyteArray JNICALL Java_com_sonicbase_index_NativePartitionedTree_ceilingEntry
-  (JNIEnv *env, jobject obj, jlong indexId, jbyteArray keyBytes) {
+JNIEXPORT jlongArray JNICALL Java_com_sonicbase_index_NativePartitionedTree_ceilingEntry
+  (JNIEnv *env, jobject obj, jlong indexId, jlong keyIn) {
+
     PartitionedMap* map = (PartitionedMap*)indexId;
-    void** key = getSerializedKey(env, keyBytes);
+    void** key = new void*[1];
+    key[0] =(void*)keyIn;
     struct my_node keyNode;
     keyNode.key = key;
     const struct my_node *p = 0;
@@ -1381,7 +1863,11 @@ JNIEXPORT jbyteArray JNICALL Java_com_sonicbase_index_NativePartitionedTree_ceil
   //          rlock lock = rlock(map->locks[partition]);
         std::lock_guard<std::mutex> lock(map->locks[partition]);
 
-            kavl_itr_find(my, map->maps[partition], &keyNode, &itr);
+            if (kavl_itr_find(my, map->maps[partition], &keyNode, &itr)) {
+            	p = kavl_at(&itr);
+                lowest = p;
+                break;
+            }
 
             p = kavl_at(&itr);
             if (lowest == 0) {
@@ -1395,9 +1881,16 @@ JNIEXPORT jbyteArray JNICALL Java_com_sonicbase_index_NativePartitionedTree_ceil
     delete[] key;
 
     if (lowest != 0) {
-//        printf("lower=%ld", (long)lowest->key[0]);
-//        fflush(stdout);
-        return serializeKeyValue(env, lowest);
+		jlongArray localRetKeys = env->NewLongArray(2);
+		jlong *longKeys = new jlong[2];
+		longKeys[0] = (long)(lowest->key)[0];
+		longKeys[1] = lowest->value;
+
+		env->SetLongArrayRegion(localRetKeys, 0, 2, longKeys);
+
+		delete[] longKeys;
+	   return localRetKeys;
+
     }
 
    return 0;
@@ -1415,9 +1908,10 @@ JNIEXPORT jbyteArray JNICALL Java_com_sonicbase_index_NativePartitionedTree_last
 //            rlock lock = rlock(map->locks[partition]);
         std::lock_guard<std::mutex> lock(map->locks[partition]);
 
-            kavl_itr_last(my, map->maps[partition], &itr);
-
-            p = kavl_at(&itr);
+//            kavl_itr_last(my, map->maps[partition], &itr);
+//
+//            p = kavl_at(&itr);
+			p = kavl_itr_last_my(map->maps[partition]);
         }
         if (highest == 0) {
             highest = p;

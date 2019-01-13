@@ -33,9 +33,9 @@ DEBUGGING := -DNDEBUG
 ifeq ($(ARCH),INTEL)
 #CC          := gcc
 CC          := g++
-CFLAGS      := -fPIC -std=c++0x -I/opt/jdk1.8.0_141/include/linux/ -I/opt/jdk1.8.0_161/include/ -I/Users/lowryda/Dropbox/git/sonicbase/db/src/main/java/com/sonicbase/index -I/Library/Java/JavaVirtualMachines/jdk1.8.0_181.jdk/Contents/Home/include -I/Library/Java/JavaVirtualMachines/jdk1.8.0_181.jdk/Contents/Home/include/darwin
-#CFLAGS	    := -Wall -g  -I/Users/lowryda/Dropbox/git/sonicbase/db/src/main/java/com/sonicbase/index -I/Library/Java/JavaVirtualMachines/jdk1.8.0_181.jdk/Contents/Home/include -I/Library/Java/JavaVirtualMachines/jdk1.8.0_181.jdk/Contents/Home/include/darwin
-LDFLAGS     := -Wl#-L /Users/lowryda/tools/boost_1_66_0/bin.v2/libs/system/build/darwin-gnu-4.2.1/release/link-static/threadapi-pthread/threading-multi #-lpthread
+CFLAGS      := -fPIC -std=c++0x -I/opt/jdk1.8.0_192/include/linux/ -I/opt/jdk1.8.0_192/include/  -I/Library/Java/JavaVirtualMachines/jdk1.8.0_181.jdk/Contents/Home/include -I/Library/Java/JavaVirtualMachines/jdk1.8.0_181.jdk/Contents/Home/include/darwin
+#CFLAGS	    := -Wall -g  -I/Library/Java/JavaVirtualMachines/jdk1.8.0_181.jdk/Contents/Home/include -I/Library/Java/JavaVirtualMachines/jdk1.8.0_181.jdk/Contents/Home/include/darwin
+LDFLAGS     := -Wl#-L
 endif
 
 UNAME := $(shell uname)

@@ -16,6 +16,7 @@ import java.util.ArrayList;
 import java.util.List;
 import java.util.Map;
 import java.util.concurrent.ConcurrentHashMap;
+import java.util.concurrent.ConcurrentLinkedQueue;
 import java.util.concurrent.atomic.AtomicInteger;
 import java.util.concurrent.atomic.AtomicLong;
 import java.util.concurrent.locks.ReentrantReadWriteLock;
@@ -42,6 +43,8 @@ public class AddressMap {
   private Long2LongOpenHashMap[] addressMaps = new Long2LongOpenHashMap[10_000];
   private ConcurrentHashMap<Long, Page> pages = new ConcurrentHashMap<>();
   private ConcurrentHashMap<Long, Long> addressMap = new ConcurrentHashMap<>();
+  private boolean shutdown;
+  private Thread freeQueueThread;
 
   public static Unsafe getUnsafe() {
     try {
@@ -69,6 +72,7 @@ public class AddressMap {
       compactionThread = new Thread(new Compactor(), "SonicBase Memory Compactor");
       compactionThread.start();
     }
+    startFreeThread();
   }
 
   public void stopCompactor() {
@@ -89,7 +93,62 @@ public class AddressMap {
   }
 
   public void shutdown() {
+    this.shutdown = true;
+    if (freeQueueThread != null) {
+      freeQueueThread.interrupt();
+    }
     stopCompactor();
+  }
+
+  private static class FreeRequest {
+    private long address;
+    private long timeAdded;
+  }
+
+  private ConcurrentLinkedQueue<FreeRequest> freeRequests = new ConcurrentLinkedQueue<>();
+  private long lastLogged = System.currentTimeMillis();
+
+  private void startFreeThread() {
+    freeQueueThread = new Thread(new Runnable(){
+      @Override
+      public void run() {
+        while (!shutdown) {
+          try {
+            FreeRequest request = freeRequests.peek();
+            if (request == null) {
+              Thread.sleep(1_000);
+              continue;
+            }
+            if (System.currentTimeMillis() - request.timeAdded < 10_000) {
+              Thread.sleep(1_000);
+              continue;
+            }
+            request = freeRequests.poll();
+            if (request == null) {
+              Thread.sleep(1_000);
+              continue;
+            }
+            removeAddress(request.address, unsafe);
+
+            if (System.currentTimeMillis() - lastLogged > 10_000) {
+              logger.info("Free queue status: size={}", freeRequests.size());
+              lastLogged = System.currentTimeMillis();
+            }
+          }
+          catch (Exception e) {
+            logger.error("error freeing address", e);
+          }
+        }
+      }
+    });
+    freeQueueThread.start();
+  }
+
+  public void delayedFreeUnsafeIds(Object value) {
+    FreeRequest request = new FreeRequest();
+    request.address = (long)value;
+    request.timeAdded = System.currentTimeMillis();
+    freeRequests.add(request);
   }
 
   class Compactor implements Runnable {
@@ -674,17 +733,17 @@ public class AddressMap {
     return fromUnsafeToRecords(obj);
   }
 
-  public void freeUnsafeIds(Object obj) {
-    try {
-      if (obj instanceof AddressEntry) {
-        return;
-      }
-      removeAddress((Long)obj, unsafe);
-    }
-    catch (Exception e) {
-      throw new DatabaseException(e);
-    }
-  }
+//  public void freeUnsafeIds(Object obj) {
+//    try {
+//      if (obj instanceof AddressEntry) {
+//        return;
+//      }
+//      removeAddress((Long)obj, unsafe);
+//    }
+//    catch (Exception e) {
+//      throw new DatabaseException(e);
+//    }
+//  }
 
 }
 

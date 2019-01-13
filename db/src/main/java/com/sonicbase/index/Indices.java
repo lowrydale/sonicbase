@@ -16,8 +16,8 @@ public class Indices {
     return indexes;
   }
 
-  public void addIndex(TableSchema tableSchema, String indexName, Comparator[] comparators) {
-    Index index = new Index(tableSchema, indexName, comparators);
+  public void addIndex(int port, TableSchema tableSchema, String indexName, Comparator[] comparators) {
+    Index index = new Index(port, tableSchema, indexName, comparators);
     ConcurrentHashMap<String, Index> tableIndexes = indexes.get(tableSchema.getName());
     if (tableIndexes == null) {
       tableIndexes = new ConcurrentHashMap<>();

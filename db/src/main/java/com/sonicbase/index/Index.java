@@ -1,27 +1,34 @@
 package com.sonicbase.index;
 
-import com.codahale.metrics.MetricRegistry;
-import com.codahale.metrics.Snapshot;
 import com.sonicbase.client.DatabaseClient;
+import com.sonicbase.common.ComObject;
 import com.sonicbase.common.DatabaseCommon;
-import com.sonicbase.query.DatabaseException;
+import com.sonicbase.common.Record;
+import com.sonicbase.common.ThreadUtil;
 import com.sonicbase.schema.DataType;
 import com.sonicbase.schema.FieldSchema;
+import com.sonicbase.schema.IndexSchema;
 import com.sonicbase.schema.TableSchema;
+import com.sonicbase.server.DatabaseServer;
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
 
-import java.io.IOException;
 import java.util.*;
-import java.util.concurrent.ConcurrentNavigableMap;
+import java.util.concurrent.ConcurrentHashMap;
 import java.util.concurrent.atomic.AtomicInteger;
 import java.util.concurrent.atomic.AtomicLong;
+import java.util.concurrent.atomic.AtomicReference;
+
+import static com.sonicbase.server.PartitionManager.DONT_RETURN_MISSING_KEY;
 
 @SuppressWarnings({"squid:S1168", "squid:S00107"})
 // I prefer to return null instead of an empty array
 // I don't know a good way to reduce the parameter count
 public class Index {
   private static final Logger logger = LoggerFactory.getLogger(Index.class);
+  private static Thread threadMonitor;
+  private TableSchema tableSchema;
+  private IndexSchema indexSchema;
 
   private Comparator[] comparators;
   private final Object[] mutexes = new Object[100_000];
@@ -34,12 +41,13 @@ public class Index {
 
   private AtomicInteger countAdded = new AtomicInteger();
   private AtomicLong beginAdded = new AtomicLong();
+  private static Map<Long, Boolean> isOpForRebalance = new ConcurrentHashMap<>();
 
   public Index() {
 
   }
 
-  public Index(TableSchema tableSchema, String indexName, final Comparator[] comparators) {
+  public Index(int port, TableSchema tableSchema, String indexName, final Comparator[] comparators) {
     this.comparators = comparators;
 
     comparator = (o1, o2) -> getObjectArrayComparator(comparators, o1, o2);
@@ -48,12 +56,14 @@ public class Index {
       mutexes[i] = new Object();
     }
 
-    String[] fields = tableSchema.getIndices().get(indexName).getFields();
+    this.tableSchema = tableSchema;
+    this.indexSchema = tableSchema.getIndices().get(indexName);
+    String[] fields = indexSchema.getFields();
     if (fields.length == 1) {
       FieldSchema fieldSchema = tableSchema.getFields().get(tableSchema.getFieldOffset(fields[0]));
       if (fieldSchema.getType() == DataType.Type.BIGINT) {
-//        impl = new NativePartitionedTreeImpl(this); //new LongIndexImpl(this); //
-        impl = new LongIndexImpl(this); //
+        impl = new NativePartitionedTreeImpl(port, this); //new LongIndexImpl(this); //
+//        impl = new LongIndexImpl(this); //
       }
       else if (fieldSchema.getType() == DataType.Type.VARCHAR) {
         impl = new StringIndexImpl(this);
@@ -64,6 +74,48 @@ public class Index {
     }
     else {
       impl = new ObjectIndexImpl(this, comparators);
+    }
+
+  }
+
+  static {
+    threadMonitor = ThreadUtil.createThread(() -> {
+      while (true) {
+        try {
+          Thread.sleep(10_00);
+          int activeCount = Thread.activeCount();
+          Thread[] threads = new Thread[activeCount];
+          Thread.enumerate(threads);
+          for (Thread thread : threads) {
+            if (thread != null) {
+              Boolean value = isOpForRebalance.get(thread.getId());
+              if (value != null) {
+                if (!thread.isAlive()) {
+                  isOpForRebalance.remove(thread.getId());
+                  logger.info("removed thread from isOptForRebalance; name={}", thread.getName());
+                }
+              }
+            }
+          }
+        }
+        catch (InterruptedException e) {
+          Thread.currentThread().interrupt();
+          break;
+        }
+      }
+    }, "Index - threadMonitor");
+    threadMonitor.start();
+  }
+
+  public static void ShutdownStatic() {
+    if (threadMonitor != null) {
+      threadMonitor.interrupt();
+      try {
+        threadMonitor.join();
+      }
+      catch (InterruptedException e) {
+        Thread.currentThread().interrupt();
+      }
     }
   }
 
@@ -112,6 +164,19 @@ public class Index {
     count.set(0);
   }
 
+  public static boolean getIsOpForRebalance() {
+    Boolean ret = isOpForRebalance.get(Thread.currentThread().getId());
+    if (ret == null) {
+      return false;
+    }
+    return ret;
+  }
+
+  public static void setIsOpForRebalance(boolean rebalance) {
+    isOpForRebalance.put(Thread.currentThread().getId(), rebalance);
+  }
+
+
   public Object get(Object[] key) {
     return impl.get(key);
   }
@@ -120,8 +185,10 @@ public class Index {
 
     Object ret = impl.put(key, id);
     if (ret == null) {
-      countAdded.incrementAndGet();
-      if (System.currentTimeMillis() - beginAdded.get() > 60 * 1_000) {
+      if (!getIsOpForRebalance()) {
+        countAdded.incrementAndGet();
+      }
+      if (System.currentTimeMillis() - beginAdded.get() > 10 * 1_000) {
         beginAdded.set(System.currentTimeMillis());
         countAdded.set(0);
       }
@@ -132,8 +199,10 @@ public class Index {
   public Object remove(Object[] key) {
     Object ret = impl.remove(key);
     if (ret != null) {
-      countAdded.decrementAndGet();
-      if (System.currentTimeMillis() - beginAdded.get() > 60 * 1_000) {
+      if (!getIsOpForRebalance()) {
+        countAdded.decrementAndGet();
+      }
+      if (System.currentTimeMillis() - beginAdded.get() > 10 * 1_000) {
         beginAdded.set(System.currentTimeMillis());
         countAdded.set(0);
       }
@@ -157,6 +226,14 @@ public class Index {
     return size;
   }
 
+  public void addSize(int count) {
+    size.addAndGet(count);
+  }
+
+  public IndexImpl getImpl() {
+    return impl;
+  }
+
   public interface Visitor {
     boolean visit(Object[] key, Object value);
   }
@@ -165,7 +242,7 @@ public class Index {
     private final T key;
     private V value;
 
-    MyEntry(T key, V value) {
+    public MyEntry(T key, V value) {
       this.key = key;
       this.value = value;
     }
@@ -232,14 +309,26 @@ public class Index {
     return currOffset.get();
   }
 
-  public long anticipatedSize() {
-    long size = size();
+  public long anticipatedSize(long lastCycleDuration, Object[] minKey, Object[] maxKey) {
+
+    long size = size();//getSize(minKey, maxKey);
+
+    if (System.currentTimeMillis() - beginAdded.get() > 10 * 1_000) {
+      beginAdded.set(System.currentTimeMillis());
+      countAdded.set(0);
+    }
 
     long duration = System.currentTimeMillis() - beginAdded.get();
+    if (duration == 0) {
+      return size();
+    }
 
     double rate = countAdded.get() / duration * 1000d;
+//    if (rate < 150_000) {
+//      return size;
+//    }
+    //size += (rate * (lastCycleDuration / 1_000d));
 
-    size += (rate * 30);
     return size;
   }
 
@@ -258,9 +347,11 @@ public class Index {
       doGetKeyAtOffset(offsets, maxKey, currOffset, ret, floorKey, curr);
     }
 
-    for (int i = ret.size(); i < offsets.size(); i++) {
-      if (lastEntry() != null) {
-        ret.add(lastEntry().getKey());
+    if (!DONT_RETURN_MISSING_KEY) {
+      for (int i = ret.size(); i < offsets.size(); i++) {
+        if (lastEntry() != null) {
+          ret.add(lastEntry().getKey());
+        }
       }
     }
 
@@ -288,7 +379,7 @@ public class Index {
         return curr.get() != offsets.size();
       }
       return true;
-    });
+    }, 45 * DatabaseClient.SELECT_PAGE_SIZE);
   }
 
   private Object[] getFloorKey(Object[] minKey) {
@@ -310,11 +401,70 @@ public class Index {
 
   public boolean visitTailMap(Object[] key, Index.Visitor visitor) {
     int blockSize = DatabaseClient.SELECT_PAGE_SIZE;
+    return visitTailMap(key, visitor, blockSize);
+  }
+
+  public ComObject traverseIndex(DatabaseServer server) {
+    int blockSize = DatabaseClient.SELECT_PAGE_SIZE;
     Object[][] keys = new Object[blockSize][];
-    Object[] values = new Object[blockSize];
+    long[] values = new long[blockSize];
+    Map.Entry<Object[], Object> firstEntry = firstEntry();
+    Object[] currKey = firstEntry.getKey();
+    int countRet = blockSize;
+    boolean first = true;
+    final AtomicInteger totalCount = new AtomicInteger();
+    final AtomicInteger countDeleted = new AtomicInteger();
+    final AtomicInteger countAdding = new AtomicInteger();
+    final long begin = System.currentTimeMillis();
+    AtomicReference<Object[]> highestKey = new AtomicReference<>();
+    AtomicReference<Object[]> lowestKey = new AtomicReference<>();
+    AtomicLong lastLogged = new AtomicLong(System.currentTimeMillis());
+    visitTailMap(currKey, new Visitor(){
+      @Override
+      public boolean visit(Object[] key, Object value) {
+        totalCount.incrementAndGet();
+        boolean skip = false;
+        byte[][] records = server.getAddressMap().fromUnsafeToRecords(value);
+        for (int j = 0; j < records.length; j++) {
+          byte[] bytes = records[j];
+          if ((Record.getDbViewFlags(bytes) & Record.DB_VIEW_FLAG_DELETING) != 0) {
+            skip = true;
+            countDeleted.incrementAndGet();
+          }
+          if ((Record.getDbViewFlags(bytes) & Record.DB_VIEW_FLAG_ADDING) != 0) {
+            countAdding.incrementAndGet();
+          }
+        }
 
-//    Map.Entry<Object[], Object> last = impl.lastEntry();
+        if (!skip) {
+          if (lowestKey.get() == null) {
+            lowestKey.set(key);
+          }
+          highestKey.set(key);
+        }
+        if (System.currentTimeMillis() - lastLogged.get() > 5_000) {
+          lastLogged.set(System.currentTimeMillis());
+          logger.info("Index traversal progress: count={}, rate={}", totalCount, (totalCount.get() / (System.currentTimeMillis() - begin)* 1000f));
+        }
 
+        return true;
+      }
+    }, blockSize);
+
+    logger.info("Index traversal finished: count={}, rate={}, lowestKey={}, highestKey={}",
+        totalCount, (totalCount.get() / (System.currentTimeMillis() - begin)* 1000f),
+        DatabaseCommon.keyToString(lowestKey.get()), DatabaseCommon.keyToString(highestKey.get()));
+
+    ComObject ret = new ComObject(3);
+    ret.put(ComObject.Tag.COUNT, totalCount.get());
+    ret.put(ComObject.Tag.DELETE_COUNT, (long)countDeleted.get());
+    ret.put(ComObject.Tag.ADD_COUNT, (long)countAdding.get());
+    return ret;
+  }
+
+  public boolean visitTailMap(Object[] key, Index.Visitor visitor, int blockSize) {
+    Object[][] keys = new Object[blockSize][];
+    long[] values = new long[blockSize];
     int countRet = impl.tailBlock(key, blockSize, true, keys, values);
     for (int i = 0; i < countRet; i++) {
       if (!visitor.visit(keys[i], values[i])) {
@@ -322,49 +472,27 @@ public class Index {
       }
     }
 
-//    long begin = System.currentTimeMillis();
-//    int count = 0;
     while (countRet >= blockSize) {
-      countRet = impl.tailBlock(keys[keys.length - 1], blockSize, false, keys, values);
+      countRet = impl.tailBlock(keys[countRet - 1], blockSize, false, keys, values);
       for (int i = 0; i < countRet; i++) {
-//        if (count++ % 10_000 == 0) {
-//          logger.info("progress: count={}, rate={}", count, (double)count / (System.currentTimeMillis() - begin) * 1000d);
-//        }
         if (!visitor.visit(keys[i], values[i])) {
           return false;
         }
       }
-//      if (countRet > 0 && (long)last.getKey()[0] < (long)keys[countRet - 1][0]) {
-//        return true;
-//      }
     }
 
-
-//    ConcurrentNavigableMap<Object[], Object> map = objectSkipIndex.tailMap(key);
-//    for (Map.Entry<Object[], Object> entry : map.entrySet()) {
-//      if (!visitor.visit(entry.getKey(), entry.getValue())) {
-//        return false;
-//      }
-//    }
     return true;
-
-
-//    try {
-//      return impl.visitTailMap(key, visitor);
-//    }
-//    catch (IOException e) {
-//      throw new DatabaseException(e);
-//    }
   }
 
   public boolean visitHeadMap(Object[] key, Index.Visitor visitor) {
     int blockSize = DatabaseClient.SELECT_PAGE_SIZE;
+    return visitHeadMap(key, visitor, blockSize);
+  }
+
+  public boolean visitHeadMap(Object[] key, Index.Visitor visitor, int blockSize) {
     Object[][] keys = new Object[blockSize][];
-    Object[] values = new Object[blockSize];
-
-//    Map.Entry<Object[], Object> first = impl.firstEntry();
-
-    int countRet = impl.headBlock(key, blockSize, true, keys, values);
+    long[] values = new long[blockSize];
+    int countRet = impl.headBlock(key, blockSize, false, keys, values);
     for (int i = 0; i < countRet; i++) {
       if (!visitor.visit(keys[i], values[i])) {
         return false;
@@ -378,10 +506,8 @@ public class Index {
           return false;
         }
       }
-//      if (countRet > 0 && (long)first.getKey()[0] > (long)keys[countRet - 1][0]) {
-//        return true;
-//      }
     }
+
     return true;
 //
 //    try {

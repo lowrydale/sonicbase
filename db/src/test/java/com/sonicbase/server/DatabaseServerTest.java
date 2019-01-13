@@ -1,7 +1,5 @@
 package com.sonicbase.server;
 
-import com.fasterxml.jackson.databind.ObjectMapper;
-import com.fasterxml.jackson.databind.node.ObjectNode;
 import com.sonicbase.client.DatabaseClient;
 import com.sonicbase.common.*;
 import com.sonicbase.index.Index;
@@ -108,7 +106,7 @@ public class  DatabaseServerTest {
     server.getIndices().put("test", new Indices());
     Comparator[] comparators = tableSchema.getComparators(new String[]{"field1"});
 
-    server.getIndices("test").addIndex(tableSchema, indexSchema.getName(), comparators);
+    server.getIndices("test").addIndex(server.getPort(), tableSchema, indexSchema.getName(), comparators);
 
     Index index = server.getIndex("test", tableSchema.getName(), indexSchema.getName());
     assertNotNull(index);

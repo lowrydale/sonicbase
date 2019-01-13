@@ -12,9 +12,9 @@ public interface IndexImpl {
 
   Object remove(Object[] key);
 
-  int tailBlock(Object[] startKey, int count, boolean first, Object[][] keys, Object[] values);
+  int tailBlock(Object[] startKey, int count, boolean first, Object[][] keys, long[] values);
 
-  int headBlock(Object[] startKey, int count, boolean first, Object[][] keys, Object[] values);
+  int headBlock(Object[] startKey, int count, boolean first, Object[][] keys, long[] values);
 
   Map.Entry<Object[], Object> higherEntry(Object[] key);
 

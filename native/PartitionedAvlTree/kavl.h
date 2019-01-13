@@ -275,11 +275,14 @@ int main(void) {
 			*++itr->top = p; \
 		itr->right = (*itr->top)->__head.p[1]; \
 	} \
-	__scope void kavl_itr_last_##suf(const __type *root, struct kavl_itr_##suf *itr) { \
-		const __type *p; \
-		for (itr->top = itr->stack - 1, p = root; p; p = p->__head.p[1]) \
-			*++itr->top = p; \
-		itr->right = (*itr->top)->__head.p[0]; \
+	__scope const __type *kavl_itr_last_##suf(const __type *root) { \
+		const __type *p = root;\
+		const __type *last = 0; \
+		while (p != 0) { \
+			last = p; \
+			p = p->__head.p[1]; \
+		}\
+		return last;\
 	} \
 	__scope int kavl_itr_find_##suf(const __type *root, const __type *x, struct kavl_itr_##suf *itr) { \
 		const __type *p = root; \
@@ -301,15 +304,18 @@ int main(void) {
 		} else return 0; \
 	} \
 	__scope int kavl_itr_next_##suf(struct kavl_itr_##suf *itr) { \
-		for (;;) { \
-			const __type *p; \
-			for (p = itr->right, --itr->top; p; p = p->__head.p[0]) \
-				*++itr->top = p; \
-			if (itr->top < itr->stack) return 0; \
-			itr->right = (*itr->top)->__head.p[1]; \
-			return 1; \
-		} \
-	} \
+     		for (;;) { \
+     			const __type *p; \
+     			for (p = itr->right, --itr->top; p; p = p->__head.p[0]) \
+     				*++itr->top = p; \
+     			if (itr->top < itr->stack) {return 0;} \
+     			if (*itr->top == 0) { \
+     				return 0; \
+     			} \
+     			itr->right = (*itr->top)->__head.p[1]; \
+     			return 1; \
+     		} \
+     	} \
 	__scope int kavl_itr_find_prev_##suf(const __type *root, const __type *x, struct kavl_itr_##suf *itr) { \
 		const __type *p = root; \
 		itr->top = itr->stack - 1; \

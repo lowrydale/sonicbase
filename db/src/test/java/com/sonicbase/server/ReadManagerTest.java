@@ -59,7 +59,7 @@ public class ReadManagerTest {
 
     when(server.getCommon()).thenReturn(common);
 
-    Index index = new Index(9010, tableSchema, indexSchema.getName(), indexSchema.getComparators());
+    Index index = new Index(9010, new HashMap<Long, Boolean>(), tableSchema, indexSchema.getName(), indexSchema.getComparators());
     when(server.getIndex(anyString(), anyString(), anyString())).thenReturn(index);
 
 
@@ -143,7 +143,7 @@ public class ReadManagerTest {
 
     when(server.getCommon()).thenReturn(common);
 
-    Index index = new Index(9010, tableSchema, indexSchema.getName(), indexSchema.getComparators());
+    Index index = new Index(9010, new HashMap<Long, Boolean>(), tableSchema, indexSchema.getName(), indexSchema.getComparators());
     when(server.getIndex(anyString(), anyString(), anyString())).thenReturn(index);
 
 
@@ -229,7 +229,7 @@ public class ReadManagerTest {
 
     when(server.getCommon()).thenReturn(common);
 
-    Index index = new Index(9010, tableSchema, indexSchema.getName(), indexSchema.getComparators());
+    Index index = new Index(9010, new HashMap<Long, Boolean>(), tableSchema, indexSchema.getName(), indexSchema.getComparators());
     when(server.getIndex(anyString(), anyString(), anyString())).thenReturn(index);
 
 
@@ -293,7 +293,7 @@ public class ReadManagerTest {
 
     when(server.getCommon()).thenReturn(common);
 
-    Index index = new Index(9010, tableSchema, indexSchema.getName(), indexSchema.getComparators());
+    Index index = new Index(9010, new HashMap<Long, Boolean>(), tableSchema, indexSchema.getName(), indexSchema.getComparators());
     when(server.getIndex(anyString(), anyString(), anyString())).thenReturn(index);
 
 
@@ -375,7 +375,7 @@ public class ReadManagerTest {
     common.setServersConfig(serversConfig);
     when(server.getCommon()).thenReturn(common);
 
-    Index index = new Index(9010, tableSchema, indexSchema.getName(), indexSchema.getComparators());
+    Index index = new Index(9010, new HashMap<Long, Boolean>(), tableSchema, indexSchema.getName(), indexSchema.getComparators());
     when(server.getIndex(anyString(), anyString(), anyString())).thenReturn(index);
 
 
@@ -479,7 +479,7 @@ public class ReadManagerTest {
     common.setServersConfig(serversConfig);
     when(server.getCommon()).thenReturn(common);
 
-    Index index = new Index(9010, tableSchema, indexSchema.getName(), indexSchema.getComparators());
+    Index index = new Index(9010, new HashMap<Long, Boolean>(), tableSchema, indexSchema.getName(), indexSchema.getComparators());
     when(server.getIndex(anyString(), anyString(), anyString())).thenReturn(index);
 
 

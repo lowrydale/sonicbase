@@ -23,6 +23,7 @@ public class BenchmarkInsert {
 
   public static final Logger logger = LoggerFactory.getLogger(BenchmarkInsert.class);
 
+  public static boolean STRING_KEY = true;
 
   private static final MetricRegistry METRICS = new MetricRegistry();
 
@@ -210,6 +211,7 @@ public class BenchmarkInsert {
             final int threadOffset = i;
             final AtomicLong lastLogged = new AtomicLong(System.currentTimeMillis());
             Thread insertThread = new Thread(() -> {
+              Random rand = new Random(System.currentTimeMillis());
               try {
                 threadLiveliness.put(threadOffset, System.currentTimeMillis());
                 activeThreads.incrementAndGet();
@@ -239,7 +241,36 @@ public class BenchmarkInsert {
                         }
                       }
                       else {
-                        if (true) {
+                        if (STRING_KEY) {
+                          try (Connection conn = cpds.getConnection()) {
+                            try (PreparedStatement stmt = conn.prepareStatement("insert into strings (id1, id2) VALUES ( ?, ?)")) {
+                              for (int i1 = 0; i1 < batchSize; i1++) {
+                                long id = offset1 + i1;
+//                                long id = Math.abs(rand.nextLong());
+                                String idString = String.valueOf(id);
+                                int len = idString.length();
+                                for (int j = 0; j < 20 - len; j++) {
+                                  idString = "0" + idString;
+                                }
+                                stmt.setString(1,  idString);
+                                stmt.setLong(2, (id + 100));
+                                long currBegin = System.nanoTime();
+                                stmt.addBatch();
+                                thisDuration += System.nanoTime() - currBegin;
+                                //limiter.acquire();
+                              }
+                              long currBegin = System.nanoTime();
+                              stmt.executeBatch();
+                              thisDuration += System.nanoTime() - currBegin;
+
+                              threadLiveliness.put(threadOffset, System.currentTimeMillis());
+                              totalDuration.addAndGet(thisDuration);
+                              countInserted.addAndGet(batchSize);
+                              logProgress(threadOffset, countInserted, lastLogged, begin, totalDuration, insertErrorCount);
+                            }
+                          }
+                        }
+                        else if (true) {
                           try (Connection conn = cpds.getConnection()) {
                             //try (PreparedStatement stmt = conn.prepareStatement("insert into persons (id1, id2, socialSecurityNumber, relatives, restricted, gender) VALUES (?, ?, ?, ?, ?, ?)")) {
                             try (PreparedStatement stmt = conn.prepareStatement("insert into persons (id1, id2, restricted, gender) VALUES ( ?, ?, ?, ?)")) {

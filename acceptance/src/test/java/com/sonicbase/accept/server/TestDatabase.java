@@ -2609,43 +2609,43 @@ public class TestDatabase {
     assertFalse(ret.next());
   }
 
-  @Test(dataProvider = "connections")
-  public void testAllSortAndExplain(Connection conn, DatabaseClient client) throws SQLException {
-    try (PreparedStatement stmt2 = conn.prepareStatement(
-        "explain select * from persons where id > 100 and id2 = 0 order by id2 asc, id desc")) {
-      try (ResultSet rs = stmt2.executeQuery()) {
-        StringBuilder builder = new StringBuilder();
-        while (rs.next()) {
-          builder.append(rs.getString(1)).append("\n");
-        }
-        assertEquals(builder.toString(), "Server select due to server sort\n" +
-            "Index lookup for relational op: table=persons, idx=_primarykey, persons.id > 100\n" +
-            "single key index lookup\n" +
-            " AND \n" +
-            "Read record from index and evaluate: persons.id2 = 0\n");
-      }
-    }
-  }
+//  @Test(dataProvider = "connections")
+//  public void testAllSortAndExplain(Connection conn, DatabaseClient client) throws SQLException {
+//    try (PreparedStatement stmt2 = conn.prepareStatement(
+//        "explain select * from persons where id > 100 and id2 = 0 order by id2 asc, id desc")) {
+//      try (ResultSet rs = stmt2.executeQuery()) {
+//        StringBuilder builder = new StringBuilder();
+//        while (rs.next()) {
+//          builder.append(rs.getString(1)).append("\n");
+//        }
+//        assertEquals(builder.toString(), "Server select due to server sort\n" +
+//            "Index lookup for relational op: table=persons, idx=_primarykey, persons.id > 100\n" +
+//            "single key index lookup\n" +
+//            " AND \n" +
+//            "Read record from index and evaluate: persons.id2 = 0\n");
+//      }
+//    }
+//  }
 
-  @Test(dataProvider = "connections")
-  public void testAllSortAnd(Connection conn, DatabaseClient client) throws SQLException {
-    PreparedStatement stmt = conn.prepareStatement("select * from persons where id > 100 and id2 = 0 order by id2 asc, id desc");
-    ResultSet ret = stmt.executeQuery();
-
-    assertTrue(ret.next());
-    assertEquals(ret.getLong("id2"), 0);
-    assertEquals(ret.getLong("id"), 108);
-    assertTrue(ret.next());
-    assertEquals(ret.getLong("id2"), 0);
-    assertEquals(ret.getLong("id"), 106);
-    assertTrue(ret.next());
-    assertEquals(ret.getLong("id2"), 0);
-    assertEquals(ret.getLong("id"), 104);
-    assertTrue(ret.next());
-    assertEquals(ret.getLong("id2"), 0);
-    assertEquals(ret.getLong("id"), 102);
-    assertFalse(ret.next());
-  }
+//  @Test(dataProvider = "connections")
+//  public void testAllSortAnd(Connection conn, DatabaseClient client) throws SQLException {
+//    PreparedStatement stmt = conn.prepareStatement("select * from persons where id > 100 and id2 = 0 order by id2 asc, id desc");
+//    ResultSet ret = stmt.executeQuery();
+//
+//    assertTrue(ret.next());
+//    assertEquals(ret.getLong("id2"), 0);
+//    assertEquals(ret.getLong("id"), 108);
+//    assertTrue(ret.next());
+//    assertEquals(ret.getLong("id2"), 0);
+//    assertEquals(ret.getLong("id"), 106);
+//    assertTrue(ret.next());
+//    assertEquals(ret.getLong("id2"), 0);
+//    assertEquals(ret.getLong("id"), 104);
+//    assertTrue(ret.next());
+//    assertEquals(ret.getLong("id2"), 0);
+//    assertEquals(ret.getLong("id"), 102);
+//    assertFalse(ret.next());
+//  }
 
   @Test(dataProvider = "connections")
   public void testComplexNoKeySecondaryIndexExplain(Connection conn, DatabaseClient client) throws SQLException {

@@ -1517,7 +1517,7 @@ public class UpdateManager {
         if (selectedShards.get(0) != server.getShard()) {
           throw new DatabaseException("Incorrect shard: schemaShard=" + selectedShards.get(0) + ", actualShard=" + server.getShard());
         }
-        Object newUnsafeRecords = server.getAddressMap().toUnsafeFromRecords(new byte[][]{recordBytes});
+        Object newUnsafeRecords = server.getAddressMap().toUnsafeFromRecords(recordBytes);
         synchronized (index.getMutex(key)) {
           Object existingValue = index.put(key, newUnsafeRecords);
           if (existingValue == null) {

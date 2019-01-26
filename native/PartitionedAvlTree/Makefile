@@ -33,7 +33,7 @@ DEBUGGING := -DNDEBUG
 ifeq ($(ARCH),INTEL)
 #CC          := gcc
 CC          := g++
-CFLAGS      := -fPIC -std=c++0x -I/opt/jdk1.8.0_192/include/linux/ -I/opt/jdk1.8.0_192/include/  -I/Library/Java/JavaVirtualMachines/jdk1.8.0_181.jdk/Contents/Home/include -I/Library/Java/JavaVirtualMachines/jdk1.8.0_181.jdk/Contents/Home/include/darwin
+CFLAGS      := -fPIC -pthread -std=c++0x -I/opt/jdk1.8.0_192/include/linux/ -I/opt/jdk1.8.0_192/include/  -I/Library/Java/JavaVirtualMachines/jdk1.8.0_181.jdk/Contents/Home/include -I/Library/Java/JavaVirtualMachines/jdk1.8.0_181.jdk/Contents/Home/include/darwin
 #CFLAGS	    := -Wall -g  -I/Library/Java/JavaVirtualMachines/jdk1.8.0_181.jdk/Contents/Home/include -I/Library/Java/JavaVirtualMachines/jdk1.8.0_181.jdk/Contents/Home/include/darwin
 LDFLAGS     := -Wl#-L
 endif
@@ -61,7 +61,7 @@ all: $(TARGETS)
 clean:
 	rm -f $(TARGETS) replay *~ core *.o *.a
 
-$(OUT_DIR)/SonicBase.so: PartitionedAvlTree.cpp
+$(OUT_DIR)/SonicBase.so: PartitionedAvlTree.cpp BigDecimal.cpp
 	echo $(OUT_DIR)
 	@mkdir -p $(@D)
-	$(CC) -shared $(CFLAGS) PartitionedAvlTree.cpp -o $(OUT_DIR)/SonicBase.so
+	$(CC) -shared $(CFLAGS) PartitionedAvlTree.cpp BigDecimal.cpp -o $(OUT_DIR)/SonicBase.so

@@ -452,7 +452,12 @@ public class AddressMap {
 
   public Object toUnsafeFromRecords(byte[][] records) {
     long seconds = (System.currentTimeMillis() - TIME_2017) / 1000;
-    return toUnsafeFromRecords(seconds, records);
+    return toUnsafeFromRecords(seconds, records, null);
+  }
+
+  public Object toUnsafeFromRecords(byte[] records) {
+    long seconds = (System.currentTimeMillis() - TIME_2017) / 1000;
+    return toUnsafeFromRecords(seconds, null, records);
   }
 
   public static class AddressEntry {
@@ -466,23 +471,36 @@ public class AddressMap {
   }
 
   public Object toUnsafeFromRecords(long updateTime, byte[][] records) {
-    if (MEM_OP) {
-      return toUnsafeForUnsafe(updateTime, records);
-    }
-    if (!useUnsafe) {
-      return new AddressEntry(records, updateTime);
-    }
-    return toUnsafeForUnsafe(updateTime, records);
+    return toUnsafeFromRecords(updateTime, records, null);
   }
 
-  private Object toUnsafeForUnsafe(long updateTime, byte[][] records) {
+  public Object toUnsafeFromRecords(long updateTime, byte[][] records, byte[] record) {
+    if (MEM_OP) {
+      return toUnsafeForUnsafe(updateTime, records, record);
+    }
+    if (!useUnsafe) {
+      return new AddressEntry(record != null ? new byte[][]{record} : records, updateTime);
+    }
+    return toUnsafeForUnsafe(updateTime, records, record);
+  }
+
+  private Object toUnsafeForUnsafe(long updateTime, byte[][] records, byte[] record) {
     if (MEM_OP) {
       int recordsLen = 0;
-      for (byte[] record : records) {
-        recordsLen += record.length;
+      if (record != null) {
+        recordsLen = record.length;
+      }
+      else {
+        for (byte[] rec : records) {
+          recordsLen += rec.length;
+        }
       }
 
-      byte[] bytes = new byte[1 + 1 + 8 + 4 + 8 + 4 + 4 + (4 * records.length) + recordsLen];
+      int recordCount = 1;
+      if (records != null) {
+        recordCount = records.length;
+      }
+      byte[] bytes = new byte[1 + 1 + 8 + 4 + 8 + 4 + 4 + (4 * recordCount) + recordsLen];
       int offset = 0;
       bytes[offset] = 1; //single allocation
       offset += 1;
@@ -492,15 +510,23 @@ public class AddressMap {
       offset += 4; //offset from top of page allocation
       DataUtils.longToBytes(updateTime, bytes, offset); //update time
       offset += 8;
-      DataUtils.intToBytes(4 + (4 * records.length) + recordsLen, bytes, offset); //actual size
+      DataUtils.intToBytes(4 + (4 * recordCount) + recordsLen, bytes, offset); //actual size
       offset += 4;
-      DataUtils.intToBytes(records.length, bytes, offset);
+      DataUtils.intToBytes(recordCount, bytes, offset);
       offset += 4;
-      for (byte[] record : records) {
+      if (record != null) {
         DataUtils.intToBytes(record.length, bytes, offset);
         offset += 4;
         System.arraycopy(record, 0, bytes, offset, record.length);
         offset += record.length;
+      }
+      else {
+        for (byte[] rec : records) {
+          DataUtils.intToBytes(rec.length, bytes, offset);
+          offset += 4;
+          System.arraycopy(rec, 0, bytes, offset, rec.length);
+          offset += record.length;
+        }
       }
 
       if (bytes.length > 1000000000) {
@@ -519,11 +545,19 @@ public class AddressMap {
     }
     else {
       int recordsLen = 0;
-      for (byte[] record : records) {
-        recordsLen += record.length;
+      if (records != null) {
+        for (byte[] rec : records) {
+          recordsLen += rec.length;
+        }
       }
-
-      int len = 8 + 4 + (4 * records.length) + recordsLen;
+      else {
+        recordsLen = record.length;
+      }
+      int recordCount = 1;
+      if (records != null) {
+        recordCount = records.length;
+      }
+      int len = 8 + 4 + (4 * recordCount) + recordsLen;
 
       if (len > 1000000000) {
         throw new DatabaseException("Invalid allocation: size=" + len);
@@ -535,9 +569,20 @@ public class AddressMap {
       int offset = 0;
       DataUtils.longToAddress(updateTime, address + offset, unsafe); //update time
       offset += 8;
-      DataUtils.intToAddress(records.length, address + offset, unsafe);
+      DataUtils.intToAddress(recordCount, address + offset, unsafe);
       offset += 4;
-      for (byte[] record : records) {
+      if (records != null) {
+        for (byte[] rec : records) {
+          DataUtils.intToAddress(rec.length, address + offset, unsafe);
+          offset += 4;
+
+          for (int i = 0; i < rec.length; i++) {
+            unsafe.putByte(address + offset + i, rec[i]);
+          }
+          offset += rec.length;
+        }
+      }
+      else {
         DataUtils.intToAddress(record.length, address + offset, unsafe);
         offset += 4;
 
@@ -653,7 +698,7 @@ public class AddressMap {
 
 
   public Object toUnsafeFromKeys(long updateTime, byte[][] records) {
-    return toUnsafeFromRecords(updateTime, records);
+    return toUnsafeFromRecords(updateTime, records, null);
   }
 
 

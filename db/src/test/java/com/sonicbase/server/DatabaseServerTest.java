@@ -16,6 +16,7 @@ import org.testng.annotations.Test;
 
 import java.io.*;
 import java.util.Comparator;
+import java.util.HashMap;
 import java.util.HashSet;
 import java.util.Set;
 import java.util.concurrent.atomic.AtomicBoolean;
@@ -106,7 +107,7 @@ public class  DatabaseServerTest {
     server.getIndices().put("test", new Indices());
     Comparator[] comparators = tableSchema.getComparators(new String[]{"field1"});
 
-    server.getIndices("test").addIndex(server.getPort(), tableSchema, indexSchema.getName(), comparators);
+    server.getIndices("test").addIndex(server.getPort(), new HashMap<Long, Boolean>(),tableSchema, indexSchema.getName(), comparators);
 
     Index index = server.getIndex("test", tableSchema.getName(), indexSchema.getName());
     assertNotNull(index);

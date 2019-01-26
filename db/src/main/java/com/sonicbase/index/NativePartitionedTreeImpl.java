@@ -2,6 +2,9 @@ package com.sonicbase.index;
 
 import com.sonicbase.common.FileUtils;
 import com.sonicbase.query.DatabaseException;
+import com.sonicbase.schema.FieldSchema;
+import com.sonicbase.schema.IndexSchema;
+import com.sonicbase.schema.TableSchema;
 import com.sonicbase.server.IndexLookupOneKey;
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
@@ -48,6 +51,9 @@ public class NativePartitionedTreeImpl extends NativePartitionedTree implements 
     try {
       synchronized (mutex) {
         if (!initializedNative) {
+
+          //System.load("/home/ec2-user/PartitionedAvlTree/linux/SonicBase.so");
+
           String libName = "";
           String name = ManagementFactory.getRuntimeMXBean().getName();
           String pid = name.split("@")[0];
@@ -86,28 +92,30 @@ public class NativePartitionedTreeImpl extends NativePartitionedTree implements 
 
     this.port = port;
     this.index = index;
-    this.indexId = initIndex();
+
+    TableSchema tableSchema = index.getTableSchema();
+    IndexSchema schema = index.getIndexSchema();
+    String[] fields = schema.getFields();
+    int[] dataTypes = new int[fields.length];
+    for (int i = 0; i < fields.length; i++) {
+      int offset = tableSchema.getFieldOffset(fields[i]);
+      FieldSchema field = tableSchema.getFields().get(offset);
+      dataTypes[i] = field.getType().getValue();
+    }
+
+    this.indexId = initIndex(dataTypes);
   }
 
   @Override
-  public Object put(Object[] key, Object value) {
-    byte[] keyBytes = new byte[8];
-    writeLong(keyBytes, (long)key[0]);
-
-    long ret = put(indexId, keyBytes, (long)value);
-    if (ret == -1) {
-      index.getSizeObj().incrementAndGet();
-      return null;
-    }
-    return ret;
+  public void logError(String msg) {
+    logger.error(msg);
   }
 
-  public byte[] putBytes(Object[] key, byte[] value) {
-    byte[] keyBytes = new byte[8];
-    writeLong(keyBytes, (long)key[0]);
 
-    byte[] ret = putBytes(indexId, keyBytes, value);
-    if (ret == null) {
+  @Override
+  public Object put(Object[] key, Object value) {
+    long ret = put(indexId, key, (long)value);
+    if (ret == -1) {
       index.getSizeObj().incrementAndGet();
       return null;
     }
@@ -116,10 +124,7 @@ public class NativePartitionedTreeImpl extends NativePartitionedTree implements 
 
   @Override
   public Object get(Object[] key) {
-    byte[] keyBytes = new byte[8];
-    writeLong(keyBytes, (long)key[0]);
-
-    long ret = get(indexId, keyBytes);
+    long ret = get(indexId, key);
     if (-1 == ret) {
       return null;
     }
@@ -128,10 +133,7 @@ public class NativePartitionedTreeImpl extends NativePartitionedTree implements 
 
   @Override
   public Object remove(Object[] key) {
-    byte[] keyBytes = new byte[8];
-    writeLong(keyBytes, (long)key[0]);
-
-    long ret = remove(indexId, keyBytes);
+    long ret = remove(indexId, key);
     if (ret != -1) {
       index.getSizeObj().decrementAndGet();
       return ret;
@@ -142,30 +144,7 @@ public class NativePartitionedTreeImpl extends NativePartitionedTree implements 
   @Override
   public int tailBlock(Object[] startKey, int count, boolean first, Object[][] keys, long[] values) {
     try {
-      byte[] keyBytes = new byte[8];
-      writeLong(keyBytes, (long)startKey[0]);
-      long[] ret = tailBlockArray(indexId, keyBytes, count, first);
-      int retCount = ret.length / 2;
-      for (int i = 0; i < retCount; i++) {
-        //keys[i][0] = (Long)ret[i];// = new Object[]{ret[i]};
-        keys[i] = new Object[]{ret[i]};// = new Object[]{ret[i]};
-        values[i] = ret[i + retCount];
-      }
-      return retCount;
-      //return parseResults(ret, keys, values);
-    }
-    catch (Exception e) {
-      throw new RuntimeException(e);
-    }
-  }
-
-  public int tailBlockBytes(Object[] startKey, int count, boolean first, Object[][] keys, byte[][] values) {
-    try {
-      byte[] keyBytes = new byte[8];
-      writeLong(keyBytes, (long)startKey[0]);
-
-      byte[] ret = tailBlockBytes(indexId, keyBytes, count, first);
-      return parseResultsBytes(ret, keys, values);
+      return tailBlockArray(indexId, startKey, count, first, keys, values);
     }
     catch (Exception e) {
       throw new RuntimeException(e);
@@ -175,17 +154,7 @@ public class NativePartitionedTreeImpl extends NativePartitionedTree implements 
   @Override
   public int headBlock(Object[] startKey, int count, boolean first, Object[][] keys, long[] values) {
     try {
-      byte[] keyBytes = new byte[8];
-      writeLong(keyBytes, (long)startKey[0]);
-      long[] ret = headBlockArray(indexId, keyBytes, count, first);
-      int retCount = ret.length / 2;
-      for (int i = 0; i < retCount; i++) {
-      //  keys[i][0] = (Long)ret[i];
-        keys[i] = new Object[]{ret[i]};
-        values[i] = ret[i + retCount];
-      }
-      return retCount;
-      //return parseResults(ret, keys, values);
+      return headBlockArray(indexId, startKey, count, first, keys, values);
     }
     catch (Exception e) {
       throw new RuntimeException(e);
@@ -194,29 +163,36 @@ public class NativePartitionedTreeImpl extends NativePartitionedTree implements 
 
   @Override
   public Map.Entry<Object[], Object> higherEntry(Object[] key) {
-    long[] ret = higherEntry(indexId, (long)key[0]);
-    if (ret == null) {
+    Object[][] keys = new Object[1][];
+    long[] values = new long[1];
+    boolean found = higherEntry(indexId, key, keys, values);
+    if (!found) {
       return null;
     }
-    return new Index.MyEntry(new Object[]{ret[0]}, ret[1]);
+    return new Index.MyEntry(keys[0], values[0]);
   }
 
   @Override
   public Map.Entry<Object[], Object> lowerEntry(Object[] key) {
-    byte[] keyBytes = new byte[8];
-    writeLong(keyBytes, (long)key[0]);
-
-    byte[] ret = lowerEntry(indexId, keyBytes);
-    return parseResults(ret);
+    Object[][] keys = new Object[1][];
+    long[] values = new long[1];
+    boolean found = lowerEntry(indexId, key, keys, values);
+    if (!found) {
+      return null;
+    }
+    return new Index.MyEntry(keys[0], values[0]);
   }
 
   @Override
   public Map.Entry<Object[], Object> floorEntry(Object[] key) {
-    byte[] keyBytes = new byte[8];
-    writeLong(keyBytes, (long)key[0]);
+    Object[][] keys = new Object[1][];
+    long[] values = new long[1];
 
-    byte[] ret = floorEntry(indexId, keyBytes);
-    return parseResults(ret);
+    boolean found = floorEntry(indexId, key, keys, values);
+    if (!found) {
+      return null;
+    }
+    return new Index.MyEntry(keys[0], values[0]);
   }
 
   @Override
@@ -234,7 +210,7 @@ public class NativePartitionedTreeImpl extends NativePartitionedTree implements 
         if (entry == null) {
           break;
         }
-        if ((long) entry.getKey()[0] != (long) key[0]) {
+        if (0 != index.getComparator().compare(entry.getKey(), key)) {
           return ret;
         }
         ret.add(entry);
@@ -246,147 +222,45 @@ public class NativePartitionedTreeImpl extends NativePartitionedTree implements 
 
   @Override
   public Map.Entry<Object[], Object> ceilingEntry(Object[] key) {
-    long[] ret = ceilingEntry(indexId, (long)key[0]);
-    if (ret == null) {
+    Object[][] keys = new Object[1][];
+    long[] values = new long[1];
+
+    boolean found = ceilingEntry(indexId, key, keys, values);
+    if (!found) {
       return null;
     }
-    return new Index.MyEntry(new Object[]{ret[0]}, ret[1]);
+    return new Index.MyEntry(keys[0], values[0]);
   }
 
   @Override
   public Map.Entry<Object[], Object> lastEntry() {
-    byte[] ret = lastEntry2(indexId);
-    return parseResults(ret);
+
+    Object[][] keys = new Object[1][];
+    long[] values = new long[1];
+
+    boolean found = lastEntry2(indexId, keys, values);
+    if (!found) {
+      return null;
+    }
+    return new Index.MyEntry(keys[0], values[0]);
   }
 
   @Override
   public Map.Entry<Object[], Object> firstEntry() {
-    byte[] ret = firstEntry2(indexId);
-    return parseResults(ret);
+
+    Object[][] keys = new Object[1][];
+    long[] values = new long[1];
+
+    boolean found = firstEntry2(indexId, keys, values);
+    if (!found) {
+      return null;
+    }
+    return new Index.MyEntry(keys[0], values[0]);
   }
 
   @Override
   public void clear() {
     clear(indexId);
-  }
-
-  private Map.Entry<Object[],Object> parseResults(byte[] ret) {
-    try {
-      if (ret == null) {
-        return null;
-      }
-      int offset = 0;
-      int len = readInt(ret, offset);
-      offset += 4;
-      if (len == 0) {
-        return null;
-      }
-      long key = readLong(ret, offset);
-      offset += 8;
-      long value = readLong(ret, offset);
-      offset += 8;
-      return new Index.MyEntry(new Object[]{key}, value);
-    }
-    catch (Exception e) {
-      throw new RuntimeException(e);
-    }
-  }
-
-
-  private int parseResults(byte[] results, Object[][] keys, long[] values) throws IOException {
-    int offset = 0;
-    int count = readInt(results, offset);
-    offset += 4;
-    long[] ret = new long[count];
-    for (int i = 0; i < count; i++) {
-      int len = readInt(results, offset);
-      offset += 4;
-      long key = readLong(results, offset);
-      offset += 8;
-      long value = readLong(results, offset);
-      offset += 8;
-      keys[i] = new Object[]{key};
-      values[i] = value;
-      ret[i] = key;
-    }
-    return count;
-  }
-
-  private int parseResultsBytes(byte[] results, Object[][] keys, byte[][] values) throws IOException {
-    int offset = 0;
-    int count = readInt(results, offset);
-    long[] ret = new long[count];
-    for (int i = 0; i < count; i++) {
-      int len = readInt(results, offset);
-      offset += 4;
-      long key = readLong(results, offset);
-      offset += 8;
-      len = readInt(results, offset);
-      byte[] bytes = new byte[len];
-      System.arraycopy(results, offset, bytes, 0, len);
-      offset += len;
-      keys[i] = new Object[]{key};
-      values[i] = bytes;
-      ret[i] = key;
-    }
-    return count;
-  }
-
-//  private List<Map.Entry<Object[], Object>> parseResultsList(byte[] results) throws IOException {
-//    AtomicInteger offset = new AtomicInteger();
-//    int count = readInt(results, offset);
-//    List<Map.Entry<Object[], Object>> retList = new ArrayList<>();
-//    for (int i = 0; i < count; i++) {
-//      int len = readInt(results, offset);
-//      long key = readLong(results, offset);
-//      long value = readLong(results, offset);
-//      Index.MyEntry<Object[], Object> entry = new Index.MyEntry<>(new Object[]{key}, value);
-//      retList.add(entry);
-//    }
-//    return retList;
-//  }
-
-  public final long readLong(byte[] bytes, int offset) throws IOException {
-    long result = 0;
-    for (int i = 0; i < 8; i++) {
-      result <<= 8;
-      result |= (bytes[i + offset] & 0xFF);
-    }
-    return result;
-  }
-
-  public final void writeLong(byte[] bytes, long v) {
-    bytes[0] = (byte)(v >>> 56);
-    bytes[1] = (byte)(v >>> 48);
-    bytes[2] = (byte)(v >>> 40);
-    bytes[3] = (byte)(v >>> 32);
-    bytes[4] = (byte)(v >>> 24);
-    bytes[5] = (byte)(v >>> 16);
-    bytes[6] = (byte)(v >>>  8);
-    bytes[7] = (byte)(v >>>  0);
-  }
-
-  public final int readInt(byte[] bytes, int offset) throws IOException {
-    return bytes[offset] << 24 |
-        (bytes[1 + offset] & 0xFF) << 16 |
-        (bytes[2 + offset] & 0xFF) << 8 |
-        (bytes[3 + offset] & 0xFF);
-  }
-
-  public static int bytesToInt(byte[] bytes, int offset) {
-    return bytes[offset] << 24 |
-        (bytes[1 + offset] & 0xFF) << 16 |
-        (bytes[2 + offset] & 0xFF) << 8 |
-        (bytes[3 + offset] & 0xFF);
-  }
-
-  public static long bytesToLong(byte[] b, int offset) {
-    long result = 0;
-    for (int i = 0; i < 8; i++) {
-      result <<= 8;
-      result |= (b[i + offset] & 0xFF);
-    }
-    return result;
   }
 
 }

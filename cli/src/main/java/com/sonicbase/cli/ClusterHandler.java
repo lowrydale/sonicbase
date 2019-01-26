@@ -742,26 +742,11 @@ public class ClusterHandler {
             p.waitFor();
           }
           else {
-            ProcessBuilder builder = new ProcessBuilder().command("ssh", "-n", "-f", "-o",
-                USER_KNOWN_HOSTS_FILE_DEV_NULL_STR, "-o", STRICT_HOST_KEY_CHECKING_NO_STR, deployUser + "@" +
-                    address, "mv", dataDir, dataDir + LAST_STR);
-            Process p = builder.start();
-            p.waitFor();
-
-            builder = new ProcessBuilder().command("ssh", "-n", "-f", "-o",
-                USER_KNOWN_HOSTS_FILE_DEV_NULL_STR, "-o", STRICT_HOST_KEY_CHECKING_NO_STR, deployUser + "@" +
-                    address, "rm", "-rf", dataDir + LAST_STR);
-            cli.println("purging: address=" + address + ", dir=" + dataDir);
-            p = builder.start();
-            p.waitFor();
-
-            //delete it twice to make sure
-            builder = new ProcessBuilder().command("ssh", "-n", "-f", "-o",
-                USER_KNOWN_HOSTS_FILE_DEV_NULL_STR, "-o", STRICT_HOST_KEY_CHECKING_NO_STR, deployUser + "@" +
-                    address, "rm", "-rf", dataDir + LAST_STR);
-            cli.println("purging: address=" + address + ", dir=" + dataDir);
-            p = builder.start();
-            p.waitFor();
+            purgeSubDirectory(dataDir, address, deployUser, "deletes");
+            purgeSubDirectory(dataDir, address, deployUser, "log");
+            purgeSubDirectory(dataDir, address, deployUser, "lrc");
+            purgeSubDirectory(dataDir, address, deployUser, "snapshot");
+            purgeSubDirectory(dataDir, address, deployUser, "nextRecordId");
           }
         }
         return null;
@@ -771,6 +756,23 @@ public class ClusterHandler {
       future.get();
     }
     cli.println("Finished purging: cluster=" + cluster);
+  }
+
+  private void purgeSubDirectory(String dataDir, String address, String deployUser, String subDir) throws IOException, InterruptedException {
+    ProcessBuilder builder = new ProcessBuilder().command("ssh", "-n", "-f", "-o",
+        USER_KNOWN_HOSTS_FILE_DEV_NULL_STR, "-o", STRICT_HOST_KEY_CHECKING_NO_STR, deployUser + "@" +
+            address, "rm", "-rf", dataDir + "/" + subDir);
+    cli.println("purging: address=" + address + ", dir=" + dataDir + "/" + subDir);
+    Process p = builder.start();
+    p.waitFor();
+
+    //delete it twice to make sure
+    builder = new ProcessBuilder().command("ssh", "-n", "-f", "-o",
+        USER_KNOWN_HOSTS_FILE_DEV_NULL_STR, "-o", STRICT_HOST_KEY_CHECKING_NO_STR, deployUser + "@" +
+            address, "rm", "-rf", dataDir + "/" + subDir);
+    cli.println("purging: address=" + address + ", dir=" + dataDir + "/" + subDir);
+    p = builder.start();
+    p.waitFor();
   }
 
   private void stopReplica(final int replica, final Config config, final List<Config.Shard> shards,

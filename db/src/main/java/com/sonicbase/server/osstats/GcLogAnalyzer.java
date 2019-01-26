@@ -72,8 +72,9 @@ public class GcLogAnalyzer {
 
   private void handleLine(String line) {
     line = line.trim();
-    if (line.startsWith("[Times:")) {
-      int pos = line.indexOf("user=");
+    if (line.contains("[Times:")) {
+      int pos0 = line.indexOf("[Times:");
+      int pos = line.indexOf("user=", pos0);
       int pos2 = line.indexOf(' ', pos);
       double user = Double.parseDouble(line.substring(pos + "user=".length(), pos2));
       pos = line.indexOf("sys=");

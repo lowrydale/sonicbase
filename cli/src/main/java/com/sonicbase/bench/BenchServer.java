@@ -4,6 +4,7 @@ import com.fasterxml.jackson.databind.ObjectMapper;
 import com.fasterxml.jackson.databind.node.ArrayNode;
 import com.fasterxml.jackson.databind.node.ObjectNode;
 import com.sonicbase.common.Config;
+import com.sonicbase.server.NettyServer;
 import org.apache.commons.cli.*;
 import org.apache.commons.io.IOUtils;
 import org.eclipse.jetty.server.Request;
@@ -59,6 +60,7 @@ public class BenchServer {
   public static class HelloHandler extends AbstractHandler {
     public void handle(String target, Request baseRequest, HttpServletRequest request, HttpServletResponse response)
         throws IOException {
+      initLogger(request);
       logger.info("target={}", target);
       logger.info("baseRequest, contextPath={}, queryString={}", baseRequest.getContextPath(),
           baseRequest.getQueryString());
@@ -74,10 +76,9 @@ public class BenchServer {
             Long.valueOf(request.getParameter(COUNT_STR)), false);
       }
       else if (uri.startsWith("/bench/start/delete")) {
-        benchDelete.start(getAddress(request), insertBegin, insertHighest, request.getParameter(CLUSTER_STR), Integer.valueOf(request.getParameter(SHARD_COUNT_STR)),
+        benchDelete.start(getAddress(request), request.getParameter(CLUSTER_STR), Integer.valueOf(request.getParameter(SHARD_COUNT_STR)),
             Integer.valueOf(request.getParameter(SHARD_STR)),
-            Long.valueOf(request.getParameter("offset")),
-            Long.valueOf(request.getParameter(COUNT_STR)), false);
+            Long.valueOf(request.getParameter(COUNT_STR)));
       }
       else if (uri.startsWith("/bench/stop/insert")) {
         benchInsert.stop();
@@ -157,6 +158,44 @@ public class BenchServer {
       response.setStatus(HttpServletResponse.SC_OK);
       baseRequest.setHandled(true);
       response.getWriter().println(ret);
+    }
+
+    private boolean initializedLogger = false;
+    private AtomicLong count = new AtomicLong();
+
+    private void initLogger(HttpServletRequest request) {
+      if (initializedLogger) {
+        return;
+      }
+      String shardStr = request.getParameter(SHARD_STR);
+      if (shardStr != null) {
+        String cluster = request.getParameter(CLUSTER_STR);
+        if (cluster != null) {
+          try {
+            InputStream in = null;
+            File file = new File(System.getProperty("user.dir"), "config/config-" + cluster + ".yaml");
+            if (file.exists()) {
+              in = new FileInputStream(file);
+            }
+
+            if (in == null) {
+              in = NettyServer.class.getResourceAsStream("/config/config-" + cluster + ".yaml");
+            }
+            String configStr = IOUtils.toString(new BufferedInputStream(in), "utf-8");
+
+            Config config = new Config(configStr);
+
+            initializedLogger = true;
+
+            int shard = Integer.parseInt(shardStr);
+            com.sonicbase.logger.Logger.init(cluster, shard + 10_000, 0, count, config.getString("logstashServers"));
+          }
+          catch (Exception e) {
+            logger.error("error initializing logger", e);
+          }
+        }
+      }
+
     }
   }
 

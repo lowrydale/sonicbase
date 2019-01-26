@@ -10,42 +10,34 @@ extern "C" {
 /*
  * Class:     com_sonicbase_index_NativePartitionedTree
  * Method:    initIndex
- * Signature: ()J
+ * Signature: ([I)J
  */
 JNIEXPORT jlong JNICALL Java_com_sonicbase_index_NativePartitionedTree_initIndex
-  (JNIEnv *, jobject);
+  (JNIEnv *, jobject, jintArray);
 
 /*
  * Class:     com_sonicbase_index_NativePartitionedTree
  * Method:    put
- * Signature: (J[BJ)J
+ * Signature: (J[Ljava/lang/Object;J)J
  */
 JNIEXPORT jlong JNICALL Java_com_sonicbase_index_NativePartitionedTree_put
-  (JNIEnv *, jobject, jlong, jbyteArray, jlong);
-
-/*
- * Class:     com_sonicbase_index_NativePartitionedTree
- * Method:    putBytes
- * Signature: (J[B[B)[B
- */
-JNIEXPORT jbyteArray JNICALL Java_com_sonicbase_index_NativePartitionedTree_putBytes
-  (JNIEnv *, jobject, jlong, jbyteArray, jbyteArray);
+  (JNIEnv *, jobject, jlong, jobjectArray, jlong);
 
 /*
  * Class:     com_sonicbase_index_NativePartitionedTree
  * Method:    get
- * Signature: (J[B)J
+ * Signature: (J[Ljava/lang/Object;)J
  */
 JNIEXPORT jlong JNICALL Java_com_sonicbase_index_NativePartitionedTree_get
-  (JNIEnv *, jobject, jlong, jbyteArray);
+  (JNIEnv *, jobject, jlong, jobjectArray);
 
 /*
  * Class:     com_sonicbase_index_NativePartitionedTree
  * Method:    remove
- * Signature: (J[B)J
+ * Signature: (J[Ljava/lang/Object;)J
  */
 JNIEXPORT jlong JNICALL Java_com_sonicbase_index_NativePartitionedTree_remove
-  (JNIEnv *, jobject, jlong, jbyteArray);
+  (JNIEnv *, jobject, jlong, jobjectArray);
 
 /*
  * Class:     com_sonicbase_index_NativePartitionedTree
@@ -57,91 +49,67 @@ JNIEXPORT void JNICALL Java_com_sonicbase_index_NativePartitionedTree_clear
 
 /*
  * Class:     com_sonicbase_index_NativePartitionedTree
- * Method:    tailBlock
- * Signature: (J[BIZ)[B
- */
-JNIEXPORT jbyteArray JNICALL Java_com_sonicbase_index_NativePartitionedTree_tailBlock
-  (JNIEnv *, jobject, jlong, jbyteArray, jint, jboolean);
-
-/*
- * Class:     com_sonicbase_index_NativePartitionedTree
  * Method:    tailBlockArray
- * Signature: (J[BIZ)[J
+ * Signature: (J[Ljava/lang/Object;IZ[[Ljava/lang/Object;[J)I
  */
-JNIEXPORT jlongArray JNICALL Java_com_sonicbase_index_NativePartitionedTree_tailBlockArray
-  (JNIEnv *, jobject, jlong, jbyteArray, jint, jboolean);
+JNIEXPORT jint JNICALL Java_com_sonicbase_index_NativePartitionedTree_tailBlockArray
+  (JNIEnv *, jobject, jlong, jobjectArray, jint, jboolean, jobjectArray, jlongArray);
 
 /*
  * Class:     com_sonicbase_index_NativePartitionedTree
  * Method:    headBlockArray
- * Signature: (J[BIZ)[J
+ * Signature: (J[Ljava/lang/Object;IZ[[Ljava/lang/Object;[J)I
  */
-JNIEXPORT jlongArray JNICALL Java_com_sonicbase_index_NativePartitionedTree_headBlockArray
-  (JNIEnv *, jobject, jlong, jbyteArray, jint, jboolean);
-
-/*
- * Class:     com_sonicbase_index_NativePartitionedTree
- * Method:    tailBlockBytes
- * Signature: (J[BIZ)[B
- */
-JNIEXPORT jbyteArray JNICALL Java_com_sonicbase_index_NativePartitionedTree_tailBlockBytes
-  (JNIEnv *, jobject, jlong, jbyteArray, jint, jboolean);
-
-/*
- * Class:     com_sonicbase_index_NativePartitionedTree
- * Method:    headBlock
- * Signature: (J[BIZ)[B
- */
-JNIEXPORT jbyteArray JNICALL Java_com_sonicbase_index_NativePartitionedTree_headBlock
-  (JNIEnv *, jobject, jlong, jbyteArray, jint, jboolean);
+JNIEXPORT jint JNICALL Java_com_sonicbase_index_NativePartitionedTree_headBlockArray
+  (JNIEnv *, jobject, jlong, jobjectArray, jint, jboolean, jobjectArray, jlongArray);
 
 /*
  * Class:     com_sonicbase_index_NativePartitionedTree
  * Method:    higherEntry
- * Signature: (JJ)[J
+ * Signature: (J[Ljava/lang/Object;[[Ljava/lang/Object;[J)Z
  */
-JNIEXPORT jlongArray JNICALL Java_com_sonicbase_index_NativePartitionedTree_higherEntry
-  (JNIEnv *, jobject, jlong, jlong);
+JNIEXPORT jboolean JNICALL Java_com_sonicbase_index_NativePartitionedTree_higherEntry
+  (JNIEnv *, jobject, jlong, jobjectArray, jobjectArray, jlongArray);
 
 /*
  * Class:     com_sonicbase_index_NativePartitionedTree
  * Method:    lowerEntry
- * Signature: (J[B)[B
+ * Signature: (J[Ljava/lang/Object;[[Ljava/lang/Object;[J)Z
  */
-JNIEXPORT jbyteArray JNICALL Java_com_sonicbase_index_NativePartitionedTree_lowerEntry
-  (JNIEnv *, jobject, jlong, jbyteArray);
+JNIEXPORT jboolean JNICALL Java_com_sonicbase_index_NativePartitionedTree_lowerEntry
+  (JNIEnv *, jobject, jlong, jobjectArray, jobjectArray, jlongArray);
 
 /*
  * Class:     com_sonicbase_index_NativePartitionedTree
  * Method:    floorEntry
- * Signature: (J[B)[B
+ * Signature: (J[Ljava/lang/Object;[[Ljava/lang/Object;[J)Z
  */
-JNIEXPORT jbyteArray JNICALL Java_com_sonicbase_index_NativePartitionedTree_floorEntry
-  (JNIEnv *, jobject, jlong, jbyteArray);
+JNIEXPORT jboolean JNICALL Java_com_sonicbase_index_NativePartitionedTree_floorEntry
+  (JNIEnv *, jobject, jlong, jobjectArray, jobjectArray, jlongArray);
 
 /*
  * Class:     com_sonicbase_index_NativePartitionedTree
  * Method:    ceilingEntry
- * Signature: (JJ)[J
+ * Signature: (J[Ljava/lang/Object;[[Ljava/lang/Object;[J)Z
  */
-JNIEXPORT jlongArray JNICALL Java_com_sonicbase_index_NativePartitionedTree_ceilingEntry
-  (JNIEnv *, jobject, jlong, jlong);
+JNIEXPORT jboolean JNICALL Java_com_sonicbase_index_NativePartitionedTree_ceilingEntry
+  (JNIEnv *, jobject, jlong, jobjectArray, jobjectArray, jlongArray);
 
 /*
  * Class:     com_sonicbase_index_NativePartitionedTree
  * Method:    lastEntry2
- * Signature: (J)[B
+ * Signature: (J[[Ljava/lang/Object;[J)Z
  */
-JNIEXPORT jbyteArray JNICALL Java_com_sonicbase_index_NativePartitionedTree_lastEntry2
-  (JNIEnv *, jobject, jlong);
+JNIEXPORT jboolean JNICALL Java_com_sonicbase_index_NativePartitionedTree_lastEntry2
+  (JNIEnv *, jobject, jlong, jobjectArray, jlongArray);
 
 /*
  * Class:     com_sonicbase_index_NativePartitionedTree
  * Method:    firstEntry2
- * Signature: (J)[B
+ * Signature: (J[[Ljava/lang/Object;[J)Z
  */
-JNIEXPORT jbyteArray JNICALL Java_com_sonicbase_index_NativePartitionedTree_firstEntry2
-  (JNIEnv *, jobject, jlong);
+JNIEXPORT jboolean JNICALL Java_com_sonicbase_index_NativePartitionedTree_firstEntry2
+  (JNIEnv *, jobject, jlong, jobjectArray, jlongArray);
 
 #ifdef __cplusplus
 }

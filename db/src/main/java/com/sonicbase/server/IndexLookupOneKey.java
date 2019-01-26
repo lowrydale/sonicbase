@@ -47,31 +47,56 @@ public class IndexLookupOneKey extends IndexLookup {
 
       Map.Entry[] entries = new Map.Entry[]{entry};
 
-      entry = processEntries(entry, countSkipped, entries);
+      Object[][] keys = new Object[count][];
+      Object[] values = new Object[count];
+
+      keys[0] = entry.getKey();
+      values[0] = entry.getValue();
+      AtomicInteger entriesPos = new AtomicInteger(1);
+
+      entry = processEntries(entry.getKey(), entry.getValue(), countSkipped, keys, values, entriesPos);
     }
     return entry;
   }
 
 
   private class ProcessEntries {
-    private final Map.Entry[] entries;
+    Object[][] keys;
+    Object[] values;
+    AtomicInteger entriesPos;
     private final AtomicInteger countSkipped;
     private boolean shouldContinue;
     private boolean shouldReturn;
-    private Map.Entry<Object[], Object> entry;
+    private Object[] key;
+    private Object value;
+    private Object[] retKey;
+    private Object retValue;
 
-    ProcessEntries(Map.Entry<Object[], Object> entry, Map.Entry[] entries, AtomicInteger countSkipped) {
-      this.entry = entry;
-      this.entries = entries;
+    ProcessEntries(Object[] key, Object value, Object[][] keys, Object[] values, AtomicInteger entriesPos, AtomicInteger countSkipped) {
+      this.key = key;
+      this.value = value;
+      this.keys = keys;
+      this.entriesPos = entriesPos;
+      this.values = values;
       this.countSkipped = countSkipped;
     }
 
-    public ProcessEntries invoke() {
-      for (Map.Entry<Object[], Object> currEntry : entries) {
-        entry = currEntry;
+    public Object[] getRetKey() {
+      return retKey;
+    }
 
-        CheckForEndOfTraversal checkForEndOfTraversal = new CheckForEndOfTraversal(entry, currEntry).invoke();
-        entry = checkForEndOfTraversal.getEntry();
+    public Object getRetValue() {
+      return retValue;
+    }
+
+    public ProcessEntries invoke() {
+      for (int i = 0; i < entriesPos.get(); i++) {
+        retKey = keys[i];
+        retValue = values[i];
+
+        CheckForEndOfTraversal checkForEndOfTraversal = new CheckForEndOfTraversal(retKey, retValue, keys[i], values[i]).invoke();
+        retKey = checkForEndOfTraversal.getRetKey();
+        retValue = checkForEndOfTraversal.getRetValue();
         if (checkForEndOfTraversal.shouldBreak()) {
           shouldReturn = true;
           return this;
@@ -82,11 +107,13 @@ public class IndexLookupOneKey extends IndexLookup {
           return this;
         }
 
-        ProcessKey processKey = new ProcessKey(countSkipped, entry, currEntry).invoke();
-        entry = processKey.getEntry();
+        ProcessKey processKey = new ProcessKey(countSkipped, retKey, retValue, keys[i], values[i]).invoke();
+        retKey = processKey.getKey();
+        retValue = processKey.getValue();
         if (processKey.shouldReturn()) {
           shouldReturn = true;
           return this;
+          
         }
       }
       return this;
@@ -104,24 +131,45 @@ public class IndexLookupOneKey extends IndexLookup {
     }
   }
 
-  private Map.Entry<Object[], Object> processEntries(Map.Entry<Object[], Object> entry, AtomicInteger countSkipped,
-                                                     Map.Entry[] entries) {
+  private Map.Entry<Object[], Object> processEntries(Object[] key, Object value, AtomicInteger countSkipped,
+                                                     Object[][] keys, Object[] values, AtomicInteger entriesPos) {
     while (!(retRecords.size() >= count || retKeyRecords.size() >= count)) {
-      ProcessEntries process = new ProcessEntries(entry, entries, countSkipped).invoke();
-      entry = process.entry;
+      ProcessEntries process = new ProcessEntries(key, value, keys, values, entriesPos, countSkipped).invoke();
+      key = process.getRetKey();
+      value = process.getRetValue();
+      entriesPos.set(0);
+
       if (process.shouldContinue) {
         continue;
       }
       if (process.shouldReturn) {
+        if (key == null) {
+          return null;
+        }
+        Map.Entry<Object[], Object> entry = new Index.MyEntry<>(key, value);
         return entry;
       }
-      GetNextEntries next = new GetNextEntries(entry).invoke();
-      entries = next.entries;
-      entry = next.getRetEntry();
+      if (retRecords.size() >= count || retKeyRecords.size() >= count) {
+        if (key == null) {
+          return null;
+        }
+        Map.Entry<Object[], Object> entry = new Index.MyEntry<>(key, value);
+        return entry;
+      }
+
+      GetNextEntries next = new GetNextEntries(key, value, keys, values, entriesPos).invoke();
       if (next.shouldRet) {
+        if (next.getRetKey() == null) {
+          return null;
+        }
+        Map.Entry<Object[], Object> entry = new Index.MyEntry<>(next.getRetKey(), next.getRetValue());
         return entry;
       }
     }
+    if (key == null) {
+      return null;
+    }
+    Map.Entry<Object[], Object> entry = new Index.MyEntry<>(key, value);
     return entry;
   }
 
@@ -450,35 +498,45 @@ public class IndexLookupOneKey extends IndexLookup {
   }
 
   private class CheckForEndOfTraversal {
+    private final Object[] currKey;
+    private final Object currValue;
+    private Object[] key;
+    private Object value;
     private boolean myResult;
-    private Map.Entry<Object[], Object> entry;
-    private final Map.Entry<Object[], Object> currEntry;
 
-    public CheckForEndOfTraversal(Map.Entry<Object[], Object> entry, Map.Entry<Object[], Object> currEntry) {
-      this.entry = entry;
-      this.currEntry = currEntry;
+    public CheckForEndOfTraversal(Object[] key, Object value, Object[] currKey, Object currValue) {
+      this.key = key;
+      this.value = value;
+      this.currKey = currKey;
+      this.currValue = currValue;
     }
 
     boolean shouldBreak() {
       return myResult;
     }
 
-    public Map.Entry<Object[], Object> getEntry() {
-      return entry;
+    public Object[] getRetKey() {
+      return key;
+    }
+
+    public Object getRetValue() {
+      return value;
     }
 
     public CheckForEndOfTraversal invoke() {
-      if (currEntry == null) {
-        entry = null;
+      if (currKey == null) {
+        key = null;
+        value = null;
         myResult = true;
         return this;
       }
 
       if (originalLeftKey != null) {
-        int compare = DatabaseCommon.compareKey(indexSchema.getComparators(), currEntry.getKey(), originalLeftKey);
+        int compare = DatabaseCommon.compareKey(indexSchema.getComparators(), currKey, originalLeftKey);
         if (compare == 0 &&
             (leftOperator.equals(BinaryExpression.Operator.LESS) || leftOperator.equals(BinaryExpression.Operator.GREATER))) {
-          entry = null;
+          key = null;
+          value = null;
           myResult = true;
           return this;
         }
@@ -496,12 +554,14 @@ public class IndexLookupOneKey extends IndexLookup {
 
     private boolean handleCompareIsLess(int compare) {
       if (compare == -1 && (ascending != null && !ascending) && leftOperator.equals(BinaryExpression.Operator.GREATER_EQUAL)) {
-        entry = null;
+        key = null;
+        value = null;
         myResult = true;
         return true;
       }
       if (compare == -1 && (ascending != null && !ascending) && leftOperator.equals(BinaryExpression.Operator.GREATER)) {
-        entry = null;
+        key = null;
+        value = null;
         myResult = true;
         return true;
       }
@@ -510,12 +570,14 @@ public class IndexLookupOneKey extends IndexLookup {
 
     private boolean handleCompareIsGreater(int compare) {
       if (compare == 1 && (ascending == null || ascending) && leftOperator.equals(BinaryExpression.Operator.LESS_EQUAL)) {
-        entry = null;
+        key = null;
+        value = null;
         myResult = true;
         return true;
       }
       if (compare == 1 && (ascending == null || ascending) && leftOperator.equals(BinaryExpression.Operator.LESS)) {
-        entry = null;
+        key = null;
+        value = null;
         myResult = true;
         return true;
       }
@@ -525,22 +587,30 @@ public class IndexLookupOneKey extends IndexLookup {
 
   private class ProcessKey {
     private final AtomicInteger countSkipped;
+    private final Object[] currKey;
+    private final Object currValue;
+    private Object[] key;
+    private Object value;
     private boolean myResult;
-    private Map.Entry<Object[], Object> entry;
-    private final Map.Entry<Object[], Object> currEntry;
 
-    ProcessKey(AtomicInteger countSkipped, Map.Entry<Object[], Object> entry, Map.Entry<Object[], Object> currEntry) {
+    ProcessKey(AtomicInteger countSkipped, Object[] key, Object value, Object[] currKey, Object currValue) {
       this.countSkipped = countSkipped;
-      this.entry = entry;
-      this.currEntry = currEntry;
+      this.key = key;
+      this.value = value;
+      this.currKey = currKey;
+      this.currValue = currValue;
     }
 
     boolean shouldReturn() {
       return myResult;
     }
 
-    public Map.Entry<Object[], Object> getEntry() {
-      return entry;
+    public Object[] getKey() {
+      return key;
+    }
+
+    public Object getValue() {
+      return value;
     }
 
     public ProcessKey invoke() {
@@ -553,22 +623,24 @@ public class IndexLookupOneKey extends IndexLookup {
         GetRecords getRecords = new GetRecords(currKeyRecords, records).invoke();
         currKeyRecords = getRecords.getCurrKeyRecords();
         records = getRecords.getRecords();
-        Object[] keyToUse = currEntry.getKey();
+        Object[] keyToUse = currKey;
         if (keyToUse == null) {
           keyToUse = originalLeftKey;
         }
-        if (currEntry.getValue() != null) {
+        if (currValue != null) {
           AtomicBoolean done = new AtomicBoolean();
           handleRecord(viewVersion, keyToUse, evaluateExpression, records, currKeyRecords, done);
           if (done.get()) {
-            entry = null;
+            key = null;
+            value = null;
             myResult = true;
             return this;
           }
         }
       }
       if (leftOperator.equals(BinaryExpression.Operator.EQUAL)) {
-        entry = null;
+        key = null;
+        value = null;
         myResult = true;
         return this;
       }
@@ -595,7 +667,7 @@ public class IndexLookupOneKey extends IndexLookup {
       }
 
       public GetRecords invoke() {
-        Object unsafeAddress = currEntry.getValue();
+        Object unsafeAddress = currValue;
         if (keys) {
           if (unsafeAddress != null && !unsafeAddress.equals(0L)) {
             currKeyRecords = server.getAddressMap().fromUnsafeToKeys(unsafeAddress);
@@ -639,76 +711,85 @@ public class IndexLookupOneKey extends IndexLookup {
 
 
   private class GetNextEntries {
-    private final Map.Entry<Object[], Object> entry;
+    private final AtomicInteger entriesPos;
+    private final Object[] key;
+    private final Object value;
+    private Object[] retKey;
+    private Object retValue;
+    private final Object[][] keys;
+    private final Object[] values;
     private boolean shouldRet;
-    private Map.Entry<Object[], Object> retEntry;
-    private Map.Entry[] entries;
 
-    GetNextEntries(Map.Entry<Object[], Object> entry) {
-      this.entry = entry;
+    GetNextEntries(Object[] key, Object value, Object[][] keys, Object[] values, AtomicInteger entriesPos) {
+      this.key = key;
+      this.value = value;
+      this.keys = keys;
+      this.values = values;
+      this.entriesPos = entriesPos;
+    }
+
+    public Object[] getRetKey() {
+      return retKey;
+    }
+
+    public Object getRetValue() {
+      return retValue;
     }
 
     public GetNextEntries invoke() {
-      if (entry == null) {
+      if (key == null) {
         shouldRet = true;
-        retEntry = null;
+        retKey = null;
+        retValue = null;
         return this;
       }
       final int diff = Math.max(retRecords.size(), retKeyRecords.size());
       if (count - diff <= 0) {
         shouldRet = true;
-        retEntry = entry;
+        retKey = key;
+        retValue = value;
         return this;
       }
 
-      entries = visitMap(entry, diff);
+      visitMap(key, value, keys, values, entriesPos, diff);
 
-      if (entries == null || entries.length == 0) {
+      if (entriesPos.get() == 0) {
         shouldRet = true;
-        retEntry = null;
+        retKey = null;
+        retValue = null;
         return this;
       }
       shouldRet = false;
-      retEntry = entry;
+      retKey = key;
+      retValue = value;
       return this;
     }
 
-    private Map.Entry[] visitMap(Map.Entry<Object[], Object> entry, final int diff) {
-      Map.Entry[] localEntries;
+    private void visitMap(Object[] key, Object value, Object[][] keys, Object[] values, AtomicInteger entriesPos, final int diff) {
       if (ascending != null && !ascending) {
         final AtomicInteger countRead = new AtomicInteger();
-        final List<MapEntry<Object[], Object>> currEntries = new ArrayList<>();
-        index.visitHeadMap(entry.getKey(), (key, value) -> {
-          MapEntry<Object[], Object> curr = new MapEntry<>();
-          curr.setKey(key);
-          curr.setValue(value);
-          currEntries.add(curr);
+        index.visitHeadMap(key, (currKey, currValue) -> {
+          keys[entriesPos.get()] = currKey;
+          values[entriesPos.get()] = currValue;
+          entriesPos.getAndIncrement();
+
           return countRead.incrementAndGet() < count - diff;
         });
-        localEntries = currEntries.toArray(new Map.Entry[currEntries.size()]);
       }
       else {
         final AtomicInteger countRead = new AtomicInteger();
-        final List<MapEntry<Object[], Object>> currEntries = new ArrayList<>();
         final AtomicBoolean first = new AtomicBoolean(true);
-        index.visitTailMap(entry.getKey(), (key, value) -> {
+        index.visitTailMap(key, (currKey, currValue) -> {
           if (first.get()) {
             first.set(false);
             return true;
           }
-          MapEntry<Object[], Object> curr = new MapEntry<>();
-          curr.setKey(key);
-          curr.setValue(value);
-          currEntries.add(curr);
+          keys[entriesPos.get()] = currKey;
+          values[entriesPos.get()] = currValue;
+          entriesPos.getAndIncrement();
           return countRead.incrementAndGet() < count - diff;
         }, count + 2);
-        localEntries = currEntries.toArray(new Map.Entry[currEntries.size()]);
       }
-      return localEntries;
-    }
-
-    Map.Entry<Object[], Object> getRetEntry() {
-      return retEntry;
     }
   }
 }

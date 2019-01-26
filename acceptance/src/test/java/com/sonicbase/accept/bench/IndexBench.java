@@ -14,6 +14,7 @@ import java.io.IOException;
 import java.lang.reflect.Field;
 import java.util.ArrayList;
 import java.util.Comparator;
+import java.util.HashMap;
 import java.util.List;
 import java.util.concurrent.*;
 import java.util.concurrent.atomic.AtomicInteger;
@@ -175,7 +176,7 @@ public class IndexBench {
     TableSchema tableSchema = createTable();
     createIndexSchema(tableSchema);
 
-    index = new Index(9010, tableSchema, "_primarykey", new Comparator[]{DataType.getLongComparator()});
+    index = new Index(9010, new HashMap<Long, Boolean>(), tableSchema, "_primarykey", new Comparator[]{DataType.getLongComparator()});
     nativeIndex = (NativePartitionedTreeImpl) index.getImpl();
     new IndexBench().bench();
   }

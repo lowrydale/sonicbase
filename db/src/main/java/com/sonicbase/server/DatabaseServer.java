@@ -167,6 +167,65 @@ public class DatabaseServer {
   private ConcurrentHashMap<String, Map<String, AggregateStats>> aggregateServerStats = new ConcurrentHashMap<>();
 
 
+  private Thread threadMonitor;
+  private Map<Long, Boolean> isOpForRebalance = new ConcurrentHashMap<>();
+
+
+  public void shutdownRebalanceOpThread() {
+    if (threadMonitor != null) {
+      threadMonitor.interrupt();
+      try {
+        threadMonitor.join();
+      }
+      catch (InterruptedException e) {
+        Thread.currentThread().interrupt();
+      }
+      threadMonitor = null;
+    }
+  }
+  public void startRebalanceOpThread() {
+    threadMonitor = ThreadUtil.createThread(() -> {
+      while (true) {
+        try {
+          Thread.sleep(10_00);
+          int activeCount = Thread.activeCount();
+          Thread[] threads = new Thread[activeCount];
+          Thread.enumerate(threads);
+          for (Thread thread : threads) {
+            if (thread != null) {
+              Boolean value = isOpForRebalance.get(thread.getId());
+              if (value != null) {
+                if (!thread.isAlive()) {
+                  isOpForRebalance.remove(thread.getId());
+                  logger.info("removed thread from isOptForRebalance; name={}", thread.getName());
+                }
+              }
+            }
+          }
+        }
+        catch (InterruptedException e) {
+          Thread.currentThread().interrupt();
+          break;
+        }
+      }
+    }, "Index - threadMonitor");
+    threadMonitor.start();
+  }
+
+  public boolean getIsOpForRebalance() {
+    Boolean ret = isOpForRebalance.get(Thread.currentThread().getId());
+    if (ret == null) {
+      return false;
+    }
+    return ret;
+  }
+
+  public void setIsOpForRebalance(boolean rebalance) {
+    isOpForRebalance.put(Thread.currentThread().getId(), rebalance);
+  }
+
+
+
   public void startServerStatsMonitor() {
     if (serverStatsMonitorThread != null) {
       shutdownServerStatsMonitor();
@@ -229,6 +288,10 @@ public class DatabaseServer {
 
   public ReadManager getReadManager() {
     return readManager;
+  }
+
+  public Map<Long, Boolean> getIsOpForRebalanceMap() {
+    return isOpForRebalance;
   }
 
   private class AggregateStats {
@@ -442,6 +505,8 @@ public class DatabaseServer {
         initProNoOpMethodInvokers();
       }
     }
+    startRebalanceOpThread();
+
     updateManager.initStreamManager();
 
     this.replicationFactor = shards.get(0).getReplicas().size();
@@ -603,9 +668,13 @@ public class DatabaseServer {
       bulkImportManager.shutdown();
       streamManager.shutdown();
 
+      shutdownRebalanceOpThread();
+
       addressMap.shutdown();
 
       executor.shutdownNow();
+
+      shutdownServerStatsMonitor();
 
       logger.error("_sonicbase_shutdown_");
     }

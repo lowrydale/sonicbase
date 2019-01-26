@@ -18,6 +18,8 @@ import java.sql.ResultSet;
 import java.util.concurrent.atomic.AtomicInteger;
 import java.util.concurrent.atomic.AtomicLong;
 
+import static com.sonicbase.bench.BenchmarkInsert.STRING_KEY;
+
 public class BenchmarkRangeQuery {
 
   public static final Logger logger = LoggerFactory.getLogger(BenchmarkRangeQuery.class);
@@ -74,21 +76,47 @@ public class BenchmarkRangeQuery {
                   if (true) {
                     DatabaseClient client = ((ConnectionProxy)conn).getDatabaseClient();
                     client.syncSchema();
-                    IndexSchema indexSchema = client.getSchema("db").getTables().get("persons").getIndices().get("_primarykey");
+                    IndexSchema indexSchema = null;
+                    if (STRING_KEY) {
+                      indexSchema = client.getSchema("db").getTables().get("strings").getIndices().get("_primarykey");
+                    }
+                    else {
+                      indexSchema = client.getSchema("db").getTables().get("persons").getIndices().get("_primarykey");
+                    }
                     TableSchema.Partition[] partitions = indexSchema.getCurrPartitions();
                     Object[][] keys = new Object[partitions.length][];
-                    keys[0] = new Object[]{0L};
+                    if (STRING_KEY) {
+                      keys[0] = new Object[]{"00000000000000000000".getBytes("utf-8")};
+                    }
+                    else {
+                      keys[0] = new Object[]{0L};
+                    }
                     for (int m = 1; m < partitions.length; m++) {
                       Object[] upperKey = partitions[m - 1].getUpperKey();
                       keys[m] = upperKey;
                     }
                     int offset = shard % partitions.length;
-                    long actualStartId = (long)keys[offset][0];
-                    logger.info("starting id=" + actualStartId);
+                    long actualLongStartId = 0;
+                    byte[] actualStringStartId = null;
+                    if (STRING_KEY) {
+                      actualStringStartId = (byte[])keys[offset][0];
+                    }
+                    else {
+                      actualLongStartId = (long) keys[offset][0];
+                    }
                     cycle.incrementAndGet();
                     long begin = System.nanoTime();
-                    stmt = conn.prepareStatement("select persons.id1  " +
-                        "from persons where id1 >= " + actualStartId + " order by id1 asc");
+
+                    if (STRING_KEY) {
+                      logger.info("starting id='" +  new String(actualStringStartId, "utf-8"));
+                      stmt = conn.prepareStatement("select id1  " +
+                          "from strings where id1 >= '" + new String(actualStringStartId, "utf-8") + "' order by id1 asc");
+                    }
+                    else {
+                      logger.info("starting id=" + actualLongStartId);
+                      stmt = conn.prepareStatement("select persons.id1  " +
+                          "from persons where id1 >= " + actualLongStartId + " order by id1 asc");
+                    }
                     long beginNano = System.nanoTime();
                     ret = stmt.executeQuery();
                     totalSelectDuration.addAndGet(System.nanoTime() - begin);
@@ -102,25 +130,32 @@ public class BenchmarkRangeQuery {
                       }
                       totalSelectDuration.addAndGet(System.nanoTime() - begin);
 
-                      if (countThisPass == 0) {
-                        logger.info("first key returned=" + ret.getLong("id1"));
+                      if (!STRING_KEY) {
+                        if (countThisPass == 0) {
+                          logger.info("first key returned=" + ret.getLong("id1"));
+                        }
+                        long idRead = ret.getLong("id1");
+                        if (idRead < lastId) {
+                          logger.error("key returned out of order: idRead={}, lastId={} #############################################", idRead, lastId);
+                        }
+                        lastId = idRead;
                       }
-                      long idRead = ret.getLong("id1");
-                      if (idRead < lastId) {
-                        logger.error("key returned out of order: idRead={}, lastId={} #############################################", idRead, lastId);
-                      }
-                      lastId = idRead;
                       countThisPass++;
                       if (readCount.incrementAndGet() % 100000 == 0) {
                         StringBuilder builder = new StringBuilder();
-                        builder.append("currKey=").append(ret.getLong("id1"));
+                        if (STRING_KEY) {
+                          builder.append("currKey=").append(ret.getString("id1"));
+                        }
+                        else {
+                          builder.append("currKey=").append(ret.getLong("id1"));
+                        }
                         builder.append(", count=").append(readCount.get());
                         builder.append(", countThisPass=").append(countThisPass);
                         Snapshot snapshot = LOOKUP_STATS.getSnapshot();
                         builder.append(String.format(", rate=%.2f", readCount.get() / (double) (System.currentTimeMillis() - totalBegin.get()) * 1000f));
                         builder.append(String.format(", avg=%.2f nanos", totalSelectDuration.get() / (double) readCount.get()));
                         builder.append(String.format(", 99th=%.2f nanos", snapshot.get99thPercentile()));
-                        builder.append(String.format(", max=%d", snapshot.getMax()));
+                        builder.append(String.format(", max=%d nanos", snapshot.getMax()));
                         builder.append(", errorCount=").append(selectErrorCount.get());
 
                         logger.info(builder.toString());

@@ -55,8 +55,8 @@ public class TestPartitionedIndex {
 
   @AfterClass(alwaysRun = true)
   public void afterClass() throws SQLException {
-//    connA.close();
-//    connB.close();
+    conn.close();
+    //connB.close();
 
     for (com.sonicbase.server.DatabaseServer server : dbServers) {
       server.shutdown();

@@ -151,7 +151,6 @@ public class PartitionUtils {
 
     List<Integer> ret = new ArrayList<>();
 
-    List<Integer> selectedPartitions = new ArrayList<>();
     if (includeCurrPartitions) {
       TableSchema.Partition[] partitions = tableSchema.getIndices().get(indexName).getCurrPartitions();
       if (rightOperator == null) {
@@ -165,6 +164,7 @@ public class PartitionUtils {
     }
 
     if (includeLastPartitions) {
+      List<Integer> selectedPartitions = new ArrayList<>();
       findOrderedPartitionsForRecordLastPartitions(tableSchema, indexName, leftOperator, rightOperator, leftKey,
           rightKey, ascending, comparators, ret, selectedPartitions);
     }

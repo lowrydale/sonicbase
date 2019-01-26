@@ -75,7 +75,7 @@ public class BulkImportManagerTest {
     Map<Integer, TableSchema> tables = new HashMap<>();
     tableSchema = TestUtils.createTable();
     indexSchema = TestUtils.createIndexSchema(tableSchema);
-    stringIndexSchema = TestUtils.createStringIndexSchema(tableSchema);
+    stringIndexSchema = TestUtils.createStringIndexSchema(tableSchema, 1);
 
     when(server.getIndexSchema(anyString(), anyString(), anyString())).thenReturn(indexSchema);
     when(server.getShardCount()).thenReturn(2);
@@ -107,8 +107,8 @@ public class BulkImportManagerTest {
     when(server.getCommon()).thenReturn(common);
 
     Indices indices = new Indices();
-    indices.addIndex(server.getPort(), tableSchema, indexSchema.getName(), indexSchema.getComparators());
-    indices.addIndex(server.getPort(), tableSchema, stringIndexSchema.getName(), stringIndexSchema.getComparators());
+    indices.addIndex(server.getPort(), new HashMap<Long, Boolean>(), tableSchema, indexSchema.getName(), indexSchema.getComparators());
+    indices.addIndex(server.getPort(), new HashMap<Long, Boolean>(), tableSchema, stringIndexSchema.getName(), stringIndexSchema.getComparators());
     index = indices.getIndices().get(tableSchema.getName()).get(indexSchema.getName());
     stringIndex = indices.getIndices().get(tableSchema.getName()).get(stringIndexSchema.getName());
     when(server.getIndex(anyString(), anyString(), eq(indexSchema.getName()))).thenReturn(index);

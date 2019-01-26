@@ -339,6 +339,11 @@ public class InsertStatementHandler implements StatementHandler {
         for (int j = 0; j < columnNames.size(); j++) {
           if (columnNames.get(j).equals(indexFields[i])) {
             key[i] = values.get(j);
+
+            String fieldName = indexSchema.getValue().getFields()[i];
+            FieldSchema fieldSchema = tableSchema.getFields().get(tableSchema.getFieldOffset(fieldName));
+
+            key[i] = fieldSchema.getType().getConverter().convert(key[i]);
           }
         }
       }

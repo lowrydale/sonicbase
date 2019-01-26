@@ -3,10 +3,10 @@ export SONIC_BASE_HOME=$4
 #export MODE=yprof
 mkdir $4/logs
 
-#if [ $5 == "4-dale" ]
-#then
-#  export MODE=yprof
-#fi
+if [ $5 == "4-dale" ]
+then
+  export MODE=yprof
+fi
 #if [ $5 == "4-dale-2" ]
 #then
 #  export MODE=yprof

@@ -48,7 +48,7 @@ public class IndexLookupTwoKeyTest {
     indexLookup.retRecords = new ArrayList<>();
     indexLookup.retKeyRecords = new ArrayList<>();
 
-    indexLookup.index = new Index(9010, tableSchema, indexLookup.indexSchema.getName(), indexLookup.indexSchema.getComparators());
+    indexLookup.index = new Index(9010, new HashMap<Long, Boolean>(),  tableSchema, indexLookup.indexSchema.getName(), indexLookup.indexSchema.getComparators());
 
 
 

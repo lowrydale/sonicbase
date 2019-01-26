@@ -922,7 +922,7 @@ public class TestDataTypes {
     assertEquals(ret.getFloat("id"), 1f);
   }
 
-  @Test
+  @Test(enabled=false)
   public void testWidth() throws SQLException {
     PreparedStatement stmt = conn.prepareStatement("create table width (id VARCHAR(16), id2 INTEGER, name VARCHAR(20), PRIMARY KEY (id))");
     stmt.executeUpdate();

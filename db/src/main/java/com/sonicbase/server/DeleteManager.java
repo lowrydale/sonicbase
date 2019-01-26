@@ -287,7 +287,7 @@ public class DeleteManager {
   private void processValue(IndexSchema indexSchema, Index index, Object[] currKey) throws InterruptedException {
     synchronized (index.getMutex(currKey)) {
       try {
-        Index.setIsOpForRebalance(true);
+        databaseServer.setIsOpForRebalance(true);
 
         Object value = index.remove(currKey); // will likely delete, so go ahead and delete and re-add later if needed
         if (value != null) {
@@ -302,14 +302,14 @@ public class DeleteManager {
         }
       }
       finally {
-        Index.setIsOpForRebalance(false);
+        databaseServer.setIsOpForRebalance(false);
       }
     }
   }
 
   private void processRecords(IndexSchema indexSchema, Index index, Object[] currKey, byte[][] content, Object value) throws InterruptedException {
     try {
-      Index.setIsOpForRebalance(true);
+      databaseServer.setIsOpForRebalance(true);
 
       if (indexSchema.isPrimaryKey()) {
         if ((Record.DB_VIEW_FLAG_DELETING & Record.getDbViewFlags(content[0])) == 0) {
@@ -329,7 +329,7 @@ public class DeleteManager {
       }
     }
     finally {
-      Index.setIsOpForRebalance(false);
+      databaseServer.setIsOpForRebalance(false);
     }
   }
 

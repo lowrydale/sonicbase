@@ -768,46 +768,93 @@ public class OSStatsManagerImpl {
         if (ch == null) {
           break;
         }
-        if (ch.indexOf("[Eden") != -1) {
-          int pos = ch.indexOf("Heap:");
-          if (pos != -1) {
-            int pos2 = ch.indexOf("(", pos);
-            if (pos2 != -1) {
-              String value = ch.substring(pos + "Heap:".length(), pos2).trim().toLowerCase();
-              double maxGig = 0;
-              if (value.contains("g")) {
-                maxGig = Double.valueOf(value.substring(0, value.length() - 1));
-              }
-              else if (value.contains("m")) {
-                maxGig = Double.valueOf(value.substring(0, value.length() - 1)) / 1000d;
-              }
-              else if (value.contains("t")) {
-                maxGig = Double.valueOf(value.substring(0, value.length() - 1)) * 1000d;
-              }
-              javaMemMax.set(maxGig);
-            }
+        if (ch.contains("PSYoungGen:") && ch.contains("Times:")) {
+          //153.889: [GC (Allocation Failure) [PSYoungGen: 2658451K->65976K(2690560K)] 2830514K->238047K(3554304K), 0.0261834 secs] [Times: user=0.16 sys=0.01, real=0.03 secs]
+          int pos = ch.indexOf("]");
+          int pos2 = ch.indexOf("->", pos + 1);
+          String max = ch.substring(pos + 1, pos2);
+          max = max.trim();
+          String maxValue = max.substring(0, max.length() - 1);
+          maxValue.trim();
+          double maxGig = Double.parseDouble(maxValue);
+          if (max.endsWith("K") || max.endsWith("k")) {
+            maxGig = maxGig / 1000d / 1000d;
+          }
+          else if (max.endsWith("G") || max.endsWith("g")) {
+            maxGig = maxGig;
+          }
+          else if (max.endsWith("M") || max.endsWith("m")) {
+            maxGig = maxGig / 1000d;
+          }
+          else if (max.endsWith("T") || max.endsWith("t")) {
+            maxGig = maxGig * 1000d;
+          }
+          javaMemMax.set(maxGig);
 
-            pos2 = ch.indexOf("->", pos);
-            if (pos2 != -1) {
-              int pos3 = ch.indexOf("(", pos2);
-              if (pos3 != -1) {
-                line = ch;
-                String value = ch.substring(pos2 + 2, pos3);
-                value = value.trim().toLowerCase();
-                double minGig = 0;
+          pos = ch.indexOf("->", pos);
+          pos2 = ch.indexOf("(", pos);
+          String min = ch.substring(pos + 2, pos2);
+          min = min.trim();
+          String minValue = min.substring(0, min.length() - 1);
+          minValue.trim();
+          double minGig = Double.parseDouble(minValue);
+          if (min.endsWith("K") || min.endsWith("k")) {
+            minGig = minGig / 1000d / 1000d;
+          }
+          else if (min.endsWith("G") || min.endsWith("g")) {
+            minGig = minGig;
+          }
+          else if (min.endsWith("M") || min.endsWith("m")) {
+            minGig = minGig / 1000d;
+          }
+          else if (min.endsWith("T") || min.endsWith("t")) {
+            minGig *= minGig / 1000d;
+          }
+          javaMemMin.set(minGig);
+          break;
+        }
+        else {
+          if (ch.indexOf("[Eden") != -1) {
+            int pos = ch.indexOf("Heap:");
+            if (pos != -1) {
+              int pos2 = ch.indexOf("(", pos);
+              if (pos2 != -1) {
+                String value = ch.substring(pos + "Heap:".length(), pos2).trim().toLowerCase();
+                double maxGig = 0;
                 if (value.contains("g")) {
-                  minGig = Double.valueOf(value.substring(0, value.length() - 1));
+                  maxGig = Double.valueOf(value.substring(0, value.length() - 1));
                 }
                 else if (value.contains("m")) {
-                  minGig = Double.valueOf(value.substring(0, value.length() - 1)) / 1000d;
+                  maxGig = Double.valueOf(value.substring(0, value.length() - 1)) / 1000d;
                 }
                 else if (value.contains("t")) {
-                  minGig = Double.valueOf(value.substring(0, value.length() - 1)) * 1000d;
+                  maxGig = Double.valueOf(value.substring(0, value.length() - 1)) * 1000d;
                 }
-                javaMemMin.set(minGig);
+                javaMemMax.set(maxGig);
               }
+
+              pos2 = ch.indexOf("->", pos);
+              if (pos2 != -1) {
+                int pos3 = ch.indexOf("(", pos2);
+                if (pos3 != -1) {
+                  line = ch;
+                  String value = ch.substring(pos2 + 2, pos3);
+                  value = value.trim().toLowerCase();
+                  double minGig = 0;
+                  if (value.contains("g")) {
+                    minGig = Double.valueOf(value.substring(0, value.length() - 1));
+                  }
+                  else if (value.contains("m")) {
+                    minGig = Double.valueOf(value.substring(0, value.length() - 1)) / 1000d;
+                  }
+                  else if (value.contains("t")) {
+                    minGig = Double.valueOf(value.substring(0, value.length() - 1)) * 1000d;
+                  }
+                  javaMemMin.set(minGig);
+                }
+              }
+              break;
             }
-            break;
           }
         }
       }

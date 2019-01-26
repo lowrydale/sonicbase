@@ -576,7 +576,7 @@ public class ComObject {
   public void deserialize(byte[] bytes, int[] offset) {
     try {
       int count = (int) DataUtils.readSignedVarLong(bytes, offset);
-      map = new Map(count + 4);
+      map = new  Map(count + 4);
       for (int i = 0; i < count; i++) {
         int tag = (int) DataUtils.readSignedVarLong(bytes, offset);
         int typeTag = (int) DataUtils.readSignedVarLong(bytes, offset);

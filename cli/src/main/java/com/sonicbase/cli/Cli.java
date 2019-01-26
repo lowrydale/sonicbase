@@ -8,6 +8,7 @@ import com.sonicbase.common.Config;
 import com.sonicbase.jdbcdriver.ConnectionProxy;
 import com.sonicbase.query.DatabaseException;
 import com.sonicbase.schema.FieldSchema;
+import com.sonicbase.schema.TableSchema;
 import jline.console.ConsoleReader;
 import net.sf.jsqlparser.JSQLParserException;
 import net.sf.jsqlparser.expression.Alias;
@@ -36,6 +37,7 @@ import java.util.concurrent.*;
 import java.util.concurrent.atomic.AtomicBoolean;
 
 import static com.sonicbase.common.MemUtil.getMemValue;
+import static java.sql.Types.VARCHAR;
 
 public class Cli {
 
@@ -132,7 +134,7 @@ public class Cli {
           plainConsole = true;
         }
         else {
-          CommandLine commandLine= getCommandLineOptions(args);
+          CommandLine commandLine = getCommandLineOptions(args);
           String localCluster = commandLine.getOptionValue(CLUSTER_STR);
           if (localCluster != null) {
             useCluster(localCluster);
@@ -333,7 +335,6 @@ public class Cli {
   }
 
 
-
   private void runScript(String script) {
     File file = new File(script);
     if (!file.exists()) {
@@ -341,7 +342,7 @@ public class Cli {
     }
     try (BufferedReader reader = new BufferedReader(new InputStreamReader(new FileInputStream(file)))) {
       while (true) {
-        String command =  reader.readLine();
+        String command = reader.readLine();
         if (command == null) {
           break;
         }
@@ -538,132 +539,132 @@ public class Cli {
 
   public void initCommands() {
 
-    commands.put("run script", currCommand->{
+    commands.put("run script", currCommand -> {
       command = command.trim();
       int pos = command.lastIndexOf(" script");
       command = command.substring(pos + " script".length());
       command = command.trim();
       runScript(command);
     });
-    commands.put("toyaml", currCommand-> convertJsonFilesToYaml());
-    commands.put("disable server", currCommand-> clusterHandler.disableServer(currCommand));
-    commands.put("enable server", currCommand-> clusterHandler.enableServer(currCommand));
-    commands.put("deploy cluster", currCommand-> clusterHandler.deploy());
-    commands.put("deploy license server", currCommand->miscHandler.deployLicenseServer());
-    commands.put("start cluster", currCommand->clusterHandler.startCluster());
-    commands.put("start server", currCommand->clusterHandler.startServer(currCommand));
-    commands.put("restart cluster", currCommand->clusterHandler.rollingRestart());
-    commands.put("start license server", currCommand->miscHandler.startLicenseServer());
-    commands.put("stop cluster", currCommand->clusterHandler.stopCluster());
-    commands.put("stop server", currCommand->clusterHandler.stopServer(currCommand));
-    commands.put("stop license server", currCommand->miscHandler.stopLicenseServer());
-    commands.put("start backup", currCommand->backupHandler.startBackup());
-    commands.put("backup status", currCommand->backupHandler.backupStatus());
-    commands.put("start restore", currCommand->backupHandler.startRestore(currCommand));
-    commands.put("restore status", currCommand->backupHandler.restoreStatus());
-    commands.put("reload server", currCommand->clusterHandler.reloadServer(currCommand));
-    commands.put("reload replica", currCommand->clusterHandler.reloadReplica(currCommand));
-    commands.put("start shard", currCommand-> {
-        int pos = currCommand.lastIndexOf(' ');
-        String shard = currCommand.substring(pos + 1);
-        clusterHandler.startShard(Integer.valueOf(shard));
-      });
-    commands.put("stop shard", currCommand-> {
-        int pos = currCommand.lastIndexOf(' ');
-        String shard = currCommand.substring(pos + 1);
-        clusterHandler.stopShard(Integer.valueOf(shard));
-      });
-    commands.put("purge cluster", currCommand->clusterHandler.purgeCluster());
-    commands.put("purge install", currCommand->miscHandler.purgeInstall());
-    commands.put("traverse index", currCommand->miscHandler.traverseIndex());
-    commands.put("start streams consumers", currCommand->miscHandler.startStreaming());
-    commands.put("stop streams consumers", currCommand->miscHandler.stopStreaming());
-    commands.put("describe licenses", currCommand->describeHandler.describeLicenses());
-    commands.put("quit", currCommand->exit());
-    commands.put("exit", currCommand->exit());
-    commands.put("healthcheck", currCommand->healthCheck());
-    commands.put("echo", currCommand->{
-        moveToBottom();
-        println(currCommand);
-      });
-    commands.put("clear", currCommand->{
-        print("\033[2J\033[;H");
-        moveToBottom();
-      });
-    commands.put("gather diagnostics", currCommand->miscHandler.gatherDiagnostics());
-    commands.put("bulk import status", currCommand->bulkImportHandler.bulkImportStatus());
-    commands.put("start bulk import", currCommand->bulkImportHandler.startBulkImport(currCommand));
-    commands.put("cancel bulk import", currCommand->bulkImportHandler.cancelBulkImport());
-    commands.put("use cluster", currCommand->{
-        int pos = currCommand.lastIndexOf(' ');
-        String cluster = currCommand.substring(pos + 1);
-        useCluster(cluster);
-      });
-    commands.put("use database", currCommand->{
-        int pos = currCommand.lastIndexOf(' ');
-        String dbName = currCommand.substring(pos + 1);
-        useDatabase(dbName);
-      });
-    commands.put("start range", currCommand->startRange());
-    commands.put("stop range", currCommand->stopRange());
-    commands.put("create database", currCommand->{
-        int pos = currCommand.lastIndexOf(' ');
-        String dbName = currCommand.substring(pos + 1);
-        createDatabase(dbName);
-      });
-    commands.put("select", currCommand->{
-        print("\033[2J\033[;H");
-        sqlHandler.select(currCommand);
-      });
-    commands.put("next", currCommand->{
-        print("\033[2J\033[;H");
-        next();
-      });
+    commands.put("toyaml", currCommand -> convertJsonFilesToYaml());
+    commands.put("disable server", currCommand -> clusterHandler.disableServer(currCommand));
+    commands.put("enable server", currCommand -> clusterHandler.enableServer(currCommand));
+    commands.put("deploy cluster", currCommand -> clusterHandler.deploy());
+    commands.put("deploy license server", currCommand -> miscHandler.deployLicenseServer());
+    commands.put("start cluster", currCommand -> clusterHandler.startCluster());
+    commands.put("start server", currCommand -> clusterHandler.startServer(currCommand));
+    commands.put("restart cluster", currCommand -> clusterHandler.rollingRestart());
+    commands.put("start license server", currCommand -> miscHandler.startLicenseServer());
+    commands.put("stop cluster", currCommand -> clusterHandler.stopCluster());
+    commands.put("stop server", currCommand -> clusterHandler.stopServer(currCommand));
+    commands.put("stop license server", currCommand -> miscHandler.stopLicenseServer());
+    commands.put("start backup", currCommand -> backupHandler.startBackup());
+    commands.put("backup status", currCommand -> backupHandler.backupStatus());
+    commands.put("start restore", currCommand -> backupHandler.startRestore(currCommand));
+    commands.put("restore status", currCommand -> backupHandler.restoreStatus());
+    commands.put("reload server", currCommand -> clusterHandler.reloadServer(currCommand));
+    commands.put("reload replica", currCommand -> clusterHandler.reloadReplica(currCommand));
+    commands.put("start shard", currCommand -> {
+      int pos = currCommand.lastIndexOf(' ');
+      String shard = currCommand.substring(pos + 1);
+      clusterHandler.startShard(Integer.valueOf(shard));
+    });
+    commands.put("stop shard", currCommand -> {
+      int pos = currCommand.lastIndexOf(' ');
+      String shard = currCommand.substring(pos + 1);
+      clusterHandler.stopShard(Integer.valueOf(shard));
+    });
+    commands.put("purge cluster", currCommand -> clusterHandler.purgeCluster());
+    commands.put("purge install", currCommand -> miscHandler.purgeInstall());
+    commands.put("traverse index", currCommand -> miscHandler.traverseIndex());
+    commands.put("start streams consumers", currCommand -> miscHandler.startStreaming());
+    commands.put("stop streams consumers", currCommand -> miscHandler.stopStreaming());
+    commands.put("describe licenses", currCommand -> describeHandler.describeLicenses());
+    commands.put("quit", currCommand -> exit());
+    commands.put("exit", currCommand -> exit());
+    commands.put("healthcheck", currCommand -> healthCheck());
+    commands.put("echo", currCommand -> {
+      moveToBottom();
+      println(currCommand);
+    });
+    commands.put("clear", currCommand -> {
+      print("\033[2J\033[;H");
+      moveToBottom();
+    });
+    commands.put("gather diagnostics", currCommand -> miscHandler.gatherDiagnostics());
+    commands.put("bulk import status", currCommand -> bulkImportHandler.bulkImportStatus());
+    commands.put("start bulk import", currCommand -> bulkImportHandler.startBulkImport(currCommand));
+    commands.put("cancel bulk import", currCommand -> bulkImportHandler.cancelBulkImport());
+    commands.put("use cluster", currCommand -> {
+      int pos = currCommand.lastIndexOf(' ');
+      String cluster = currCommand.substring(pos + 1);
+      useCluster(cluster);
+    });
+    commands.put("use database", currCommand -> {
+      int pos = currCommand.lastIndexOf(' ');
+      String dbName = currCommand.substring(pos + 1);
+      useDatabase(dbName);
+    });
+    commands.put("start range", currCommand -> startRange());
+    commands.put("stop range", currCommand -> stopRange());
+    commands.put("create database", currCommand -> {
+      int pos = currCommand.lastIndexOf(' ');
+      String dbName = currCommand.substring(pos + 1);
+      createDatabase(dbName);
+    });
+    commands.put("select", currCommand -> {
+      print("\033[2J\033[;H");
+      sqlHandler.select(currCommand);
+    });
+    commands.put("next", currCommand -> {
+      print("\033[2J\033[;H");
+      next();
+    });
     commands.put("build config", this::buildConfig);
-    commands.put("force rebalance", currCommand->forceRebalance());
-    commands.put("insert", currCommand->{
-        print("\033[2J\033[;H");
-        sqlHandler.insert(currCommand);
-      });
-    commands.put("update", currCommand->{
-        print("\033[2J\033[;H");
-        update(currCommand);
-      });
-    commands.put("delete", currCommand->{
-        print("\033[2J\033[;H");
-        sqlHandler.delete(currCommand);
-      });
-    commands.put("truncate", currCommand->{
-        print("\033[2J\033[;H");
-        sqlHandler.truncate(currCommand);
-      });
-    commands.put("drop", currCommand->{
-        print("\033[2J\033[;H");
-        sqlHandler.drop(currCommand);
-      });
-    commands.put("create", currCommand->{
-        print("\033[2J\033[;H");
-        sqlHandler.create(currCommand);
-      });
-    commands.put("alter", currCommand->{
-        print("\033[2J\033[;H");
-        sqlHandler.alter(currCommand);
-      });
-    commands.put("help", currCommand->help());
-    commands.put(DESCRIBE_STR, currCommand->{
-        print("\033[2J\033[;H");
-        describeHandler.describe(currCommand);
-      });
-    commands.put("explain", currCommand->{
-        print("\033[2J\033[;H");
-        miscHandler.explain(currCommand);
-      });
-    commands.put("reconfigure cluster", currCommand->clusterHandler.reconfigureCluster());
-    commands.put("bench healthcheck", currCommand->benchHandler.benchHealthcheck());
-    commands.put("bench start", currCommand->benchHandler.benchStartTest(currCommand));
-    commands.put("bench stop", currCommand->benchHandler.benchStopTest(currCommand));
-    commands.put("bench stats", currCommand->benchHandler.benchstats(currCommand));
-    commands.put("bench resetStats", currCommand->benchHandler.benchResetStats(currCommand));
+    commands.put("force rebalance", currCommand -> forceRebalance());
+    commands.put("insert", currCommand -> {
+      print("\033[2J\033[;H");
+      sqlHandler.insert(currCommand);
+    });
+    commands.put("update", currCommand -> {
+      print("\033[2J\033[;H");
+      update(currCommand);
+    });
+    commands.put("delete", currCommand -> {
+      print("\033[2J\033[;H");
+      sqlHandler.delete(currCommand);
+    });
+    commands.put("truncate", currCommand -> {
+      print("\033[2J\033[;H");
+      sqlHandler.truncate(currCommand);
+    });
+    commands.put("drop", currCommand -> {
+      print("\033[2J\033[;H");
+      sqlHandler.drop(currCommand);
+    });
+    commands.put("create", currCommand -> {
+      print("\033[2J\033[;H");
+      sqlHandler.create(currCommand);
+    });
+    commands.put("alter", currCommand -> {
+      print("\033[2J\033[;H");
+      sqlHandler.alter(currCommand);
+    });
+    commands.put("help", currCommand -> help());
+    commands.put(DESCRIBE_STR, currCommand -> {
+      print("\033[2J\033[;H");
+      describeHandler.describe(currCommand);
+    });
+    commands.put("explain", currCommand -> {
+      print("\033[2J\033[;H");
+      miscHandler.explain(currCommand);
+    });
+    commands.put("reconfigure cluster", currCommand -> clusterHandler.reconfigureCluster());
+    commands.put("bench healthcheck", currCommand -> benchHandler.benchHealthcheck());
+    commands.put("bench start", currCommand -> benchHandler.benchStartTest(currCommand));
+    commands.put("bench stop", currCommand -> benchHandler.benchStopTest(currCommand));
+    commands.put("bench stats", currCommand -> benchHandler.benchstats(currCommand));
+    commands.put("bench resetStats", currCommand -> benchHandler.benchResetStats(currCommand));
   }
 
   private void runCommand(String command) {
@@ -1263,14 +1264,17 @@ public class Cli {
     net.sf.jsqlparser.statement.Statement statement = parser.parse(new StringReader(command));
     Select select = (Select) statement;
     SelectBody selectBody = select.getSelectBody();
+    List<Integer> columnTypes = new ArrayList<>();
+    String fromTable = "";
     if (selectBody instanceof PlainSelect) {
       PlainSelect pselect = (PlainSelect) selectBody;
-      String fromTable = ((Table) pselect.getFromItem()).getName();
+      fromTable = ((Table) pselect.getFromItem()).getName();
       int columnOffset = 1;
       List<SelectItem> selectItemList = pselect.getSelectItems();
       for (SelectItem selectItem : selectItemList) {
         if (selectItem instanceof AllColumns) {
           for (FieldSchema field : conn.getTables(currDbName).get(fromTable).getFields()) {
+            columnTypes.add(field.getType().getValue());
             columns.add(new SelectColumn(field.getName()));
           }
         }
@@ -1310,79 +1314,79 @@ public class Cli {
       }
     }
 
-    String str = getTerminalSize();
-    String[] parts = str.split(",");
-    String width = parts[0].trim();
-    String height = parts[1].trim();
-
-    List<List<String>> data = new ArrayList<>();
-
-    for (int i = 0; i < Integer.valueOf(height) - 7; i++) {
-      List<String> line = new ArrayList<>();
-
-      if (!ret.next()) {
-        break;
-      }
+      TableSchema tableSchema = conn.getTables(currDbName).get(fromTable);
       for (SelectColumn column : columns) {
-        if (column.columnOffset != null) {
-          str = ret.getString(column.columnOffset);
+        FieldSchema fieldSchema = tableSchema.getFields().get(tableSchema.getFieldOffset(column.name));
+        columnTypes.add(fieldSchema.getType().getValue());
+      }
+
+      String str = getTerminalSize();
+      String[] parts = str.split(",");
+      String width = parts[0].trim();
+      String height = parts[1].trim();
+
+      List<List<String>> data = new ArrayList<>();
+
+      for (int i = 0; i < Integer.valueOf(height) - 7; i++) {
+        List<String> line = new ArrayList<>();
+
+        if (!ret.next()) {
+          break;
+        }
+        for (SelectColumn column : columns) {
+          if (column.columnOffset != null) {
+            str = ret.getString(column.columnOffset);
+          }
+          else {
+            str = ret.getString(column.name);
+          }
+          int type = 0;
+          for (int j = 0; j < columns.size(); j++) {
+            if (column.name.equalsIgnoreCase(columns.get(j).name)) {
+              type = columnTypes.get(j);
+              break;
+            }
+          }
+          if (type == VARCHAR) {
+            str = "'" + str + "'";
+          }
+          line.add(str == null ? "<null>" : str);
+        }
+        data.add(line);
+      }
+
+      displayPageOfData(columns, width, data, !ret.isLast());
+    }
+
+    void displayPageOfData (List < SelectColumn > columns, String width, List < List < String >> data,boolean isLast){
+      StringBuilder builder = new StringBuilder();
+
+      int totalWidth = 0;
+      List<Integer> columnWidths = new ArrayList<>();
+      for (int i = 0; i < columns.size(); i++) {
+        int currWidth = 0;
+        for (int j = 0; j < data.size(); j++) {
+          currWidth = Math.min(33, Math.max(columns.get(i).name.length(), Math.max(currWidth, data.get(j).get(i).length())));
+        }
+        if (totalWidth + currWidth + 3 > Integer.valueOf(width)) {
+          columnWidths.add(-1);
         }
         else {
-          str = ret.getString(column.name);
+          totalWidth += currWidth + 3;
+          columnWidths.add(currWidth);
         }
-        line.add(str == null ? "<null>" : str);
       }
-      data.add(line);
-    }
 
-    displayPageOfData(columns, width, data, !ret.isLast());
-  }
-
-  void displayPageOfData(List<SelectColumn> columns, String width, List<List<String>> data, boolean isLast) {
-    StringBuilder builder = new StringBuilder();
-
-    int totalWidth = 0;
-    List<Integer> columnWidths = new ArrayList<>();
-    for (int i = 0; i < columns.size(); i++) {
-      int currWidth = 0;
-      for (int j = 0; j < data.size(); j++) {
-        currWidth = Math.min(33, Math.max(columns.get(i).name.length(), Math.max(currWidth, data.get(j).get(i).length())));
-      }
-      if (totalWidth + currWidth + 3 > Integer.valueOf(width)) {
-        columnWidths.add(-1);
-      }
-      else {
-        totalWidth += currWidth + 3;
-        columnWidths.add(currWidth);
-      }
-    }
-
-    totalWidth += 1;
-    appendChar(builder, "-", totalWidth);
-    builder.append("\n");
-    for (int i = 0; i < columns.size(); i++) {
-      SelectColumn column = columns.get(i);
-      if (columnWidths.get(i) == -1) {
-        continue;
-      }
-      builder.append("| ");
-      String value = column.name;
-      if (value.length() > 30) {
-        value = value.substring(0, 30);
-        value += "...";
-      }
-      builder.append(value);
-      appendChar(builder, " ", columnWidths.get(i) - value.length() + 1);
-    }
-    builder.append("|\n");
-    if (columns.get(0).metric != null) {
+      totalWidth += 1;
+      appendChar(builder, "-", totalWidth);
+      builder.append("\n");
       for (int i = 0; i < columns.size(); i++) {
         SelectColumn column = columns.get(i);
         if (columnWidths.get(i) == -1) {
           continue;
         }
         builder.append("| ");
-        String value = column.metric;
+        String value = column.name;
         if (value.length() > 30) {
           value = value.substring(0, 30);
           value += "...";
@@ -1391,136 +1395,124 @@ public class Cli {
         appendChar(builder, " ", columnWidths.get(i) - value.length() + 1);
       }
       builder.append("|\n");
-    }
-    appendChar(builder, "-", totalWidth);
-    builder.append("\n");
-
-    for (int i = 0; i < data.size(); i++) {
-      List<String> line = data.get(i);
-      for (int j = 0; j < line.size(); j++) {
-        if (columnWidths.get(j) == -1) {
-          continue;
+      if (columns.get(0).metric != null) {
+        for (int i = 0; i < columns.size(); i++) {
+          SelectColumn column = columns.get(i);
+          if (columnWidths.get(i) == -1) {
+            continue;
+          }
+          builder.append("| ");
+          String value = column.metric;
+          if (value.length() > 30) {
+            value = value.substring(0, 30);
+            value += "...";
+          }
+          builder.append(value);
+          appendChar(builder, " ", columnWidths.get(i) - value.length() + 1);
         }
-        String value = line.get(j);
-        if (line.get(j).length() > 30) {
-          value = line.get(j).substring(0, 30);
-          value += "...";
+        builder.append("|\n");
+      }
+      appendChar(builder, "-", totalWidth);
+      builder.append("\n");
+
+      for (int i = 0; i < data.size(); i++) {
+        List<String> line = data.get(i);
+        for (int j = 0; j < line.size(); j++) {
+          if (columnWidths.get(j) == -1) {
+            continue;
+          }
+          String value = line.get(j);
+          if (line.get(j).length() > 30) {
+            value = line.get(j).substring(0, 30);
+            value += "...";
+          }
+          builder.append("| ");
+          builder.append(value);
+          appendChar(builder, " ", columnWidths.get(j) - value.length() + 1);
         }
-        builder.append("| ");
-        builder.append(value);
-        appendChar(builder, " ", columnWidths.get(j) - value.length() + 1);
+        builder.append("|\n");
       }
-      builder.append("|\n");
-    }
-    appendChar(builder, "-", totalWidth);
-    if (!isLast) {
-      builder.append("\nnext");
-    }
-    println(builder.toString());
-  }
-
-  private void appendChar(StringBuilder builder, String c, int count) {
-    for (int i = 0; i < count; i++) {
-      builder.append(c);
-    }
-  }
-
-  private void useCluster(String cluster) throws SQLException, IOException, InterruptedException {
-
-    Timer timer = new Timer("detect json files", true);
-    timer.schedule(new TimerTask(){
-      @Override
-      public void run() {
-        detectJsonFiles();
+      appendChar(builder, "-", totalWidth);
+      if (!isLast) {
+        builder.append("\nnext");
       }
-    }, 3_000);
-
-
-    cluster = cluster.trim();
-
-    currCluster = cluster;
-
-    benchHandler.initBench(cluster);
-
-
-    closeConnection();
-    currDbName = null;
-
-    Config config = getConfig(cluster);
-    List<Config.Shard> shards = config.getShards();
-    List<Config.Replica> replicas = shards.get(0).getReplicas();
-
-    if (replicas.size() >= 2 && replicas.size() < 3 && shards.size() == 1) {
-      throw new DatabaseException("If you have two or more replicas, you must have at least three total servers");
+      println(builder.toString());
     }
 
-    if (isWindows()) {
-      boolean remote = false;
-      for (int shard = 0; shard < shards.size(); shard++) {
-        for (int i = 0; i < shards.get(shard).getReplicas().size(); i++) {
-          Config.Replica replica = shards.get(shard).getReplicas().get(i);
-          String privateAddress = replica.getString(PRIVATE_ADDRESS_STR);
-          String publicAddress = replica.getString(PUBLIC_ADDRESS_STR);
-          if (!(privateAddress.equalsIgnoreCase(LOCAL_HOST_NUMS_STR) || privateAddress.equalsIgnoreCase(LOCALHOST_STR) ||
-              publicAddress.equalsIgnoreCase(LOCAL_HOST_NUMS_STR) || publicAddress.equalsIgnoreCase(LOCALHOST_STR))) {
-            remote = true;
-            break;
+    private void appendChar (StringBuilder builder, String c,int count){
+      for (int i = 0; i < count; i++) {
+        builder.append(c);
+      }
+    }
+
+    private void useCluster (String cluster) throws SQLException, IOException, InterruptedException {
+
+      Timer timer = new Timer("detect json files", true);
+      timer.schedule(new TimerTask() {
+        @Override
+        public void run() {
+          detectJsonFiles();
+        }
+      }, 3_000);
+
+
+      cluster = cluster.trim();
+
+      currCluster = cluster;
+
+      benchHandler.initBench(cluster);
+
+
+      closeConnection();
+      currDbName = null;
+
+      Config config = getConfig(cluster);
+      List<Config.Shard> shards = config.getShards();
+      List<Config.Replica> replicas = shards.get(0).getReplicas();
+
+      if (replicas.size() >= 2 && replicas.size() < 3 && shards.size() == 1) {
+        throw new DatabaseException("If you have two or more replicas, you must have at least three total servers");
+      }
+
+      if (isWindows()) {
+        boolean remote = false;
+        for (int shard = 0; shard < shards.size(); shard++) {
+          for (int i = 0; i < shards.get(shard).getReplicas().size(); i++) {
+            Config.Replica replica = shards.get(shard).getReplicas().get(i);
+            String privateAddress = replica.getString(PRIVATE_ADDRESS_STR);
+            String publicAddress = replica.getString(PUBLIC_ADDRESS_STR);
+            if (!(privateAddress.equalsIgnoreCase(LOCAL_HOST_NUMS_STR) || privateAddress.equalsIgnoreCase(LOCALHOST_STR) ||
+                publicAddress.equalsIgnoreCase(LOCAL_HOST_NUMS_STR) || publicAddress.equalsIgnoreCase(LOCALHOST_STR))) {
+              remote = true;
+              break;
+            }
           }
         }
-      }
-      if (remote) {
-        getCredentials(cluster);
-      }
-    }
-
-    Boolean clientIsPrivate = config.getBoolean("clientIsPrivate");
-    if (clientIsPrivate == null) {
-      clientIsPrivate = false;
-    }
-    hosts = new String[shards.get(0).getReplicas().size()];
-    for (int i = 0; i < hosts.length; i++) {
-      Config.Replica replica = shards.get(0).getReplicas().get(i);
-      if (clientIsPrivate) {
-        hosts[i] = replica.getString(PRIVATE_ADDRESS_STR);
-      }
-      else {
-        hosts[i] = replica.getString(PUBLIC_ADDRESS_STR);
-      }
-      hosts[i] += ":" + replica.getInt("port");
-    }
-  }
-
-  void getCredentials(String cluster) throws IOException, InterruptedException {
-    File dir = new File(System.getProperty(USER_DIR_STR), "credentials");
-    File[] files = dir.listFiles();
-    username = null;
-    if (files != null) {
-      for (File currFile : files) {
-        if (currFile.getName().startsWith(cluster + "-")) {
-          username = currFile.getName().substring(cluster.length() + "-".length());
+        if (remote) {
+          getCredentials(cluster);
         }
       }
-    }
-    if (username == null) {
-      dir.mkdirs();
-      println("Enter credentials for server");
 
-      File script = new File("bin/get-credentials.ps1");
-      String str = IOUtils.toString(new FileInputStream(script), UTF_8_STR);
-      str = str.replaceAll("\\$1", dir.getAbsolutePath().replaceAll("\\\\", "/"));
-      str = str.replaceAll("\\$2", cluster);
-      File outFile = new File("tmp/" + cluster + "-get-credentials.ps1");
-      outFile.getParentFile().mkdirs();
-      FileUtils.deleteQuietly(outFile);
-      try (BufferedWriter writer = new BufferedWriter(new OutputStreamWriter(new FileOutputStream(outFile)))) {
-        writer.write(str);
+      Boolean clientIsPrivate = config.getBoolean("clientIsPrivate");
+      if (clientIsPrivate == null) {
+        clientIsPrivate = false;
       }
+      hosts = new String[shards.get(0).getReplicas().size()];
+      for (int i = 0; i < hosts.length; i++) {
+        Config.Replica replica = shards.get(0).getReplicas().get(i);
+        if (clientIsPrivate) {
+          hosts[i] = replica.getString(PRIVATE_ADDRESS_STR);
+        }
+        else {
+          hosts[i] = replica.getString(PUBLIC_ADDRESS_STR);
+        }
+        hosts[i] += ":" + replica.getInt("port");
+      }
+    }
 
-      ProcessBuilder builder = new ProcessBuilder().command("powershell", "-F", outFile.getAbsolutePath());
-      Process p = builder.start();
-      p.waitFor();
-
-      files = dir.listFiles();
+    void getCredentials (String cluster) throws IOException, InterruptedException {
+      File dir = new File(System.getProperty(USER_DIR_STR), "credentials");
+      File[] files = dir.listFiles();
       username = null;
       if (files != null) {
         for (File currFile : files) {
@@ -1529,57 +1521,85 @@ public class Cli {
           }
         }
       }
-    }
-  }
+      if (username == null) {
+        dir.mkdirs();
+        println("Enter credentials for server");
 
-  String getMaxHeap(Config config) throws IOException, InterruptedException {
-    String maxStr = config.getString("maxJavaHeap");
-    String maxHeap = maxStr;
-    if (maxStr != null && maxStr.contains("%")) {
-      String command = "bin/get-mem-total";
-      if (isCygwin() || isWindows()) {
-        command = "bin/get-mem-total.bat";
+        File script = new File("bin/get-credentials.ps1");
+        String str = IOUtils.toString(new FileInputStream(script), UTF_8_STR);
+        str = str.replaceAll("\\$1", dir.getAbsolutePath().replaceAll("\\\\", "/"));
+        str = str.replaceAll("\\$2", cluster);
+        File outFile = new File("tmp/" + cluster + "-get-credentials.ps1");
+        outFile.getParentFile().mkdirs();
+        FileUtils.deleteQuietly(outFile);
+        try (BufferedWriter writer = new BufferedWriter(new OutputStreamWriter(new FileOutputStream(outFile)))) {
+          writer.write(str);
+        }
+
+        ProcessBuilder builder = new ProcessBuilder().command("powershell", "-F", outFile.getAbsolutePath());
+        Process p = builder.start();
+        p.waitFor();
+
+        files = dir.listFiles();
+        username = null;
+        if (files != null) {
+          for (File currFile : files) {
+            if (currFile.getName().startsWith(cluster + "-")) {
+              username = currFile.getName().substring(cluster.length() + "-".length());
+            }
+          }
+        }
       }
-      ProcessBuilder builder = new ProcessBuilder().command(command);
-      Process p = builder.start();
-      BufferedReader reader = new BufferedReader(new InputStreamReader(p.getInputStream()));
-      String line = reader.readLine();
-      double totalGig = 0;
-      if (isCygwin() || isWindows()) {
-        totalGig = Long.valueOf(line.trim()) / 1024d / 1024d / 1024d;
-      }
-      else {
-        if (line.toLowerCase().startsWith("memtotal")) {
-          line = line.substring("MemTotal:".length()).trim();
-          totalGig = getMemValue(line);
+    }
+
+    String getMaxHeap (Config config) throws IOException, InterruptedException {
+      String maxStr = config.getString("maxJavaHeap");
+      String maxHeap = maxStr;
+      if (maxStr != null && maxStr.contains("%")) {
+        String command = "bin/get-mem-total";
+        if (isCygwin() || isWindows()) {
+          command = "bin/get-mem-total.bat";
+        }
+        ProcessBuilder builder = new ProcessBuilder().command(command);
+        Process p = builder.start();
+        BufferedReader reader = new BufferedReader(new InputStreamReader(p.getInputStream()));
+        String line = reader.readLine();
+        double totalGig = 0;
+        if (isCygwin() || isWindows()) {
+          totalGig = Long.valueOf(line.trim()) / 1024d / 1024d / 1024d;
         }
         else {
-          String[] parts = line.split(" ");
-          String memStr = parts[1];
-          totalGig = getMemValue(memStr);
+          if (line.toLowerCase().startsWith("memtotal")) {
+            line = line.substring("MemTotal:".length()).trim();
+            totalGig = getMemValue(line);
+          }
+          else {
+            String[] parts = line.split(" ");
+            String memStr = parts[1];
+            totalGig = getMemValue(memStr);
+          }
+        }
+        p.waitFor();
+        maxStr = maxStr.substring(0, maxStr.indexOf('%'));
+        double maxPercent = Double.parseDouble(maxStr);
+        double maxGig = totalGig * (maxPercent / 100);
+        maxHeap = (int) Math.floor(maxGig * 1024d) + "m";
+      }
+      return maxHeap;
+    }
+
+    String resolvePath (String installDir){
+      if (installDir.startsWith("$HOME")) {
+        installDir = installDir.substring("$HOME".length());
+        if (installDir.startsWith("/")) {
+          installDir = installDir.substring(1);
         }
       }
-      p.waitFor();
-      maxStr = maxStr.substring(0, maxStr.indexOf('%'));
-      double maxPercent = Double.parseDouble(maxStr);
-      double maxGig = totalGig * (maxPercent / 100);
-      maxHeap = (int) Math.floor(maxGig * 1024d) + "m";
-    }
-    return maxHeap;
-  }
-
-  String resolvePath(String installDir) {
-    if (installDir.startsWith("$HOME")) {
-      installDir = installDir.substring("$HOME".length());
-      if (installDir.startsWith("/")) {
-        installDir = installDir.substring(1);
+      else if (installDir.startsWith("$WORKING_DIR")) {
+        installDir = installDir.replace("$WORKING_DIR", System.getProperty(USER_DIR_STR));
       }
+      return installDir;
     }
-    else if (installDir.startsWith("$WORKING_DIR")) {
-      installDir = installDir.replace("$WORKING_DIR", System.getProperty(USER_DIR_STR));
-    }
-    return installDir;
+
+
   }
-
-
-}

@@ -20,13 +20,15 @@ import java.util.concurrent.atomic.AtomicLong;
 import java.util.concurrent.atomic.AtomicReference;
 
 import static com.sonicbase.server.PartitionManager.DONT_RETURN_MISSING_KEY;
+import static java.sql.Types.*;
 
 @SuppressWarnings({"squid:S1168", "squid:S00107"})
 // I prefer to return null instead of an empty array
 // I don't know a good way to reduce the parameter count
 public class Index {
   private static final Logger logger = LoggerFactory.getLogger(Index.class);
-  private static Thread threadMonitor;
+
+  private Map<Long, Boolean> isOpForRebalance;
   private TableSchema tableSchema;
   private IndexSchema indexSchema;
 
@@ -41,13 +43,13 @@ public class Index {
 
   private AtomicInteger countAdded = new AtomicInteger();
   private AtomicLong beginAdded = new AtomicLong();
-  private static Map<Long, Boolean> isOpForRebalance = new ConcurrentHashMap<>();
 
   public Index() {
 
   }
 
-  public Index(int port, TableSchema tableSchema, String indexName, final Comparator[] comparators) {
+  public Index(int port, Map<Long, Boolean> isOpForRebalance, TableSchema tableSchema, String indexName, final Comparator[] comparators) {
+    this.isOpForRebalance = isOpForRebalance;
     this.comparators = comparators;
 
     comparator = (o1, o2) -> getObjectArrayComparator(comparators, o1, o2);
@@ -61,15 +63,34 @@ public class Index {
     String[] fields = indexSchema.getFields();
     if (fields.length == 1) {
       FieldSchema fieldSchema = tableSchema.getFields().get(tableSchema.getFieldOffset(fields[0]));
-      if (fieldSchema.getType() == DataType.Type.BIGINT) {
-        impl = new NativePartitionedTreeImpl(port, this); //new LongIndexImpl(this); //
-//        impl = new LongIndexImpl(this); //
-      }
-      else if (fieldSchema.getType() == DataType.Type.VARCHAR) {
-        impl = new StringIndexImpl(this);
-      }
-      else {
-        impl = new ObjectIndexImpl(this, comparators);
+      switch (fieldSchema.getType().getValue()) {
+        case BIGINT:
+        case ROWID:
+        case VARCHAR:
+        case CHAR:
+        case LONGVARCHAR:
+        case NCHAR:
+        case NVARCHAR:
+        case LONGNVARCHAR:
+        case NCLOB:
+        case NUMERIC:
+        case DECIMAL:
+        case SMALLINT:
+        case BIT:
+        case BOOLEAN:
+        case TINYINT:
+        case INTEGER:
+        case DOUBLE:
+        case FLOAT:
+        case REAL:
+        case DATE:
+        case TIME:
+        case TIMESTAMP:
+          impl = new NativePartitionedTreeImpl(port, this); //new LongIndexImpl(this); //
+        break;
+        default:
+          impl = new ObjectIndexImpl(this, comparators);
+          break;
       }
     }
     else {
@@ -77,48 +98,6 @@ public class Index {
     }
 
   }
-
-  static {
-    threadMonitor = ThreadUtil.createThread(() -> {
-      while (true) {
-        try {
-          Thread.sleep(10_00);
-          int activeCount = Thread.activeCount();
-          Thread[] threads = new Thread[activeCount];
-          Thread.enumerate(threads);
-          for (Thread thread : threads) {
-            if (thread != null) {
-              Boolean value = isOpForRebalance.get(thread.getId());
-              if (value != null) {
-                if (!thread.isAlive()) {
-                  isOpForRebalance.remove(thread.getId());
-                  logger.info("removed thread from isOptForRebalance; name={}", thread.getName());
-                }
-              }
-            }
-          }
-        }
-        catch (InterruptedException e) {
-          Thread.currentThread().interrupt();
-          break;
-        }
-      }
-    }, "Index - threadMonitor");
-    threadMonitor.start();
-  }
-
-  public static void ShutdownStatic() {
-    if (threadMonitor != null) {
-      threadMonitor.interrupt();
-      try {
-        threadMonitor.join();
-      }
-      catch (InterruptedException e) {
-        Thread.currentThread().interrupt();
-      }
-    }
-  }
-
   public Comparator[] getComparators() {
     return comparators;
   }
@@ -164,7 +143,12 @@ public class Index {
     count.set(0);
   }
 
-  public static boolean getIsOpForRebalance() {
+
+  public Object get(Object[] key) {
+    return impl.get(key);
+  }
+
+  public boolean getIsOpForRebalance() {
     Boolean ret = isOpForRebalance.get(Thread.currentThread().getId());
     if (ret == null) {
       return false;
@@ -172,13 +156,8 @@ public class Index {
     return ret;
   }
 
-  public static void setIsOpForRebalance(boolean rebalance) {
+  public void setIsOpForRebalance(boolean rebalance) {
     isOpForRebalance.put(Thread.currentThread().getId(), rebalance);
-  }
-
-
-  public Object get(Object[] key) {
-    return impl.get(key);
   }
 
   public Object put(Object[] key, Object id) {
@@ -232,6 +211,14 @@ public class Index {
 
   public IndexImpl getImpl() {
     return impl;
+  }
+
+  public IndexSchema getIndexSchema() {
+    return indexSchema;
+  }
+
+  public TableSchema getTableSchema() {
+    return tableSchema;
   }
 
   public interface Visitor {
@@ -509,13 +496,6 @@ public class Index {
     }
 
     return true;
-//
-//    try {
-//      return impl.visitHeadMap(key, visitor);
-//    }
-//    catch (IOException e) {
-//      throw new DatabaseException(e);
-//    }
   }
 
   public Map.Entry<Object[], Object> lastEntry() {

@@ -302,12 +302,22 @@ public class DatabaseCommon {
     }
   }
 
+  private byte[] serializedSchema = null;
+  private int serializedSchemaVersion = 0;
+
   public byte[] serializeSchema(short serializationVersionNumber) throws IOException {
+
+    if (serializationVersionNumber == schemaVersion && serializedSchema != null) {
+      return serializedSchema;
+    }
     ByteArrayOutputStream bytesOut = new ByteArrayOutputStream();
     DataOutputStream out = new DataOutputStream(bytesOut);
     serializeSchema(out, serializationVersionNumber);
     out.close();
-    return bytesOut.toByteArray();
+    byte[] ret = bytesOut.toByteArray();
+    serializedSchema = ret;
+    serializedSchemaVersion = schemaVersion;
+    return ret;
   }
 
   private void serializeSchema(DataOutputStream out, short serializationVersionNumber) throws IOException {

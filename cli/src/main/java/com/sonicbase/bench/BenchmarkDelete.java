@@ -8,6 +8,10 @@ import com.fasterxml.jackson.databind.node.ArrayNode;
 import com.fasterxml.jackson.databind.node.JsonNodeFactory;
 import com.fasterxml.jackson.databind.node.ObjectNode;
 import com.mchange.v2.c3p0.ComboPooledDataSource;
+import com.sonicbase.client.DatabaseClient;
+import com.sonicbase.jdbcdriver.ConnectionProxy;
+import com.sonicbase.schema.IndexSchema;
+import com.sonicbase.schema.TableSchema;
 import org.apache.commons.io.IOUtils;
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
@@ -16,7 +20,9 @@ import java.io.BufferedInputStream;
 import java.io.File;
 import java.io.FileInputStream;
 import java.sql.Connection;
+import java.sql.DriverManager;
 import java.sql.PreparedStatement;
+import java.sql.ResultSet;
 import java.util.ArrayList;
 import java.util.List;
 import java.util.Map;
@@ -31,174 +37,90 @@ public class BenchmarkDelete {
 
   private static final MetricRegistry METRICS = new MetricRegistry();
 
-  private static final Timer INSERT_STATS = METRICS.timer("insert");
-  public static final String USER_DIR_STR = "user.dir";
   public static final String ERROR_STR = "Error";
 
+
+  private static final com.codahale.metrics.Timer LOOKUP_STATS = METRICS.timer("lookup");
   private Thread mainThread;
   private boolean shutdown;
+  final AtomicLong totalBegin = new AtomicLong(System.currentTimeMillis());
+  final AtomicLong totalSelectDuration = new AtomicLong();
+  final AtomicLong selectErrorCount = new AtomicLong();
+  final AtomicLong selectBegin = new AtomicLong(System.currentTimeMillis());
+  final AtomicLong selectOffset = new AtomicLong();
+  final AtomicLong selectCount = new AtomicLong();
+  final AtomicLong readCount = new AtomicLong();
 
-  private final AtomicInteger countInserted = new AtomicInteger();
-  private final AtomicLong insertErrorCount = new AtomicLong();
-  private long begin;
-  private final AtomicLong totalDuration = new AtomicLong();
-  private AtomicLong insertHighest;
-
-  private final AtomicInteger activeThreads = new AtomicInteger();
-  private final ConcurrentHashMap<Integer, Long> threadLiveliness = new ConcurrentHashMap<>();
-  private int countDead = 0;
-
-  public void start(String address, final AtomicLong insertBegin, AtomicLong insertHighest, final String cluster, final int shardCount, final int shard, final long offset,
-                    final long count, final boolean simulate) {
+  public void start(String address, final String cluster, final int shardCount, final Integer shard, final long count) {
     shutdown = false;
+    selectBegin.set(System.currentTimeMillis());
     doResetStats();
-    this.insertHighest = insertHighest;
-    begin = System.currentTimeMillis();
     mainThread = new Thread(() -> {
       try {
-        final ThreadPoolExecutor executor = new ThreadPoolExecutor(256, 256,
-            10000, TimeUnit.MILLISECONDS, new ArrayBlockingQueue<Runnable>(1000), new ThreadPoolExecutor.CallerRunsPolicy());
-        final ThreadPoolExecutor selectExecutor = new ThreadPoolExecutor(256, 256,
-            10000, TimeUnit.MILLISECONDS, new ArrayBlockingQueue<Runnable>(1000), (r, executor1) -> {
-              // This will block if the queue is full
-              try {
-                executor1.getQueue().put(r);
-              }
-              catch (InterruptedException e) {
-                Thread.currentThread().interrupt();
-                logger.error(ERROR_STR, e);
-                return;
-              }
+        final AtomicInteger cycle = new AtomicInteger();
+        final long startId = shard * count;
+        logger.info("startId={}, count={}, shard={}", startId, count, shard);
 
-            });
-
-        final ComboPooledDataSource cpds;
-        if (!simulate) {
-          logger.info("userDir=" + System.getProperty(USER_DIR_STR));
-          File file = new File(System.getProperty(USER_DIR_STR), "config/config-" + cluster + ".yaml");
-          if (!file.exists()) {
-            file = new File(System.getProperty(USER_DIR_STR), "db/src/main/resources/config/config-" + cluster + ".yaml");
-            logger.info("Loaded config resource dir");
-          }
-          else {
-            logger.info("Loaded config default dir");
-          }
-
-          logger.info("Using address: address=" + address);
-
-          Class.forName("com.sonicbase.jdbcdriver.Driver");
-
-          cpds = new ComboPooledDataSource();
-          cpds.setDriverClass("com.sonicbase.jdbcdriver.Driver"); //loads the jdbc driver
-          cpds.setJdbcUrl("jdbc:sonicbase:" + address + ":9010/db");
-
-          cpds.setMinPoolSize(5);
-          cpds.setAcquireIncrement(1);
-          cpds.setMaxPoolSize(20);
+        File file = new File(System.getProperty("user.dir"), "config/config-" + cluster + ".yaml");
+        if (!file.exists()) {
+          file = new File(System.getProperty("user.dir"), "db/src/main/resources/config/config-" + cluster + ".yaml");
+          logger.info("Loaded config resource dir");
         }
         else {
-          cpds = null;
+          logger.info("Loaded config default dir");
         }
 
-        final boolean batch = offset != 1;
+        logger.info("Using address: address={}", address);
+
+        Class.forName("com.sonicbase.jdbcdriver.Driver");
+
+        final java.sql.Connection conn = DriverManager.getConnection("jdbc:sonicbase:" + address + ":9010/db", "user", "password");
 
         //test insert
-        final AtomicLong countFinished = new AtomicLong();
-
-        final AtomicInteger errorCountInARow = new AtomicInteger();
-        final int batchSize = 100;
-        while (!shutdown) {
-          final long startId = offset + (shard * count);
-          insertBegin.set(startId);
-          List<Thread> threads = new ArrayList<>();
-          final AtomicLong currOffset = new AtomicLong(startId);
-          final int threadCount = (batch ? 8 : 256);
-          for (int i = 0; i < threadCount; i++) {
-            final int threadOffset = i;
-            final AtomicLong lastLogged = new AtomicLong(System.currentTimeMillis());
-            Thread insertThread = new Thread(() -> {
-              try {
-                threadLiveliness.put(threadOffset, System.currentTimeMillis());
-                activeThreads.incrementAndGet();
-                while (!shutdown) {
-
-                  long offset1 = 0;
-                  synchronized (currOffset) {
-                    offset1 = currOffset.addAndGet(2);
+        try {
+          Thread[] threads = new Thread[32];
+          for (int i = 0; i < threads.length; i++) {
+            threads[i] = new Thread(() -> {
+              outer:
+              while (!shutdown) {
+                try {
+                  DatabaseClient client = ((ConnectionProxy)conn).getDatabaseClient();
+                  client.syncSchema();
+                  IndexSchema indexSchema = client.getSchema("db").getTables().get("persons").getIndices().get("_primarykey");
+                  TableSchema.Partition[] partitions = indexSchema.getCurrPartitions();
+                  Object[][] keys = new Object[partitions.length][];
+                  keys[0] = new Object[]{0L};
+                  for (int m = 1; m < partitions.length; m++) {
+                    Object[] upperKey = partitions[m - 1].getUpperKey();
+                    keys[m] = upperKey;
                   }
-                  BenchmarkDelete.this.insertHighest.set(offset1 - (threadCount * batchSize * 2));
-                  try {
+                  int offset = shard % partitions.length;
+                  long actualStartId = (long)keys[offset][0];
+                  logger.info("starting id=" + actualStartId);
+                  cycle.incrementAndGet();
 
-                    long thisDuration = 0;
-                    for (int attempt = 0; attempt < 4; attempt++) {
-                      Connection conn = cpds.getConnection();
-                      try {
-                        long currBegin = System.nanoTime();
-                        PreparedStatement stmt = conn.prepareStatement("delete from persons where id=?");
-                        stmt.setLong(1, offset1);
-                        stmt.executeUpdate();
+                  PreparedStatement delStmt = conn.prepareStatement("delete from persons where id1 >=" + actualStartId + " limit 1000");
+                  long begin = System.nanoTime();
 
-                        thisDuration += System.nanoTime() - currBegin;
-                        break;
-                      }
-                      catch (Exception e) {
-                        if (attempt == 3) {
-                          throw e;
-                        }
-                        logger.error(ERROR_STR, e);
-                      }
-                      finally {
-                        conn.close();
-                      }
-                    }
-
-                    threadLiveliness.put(threadOffset, System.currentTimeMillis());
-                    totalDuration.addAndGet(thisDuration);
-                    countInserted.addAndGet(batchSize);
-                    logProgress(threadOffset, countInserted, lastLogged, begin, totalDuration, insertErrorCount);
-                    errorCountInARow.set(0);
-                  }
-                  catch (Exception e) {
-                    if (errorCountInARow.incrementAndGet() > 2000) {
-                      logger.error("Too many errors, aborting");
-                      break;
-                    }
-                    insertErrorCount.incrementAndGet();
-                    if (e.getMessage() != null && e.getMessage().contains("Unique constraint violated")) {
-                      logger.error("Unique constraint violation");
-                    }
-                    else {
-                      logger.error("Error inserting", e);
-                    }
-                  }
-                  finally {
-                    countFinished.incrementAndGet();
-                    logProgress(threadOffset, countInserted, lastLogged, begin, totalDuration, insertErrorCount);
-                  }
+                  delStmt.executeQuery();
+                  delStmt.executeUpdate();
+                  selectCount.addAndGet(1000);
+                  totalSelectDuration.addAndGet(System.nanoTime() - begin);
+                }
+                catch (Exception e) {
+                  logger.error(ERROR_STR, e);
                 }
               }
-              finally {
-                activeThreads.decrementAndGet();
-              }
             });
-            insertThread.start();
-            threads.add(insertThread);
-          }
-
-          while (true) {
-            int countDead = 0;
-            for (Map.Entry<Integer, Long> entry : threadLiveliness.entrySet()) {
-              if (System.currentTimeMillis() - entry.getValue() > 4 * 60 * 1000) {
-                countDead++;
-              }
-            }
-            BenchmarkDelete.this.countDead = countDead;
-            Thread.sleep(1000);
+            threads[i].start();
           }
         }
-
-        selectExecutor.shutdownNow();
-        executor.shutdownNow();
+        catch (Exception e) {
+          logger.error(ERROR_STR, e);
+        }
+        while (true) {
+          Thread.sleep(1000);
+        }
       }
       catch (Exception e) {
         logger.error(ERROR_STR, e);
@@ -208,25 +130,12 @@ public class BenchmarkDelete {
   }
 
   private void doResetStats() {
-    countInserted.set(0);
-    insertErrorCount.set(0);
-    begin = System.currentTimeMillis();
-    totalDuration.set(0);
-  }
-
-  private static void logProgress(int threadOffset, AtomicInteger countInserted, AtomicLong lastLogged, long begin, AtomicLong totalDuration, AtomicLong insertErrorCount) {
-    if (threadOffset == 0 && System.currentTimeMillis() - lastLogged.get() > 2000) {
-      lastLogged.set(System.currentTimeMillis());
-      StringBuilder builder = new StringBuilder();
-      builder.append("count=").append(countInserted.get());
-      Snapshot snapshot = INSERT_STATS.getSnapshot();
-      builder.append(String.format(", rate=%.2f", countInserted.get() / (double) (System.currentTimeMillis() - begin) * 1000f));
-      builder.append(String.format(", avg=%.2f", (double)totalDuration.get() / (countInserted.get()) / 1000000d));
-      builder.append(String.format(", 99th=%.2f", snapshot.get99thPercentile() / 1000000d));
-      builder.append(String.format(", max=%.2f", (double) snapshot.getMax() / 1000000d));
-      builder.append(", errorCount=").append(insertErrorCount.get());
-      logger.info(builder.toString());
-    }
+    totalBegin.set(System.currentTimeMillis());
+    totalSelectDuration.set(0);
+    selectErrorCount.set(0);
+    selectBegin.set(System.currentTimeMillis());
+    selectOffset.set(0);
+    readCount.set(0);
   }
 
   public void stop() {
@@ -236,16 +145,17 @@ public class BenchmarkDelete {
 
   public String stats() {
     ObjectNode dict = new ObjectNode(JsonNodeFactory.instance);
-    dict.put("begin", begin);
-    dict.put("count", countInserted.get());
-    dict.put("errorCount", insertErrorCount.get());
-    dict.put("totalDuration", totalDuration.get());
-    dict.put("activeThreads", activeThreads.get());
-    dict.put("countDead", countDead);
+    dict.put("begin", selectBegin.get());
+    dict.put("count", readCount.get());
+    dict.put("errorCount", selectErrorCount.get());
+    dict.put("totalDuration", totalSelectDuration.get());
+    dict.put("countDead", 0);
+    dict.put("activeThreads", 0);
     return dict.toString();
   }
 
   public void resetStats() {
     doResetStats();
   }
+
 }

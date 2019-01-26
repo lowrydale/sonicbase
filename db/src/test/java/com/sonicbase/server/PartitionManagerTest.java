@@ -23,6 +23,7 @@ import org.testng.annotations.BeforeClass;
 import org.testng.annotations.Test;
 
 import java.io.EOFException;
+import java.io.UnsupportedEncodingException;
 import java.util.ArrayList;
 import java.util.HashMap;
 import java.util.List;
@@ -81,14 +82,14 @@ public class PartitionManagerTest {
         "      ]\n" +
         "    }\n" +
         "  ]}\n");
-    ServersConfig serversConfig = new ServersConfig("test", (ArrayNode) ((ObjectNode)node).withArray("shards"), true, true);
+    ServersConfig serversConfig = new ServersConfig("test", (ArrayNode) ((ObjectNode) node).withArray("shards"), true, true);
     //when(common.getServersConfig()).thenReturn(serversConfig);
     common.setServersConfig(serversConfig);
     when(server.getCommon()).thenReturn(common);
     when(server.useUnsafe()).thenReturn(true);
 
     Indices indices = new Indices();
-    indices.addIndex(server.getPort(), tableSchema, indexSchema.getName(), indexSchema.getComparators());
+    indices.addIndex(server.getPort(), new HashMap<Long, Boolean>(), tableSchema, indexSchema.getName(), indexSchema.getComparators());
     Index index = indices.getIndices().get(tableSchema.getName()).get(indexSchema.getName());
     when(server.getIndex(anyString(), anyString(), anyString())).thenReturn(index);
 
@@ -121,18 +122,18 @@ public class PartitionManagerTest {
     ComArray array = cobj.putArray(ComObject.Tag.SIZES, ComObject.Type.OBJECT_TYPE, 2);
     ComObject size0Obj = new ComObject(3);
     size0Obj.put(ComObject.Tag.SHARD, 0);
-    size0Obj.put(ComObject.Tag.SIZE, (long)10);
-    size0Obj.put(ComObject.Tag.RAW_SIZE, (long)10);
+    size0Obj.put(ComObject.Tag.SIZE, (long) 10);
+    size0Obj.put(ComObject.Tag.RAW_SIZE, (long) 10);
     array.add(size0Obj);
 
     ComObject size1Obj = new ComObject(3);
     size1Obj.put(ComObject.Tag.SHARD, 0);
-    size1Obj.put(ComObject.Tag.SIZE, (long)0);
-    size1Obj.put(ComObject.Tag.RAW_SIZE, (long)0);
+    size1Obj.put(ComObject.Tag.SIZE, (long) 0);
+    size1Obj.put(ComObject.Tag.RAW_SIZE, (long) 0);
     array.add(size1Obj);
 
     byte[] bytes0 = cobj.serialize();
-    when(client.send(   eq("PartitionManager:getPartitionSize"), anyInt(), eq((long)0), (ComObject) anyObject(), eq(DatabaseClient.Replica.MASTER))).thenAnswer(
+    when(client.send(eq("PartitionManager:getPartitionSize"), anyInt(), eq((long) 0), (ComObject) anyObject(), eq(DatabaseClient.Replica.MASTER))).thenAnswer(
         (Answer) invocation -> {
 //            Object[] args = invocation.getArguments();
 //            return partitionManager.getPartitionSize((ComObject)args[3], false).serialize();
@@ -143,18 +144,18 @@ public class PartitionManagerTest {
     array = cobj.putArray(ComObject.Tag.SIZES, ComObject.Type.OBJECT_TYPE, 2);
     size0Obj = new ComObject(3);
     size0Obj.put(ComObject.Tag.SHARD, 0);
-    size0Obj.put(ComObject.Tag.SIZE, (long)0);
-    size0Obj.put(ComObject.Tag.RAW_SIZE, (long)0);
+    size0Obj.put(ComObject.Tag.SIZE, (long) 0);
+    size0Obj.put(ComObject.Tag.RAW_SIZE, (long) 0);
     array.add(size0Obj);
 
     size1Obj = new ComObject(3);
     size1Obj.put(ComObject.Tag.SHARD, 0);
-    size1Obj.put(ComObject.Tag.SIZE, (long)0);
-    size1Obj.put(ComObject.Tag.RAW_SIZE, (long)0);
+    size1Obj.put(ComObject.Tag.SIZE, (long) 0);
+    size1Obj.put(ComObject.Tag.RAW_SIZE, (long) 0);
     array.add(size1Obj);
 
     byte[] bytes1 = cobj.serialize();
-    when(client.send(   eq("PartitionManager:getPartitionSize"), eq(1), eq((long)0), (ComObject) anyObject(), eq(DatabaseClient.Replica.MASTER))).thenReturn(
+    when(client.send(eq("PartitionManager:getPartitionSize"), eq(1), eq((long) 0), (ComObject) anyObject(), eq(DatabaseClient.Replica.MASTER))).thenReturn(
         bytes1
     );
 
@@ -162,10 +163,10 @@ public class PartitionManagerTest {
     array = cobj.putArray(ComObject.Tag.KEYS, ComObject.Type.BYTE_ARRAY_TYPE, 1);
     array.add(DatabaseCommon.serializeKey(tableSchema, "_primarykey", keys.get(4)));
     bytes1 = cobj.serialize();
-    when(client.send(   eq("PartitionManager:getKeyAtOffset"), eq(0), eq((long)0), (ComObject) anyObject(), eq(DatabaseClient.Replica.MASTER))).thenAnswer(
+    when(client.send(eq("PartitionManager:getKeyAtOffset"), eq(0), eq((long) 0), (ComObject) anyObject(), eq(DatabaseClient.Replica.MASTER))).thenAnswer(
         (Answer) invocation -> {
           Object[] args = invocation.getArguments();
-          return partitionManager.getKeyAtOffset((ComObject)args[3], false).serialize();
+          return partitionManager.getKeyAtOffset((ComObject) args[3], false).serialize();
         });
 
 //    cobj.put(ComObject.Tag.replica, 0);
@@ -178,22 +179,22 @@ public class PartitionManagerTest {
         eq(DatabaseClient.Replica.SPECIFIED))).thenAnswer(
         (Answer) invocation -> {
           Object[] args = invocation.getArguments();
-          return partitionManager.isShardRepartitioningComplete((ComObject)args[3], false).serialize();
+          return partitionManager.isShardRepartitioningComplete((ComObject) args[3], false).serialize();
         });
 
 
-    when(client.send(eq("PartitionManager:rebalanceOrderedIndex"), eq(0), eq((long)0), any(ComObject.class),
+    when(client.send(eq("PartitionManager:rebalanceOrderedIndex"), eq(0), eq((long) 0), any(ComObject.class),
         eq(DatabaseClient.Replica.MASTER))).thenAnswer(
         (Answer) invocation -> {
           Object[] args = invocation.getArguments();
-          return partitionManager.doRebalanceOrderedIndex((ComObject)args[3], false);
+          return partitionManager.doRebalanceOrderedIndex((ComObject) args[3], false);
         });
 
-    when(client.send(eq("PartitionManager:deleteMovedRecords"), anyInt(), eq((long)0), any(ComObject.class),
+    when(client.send(eq("PartitionManager:deleteMovedRecords"), anyInt(), eq((long) 0), any(ComObject.class),
         eq(DatabaseClient.Replica.SPECIFIED))).thenAnswer(
         (Answer) invocation -> {
           Object[] args = invocation.getArguments();
-          ComObject cobj12 = (ComObject)args[3];
+          ComObject cobj12 = (ComObject) args[3];
           cobj12.put(ComObject.Tag.SEQUENCE_0, 10000L);
           cobj12.put(ComObject.Tag.SEQUENCE_1, 10000L);
 
@@ -203,7 +204,7 @@ public class PartitionManagerTest {
 
     final AtomicReference<Exception> exception = new AtomicReference<>();
     final AtomicBoolean calledMoveIndexEntries = new AtomicBoolean();
-    when(client.send(eq("PartitionManager:moveIndexEntries"), eq(1), eq((long)0), any(ComObject.class),
+    when(client.send(eq("PartitionManager:moveIndexEntries"), eq(1), eq((long) 0), any(ComObject.class),
         eq(DatabaseClient.Replica.DEF))).thenAnswer(
         (Answer) invocation -> {
           try {
@@ -266,13 +267,13 @@ public class PartitionManagerTest {
         "      ]\n" +
         "    }\n" +
         "  ]}\n");
-    ServersConfig serversConfig = new ServersConfig("test", (ArrayNode) ((ObjectNode)node).withArray("shards"), true, true);
+    ServersConfig serversConfig = new ServersConfig("test", (ArrayNode) ((ObjectNode) node).withArray("shards"), true, true);
     //when(common.getServersConfig()).thenReturn(serversConfig);
     common.setServersConfig(serversConfig);
     when(server.getCommon()).thenReturn(common);
 
     Indices indices = new Indices();
-    indices.addIndex(server.getPort(), tableSchema, indexSchema.getName(), indexSchema.getComparators());
+    indices.addIndex(server.getPort(), new HashMap<Long, Boolean>(), tableSchema, indexSchema.getName(), indexSchema.getComparators());
     Index index = indices.getIndices().get(tableSchema.getName()).get(indexSchema.getName());
     when(server.getIndex(anyString(), anyString(), anyString())).thenReturn(index);
 
@@ -306,18 +307,18 @@ public class PartitionManagerTest {
     ComArray array = cobj.putArray(ComObject.Tag.SIZES, ComObject.Type.OBJECT_TYPE, 2);
     ComObject size0Obj = new ComObject(3);
     size0Obj.put(ComObject.Tag.SHARD, 0);
-    size0Obj.put(ComObject.Tag.SIZE, (long)10);
-    size0Obj.put(ComObject.Tag.RAW_SIZE, (long)10);
+    size0Obj.put(ComObject.Tag.SIZE, (long) 10);
+    size0Obj.put(ComObject.Tag.RAW_SIZE, (long) 10);
     array.add(size0Obj);
 
     ComObject size1Obj = new ComObject(3);
     size1Obj.put(ComObject.Tag.SHARD, 0);
-    size1Obj.put(ComObject.Tag.SIZE, (long)0);
-    size1Obj.put(ComObject.Tag.RAW_SIZE, (long)0);
+    size1Obj.put(ComObject.Tag.SIZE, (long) 0);
+    size1Obj.put(ComObject.Tag.RAW_SIZE, (long) 0);
     array.add(size1Obj);
 
     byte[] bytes0 = cobj.serialize();
-    when(client.send(   eq("PartitionManager:getPartitionSize"), anyInt(), eq((long)0), (ComObject) anyObject(), eq(DatabaseClient.Replica.MASTER))).thenAnswer(
+    when(client.send(eq("PartitionManager:getPartitionSize"), anyInt(), eq((long) 0), (ComObject) anyObject(), eq(DatabaseClient.Replica.MASTER))).thenAnswer(
         new Answer() {
           public Object answer(InvocationOnMock invocation) {
 //            Object[] args = invocation.getArguments();
@@ -330,18 +331,18 @@ public class PartitionManagerTest {
     array = cobj.putArray(ComObject.Tag.SIZES, ComObject.Type.OBJECT_TYPE, 2);
     size0Obj = new ComObject(3);
     size0Obj.put(ComObject.Tag.SHARD, 0);
-    size0Obj.put(ComObject.Tag.SIZE, (long)0);
-    size0Obj.put(ComObject.Tag.RAW_SIZE, (long)0);
+    size0Obj.put(ComObject.Tag.SIZE, (long) 0);
+    size0Obj.put(ComObject.Tag.RAW_SIZE, (long) 0);
     array.add(size0Obj);
 
     size1Obj = new ComObject(3);
     size1Obj.put(ComObject.Tag.SHARD, 0);
-    size1Obj.put(ComObject.Tag.SIZE, (long)0);
-    size1Obj.put(ComObject.Tag.RAW_SIZE, (long)0);
+    size1Obj.put(ComObject.Tag.SIZE, (long) 0);
+    size1Obj.put(ComObject.Tag.RAW_SIZE, (long) 0);
     array.add(size1Obj);
 
     byte[] bytes1 = cobj.serialize();
-    when(client.send(   eq("PartitionManager:getPartitionSize"), eq(1), eq((long)0), (ComObject) anyObject(), eq(DatabaseClient.Replica.MASTER))).thenReturn(
+    when(client.send(eq("PartitionManager:getPartitionSize"), eq(1), eq((long) 0), (ComObject) anyObject(), eq(DatabaseClient.Replica.MASTER))).thenReturn(
         bytes1
     );
 
@@ -349,11 +350,11 @@ public class PartitionManagerTest {
     array = cobj.putArray(ComObject.Tag.KEYS, ComObject.Type.BYTE_ARRAY_TYPE, 1);
     array.add(DatabaseCommon.serializeKey(tableSchema, "_primarykey", keys.get(4)));
     bytes1 = cobj.serialize();
-    when(client.send(   eq("PartitionManager:getKeyAtOffset"), eq(0), eq((long)0), (ComObject) anyObject(), eq(DatabaseClient.Replica.MASTER))).thenAnswer(
+    when(client.send(eq("PartitionManager:getKeyAtOffset"), eq(0), eq((long) 0), (ComObject) anyObject(), eq(DatabaseClient.Replica.MASTER))).thenAnswer(
         new Answer() {
           public Object answer(InvocationOnMock invocation) {
             Object[] args = invocation.getArguments();
-            return partitionManager.getKeyAtOffset((ComObject)args[3], false).serialize();
+            return partitionManager.getKeyAtOffset((ComObject) args[3], false).serialize();
           }
         });
 
@@ -363,21 +364,21 @@ public class PartitionManagerTest {
 //        bytes3
 //    );
 
-    when(client.send(eq("PartitionManager:rebalanceOrderedIndex"), eq(0), eq((long)0), any(ComObject.class),
+    when(client.send(eq("PartitionManager:rebalanceOrderedIndex"), eq(0), eq((long) 0), any(ComObject.class),
         eq(DatabaseClient.Replica.MASTER))).thenAnswer(
         new Answer() {
           public Object answer(InvocationOnMock invocation) {
             Object[] args = invocation.getArguments();
-            return partitionManager.doRebalanceOrderedIndex((ComObject)args[3], false);
+            return partitionManager.doRebalanceOrderedIndex((ComObject) args[3], false);
           }
         });
 
-    when(client.send(eq("PartitionManager:deleteMovedRecords"), anyInt(), eq((long)0), any(ComObject.class),
+    when(client.send(eq("PartitionManager:deleteMovedRecords"), anyInt(), eq((long) 0), any(ComObject.class),
         eq(DatabaseClient.Replica.SPECIFIED))).thenAnswer(
         new Answer() {
           public Object answer(InvocationOnMock invocation) {
             Object[] args = invocation.getArguments();
-            ComObject cobj = (ComObject)args[3];
+            ComObject cobj = (ComObject) args[3];
             cobj.put(ComObject.Tag.SEQUENCE_0, 10000L);
             cobj.put(ComObject.Tag.SEQUENCE_1, 10000L);
 
@@ -389,7 +390,7 @@ public class PartitionManagerTest {
     final AtomicInteger callCount = new AtomicInteger();
     final AtomicReference<Exception> exception = new AtomicReference<>();
     final AtomicBoolean calledMoveIndexEntries = new AtomicBoolean();
-    when(client.send(eq("PartitionManager:moveIndexEntries"), anyInt(), eq((long)0), any(ComObject.class),
+    when(client.send(eq("PartitionManager:moveIndexEntries"), anyInt(), eq((long) 0), any(ComObject.class),
         eq(DatabaseClient.Replica.DEF))).thenAnswer(
         new Answer() {
           public Object answer(InvocationOnMock invocation) {
@@ -444,7 +445,7 @@ public class PartitionManagerTest {
         "      ]\n" +
         "    }\n" +
         "  ]}\n");
-    ServersConfig serversConfig = new ServersConfig("test", (ArrayNode) ((ObjectNode)node).withArray("shards"), true, true);
+    ServersConfig serversConfig = new ServersConfig("test", (ArrayNode) ((ObjectNode) node).withArray("shards"), true, true);
     //when(common.getServersConfig()).thenReturn(serversConfig);
     common.setServersConfig(serversConfig);
     when(server.getCommon()).thenReturn(common);
@@ -456,7 +457,7 @@ public class PartitionManagerTest {
     byte[][] records = TestUtils.createRecords(common, tableSchema, 10);
 
     Indices indices = new Indices();
-    indices.addIndex(server.getPort(), tableSchema, indexSchema.getName(), indexSchema.getComparators());
+    indices.addIndex(server.getPort(), new HashMap<Long, Boolean>(), tableSchema, indexSchema.getName(), indexSchema.getComparators());
     Index index = indices.getIndices().get(tableSchema.getName()).get(indexSchema.getName());
     when(server.getIndex(anyString(), anyString(), anyString())).thenReturn(index);
 
@@ -500,7 +501,7 @@ public class PartitionManagerTest {
 
       PartitionUtils.GlobalIndexCounts counts = PartitionUtils.getIndexCounts("test", client);
       Map<Integer, Long> count = counts.getTables().get("table1").getIndices().get("_primarykey").getCounts();
-      assertEquals((long)count.get(0), 10);
+      assertEquals((long) count.get(0), 10);
       System.out.println("test");
       //    ComObject ret = partitionManager.getIndexCounts(cobj, false);
       //
@@ -519,15 +520,21 @@ public class PartitionManagerTest {
 
 
   @Test
-  public void testManyShards() throws Exception {
-    int shardCount = 32;
-    int countPerShard = 1_000;
+  public void testSeveralShards() throws Exception {
+    int shardCount = 8;
+    int countPerShard = 2_000;
     int totalRecordCount = shardCount * countPerShard;
 
     final TableSchema tableSchema = TestUtils.createTable();
     IndexSchema indexSchema = TestUtils.createIndexSchema(tableSchema, shardCount);
+    final TableSchema stringTableSchema = TestUtils.createStringTable();
+    IndexSchema stringIndexSchema = TestUtils.createStringIndexSchema(stringTableSchema, shardCount);
+
 
     DatabaseCommon common = TestUtils.createCommon(tableSchema);
+    common.getTables("test").put("table2", stringTableSchema);
+    common.getTablesById("test").put(stringTableSchema.getTableId(), stringTableSchema);
+
     JsonNode node = new ObjectMapper().readTree(" { \"shards\" : [\n" +
         "    {\n" +
         "      \"replicas\": [\n" +
@@ -549,20 +556,36 @@ public class PartitionManagerTest {
     when(client.getShardCount()).thenReturn(shardCount);
 
     final List<Object[]> keys = new ArrayList<>();
+
     for (long i = 2306398204483007890L; i < 2306398204483007890L + totalRecordCount * 4; i++) {
       Object[] fieldArray = new Object[1];
-      fieldArray[0] = (long)i;
+      fieldArray[0] = (long) i;
       keys.add(fieldArray);
     }
 
+    final List<Object[]> stringKeys = new ArrayList<>();
+    for (long i = 0; i < totalRecordCount * 4; i++) {
+      String idString = String.valueOf(i);
+      for (int j = 0; j < 6 - String.valueOf(i).length(); j++) {
+        idString = "0" + idString;
+      }
+
+      Object[] fieldArray = new Object[1];
+      fieldArray[0] = idString.getBytes("utf-8");
+      stringKeys.add(fieldArray);
+    }
+
     byte[][] records = TestUtils.createRecords(common, tableSchema, totalRecordCount * 4, keys);
+    byte[][] stringRecords = TestUtils.createStringRecords(common, stringTableSchema, totalRecordCount * 4, stringKeys);
 
     final PartitionManager[] partitionManagers = new PartitionManager[shardCount];
     DatabaseServer[] servers = new DatabaseServer[shardCount];
 
     List<Index> allIndices = new ArrayList<>();
+    List<Index> allStringIndices = new ArrayList<>();
     AddressMap lastAddressMap = null;
     Index lastIndex = null;
+    Index lastStringIndex = null;
     for (int shard = 0; shard < shardCount; shard++) {
       DatabaseServer server = mock(DatabaseServer.class);
       servers[shard] = server;
@@ -578,7 +601,8 @@ public class PartitionManagerTest {
       when(server.getAddressMap()).thenReturn(addressMap);
       when(server.getBatchRepartCount()).thenReturn(new AtomicInteger(0));
 
-      when(server.getIndexSchema(anyString(), anyString(), anyString())).thenReturn(indexSchema);
+      when(server.getIndexSchema(anyString(), eq("table1"), anyString())).thenReturn(indexSchema);
+      when(server.getIndexSchema(anyString(), eq("table2"), anyString())).thenReturn(stringIndexSchema);
       when(server.getShard()).thenReturn(shard);
       when(server.getShardCount()).thenReturn(shardCount);
       when(server.getReplicationFactor()).thenReturn(1);
@@ -588,13 +612,15 @@ public class PartitionManagerTest {
       when(server.useUnsafe()).thenReturn(true);
 
       Indices indices = new Indices();
-      indices.addIndex(server.getPort(), tableSchema, indexSchema.getName(), indexSchema.getComparators());
+      indices.addIndex(server.getPort(), new HashMap<Long, Boolean>(), tableSchema, indexSchema.getName(), indexSchema.getComparators());
+      indices.addIndex(server.getPort(), new HashMap<Long, Boolean>(), stringTableSchema, stringIndexSchema.getName(), stringIndexSchema.getComparators());
       Index index = indices.getIndices().get(tableSchema.getName()).get(indexSchema.getName());
-      when(server.getIndex(anyString(), eq("table1"), anyString())).thenAnswer(new Answer(){
+      Index stringIndex = indices.getIndices().get(stringTableSchema.getName()).get(stringIndexSchema.getName());
+      when(server.getIndex(anyString(), eq("table1"), anyString())).thenAnswer(new Answer() {
         @Override
         public Object answer(InvocationOnMock invocationOnMock) throws Throwable {
           Object[] args = invocationOnMock.getArguments();
-          if (!((String)args[1]).equalsIgnoreCase("table1")) {
+          if (!((String) args[1]).equalsIgnoreCase("table1")) {
             throw new DatabaseException("wrong index");
           }
           return index;
@@ -605,7 +631,22 @@ public class PartitionManagerTest {
         lastIndex = index;
         lastAddressMap = addressMap;
       }
-      doAnswer(        new Answer() {
+      when(server.getIndex(anyString(), eq("table2"), anyString())).thenAnswer(new Answer() {
+        @Override
+        public Object answer(InvocationOnMock invocationOnMock) throws Throwable {
+          Object[] args = invocationOnMock.getArguments();
+          if (!((String) args[1]).equalsIgnoreCase("table2")) {
+            throw new DatabaseException("wrong index");
+          }
+          return stringIndex;
+        }
+      });
+      allStringIndices.add(stringIndex);
+      if (shard == shardCount - 1) {
+        lastStringIndex = stringIndex;
+        lastAddressMap = addressMap;
+      }
+      doAnswer(new Answer() {
         public Object answer(InvocationOnMock invocation) {
           Object[] args = invocation.getArguments();
           ConcurrentLinkedQueue<DeleteManager.DeleteRequest> keysToDeleteExpanded = (ConcurrentLinkedQueue<DeleteManager.DeleteRequest>) args[5];
@@ -614,7 +655,17 @@ public class PartitionManagerTest {
           }
           return null;
         }
-      }).when(deleteManager).saveDeletesForRecords(anyString(), anyString(), anyString(), anyLong(), anyLong(), any());
+      }).when(deleteManager).saveDeletesForRecords(anyString(), eq("table1"), anyString(), anyLong(), anyLong(), any());
+      doAnswer(new Answer() {
+        public Object answer(InvocationOnMock invocation) {
+          Object[] args = invocation.getArguments();
+          ConcurrentLinkedQueue<DeleteManager.DeleteRequest> keysToDeleteExpanded = (ConcurrentLinkedQueue<DeleteManager.DeleteRequest>) args[5];
+          for (DeleteManager.DeleteRequest request : keysToDeleteExpanded) {
+            stringIndex.remove(request.getKey());
+          }
+          return null;
+        }
+      }).when(deleteManager).saveDeletesForRecords(anyString(), eq("table2"), anyString(), anyLong(), anyLong(), any());
 
 
       Map<String, Indices> map = new HashMap<>();
@@ -628,6 +679,11 @@ public class PartitionManagerTest {
           Object address = addressMap.toUnsafeFromRecords(new byte[][]{records[j]});
           index.put(key, address);
         }
+        for (int j = 0; j < totalRecordCount; j++) {
+          Object[] key = stringKeys.get(j);
+          Object address = addressMap.toUnsafeFromRecords(new byte[][]{stringRecords[j]});
+          stringIndex.put(key, address);
+        }
       }
 
       when(server.getClient()).thenReturn(client);
@@ -639,11 +695,11 @@ public class PartitionManagerTest {
     ComObject cobj = new ComObject(1);
     //cobj.put(ComObject.Tag.SIZE, (long)10);
     byte[] bytes0 = cobj.serialize();
-    when(client.send(   eq("PartitionManager:getPartitionSize"), anyInt(), eq((long)0), (ComObject) anyObject(), eq(DatabaseClient.Replica.MASTER))).thenAnswer(
+    when(client.send(eq("PartitionManager:getPartitionSize"), anyInt(), eq((long) 0), (ComObject) anyObject(), eq(DatabaseClient.Replica.MASTER))).thenAnswer(
         new Answer() {
           public Object answer(InvocationOnMock invocation) {
             Object[] args = invocation.getArguments();
-            ComObject retObj = partitionManagers[(Integer)args[1]].getPartitionSize((ComObject)args[3], false);
+            ComObject retObj = partitionManagers[(Integer) args[1]].getPartitionSize((ComObject) args[3], false);
             return retObj.serialize();
           }
         });
@@ -658,11 +714,11 @@ public class PartitionManagerTest {
 //    ComArray array = cobj.putArray(ComObject.Tag.KEYS, ComObject.Type.BYTE_ARRAY_TYPE);
 //    array.add(DatabaseCommon.serializeKey(tableSchema, "_primarykey", keys.get(4)));
 //    bytes1 = cobj.serialize();
-    when(client.send(   eq("PartitionManager:getKeyAtOffset"), anyInt(), eq((long)0), (ComObject) anyObject(), eq(DatabaseClient.Replica.MASTER))).thenAnswer(
+    when(client.send(eq("PartitionManager:getKeyAtOffset"), anyInt(), eq((long) 0), (ComObject) anyObject(), eq(DatabaseClient.Replica.MASTER))).thenAnswer(
         new Answer() {
           public Object answer(InvocationOnMock invocation) {
             Object[] args = invocation.getArguments();
-            ComObject retObj = partitionManagers[(Integer)args[1]].getKeyAtOffset((ComObject)args[3], false);
+            ComObject retObj = partitionManagers[(Integer) args[1]].getKeyAtOffset((ComObject) args[3], false);
             ComArray array = retObj.getArray(ComObject.Tag.KEYS);
             if (array.getArray().size() != 0) {
               byte[] bytes = (byte[]) array.getArray().get(0);
@@ -684,12 +740,12 @@ public class PartitionManagerTest {
 //        bytes3
 //    );
 
-    when(client.send(eq("PartitionManager:rebalanceOrderedIndex"), anyInt(), eq((long)0), any(ComObject.class),
+    when(client.send(eq("PartitionManager:rebalanceOrderedIndex"), anyInt(), eq((long) 0), any(ComObject.class),
         eq(DatabaseClient.Replica.MASTER))).thenAnswer(
         new Answer() {
           public Object answer(InvocationOnMock invocation) {
             Object[] args = invocation.getArguments();
-            return partitionManagers[(Integer)args[1]].rebalanceOrderedIndex((ComObject)args[3], false).serialize();
+            return partitionManagers[(Integer) args[1]].rebalanceOrderedIndex((ComObject) args[3], false).serialize();
           }
         });
 
@@ -698,16 +754,16 @@ public class PartitionManagerTest {
         new Answer() {
           public Object answer(InvocationOnMock invocation) {
             Object[] args = invocation.getArguments();
-            return partitionManagers[(Integer)args[1]].isShardRepartitioningComplete((ComObject)args[3], false).serialize();
+            return partitionManagers[(Integer) args[1]].isShardRepartitioningComplete((ComObject) args[3], false).serialize();
           }
         });
 
-      when(client.send(eq("PartitionManager:deleteMovedRecords"), anyInt(), eq((long)0), any(ComObject.class),
+    when(client.send(eq("PartitionManager:deleteMovedRecords"), anyInt(), eq((long) 0), any(ComObject.class),
         eq(DatabaseClient.Replica.SPECIFIED))).thenAnswer(
         new Answer() {
           public Object answer(InvocationOnMock invocation) throws EOFException {
             Object[] args = invocation.getArguments();
-            ComObject cobj = (ComObject)args[3];
+            ComObject cobj = (ComObject) args[3];
             cobj.put(ComObject.Tag.SEQUENCE_0, 10000L);
             cobj.put(ComObject.Tag.SEQUENCE_1, 10000L);
 
@@ -722,9 +778,9 @@ public class PartitionManagerTest {
             final IndexSchema indexSchema = tableSchema.getIndices().get(indexName);
             ComArray keys = cobj.getArray(ComObject.Tag.KEYS);
 
-            partitionManagers[(Integer)args[1]].getKeysToDelete(keysToDelete, tableSchema, indexSchema, keys);
+            partitionManagers[(Integer) args[1]].getKeysToDelete(keysToDelete, tableSchema, indexSchema, keys);
 
-            final Index index = servers[(Integer)args[1]].getIndex(dbName, tableName, indexName);
+            final Index index = servers[(Integer) args[1]].getIndex(dbName, tableName, indexName);
 
             List<DeleteManager.DeleteRequest> batch = new ArrayList<>();
             AtomicInteger count = new AtomicInteger();
@@ -734,7 +790,7 @@ public class PartitionManagerTest {
                 synchronized (index.getMutex(request1.getKey())) {
                   Object obj = index.remove(request1.getKey());
                   if (obj != null) {
-                    servers[(Integer)args[1]].getAddressMap().delayedFreeUnsafeIds(obj);
+                    servers[(Integer) args[1]].getAddressMap().delayedFreeUnsafeIds(obj);
                   }
                 }
               }
@@ -747,7 +803,7 @@ public class PartitionManagerTest {
 
     final AtomicReference<Exception> exception = new AtomicReference<>();
     final AtomicBoolean calledMoveIndexEntries = new AtomicBoolean();
-    when(client.send(eq("PartitionManager:moveIndexEntries"), anyInt(), eq((long)0), any(ComObject.class),
+    when(client.send(eq("PartitionManager:moveIndexEntries"), anyInt(), eq((long) 0), any(ComObject.class),
         eq(DatabaseClient.Replica.DEF))).thenAnswer(
         new Answer() {
           public Object answer(InvocationOnMock invocation) {
@@ -755,10 +811,10 @@ public class PartitionManagerTest {
               calledMoveIndexEntries.set(true);
 
               Object[] args = invocation.getArguments();
-              ComObject cobj = (ComObject)args[3];
+              ComObject cobj = (ComObject) args[3];
               cobj.put(ComObject.Tag.SEQUENCE_0, 10000L);
               cobj.put(ComObject.Tag.SEQUENCE_1, 10000L);
-              return partitionManagers[(Integer)args[1]].moveIndexEntries(cobj, false).serialize();
+              return partitionManagers[(Integer) args[1]].moveIndexEntries(cobj, false).serialize();
 
 //              Object[] args = invocation.getArguments();
 //              ComObject cobj = (ComObject) args[3];
@@ -788,9 +844,11 @@ public class PartitionManagerTest {
 
     List<String> toRebalance = new ArrayList<>();
     toRebalance.add("table1 _primarykey");
+    toRebalance.add("table2 _primarykey");
 
     int countAdded = 0;
-    for (int i = 0; i < 6 ; i++) {
+    int countStringAdded = 0;
+    for (int i = 0; i < 6; i++) {
 
       if (i == 2) {
         for (int j = totalRecordCount; j < totalRecordCount * 2; j++) {
@@ -803,6 +861,17 @@ public class PartitionManagerTest {
           Index index = servers[j].getIndices().get("test").getIndices().get(tableSchema.getName()).get(indexSchema.getName());
           countAdded += index.size();
         }
+
+        for (int j = totalRecordCount; j < totalRecordCount * 2; j++) {
+          Object[] key = stringKeys.get(j);
+          Object address = lastAddressMap.toUnsafeFromRecords(new byte[][]{stringRecords[j]});
+          lastStringIndex.put(key, address);
+          lastStringIndex.addAndGetCount(1);
+        }
+        for (int j = 0; j < shardCount; j++) {
+          Index index = servers[j].getIndices().get("test").getIndices().get(stringTableSchema.getName()).get(stringIndexSchema.getName());
+          countStringAdded += index.size();
+        }
       }
 
       if (i == 4) {
@@ -812,6 +881,11 @@ public class PartitionManagerTest {
             Object address = lastAddressMap.toUnsafeFromRecords(new byte[][]{records[totalRecordCount + k * j]});
             allIndices.get(k).put(key, address);
             allIndices.get(k).addAndGetCount(1);
+
+            Object[] stringKey = stringKeys.get(totalRecordCount + k * j);
+            Object stringAddress = lastAddressMap.toUnsafeFromRecords(new byte[][]{records[totalRecordCount + k * j]});
+            allStringIndices.get(k).put(stringKey, stringAddress);
+            allStringIndices.get(k).addAndGetCount(1);
           }
         }
       }
@@ -846,44 +920,108 @@ public class PartitionManagerTest {
 //          System.out.println(index.size());
           assertTrue(index.size() > countPerShard - 32 && index.size() < countPerShard + 32);
         }
+
       }
-    }
-
-    partitionManagers[0].beginRebalance("test", toRebalance);
-
-    while (true) {
-      ComObject retObj = partitionManagers[0].isRepartitioningComplete(null, false);
-      if (retObj.getBoolean(ComObject.Tag.FINISHED)) {
-        break;
-      }
-      Thread.sleep(1000);
-    }
-
-    if (exception.get() != null) {
-      throw exception.get();
-    }
-
-    final AtomicInteger count = new AtomicInteger();
-    final AtomicLong lastKey = new AtomicLong();
-    for (int j = 0; j < shardCount; j++) {
-      Index index = servers[j].getIndices().get("test").getIndices().get(tableSchema.getName()).get(indexSchema.getName());
-
-      index.visitTailMap(new Object[]{2306398204483007890L}, new Index.Visitor() {
-        @Override
-        public boolean visit(Object[] key, Object value) {
-          if (lastKey.get() != 0 && (long)key[0] < lastKey.get()) {
-            fail();
-          }
-          lastKey.set((long)key[0]);
-          assertEquals((long)key[0], 2306398204483007890L + count.get());
-          count.incrementAndGet();
-          return true;
+      for (int j = 0; j < shardCount; j++) {
+        Index index = servers[j].getIndices().get("test").getIndices().get(stringTableSchema.getName()).get(stringIndexSchema.getName());
+        //assertEquals(index.size(), countPerShard, "shard=" + i);
+        System.out.println("pass(string)=" + i + ", shard=" + j + ", count=" + index.size());
+        if (i == 3) {
+//          System.out.println(index.size());
+          assertTrue(index.size() > countPerShard * 2 - 162 && index.size() < countPerShard * 2 + 162);
         }
-      });
+        else if (i == 5) {
+//          System.out.println(index.size());
+          assertTrue(index.size() > countPerShard * 2 - 50 && index.size() < countPerShard * 2 + 92);
+        }
+        else if (i == 1) {
+//          System.out.println(index.size());
+          assertTrue(index.size() > countPerShard - 32 && index.size() < countPerShard + 32);
+        }
+      }
+
+      partitionManagers[0].beginRebalance("test", toRebalance);
+
+      while (true) {
+        ComObject retObj = partitionManagers[0].isRepartitioningComplete(null, false);
+        if (retObj.getBoolean(ComObject.Tag.FINISHED)) {
+          break;
+        }
+        Thread.sleep(1000);
+      }
+
+      if (exception.get() != null) {
+        throw exception.get();
+      }
+
+      final AtomicInteger count = new AtomicInteger();
+      final AtomicInteger stringCount = new AtomicInteger();
+      final AtomicLong lastKey = new AtomicLong();
+      for (int j = 0; j < shardCount; j++) {
+        Index index = servers[j].getIndices().get("test").getIndices().get(tableSchema.getName()).get(indexSchema.getName());
+
+        index.visitTailMap(new Object[]{2306398204483007890L}, new Index.Visitor() {
+          @Override
+          public boolean visit(Object[] key, Object value) {
+            if (lastKey.get() != 0 && (long) key[0] < lastKey.get()) {
+              fail();
+            }
+            lastKey.set((long) key[0]);
+            assertEquals((long) key[0], 2306398204483007890L + count.get());
+            count.incrementAndGet();
+            return true;
+          }
+        });
+      }
+      if (i > 3) {
+        assertEquals(count.get(), countAdded);
+      }
+
+      AtomicReference<byte[]> lastStringKey = new AtomicReference<>();
+      for (int j = 0; j < shardCount; j++) {
+        Index stringIndex = servers[j].getIndices().get("test").getIndices().get(stringTableSchema.getName()).get(stringIndexSchema.getName());
+
+        String idString = String.valueOf(0);
+        for (int k = 0; k < 6 - String.valueOf(0).length(); k++) {
+          idString = "0" + idString;
+        }
+
+
+        stringIndex.visitTailMap(new Object[]{idString.getBytes("utf-8")}, new Index.Visitor() {
+          @Override
+          public boolean visit(Object[] key, Object value) {
+
+            try {
+              if (lastStringKey.get() != null && (new String((byte[])key[0], "utf-8").compareTo(new String(lastStringKey.get())) < 0)) {
+                fail();
+              }
+            }
+            catch (UnsupportedEncodingException e) {
+              e.printStackTrace();
+            }
+            lastStringKey.set((byte[])key[0]);
+            String idString = String.valueOf(stringCount.get());
+            for (int j = 0; j < 6 - String.valueOf(stringCount.get()).length(); j++) {
+              idString = "0" + idString;
+            }
+
+            try {
+              assertEquals(new String((byte[])key[0], "utf-8"), idString);
+            }
+            catch (UnsupportedEncodingException e) {
+              e.printStackTrace();
+            }
+            stringCount.incrementAndGet();
+            return true;
+          }
+        });
+      }
+      if (i > 3) {
+        assertEquals(stringCount.get(), countStringAdded);
+      }
+
+      assertTrue(calledMoveIndexEntries.get());
     }
-    assertEquals(count.get(), countAdded);
 
-    assertTrue(calledMoveIndexEntries.get());
   }
-
 }

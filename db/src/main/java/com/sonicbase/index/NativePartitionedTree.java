@@ -2,37 +2,32 @@ package com.sonicbase.index;
 
 public class NativePartitionedTree {
 
-  public native long initIndex();
+  public void logError(String msg) {
+  }
 
-  public native long put(long indexId, byte[] key, long value);
+  public native long initIndex(int[] dataTypes);
 
-  public native byte[] putBytes(long indexId, byte[] key, byte[] value);
+  public native long put(long indexId, Object[] startKey, long value);
 
-  public native long get(long indexId, byte[] startKey);
+  public native long get(long indexId, Object[] key);
 
-  public native long remove(long indexId, byte[] key);
+  public native long remove(long indexId, Object[] key);
 
   public native void clear(long indexId);
 
-  public native byte[] tailBlock(long indexId, byte[] startKey, int count, boolean first);
+  public native int tailBlockArray(long indexId, Object[] startKey, int count, boolean first, Object[][] keys, long[] values);
 
-  public native long[] tailBlockArray(long indexId, byte[] startKey, int count, boolean first);
+  public native int headBlockArray(long indexId, Object[] startKey, int count, boolean first, Object[][] keys, long[] values);
 
-  public native long[] headBlockArray(long indexId, byte[] startKey, int count, boolean first);
+  public native boolean higherEntry(long indexId, Object[] key, Object[][] retKey, long[] retValue);
 
-  public native byte[] tailBlockBytes(long indexId, byte[] startKey, int count, boolean first);
+  public native boolean lowerEntry(long indexId, Object[] key, Object[][] retKey, long[] retValue);
 
-  public native byte[] headBlock(long indexId, byte[] startKey, int count, boolean first);
+  public native boolean floorEntry(long indexId, Object[] key, Object[][] retKey, long[] retValue);
 
-  public native long[] higherEntry(long indexId, long key);
+  public native boolean ceilingEntry(long indexId, Object[] key, Object[][] retKey, long[] retValue);
 
-  public native byte[] lowerEntry(long indexId, byte[] key);
+  public native boolean lastEntry2(long indexId, Object[][] retKey, long[] retValue);
 
-  public native byte[] floorEntry(long indexId, byte[] key);
-
-  public native long[] ceilingEntry(long indexId, long key);
-
-  public native byte[] lastEntry2(long indexId);
-
-  public native byte[] firstEntry2(long indexId);
+  public native boolean firstEntry2(long indexId, Object[][] retKey, long[] retValue);
 }

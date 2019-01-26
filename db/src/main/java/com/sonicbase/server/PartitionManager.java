@@ -37,7 +37,7 @@ public class PartitionManager extends Thread {
   private static final String DO_PROCESS_ENTRIES_FINISHED_TABLE_INDEX_COUNT_DURATION_STR =
       "doProcessEntries - finished: table={}, index={}, count={}, duration={}";
   private static final Logger logger = LoggerFactory.getLogger(PartitionManager.class);
-  public static final int MOVE_BATCH_SIZE = 10 * DatabaseClient.SELECT_PAGE_SIZE;
+  public static final int MOVE_BATCH_SIZE = 5 * DatabaseClient.SELECT_PAGE_SIZE;
   public static final boolean DONT_RETURN_MISSING_KEY = true;
 
   private final DatabaseServer databaseServer;
@@ -1050,7 +1050,7 @@ public class PartitionManager extends Thread {
         doProcessEntry(context, key, value1, countVisited, currEntries, countSubmitted, executor,
             fieldOffsets, cobj, countFinished);
         return true;
-      }, 10 * DatabaseClient.SELECT_PAGE_SIZE);
+      }, 5 * DatabaseClient.SELECT_PAGE_SIZE);
 
       if (currEntries.get() != null && !currEntries.get().isEmpty()) {
         long localBegin = System.currentTimeMillis();
@@ -1107,7 +1107,7 @@ public class PartitionManager extends Thread {
         });
       }
       return true;
-    }, 10 * DatabaseClient.SELECT_PAGE_SIZE);
+    }, 5 * DatabaseClient.SELECT_PAGE_SIZE);
 
     if (currEntries.get() != null && !currEntries.get().isEmpty()) {
       try {
@@ -1131,7 +1131,7 @@ public class PartitionManager extends Thread {
                               final AtomicInteger countFinished) {
     countVisited.incrementAndGet();
     currEntries.get().add(new MapEntry(key, value));
-    if (currEntries.get().size() >= (batchOverride == null ? 40 * DatabaseClient.SELECT_PAGE_SIZE : batchOverride) * databaseServer.getShardCount()) {
+    if (currEntries.get().size() >= (batchOverride == null ? 5 * DatabaseClient.SELECT_PAGE_SIZE : batchOverride) * databaseServer.getShardCount()) {
       final List<MapEntry> toProcess = currEntries.get();
       currEntries.set(new ArrayList<>());
       countSubmitted.incrementAndGet();
@@ -1388,11 +1388,11 @@ public class PartitionManager extends Thread {
     }
     Object newValue = databaseServer.getAddressMap().toUnsafeFromRecords(newContent);
     try {
-      Index.setIsOpForRebalance(true);
+      databaseServer.setIsOpForRebalance(true);
       index.put(request.getKey(), newValue);
     }
     finally {
-      Index.setIsOpForRebalance(false);
+      databaseServer.setIsOpForRebalance(false);
     }
     databaseServer.getAddressMap().delayedFreeUnsafeIds(value);
   }
@@ -1645,6 +1645,7 @@ public class PartitionManager extends Thread {
     MoveRequestArray requests = moveRequestPool.poll();
     if (requests == null) {
       requests = new MoveRequestArray();
+      //get rid of moverequest and just use arrays
       for (int i = 0; i < requests.requests.length; i++) {
         requests.requests[i] = new MoveRequest();
       }
@@ -1723,6 +1724,7 @@ public class PartitionManager extends Thread {
           AtomicLong srvCount = databaseServer.getStats().get(METRIC_REPART_MOVE_RCV_ENTRY).getCount();
           logger.debug("moveIndexEntries: db={}, table={}, index={}, count={}", dbName, tableName, indexName, keys.getArray().size());
           int lockCount = 0;
+          TableSchema table = common.getTables(dbName).get(tableName);
           for (int i = 0; i < keys.getArray().size(); i++) {
             try {
               if (lockCount++ == 2) {
@@ -1732,7 +1734,7 @@ public class PartitionManager extends Thread {
               registerForThrottle();
 
               ComObject keyObj = (ComObject) keys.getArray().get(i);
-              Object[] key = DatabaseCommon.deserializeKey(common.getTables(dbName).get(tableName),
+              Object[] key = DatabaseCommon.deserializeKey(table,
                   keyObj.getByteArray(ComObject.Tag.KEY_BYTES));
               ComArray records = keyObj.getArray(ComObject.Tag.RECORDS);
               if (records != null) {
@@ -1755,13 +1757,13 @@ public class PartitionManager extends Thread {
         Index index = databaseServer.getIndex(dbName, tableName, indexName);
 
         try {
-          Index.setIsOpForRebalance(true);
+          databaseServer.setIsOpForRebalance(true);
           IndexSchema indexSchema = databaseServer.getIndexSchema(dbName, tableName, indexName);
           databaseServer.getUpdateManager().doInsertKeys(cobj, false, dbName, moveRequests, index, tableName, indexSchema,
               replayedCommand, true, failedKeys);
         }
         finally {
-          Index.setIsOpForRebalance(false);
+          databaseServer.setIsOpForRebalance(false);
         }
         return ret;
       }

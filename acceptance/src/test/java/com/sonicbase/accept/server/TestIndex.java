@@ -145,7 +145,7 @@ public class TestIndex {
     Schema schema = client.getSchema("test");
     TableSchema tableSchema = schema.getTables().get("memberships");
     IndexSchema indexSchema = tableSchema.getIndices().get("_primarykey");
-    Index index = new Index(9010, tableSchema, indexSchema.getName(), indexSchema.getComparators());
+    Index index = new Index(9010, new HashMap<Long, Boolean>(), tableSchema, indexSchema.getName(), indexSchema.getComparators());
 
     for (int i = 0; i < 10; i++) {
       for (int j = 0; j < 10; j++) {
@@ -195,7 +195,7 @@ public class TestIndex {
     Schema schema = client.getSchema("test");
     TableSchema tableSchema = schema.getTables().get("persons");
     IndexSchema indexSchema = tableSchema.getIndices().get("_primarykey");
-    Index index = new Index(9010, tableSchema, indexSchema.getName(), indexSchema.getComparators());
+    Index index = new Index(9010, new HashMap<Long, Boolean>(), tableSchema, indexSchema.getName(), indexSchema.getComparators());
 
     for (int i = 0; i < 10; i++) {
       index.put(new Object[]{(long)i}, (long)(i + 100));
@@ -236,7 +236,7 @@ public class TestIndex {
     Schema schema = client.getSchema("test");
     TableSchema tableSchema = schema.getTables().get("persons");
     IndexSchema indexSchema = tableSchema.getIndices().get("_primarykey");
-    Index index = new Index(9010, tableSchema, indexSchema.getName(), indexSchema.getComparators());
+    Index index = new Index(9010, new HashMap<Long, Boolean>(), tableSchema, indexSchema.getName(), indexSchema.getComparators());
 
     for (int i = 0; i < 10021; i++) {
       index.put(new Object[]{(long) i}, (long) i + 1000);
@@ -259,7 +259,7 @@ public class TestIndex {
     Schema schema = client.getSchema("test");
     TableSchema tableSchema = schema.getTables().get("persons");
     IndexSchema indexSchema = tableSchema.getIndices().get("_primarykey");
-    Index index = new Index(9010, tableSchema, indexSchema.getName(), indexSchema.getComparators());
+    Index index = new Index(9010, new HashMap<Long, Boolean>(), tableSchema, indexSchema.getName(), indexSchema.getComparators());
 
     for (int i = 0; i < 10000; i++) {
       index.put(new Object[]{(long) i}, (long) i + 1000);
@@ -282,7 +282,7 @@ public class TestIndex {
     Schema schema = client.getSchema("test");
     TableSchema tableSchema = schema.getTables().get("persons");
     IndexSchema indexSchema = tableSchema.getIndices().get("_primarykey");
-    Index index = new Index(9010, tableSchema, indexSchema.getName(), indexSchema.getComparators());
+    Index index = new Index(9010, new HashMap<Long, Boolean>(), tableSchema, indexSchema.getName(), indexSchema.getComparators());
 
     for (int i = 0; i < 1000; i++) {
       index.put(new Object[]{(long) i}, (long)i + 1000);
@@ -341,7 +341,7 @@ public class TestIndex {
     Schema schema = client.getSchema("test");
     TableSchema tableSchema = schema.getTables().get("persons");
     IndexSchema indexSchema = tableSchema.getIndices().get("_primarykey");
-    Index index = new Index(9010, tableSchema, indexSchema.getName(), indexSchema.getComparators());
+    Index index = new Index(9010, new HashMap<Long, Boolean>(), tableSchema, indexSchema.getName(), indexSchema.getComparators());
 
     for (int i = 0; i < 100000; i++) {
       index.put(new Object[]{(long) i}, (long)i);

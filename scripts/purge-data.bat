@@ -1,5 +1,6 @@
 @echo off
-rd /s /q %1.last
-rename %1 %1.last
-rd /s /q %1
-rd /s /q %1.last
+
+rd /s /q %1\deletes
+rd /s /q %1\log
+rd /s /q %1\lrc
+rd /s /q %1\snapshot

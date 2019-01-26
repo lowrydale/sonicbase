@@ -65,58 +65,58 @@ public class TestPerformance {
 
     List<String> methods = new ArrayList<>();
 
-    methods.add("testBatchIdentityOr");
-    methods.add("testBatchIdentityIn");
-    methods.add("testIdLookup");
-    methods.add("testMath");
-    methods.add("testIdNoKey");
-    methods.add("testRangeNoKey");
-    methods.add("testRangeThreeKey");
-    methods.add("testRangeThreeKeyBackwards");
-    methods.add("testRangeThreeKeyMixed");
-    methods.add("testRangeThreeKeySingle");
-    methods.add("testNoKeyTwoKeyGreaterEqual");
-    methods.add("testNoKeyTwoKeyGreater");
-    methods.add("testNoKeyTwoKeyGreaterLeftSided");
-    methods.add("notIn");
-    methods.add("notInSecondary");
-    methods.add("notInTableScan");
-    methods.add("test2keyRange");
-    methods.add("testSecondaryKey");
-    methods.add("testTableScan");
-    methods.add("testTwoKey");
-    methods.add("testTwoKeyRightSided");
-    methods.add("testTwoKeyLeftSidedGreater");
-    methods.add("testTwoKeyGreater");
-    methods.add("testTwoKeyGreaterBackwards");
-    methods.add("testTwoKeyLeftSidedGreaterEqual");
-    methods.add("testCountTwoKeyGreaterEqual");
-    methods.add("testMaxWhere");
-    methods.add("testMax");
-    methods.add("testMin");
-    methods.add("testCount");
-    methods.add("testSort");
-    methods.add("testSortDisk");
-    methods.add("testId2");
-    methods.add("testId2Range");
-    methods.add("testOtherExpression");
-    methods.add("testNoWhereClause");
-
-    methods.add("testRangeGreaterDescend");
+//    methods.add("testBatchIdentityOr");
+//    methods.add("testBatchIdentityIn");
+//    methods.add("testIdLookup");
+//    methods.add("testMath");
+//    methods.add("testIdNoKey");
+//    methods.add("testRangeNoKey");
+//    methods.add("testRangeThreeKey");
+//    methods.add("testRangeThreeKeyBackwards");
+//    methods.add("testRangeThreeKeyMixed");
+//    methods.add("testRangeThreeKeySingle");
+//    methods.add("testNoKeyTwoKeyGreaterEqual");
+//    methods.add("testNoKeyTwoKeyGreater");
+//    methods.add("testNoKeyTwoKeyGreaterLeftSided");
+//    methods.add("notIn");
+//    methods.add("notInSecondary");
+//    methods.add("notInTableScan");
+//    methods.add("test2keyRange");
+//    methods.add("testSecondaryKey");
+//    methods.add("testTableScan");
+//    methods.add("testTwoKey");
+//    methods.add("testTwoKeyRightSided");
+//    methods.add("testTwoKeyLeftSidedGreater");
+//    methods.add("testTwoKeyGreater");
+//    methods.add("testTwoKeyGreaterBackwards");
+//    methods.add("testTwoKeyLeftSidedGreaterEqual");
+//    methods.add("testCountTwoKeyGreaterEqual");
+//    methods.add("testMaxWhere");
+//    methods.add("testMax");
+//    methods.add("testMin");
+//    methods.add("testCount");
+//    methods.add("testSort");
+//    methods.add("testSortDisk");
+//    methods.add("testId2");
+//    methods.add("testId2Range");
+//    methods.add("testOtherExpression");
+//    methods.add("testNoWhereClause");
+//
+//    methods.add("testRangeGreaterDescend");
     methods.add("testRange");
-    methods.add("testRangeLess");
-
-    methods.add("testRangeOtherExpression");
-    methods.add("testSecondary");
-    methods.add("testUnion");
-    methods.add("testUnionInMemory");
-    methods.add("testUnionAll"); //
-    methods.add("testIntersect");
-    methods.add("testExcept");
-    methods.add("testNot");
-    methods.add("testFunctionAvg");
-    methods.add("testFunctionMin");
-    methods.add("testFunctionCustom");
+//    methods.add("testRangeLess");
+//
+//    methods.add("testRangeOtherExpression");
+//    methods.add("testSecondary");
+//    methods.add("testUnion");
+//    methods.add("testUnionInMemory");
+//    methods.add("testUnionAll"); //
+//    methods.add("testIntersect");
+//    methods.add("testExcept");
+//    methods.add("testNot");
+//    methods.add("testFunctionAvg");
+//    methods.add("testFunctionMin");
+//    methods.add("testFunctionCustom");
 
     for (String method : methods) {
       try {
@@ -172,6 +172,9 @@ public class TestPerformance {
         prefix += " ";
       }
       logger.info(prefix + name + ": " + entry.getValue().duration / 1_000_000 + " " +
+          entry.getValue().duration / entry.getValue().count / 1_000_000D + " " +
+          (double)entry.getValue().count / (double)entry.getValue().duration * 1_000_000D * 1000D);
+      System.out.println(prefix + name + ": " + entry.getValue().duration / 1_000_000 + " " +
           entry.getValue().duration / entry.getValue().count / 1_000_000D + " " +
           (double)entry.getValue().count / (double)entry.getValue().duration * 1_000_000D * 1000D);
     }
@@ -236,6 +239,8 @@ public class TestPerformance {
         dbServers[1] = server0_1.getDatabaseServer();
 
         logger.info("Started 2 servers");
+        System.out.println("Started 2 servers");
+
       }
 
       Class.forName("com.sonicbase.jdbcdriver.Driver");
@@ -365,6 +370,7 @@ public class TestPerformance {
               stmt1.setString(4, "5078 West Black");
               if (offset1++ % 1000 == 0) {
                 logger.info(PROGRESS_COUNT_STR + offset1);
+                System.out.println(PROGRESS_COUNT_STR + offset1);
               }
               stmt1.addBatch();
             }
@@ -391,6 +397,7 @@ public class TestPerformance {
               stmt12.setString(3, leading);
               if (offset12++ % 1000 == 0) {
                 logger.info(PROGRESS_COUNT_STR + offset12);
+                System.out.println(PROGRESS_COUNT_STR + offset12);
               }
               stmt12.addBatch();
             }
@@ -478,6 +485,7 @@ public class TestPerformance {
         stmt.addBatch();
         if (offset++ % 1000 == 0) {
           logger.info(PROGRESS_COUNT_STR + offset);
+          System.out.println(PROGRESS_COUNT_STR + offset);
         }
       }
       stmt.executeBatch();
@@ -499,9 +507,13 @@ public class TestPerformance {
   private void registerResults(String testName, long duration, int count) {
     if (count == 0) {
      logger.info(testName + ":" + 0 + " " + 0 + " " + 0);
+     System.out.println(testName + ":" + 0 + " " + 0 + " " + 0);
     }
     else {
       logger.info(testName + ": " + duration / 1_000_000d + " " +
+          (double)duration / count / 1_000_000d + " " +
+          (double)count / duration / 1_000_000d * 1000d);
+      System.out.println(testName + ": " + duration / 1_000_000d + " " +
           (double)duration / count / 1_000_000d + " " +
           (double)count / duration / 1_000_000d * 1000d);
 

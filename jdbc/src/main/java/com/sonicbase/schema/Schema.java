@@ -34,7 +34,7 @@ public class Schema {
         out.writeShort(DatabaseClient.SERIALIZATION_VERSION);
         out.writeInt(tables.size());
         for (TableSchema table : tables.values()) {
-          table.serialize(out);
+            table.serialize(out);
         }
         if (currRecordIndexPartitions == null) {
           out.writeInt(0);

@@ -67,6 +67,19 @@ public class TestUtils {
     return createRecords(common, tableSchema, count, null);
   }
 
+  public static byte[][] createStringRecords(DatabaseCommon common, TableSchema tableSchema, int count, List<Object[]> keys) throws UnsupportedEncodingException {
+    byte[][] records = new byte[count][];
+    for (int i = 0; i < records.length; i++) {
+      Object[] fieldArray = new Object[28];
+      fieldArray[1] = keys != null ? keys.get(i)[0] : String.valueOf(i);
+
+      Record record = new Record(tableSchema);
+      record.setFields(fieldArray);
+      records[i] = record.serialize(common, DatabaseClient.SERIALIZATION_VERSION);
+    }
+    return records;
+  }
+
   public static byte[][] createRecords(DatabaseCommon common, TableSchema tableSchema, int count, List<Object[]> keys) throws UnsupportedEncodingException {
     byte[][] records = new byte[count][];
     for (int i = 0; i < records.length; i++) {
@@ -200,6 +213,26 @@ public class TestUtils {
     }
     return ret;
   }
+  public static TableSchema createStringTable() {
+    TableSchema tableSchema = new TableSchema();
+    tableSchema.setName("table2");
+    tableSchema.setTableId(101);
+    List<FieldSchema> fields = new ArrayList<>();
+    FieldSchema fSchema = new FieldSchema();
+    fSchema.setName("_id");
+    fSchema.setType(DataType.Type.BIGINT);
+    fields.add(fSchema);
+    fSchema = new FieldSchema();
+    fSchema.setName("field2");
+    fSchema.setType(DataType.Type.VARCHAR);
+    fields.add(fSchema);
+    List<String> primaryKey = new ArrayList<>();
+    primaryKey.add("field2");
+    tableSchema.setFields(fields);
+    tableSchema.setPrimaryKey(primaryKey);
+    return tableSchema;
+  }
+
 
   public static TableSchema createTable() {
     TableSchema tableSchema = new TableSchema();
@@ -601,21 +634,23 @@ public class TestUtils {
     return indexSchema;
   }
 
-  public static IndexSchema createStringIndexSchema(TableSchema tableSchema) {
+  public static IndexSchema createStringIndexSchema(TableSchema tableSchema, int partitionCount) {
     IndexSchema indexSchema = new IndexSchema();
     indexSchema.setFields(new String[]{
         "field2"}, tableSchema);
 
-    indexSchema.setIndexId(3);
+    indexSchema.setIndexId(1);
     indexSchema.setIsPrimaryKey(false);
-    indexSchema.setName("stringIndex");
+    indexSchema.setName("_primarykey");
     indexSchema.setComparators(tableSchema.getComparators(
         new String[]{
             "field2"}));
 
-    TableSchema.Partition[] partitions = new TableSchema.Partition[1];
-    partitions[0] = new TableSchema.Partition();
-    partitions[0].setUnboundUpper(true);
+    TableSchema.Partition[] partitions = new TableSchema.Partition[partitionCount];
+    for (int i = 0; i < partitionCount; i++) {
+      partitions[i] = new TableSchema.Partition();
+      partitions[i].setUnboundUpper(true);
+    }
     indexSchema.setCurrPartitions(partitions);
     tableSchema.addIndex(indexSchema);
     return indexSchema;
@@ -640,4 +675,5 @@ public class TestUtils {
     tableSchema.addIndex(indexSchema);
     return indexSchema;
   }
+
 }

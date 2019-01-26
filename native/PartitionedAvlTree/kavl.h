@@ -64,6 +64,12 @@ int main(void) {
 
 #define KAVL_MAX_DEPTH 64
 
+
+class Comparator {
+	public:
+		virtual int compare(void *o1, void *o2) = 0;
+};
+
 #define kavl_size(head, p) ((p)? (p)->head.size : 0)
 #define kavl_size_child(head, q, i) ((q)->head.p[(i)]? (q)->head.p[(i)]->head.size : 0)
 
@@ -73,6 +79,13 @@ int main(void) {
 		signed char balance; /* balance factor */ \
 		unsigned size; /* #elements in subtree */ \
 	}
+
+struct my_node {
+    void** key;
+    KAVL_HEAD(struct my_node) head;
+    long value;
+};
+
 
 #define __KAVL_FIND(suf, __scope, __type, __head,  __cmp) \
 	__scope __type *kavl_find_##suf(const __type *root, const __type *x, unsigned *cnt_) { \
@@ -123,7 +136,7 @@ int main(void) {
 	}
 
 #define __KAVL_INSERT(suf, __scope, __type, __head, __cmp) \
-	__scope __type *kavl_insert_##suf(__type **root_, __type *x, unsigned *cnt_) { \
+	__scope __type *kavl_insert_##suf(__type **root_, __type *x, Comparator *comparator, unsigned *cnt_) { \
 		unsigned char stack[KAVL_MAX_DEPTH]; \
 		__type *path[KAVL_MAX_DEPTH]; \
 		__type *bp, *bq; \
@@ -134,7 +147,7 @@ int main(void) {
 		/* find the insertion location */ \
 		for (p = bp, q = bq, top = path_len = 0; p; q = p, p = p->__head.p[which]) { \
 			int cmp; \
-			cmp = __cmp(x, p); \
+			cmp = comparator->compare(x->key, p->key); \
 			if (cmp >= 0) cnt += kavl_size_child(__head, p, 0) + 1; \
 			if (cmp == 0) { \
 				if (cnt_) *cnt_ = cnt; \
@@ -169,7 +182,7 @@ int main(void) {
 	}
 
 #define __KAVL_ERASE(suf, __scope, __type, __head, __cmp) \
-	__scope __type *kavl_erase_##suf(__type **root_, const __type *x, unsigned *cnt_) { \
+	__scope __type *kavl_erase_##suf(__type **root_, const __type *x, unsigned *cnt_, Comparator *comparator) { \
 		__type *p, *path[KAVL_MAX_DEPTH], fake; \
 		unsigned char dir[KAVL_MAX_DEPTH]; \
 		int i, d = 0, cmp; \
@@ -177,7 +190,7 @@ int main(void) {
 		fake.__head.p[0] = *root_, fake.__head.p[1] = 0; \
 		if (cnt_) *cnt_ = 0; \
 		if (x) { \
-			for (cmp = -1, p = &fake; cmp; cmp = __cmp(x, p)) { \
+			for (cmp = -1, p = &fake; cmp; cmp = comparator->compare(x->key, p->key)) { \
 				int which = (cmp > 0); \
 				if (cmp > 0) cnt += kavl_size_child(__head, p, 0) + 1; \
 				dir[d] = which; \
@@ -251,12 +264,12 @@ int main(void) {
 		return p; \
 	}
 
-#define kavl_free(__type, __head, __root, __free) do { \
+#define kavl_free(__type, __head, map, __root, __free) do { \
 		__type *_p, *_q; \
 		for (_p = __root; _p; _p = _q) { \
 			if (_p->__head.p[0] == 0) { \
 				_q = _p->__head.p[1]; \
-				__free(_p); \
+				__free(map, _p); \
 			} else { \
 				_q = _p->__head.p[0]; \
 				_p->__head.p[0] = _q->__head.p[1]; \
@@ -269,11 +282,14 @@ int main(void) {
 	struct kavl_itr_##suf { \
 		const __type *stack[KAVL_MAX_DEPTH], **top, *right, *left;/* _right_ points to the right child of *top */ \
 	}; \
-	__scope void kavl_itr_first_##suf(const __type *root, struct kavl_itr_##suf *itr) { \
-		const __type *p; \
-		for (itr->top = itr->stack - 1, p = root; p; p = p->__head.p[0]) \
-			*++itr->top = p; \
-		itr->right = (*itr->top)->__head.p[1]; \
+	__scope const __type *kavl_itr_first_##suf(const __type *root) { \
+		const __type *p = root;\
+		const __type *first = 0; \
+		while (p != 0) { \
+			first = p; \
+			p = p->__head.p[0]; \
+		}\
+		return first;\
 	} \
 	__scope const __type *kavl_itr_last_##suf(const __type *root) { \
 		const __type *p = root;\
@@ -284,12 +300,12 @@ int main(void) {
 		}\
 		return last;\
 	} \
-	__scope int kavl_itr_find_##suf(const __type *root, const __type *x, struct kavl_itr_##suf *itr) { \
+	__scope int kavl_itr_find_##suf(const __type *root, const __type *x, struct kavl_itr_##suf *itr, Comparator *comparator) { \
 		const __type *p = root; \
 		itr->top = itr->stack - 1; \
 		while (p != 0) { \
 			int cmp; \
-			cmp = __cmp(x, p); \
+			cmp = comparator->compare(x->key, p->key); \
 			if (cmp < 0) *++itr->top = p, p = p->__head.p[0]; \
 			else if (cmp > 0) p = p->__head.p[1]; \
 			else break; \
@@ -316,12 +332,12 @@ int main(void) {
      			return 1; \
      		} \
      	} \
-	__scope int kavl_itr_find_prev_##suf(const __type *root, const __type *x, struct kavl_itr_##suf *itr) { \
+	__scope int kavl_itr_find_prev_##suf(const __type *root, const __type *x, struct kavl_itr_##suf *itr, Comparator *comparator) { \
 		const __type *p = root; \
 		itr->top = itr->stack - 1; \
 		while (p != 0) { \
 			int cmp; \
-			cmp = __cmp(x, p); \
+			cmp = comparator->compare(x->key, p->key); \
 			if (cmp > 0) *++itr->top = p, p = p->__head.p[1]; \
 			else if (cmp < 0) p = p->__head.p[0]; \
 			else break; \
@@ -356,7 +372,7 @@ int main(void) {
  *
  * @return _x_ if not present in the tree, or the node equal to x.
  */
-#define kavl_insert(suf, proot, x, cnt) kavl_insert_##suf(proot, x, cnt)
+#define kavl_insert(suf, proot, x, comparator, cnt) kavl_insert_##suf(proot, x, comparator, cnt)
 
 /**
  * Find a node in the tree
@@ -391,7 +407,7 @@ int main(void) {
  * @param root    root of the tree
  * @param itr     iterator
  */
-#define kavl_itr_first(suf, root, itr) kavl_itr_first_##suf(root, itr)
+#define kavl_itr_first(suf, root) kavl_itr_first_##suf(root)
 
 #define kavl_itr_last(suf, root, itr) kavl_itr_last_##suf(root, itr)
 
@@ -406,7 +422,7 @@ int main(void) {
  * @return 1 if find; 0 otherwise. kavl_at(itr) is NULL if and only if query is
  *         larger than all objects in the tree
  */
-#define kavl_itr_find(suf, root, x, itr) kavl_itr_find_##suf(root, x, itr)
+#define kavl_itr_find(suf, root, x, itr, comparator) kavl_itr_find_##suf(root, x, itr, comparator)
 
 /**
  * Move to the next object in order
@@ -417,7 +433,7 @@ int main(void) {
  */
 #define kavl_itr_next(suf, itr) kavl_itr_next_##suf(itr)
 
-#define kavl_itr_find_prev(suf, root, x, itr) kavl_itr_find_prev_##suf(root, x, itr)
+#define kavl_itr_find_prev(suf, root, x, itr, comparator) kavl_itr_find_prev_##suf(root, x, itr, comparator)
 #define kavl_itr_prev(suf, itr) kavl_itr_prev_##suf(itr)
 
 
@@ -441,3 +457,36 @@ int main(void) {
 	KAVL_INIT2(suf,, __type, __head, __cmp)
 
 #endif
+
+int doCompare(const struct my_node* p, const struct my_node* q) {
+	if (p == 0) {
+		printf("doCompare, null  p");
+		fflush(stdout);
+	}
+	if (q == 0) {
+		printf("doCompare, null q");
+		fflush(stdout);
+	}
+	if (p->key == 0) {
+		printf("doCompare, null p->key");
+		fflush(stdout);
+	}
+	if (q->key == 0) {
+		printf("doCompare, null q->key");
+		fflush(stdout);
+	}
+
+    if (((long)p->key[0] < (long)q->key[0])) {
+    	return -1;
+   	}
+    if (((long)p->key[0] > (long)q->key[0])) {
+    	return 1;
+    }
+    return 0;
+
+}
+
+
+
+KAVL_INIT(my, struct my_node, head, doCompare)
+

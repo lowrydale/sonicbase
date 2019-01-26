@@ -10,6 +10,7 @@ import com.sonicbase.query.BinaryExpression;
 import com.sonicbase.query.DatabaseException;
 import com.sonicbase.query.Expression;
 import com.sonicbase.schema.DataType;
+import com.sonicbase.schema.FieldSchema;
 import com.sonicbase.schema.IndexSchema;
 import com.sonicbase.schema.TableSchema;
 import net.sf.jsqlparser.statement.select.Limit;
@@ -360,6 +361,12 @@ public class BinaryExpressionImpl extends ExpressionImpl implements BinaryExpres
       int fieldCount = indexSchema.getFields().length;
       Object[] leftOriginalKey = new Object[fieldCount];
       leftOriginalKey[0] = originalLeftValue;
+
+      TableSchema tableSchema = getClient().getCommon().getTables(dbName).get(getTableName());
+      String fieldName = indexSchema.getFields()[0];
+      FieldSchema fieldSchema = tableSchema.getFields().get(tableSchema.getFieldOffset(fieldName));
+
+      leftOriginalKey[0] = fieldSchema.getType().getConverter().convert(originalLeftValue);
 
       IndexLookup indexLookup = createIndexLookup();
       indexLookup.setCount(count);
@@ -864,8 +871,17 @@ public class BinaryExpressionImpl extends ExpressionImpl implements BinaryExpres
       int fieldCount = indexSchema.getFields().length;
       Object[] leftOriginalKey = new Object[fieldCount];
       leftOriginalKey[0] = originalLeftValue;
+
+      String fieldName = indexSchema.getFields()[0];
+      FieldSchema fieldSchema = tableSchema.getFields().get(tableSchema.getFieldOffset(fieldName));
+
+      leftOriginalKey[0] = fieldSchema.getType().getConverter().convert(originalLeftValue);
+
+
       Object[] rightOriginalKey = new Object[fieldCount];
       rightOriginalKey[0] = originalRightValue;
+
+      rightOriginalKey[0] = fieldSchema.getType().getConverter().convert(originalRightValue);
 
       IndexLookup indexLookup = createIndexLookup();
       indexLookup.setCount(count);

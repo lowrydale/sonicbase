@@ -1,6 +1,8 @@
 package com.sonicbase.index;
 
 import com.sonicbase.common.DatabaseCommon;
+import com.sonicbase.schema.DataType;
+import com.sonicbase.schema.FieldSchema;
 import com.sonicbase.schema.IndexSchema;
 import com.sonicbase.schema.TableSchema;
 import com.sonicbase.util.TestUtils;
@@ -23,11 +25,11 @@ public class IndexTest {
   }
 
   @Test
-  public void testDelete() {
+  public void testDelete() throws InterruptedException {
     TableSchema tableSchema = TestUtils.createTable();
     IndexSchema indexSchema = TestUtils.createIndexSchema(tableSchema);
     List<Object[]> keys = TestUtils.createKeys(10_000);
-    Index index = new Index(9010, tableSchema, indexSchema.getName(), indexSchema.getComparators());
+    Index index = new Index(9010, new HashMap<Long, Boolean>(), tableSchema, indexSchema.getName(), indexSchema.getComparators());
 
     for (int i = 0; i < keys.size(); i++) {
       index.put(keys.get(i), (long)i);
@@ -36,13 +38,14 @@ public class IndexTest {
     for (int i = keys.size() - 1; i >= 0; i--) {
       assertEquals(index.remove(keys.get(i)), (long)i);
     }
+    Thread.sleep(12_000);
   }
 
   @Test
   public void testGetKeyAtOffset()  {
     TableSchema tableSchema = TestUtils.createTable();
     IndexSchema indexSchema = TestUtils.createIndexSchema(tableSchema);
-    Index index = new Index(9010, tableSchema, indexSchema.getName(), indexSchema.getComparators());
+    Index index = new Index(9010,new HashMap<Long, Boolean>(), tableSchema, indexSchema.getName(), indexSchema.getComparators());
 
     int count = 0;
     for (int i = 0; i < 4; i++) {
@@ -104,7 +107,7 @@ public class IndexTest {
   public void testLargeLong() {
     TableSchema tableSchema = TestUtils.createTable();
     IndexSchema indexSchema = TestUtils.createIndexSchema(tableSchema);
-    Index index = new Index(9010, tableSchema, indexSchema.getName(), indexSchema.getComparators());
+    Index index = new Index(9010, new HashMap<Long, Boolean>(), tableSchema, indexSchema.getName(), indexSchema.getComparators());
     Set<Long> keys = new HashSet<>();
     Random rand = new Random(System.currentTimeMillis());
     for (long i = 0; i < 1500; i++) {
@@ -179,9 +182,9 @@ public class IndexTest {
   @Test
   public void test() throws UnsupportedEncodingException {
     TableSchema tableSchema = TestUtils.createTable();
-    IndexSchema indexSchema = TestUtils.createStringIndexSchema(tableSchema);
+    IndexSchema indexSchema = TestUtils.createStringIndexSchema(tableSchema, 1);
     List<Object[]> keys = TestUtils.createKeysForStringIndex(10);
-    Index index = new Index(9010, tableSchema, indexSchema.getName(), indexSchema.getComparators());
+    Index index = new Index(9010, new HashMap<Long, Boolean>(), tableSchema, indexSchema.getName(), indexSchema.getComparators());
 
     index.put(keys.get(0), (long)100);
     assertEquals(index.get(keys.get(0)), (long)100);
@@ -232,7 +235,7 @@ public class IndexTest {
     TableSchema tableSchema = TestUtils.createTable();
     IndexSchema indexSchema = TestUtils.createIndexSchema(tableSchema);
     List<Object[]> keys = TestUtils.createKeys(10000);
-    Index index = new Index(9010, tableSchema, indexSchema.getName(), indexSchema.getComparators());
+    Index index = new Index(9010, new HashMap<Long, Boolean>(), tableSchema, indexSchema.getName(), indexSchema.getComparators());
 
     for (int i = 0; i < keys.size(); i++) {
       index.put(keys.get(i), (long) i);
@@ -250,7 +253,7 @@ public class IndexTest {
     TableSchema tableSchema = TestUtils.createTable();
     IndexSchema indexSchema = TestUtils.createIndexSchema(tableSchema);
     List<Object[]> keys = TestUtils.createKeys(10000);
-    Index index = new Index(9010, tableSchema, indexSchema.getName(), indexSchema.getComparators());
+    Index index = new Index(9010, new HashMap<Long, Boolean>(), tableSchema, indexSchema.getName(), indexSchema.getComparators());
 
     for (int i = 0; i < keys.size(); i++) {
       index.put(keys.get(i), (long) i);
@@ -263,13 +266,55 @@ public class IndexTest {
     });
   }
 
+  @Test
+  public void testTailMapString() throws UnsupportedEncodingException {
+    TableSchema tableSchema = new TableSchema();
+    tableSchema.setName("table1");
+    tableSchema.setTableId(100);
+    List<FieldSchema> fields = new ArrayList<>();
+    FieldSchema fSchema = new FieldSchema();
+    fSchema.setName("_id");
+    fSchema.setType(DataType.Type.BIGINT);
+    fields.add(fSchema);
+    fSchema = new FieldSchema();
+    fSchema.setName("field2");
+    fSchema.setType(DataType.Type.VARCHAR);
+    fields.add(fSchema);
+    tableSchema.setFields(fields);
+    List<String> primaryKey = new ArrayList<>();
+    primaryKey.add("field2");
+    tableSchema.setPrimaryKey(primaryKey);
+
+    IndexSchema indexSchema = TestUtils.createStringIndexSchema(tableSchema, 1);
+    Index index = new Index(9010, new HashMap<Long, Boolean>(), tableSchema, indexSchema.getName(), indexSchema.getComparators());
+
+    for (int i = 0; i < 10_000; i++) {
+      String value = String.valueOf(i);
+      int len = value.length();
+      for (int j = 0; j < 6-len; j++) {
+        value = "0" + value;
+      }
+      index.put(new Object[]{value.getBytes("utf-8")}, (long)i);
+    }
+
+    AtomicLong offset = new AtomicLong();
+    index.visitTailMap(new Object[]{"0000".getBytes("utf-8")}, (k, v) -> {
+      String value = String.valueOf(offset.getAndIncrement());
+      int len = value.length();
+      for (int j = 0; j < 6-len; j++) {
+        value = "0" + value;
+      }
+      assertEquals(new String((byte[])k[0]), value);
+      return true;
+    });
+  }
 
   @Test
   public void put() {
     TableSchema tableSchema = TestUtils.createTable();
     IndexSchema indexSchema = TestUtils.createIndexSchema(tableSchema);
     List<Object[]> keys = TestUtils.createKeys(10000);
-    Index index = new Index(9010, tableSchema, indexSchema.getName(), indexSchema.getComparators());
+    Index index = new Index(9010, new HashMap<Long, Boolean>(), tableSchema, indexSchema.getName(), indexSchema.getComparators());
 
     for (int i = 0; i < keys.size(); i++) {
       index.put(keys.get(i), (long) i);
@@ -292,7 +337,7 @@ public class IndexTest {
     TableSchema tableSchema = TestUtils.createTable();
     IndexSchema indexSchema = TestUtils.createIndexSchema(tableSchema);
     List<Object[]> keys = TestUtils.createKeys(10000);
-    Index index = new Index(9010, tableSchema, indexSchema.getName(), indexSchema.getComparators());
+    Index index = new Index(9010, new HashMap<Long, Boolean>(), tableSchema, indexSchema.getName(), indexSchema.getComparators());
 
     for (int i = 0; i < keys.size(); i++) {
       index.put(keys.get(i), (long) i);
@@ -306,7 +351,7 @@ public class IndexTest {
     TableSchema tableSchema = TestUtils.createTable();
     IndexSchema indexSchema = TestUtils.createIndexSchema(tableSchema);
     List<Object[]> keys = TestUtils.createKeys(10000);
-    Index index = new Index(190, tableSchema, indexSchema.getName(), indexSchema.getComparators());
+    Index index = new Index(190, new HashMap<Long, Boolean>(), tableSchema, indexSchema.getName(), indexSchema.getComparators());
 
     for (int i = 0; i < keys.size() / 2; i++) {
       index.put(keys.get(i), (long)i);
@@ -341,7 +386,7 @@ public class IndexTest {
     TableSchema tableSchema = TestUtils.createTable();
     IndexSchema indexSchema = TestUtils.createBigDecimalIndexSchema(tableSchema);
     List<Object[]> keys = TestUtils.createKeysForBigDecimalIndex(10);
-    Index index = new Index(9010, tableSchema, indexSchema.getName(), indexSchema.getComparators());
+    Index index = new Index(9010, new HashMap<Long, Boolean>(), tableSchema, indexSchema.getName(), indexSchema.getComparators());
 
     index.put(keys.get(0), (long)100);
     assertEquals(index.get(keys.get(0)), (long)100);

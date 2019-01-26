@@ -19,6 +19,7 @@ import java.util.List;
 import java.util.Map;
 import java.util.Set;
 import java.util.concurrent.atomic.AtomicBoolean;
+import java.util.concurrent.atomic.AtomicInteger;
 import java.util.concurrent.atomic.AtomicLong;
 
 @SuppressWarnings({"squid:S1172", "squid:S1168", "squid:S00107"})
@@ -212,32 +213,39 @@ public abstract class IndexLookup {
   public abstract Map.Entry<Object[], Object> lookup();
 
   byte[][] processViewFlags(long viewVersion, byte[][] records) {
-    List<byte[]> remaining = new ArrayList<>(count);
     if (records != null) {
+      byte[][] ret = new byte[records.length][];
+      AtomicInteger retPos = new AtomicInteger();
       for (byte[] bytes : records) {
-        processViewFlags(viewVersion, remaining, bytes);
+        processViewFlags(viewVersion, ret, retPos, bytes);
       }
-      if (remaining.isEmpty()) {
+      if (retPos.get() == 0) {
         records = null;
       }
       else {
-        records = remaining.toArray(new byte[remaining.size()][]);
+        if (retPos.get() < records.length) {
+          records = new byte[retPos.get()][];
+          System.arraycopy(ret, 0, records, 0, retPos.get());
+        }
+        else {
+          records = ret;
+        }
       }
     }
     return records;
   }
 
-  private boolean processViewFlags(long viewVersion, List<byte[]> remaining, byte[] bytes) {
+  private boolean processViewFlags(long viewVersion, byte[][] ret, AtomicInteger retPos,  byte[] bytes) {
     long dbViewNum = Record.getDbViewNumber(bytes);
     long dbViewFlags = Record.getDbViewFlags(bytes);
     if ((dbViewNum <= viewVersion - 1) && (dbViewFlags & Record.DB_VIEW_FLAG_ADDING) != 0) {
-      remaining.add(bytes);
+      ret[retPos.getAndIncrement()] = bytes;
     }
     else if ((dbViewNum == viewVersion || dbViewNum == viewVersion - 1) && (dbViewFlags & Record.DB_VIEW_FLAG_DELETING) != 0) {
-      remaining.add(bytes);
+      ret[retPos.getAndIncrement()] = bytes;
     }
     else if ((dbViewFlags & Record.DB_VIEW_FLAG_DELETING) == 0) {
-      remaining.add(bytes);
+      ret[retPos.getAndIncrement()] = bytes;
     }
     else {
       return false;
@@ -348,6 +356,11 @@ public abstract class IndexLookup {
     }
     if (pass && counters == null) {
       handlePassingRecord(done, ret);
+    }
+    else if (pass) {
+      if (limit != null && countReturned.get() >= limit) {
+        done.set(true);
+      }
     }
   }
 

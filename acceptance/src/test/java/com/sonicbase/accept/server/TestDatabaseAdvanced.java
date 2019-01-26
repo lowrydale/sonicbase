@@ -4,6 +4,7 @@ import com.sonicbase.client.DatabaseClient;
 import com.sonicbase.common.*;
 import com.sonicbase.index.Index;
 import com.sonicbase.jdbcdriver.ConnectionProxy;
+import com.sonicbase.query.DatabaseException;
 import com.sonicbase.schema.TableSchema;
 import com.sonicbase.server.DatabaseServer;
 import org.apache.commons.io.FileUtils;
@@ -127,7 +128,24 @@ public class TestDatabaseAdvanced {
 
     stmt = conn.prepareStatement("create unique index id3 on persons(id3)");
     stmt.executeUpdate();
+
+    stmt = conn.prepareStatement("create table strings (id VARCHAR, id2 BIGINT, PRIMARY KEY (id))");
+    stmt.executeUpdate();
     //test upsert
+
+    for (int i = 0; i < 2_000; i++) {
+      stmt = conn.prepareStatement("insert into strings (id, id2) VALUES (?, ?)");
+
+      String idString = String.valueOf(i);
+      int len = idString.length();
+      for (int j = 0; j < 10 - len; j++) {
+        idString = "0" + idString;
+      }
+
+      stmt.setString(1, idString);
+      stmt.setLong(2, i);
+      assertEquals(stmt.executeUpdate(), 1);
+    }
 
     stmt = conn.prepareStatement("insert into Resorts (resortId, resortName) VALUES (?, ?)");
     stmt.setLong(1, 1000);
@@ -316,6 +334,31 @@ public class TestDatabaseAdvanced {
     int pos = filename.indexOf(".");
     int pos2 = filename.indexOf(".", pos + 1);
     return Integer.valueOf(filename.substring(pos + 1, pos2));
+  }
+
+  @Test
+  public void testStringIndex() throws SQLException {
+    for (int i = 0; i < dbServers.length; i++) {
+      Index index = dbServers[i].getIndex("test", "strings", "_primarykey");
+      System.out.println("index size=" + index.size());
+      assertEquals(index.size(), 1000);
+    }
+      PreparedStatement stmt = conn.prepareStatement("select * from strings where  id >= '0'");
+    ResultSet rs = stmt.executeQuery();
+    for (int i = 0; i < 2_000; i++) {
+      if (!rs.next()) {
+        fail();
+      }
+      String val = rs.getString("id");
+      String idString = String.valueOf(i);
+      int len = idString.length();
+      for (int j = 0; j < 10 - len; j++) {
+        idString = "0" + idString;
+      }
+
+      //System.out.println(val);
+      assertEquals(val, idString);
+    }
   }
 
   @Test
@@ -735,6 +778,51 @@ public class TestDatabaseAdvanced {
     finally {
       ((ConnectionProxy)conn).getDatabaseClient().setPageSize(prevSize);
     }
+  }
+
+  @Test
+  public void testDelete() throws SQLException, InterruptedException {
+    PreparedStatement stmt = conn.prepareStatement("create table toDelete (id BIGINT, PRIMARY KEY (id))");
+    stmt.executeUpdate();
+
+    for (int i = 0; i < 1000; i++) {
+      stmt = conn.prepareStatement("insert into toDelete (id) values (" + i + ")");
+      stmt.executeUpdate();
+    }
+    PreparedStatement countStmt = conn.prepareStatement("select count(*) from toDelete");
+    ResultSet rs = countStmt.executeQuery();
+    assertTrue(rs.next());
+    int count = rs.getInt(1);
+    assertEquals(count, 1000);
+
+    Thread[] threads = new Thread[32];
+    for (int i = 0; i < threads.length; i++) {
+      threads[i] = new Thread(() -> {
+        try (PreparedStatement readStmt = conn.prepareStatement("select * from toDelete order by id asc")) {
+          ResultSet qrs = readStmt.executeQuery();
+          while (qrs.next()) {
+            long id = qrs.getLong("id");
+
+            PreparedStatement delStmt = conn.prepareStatement("delete from toDelete where id=" + id);
+            delStmt.executeUpdate();
+          }
+        }
+        catch (Exception e) {
+          throw new DatabaseException(e);
+        }
+      });
+    }
+    for (Thread thread : threads) {
+      thread.start();
+    }
+    for (Thread thread : threads) {
+      thread.join();
+    }
+    countStmt = conn.prepareStatement("select count(*) from toDelete");
+    rs = countStmt.executeQuery();
+    assertTrue(rs.next());
+    count = rs.getInt(1);
+    assertEquals(count, 0);
   }
 
   @Test

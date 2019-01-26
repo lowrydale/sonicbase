@@ -16,8 +16,8 @@ public class Indices {
     return indexes;
   }
 
-  public void addIndex(int port, TableSchema tableSchema, String indexName, Comparator[] comparators) {
-    Index index = new Index(port, tableSchema, indexName, comparators);
+  public void addIndex(int port, Map<Long, Boolean> isOpForRebalance, TableSchema tableSchema, String indexName, Comparator[] comparators) {
+    Index index = new Index(port, isOpForRebalance, tableSchema, indexName, comparators);
     ConcurrentHashMap<String, Index> tableIndexes = indexes.get(tableSchema.getName());
     if (tableIndexes == null) {
       tableIndexes = new ConcurrentHashMap<>();

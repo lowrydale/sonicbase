@@ -43,12 +43,7 @@ public class ConstantImpl extends ExpressionImpl {
         sqlType == DataType.Type.LONGNVARCHAR.getValue() ||
         sqlType == DataType.Type.NCLOB.getValue() ||
         sqlType == DataType.Type.CLOB.getValue()) {
-      try {
-        return new String((byte[])value, "utf-8");
-      }
-      catch (UnsupportedEncodingException e) {
-        throw new DatabaseException(e);
-      }
+      return new String((char[])value);
     }
     else {
       return String.valueOf(value);
@@ -153,11 +148,9 @@ public class ConstantImpl extends ExpressionImpl {
       out.writeInt(sqlType);
       switch (sqlType) {
         case Types.CLOB:
-          new Parameter.Clob((byte[]) value).serialize(out, false);
-          break;
         case Types.VARCHAR:
         case Types.CHAR:
-          new Parameter.String((byte[]) value).serialize(out, false);
+          new Parameter.String((char[]) value).serialize(out, false);
           break;
         case Types.INTEGER:
           new Parameter.Int((Integer) value).serialize(out, false);

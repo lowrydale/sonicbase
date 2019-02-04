@@ -16,43 +16,43 @@ public class ParameterTest {
   public void test() throws IOException, SQLException {
     Parameter.NClobReader reader = new Parameter.NClobReader(new StringReader("123"));
     assertEquals(reader.getSqlType(), Types.NCLOB);
-    assertEquals(IOUtils.toString(reader.getValue()), "123");
+    assertEquals(new String(reader.getValue()), "123");
     ByteArrayOutputStream bytesOut = new ByteArrayOutputStream();
     DataOutputStream out = new DataOutputStream(bytesOut);
     reader.serialize(out, false);
     DataInputStream in = new DataInputStream(new ByteArrayInputStream(bytesOut.toByteArray()));
     reader = (Parameter.NClobReader) Parameter.NClobReader.deserialize(in);
-    assertEquals(IOUtils.toString(reader.getValue()), "123");
+    assertEquals(new String(reader.getValue()), "123");
 
     Parameter.ClobReader creader = new Parameter.ClobReader(new StringReader("123"));
     assertEquals(creader.getSqlType(), Types.CLOB);
-    assertEquals(IOUtils.toString(creader.getValue()), "123");
+    assertEquals(new String(reader.getValue()), "123");
     bytesOut = new ByteArrayOutputStream();
     out = new DataOutputStream(bytesOut);
     creader.serialize(out, false);
     in = new DataInputStream(new ByteArrayInputStream(bytesOut.toByteArray()));
     creader = (Parameter.ClobReader) Parameter.ClobReader.deserialize(in);
-    assertEquals(IOUtils.toString(creader.getValue()), "123");
+    assertEquals(new String(creader.getValue()), "123");
 
     Parameter.CharacterStream cstream = new Parameter.CharacterStream(new StringReader("123"));
     assertEquals(cstream.getSqlType(), Types.VARCHAR);
-    assertEquals(IOUtils.toString(cstream.getValue()), "123");
+    assertEquals(new String(cstream.getValue()), "123");
     bytesOut = new ByteArrayOutputStream();
     out = new DataOutputStream(bytesOut);
     cstream.serialize(out, false);
     in = new DataInputStream(new ByteArrayInputStream(bytesOut.toByteArray()));
     cstream = (Parameter.CharacterStream) Parameter.CharacterStream.deserialize(in);
-    assertEquals(IOUtils.toString(cstream.getValue()), "123");
+    assertEquals(new String(cstream.getValue()), "123");
 
     Parameter.NCharacterStream nstream = new Parameter.NCharacterStream(new StringReader("123"));
     assertEquals(nstream.getSqlType(), Types.NVARCHAR);
-    assertEquals(IOUtils.toString(nstream.getValue()), "123");
+    assertEquals(new String(nstream.getValue()), "123");
     bytesOut = new ByteArrayOutputStream();
     out = new DataOutputStream(bytesOut);
     nstream.serialize(out, false);
     in = new DataInputStream(new ByteArrayInputStream(bytesOut.toByteArray()));
     nstream = (Parameter.NCharacterStream) Parameter.NCharacterStream.deserialize(in);
-    assertEquals(IOUtils.toString(nstream.getValue()), "123");
+    assertEquals(new String(nstream.getValue()), "123");
 
 
     Parameter.BinaryStream bstream = new Parameter.BinaryStream("123".getBytes("utf-8"));
@@ -67,35 +67,35 @@ public class ParameterTest {
 
     Parameter.AsciiStream astream = new Parameter.AsciiStream(new ByteArrayInputStream("123".getBytes("utf-8")));
     assertEquals(astream.getSqlType(), Types.VARCHAR);
-    assertEquals(IOUtils.toString(astream.getValue()), "123");
+    assertEquals(new String(astream.getValue()), "123");
     bytesOut = new ByteArrayOutputStream();
     out = new DataOutputStream(bytesOut);
     astream.serialize(out, false);
     in = new DataInputStream(new ByteArrayInputStream(bytesOut.toByteArray()));
     astream = (Parameter.AsciiStream) Parameter.AsciiStream.deserialize(in);
-    assertEquals(IOUtils.toString(astream.getValue()), "123");
+    assertEquals(new String(astream.getValue()), "123");
 
     NClob nc = new com.sonicbase.query.impl.NClob();
     nc.setString(0, "123");
     Parameter.NClob nclob = new Parameter.NClob(nc);
     assertEquals(nclob.getSqlType(), Types.NCLOB);
-    assertEquals(IOUtils.toString(nclob.getValue()), "123");
+    assertEquals(new String(nclob.getValue()), "123");
     bytesOut = new ByteArrayOutputStream();
     out = new DataOutputStream(bytesOut);
     nclob.serialize(out, false);
     in = new DataInputStream(new ByteArrayInputStream(bytesOut.toByteArray()));
     nclob = (Parameter.NClob) Parameter.NClob.deserialize(in);
-    assertEquals(IOUtils.toString(nclob.getValue()), "123");
+    assertEquals(new String(nclob.getValue()), "123");
 
     Parameter.NString nstring = new Parameter.NString("123");
     assertEquals(nstring.getSqlType(), Types.NVARCHAR);
-    assertEquals(nstring.getValue(), "123".getBytes("utf-8"));
+    assertEquals(new String(nstring.getValue()), "123");
     bytesOut = new ByteArrayOutputStream();
     out = new DataOutputStream(bytesOut);
     nstring.serialize(out, false);
     in = new DataInputStream(new ByteArrayInputStream(bytesOut.toByteArray()));
     nstring = (Parameter.NString) Parameter.NString.deserialize(in);
-    assertEquals(nstring.getValue(), "123".getBytes("utf-8"));
+    assertEquals(new String(nstring.getValue()), "123");
 
     Parameter.Timestamp timestamp = new Parameter.Timestamp(new Timestamp(123));
     assertEquals(timestamp.getSqlType(), Types.TIMESTAMP);
@@ -131,13 +131,13 @@ public class ParameterTest {
     cl.setString(0, "123");
     Parameter.Clob clob = new Parameter.Clob(cl);
     assertEquals(clob.getSqlType(), Types.CLOB);
-    assertEquals(IOUtils.toString(clob.getValue()), "123");
+    assertEquals(new String(clob.getValue()), "123");
     bytesOut = new ByteArrayOutputStream();
     out = new DataOutputStream(bytesOut);
     clob.serialize(out, false);
     in = new DataInputStream(new ByteArrayInputStream(bytesOut.toByteArray()));
     clob = (Parameter.Clob) Parameter.Clob.deserialize(in);
-    assertEquals(IOUtils.toString(clob.getValue()), "123");
+    assertEquals(new String(clob.getValue()), "123");
 
     Blob bl = new com.sonicbase.query.impl.Blob();
     bl.setBytes(0, "123".getBytes("utf-8"));
@@ -153,13 +153,13 @@ public class ParameterTest {
 
     Parameter.UnicodeStream ustream = new Parameter.UnicodeStream(new ByteArrayInputStream("123".getBytes("utf-8")), 3);
     assertEquals(ustream.getSqlType(), Types.VARCHAR);
-    assertEquals(new String(ustream.getValue(), "utf-8"), "123");
+    assertEquals(new String(ustream.getValue()), "123");
     bytesOut = new ByteArrayOutputStream();
     out = new DataOutputStream(bytesOut);
     ustream.serialize(out, false);
     in = new DataInputStream(new ByteArrayInputStream(bytesOut.toByteArray()));
     ustream = (Parameter.UnicodeStream) Parameter.UnicodeStream.deserialize(in);
-    assertEquals(new String(ustream.getValue(), "utf-8"), "123");
+    assertEquals(new String(ustream.getValue()), "123");
 
     Parameter.Bytes bytes = new Parameter.Bytes("123".getBytes("utf-8"));
     assertEquals(bytes.getSqlType(), Types.VARBINARY);
@@ -171,15 +171,17 @@ public class ParameterTest {
     bytes = (Parameter.Bytes) Parameter.Bytes.deserialize(in);
     assertEquals(IOUtils.toString(bytes.getValue()), "123");
 
-    Parameter.String string = new Parameter.String("123".getBytes("utf-8"));
+    char[] chars = new char["123".length()];
+    "123".getChars(0, "123".length(), chars, 0);
+    Parameter.String string = new Parameter.String(chars);
     assertEquals(string.getSqlType(), Types.VARCHAR);
-    assertEquals(string.getValue(), "123".getBytes("utf-8"));
+    assertEquals(new String(string.getValue()), "123");
     bytesOut = new ByteArrayOutputStream();
     out = new DataOutputStream(bytesOut);
     string.serialize(out, false);
     in = new DataInputStream(new ByteArrayInputStream(bytesOut.toByteArray()));
     string = (Parameter.String) Parameter.String.deserialize(in);
-    assertEquals(string.getValue(), "123".getBytes("utf-8"));
+    assertEquals(new String(string.getValue()), "123");
 
     Parameter.BigDecimal bigDecimal = new Parameter.BigDecimal(new BigDecimal(123));
     assertEquals(bigDecimal.getSqlType(), Types.NUMERIC);

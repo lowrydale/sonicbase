@@ -30,4 +30,8 @@ public class NativePartitionedTree {
   public native boolean lastEntry2(long indexId, Object[][] retKey, long[] retValue);
 
   public native boolean firstEntry2(long indexId, Object[][] retKey, long[] retValue);
+
+  public native void delete(long indexId);
+
+  public native void sortKeys(long indexId, Object[][] keys, boolean ascend);
 }

@@ -5,6 +5,7 @@ import com.google.gson.JsonParser;
 import com.sonicbase.client.DatabaseClient;
 import com.sonicbase.common.Config;
 import com.sonicbase.jdbcdriver.ConnectionProxy;
+import com.sonicbase.schema.DataType;
 import com.sonicbase.server.DatabaseServer;
 import org.apache.commons.io.FileUtils;
 import org.apache.commons.io.IOUtils;
@@ -87,6 +88,8 @@ public class TestDataTypes {
     conn.close();
 
     conn = DriverManager.getConnection("jdbc:sonicbase:localhost:9010/test", "user", "password");
+
+    initTypes();
 
     executor.shutdownNow();
   }
@@ -226,7 +229,6 @@ public class TestDataTypes {
       Thread.sleep(1000);
     }
 
-
     assertEquals(client.getPartitionSize("test", 0, "persons", "_primarykey"), 10);
     assertEquals(client.getPartitionSize("test", 1, "persons", "_primarykey"), 10);
 //    assertEquals(client.getPartitionSize(2, "persons", "_1__primarykey"), 9);
@@ -244,8 +246,6 @@ public class TestDataTypes {
 
   @Test
   public void testBasics() throws Exception {
-
-    initTypes();
 
     //test select returns multiple records with an index using operator '<'
     PreparedStatement stmt = conn.prepareStatement("select id, int, smallint, bool, char, float, double, blob, numeric, decimal, bin, date, time, timestamp, tinyint, bit, real, nchar, nvarchar, longnvarchar, longvarchar, longvarbinary from persons where int < ? and smallint < ? and bool = ? and id < ? and nchar < ? and float < ? and double < ? and tinyint < ? order by longvarchar desc"); //force server select for serialization
@@ -568,6 +568,10 @@ public class TestDataTypes {
 
   @Test
   public void testDate() throws SQLException {
+
+    Date date1 = new Date(6, 6, 6);
+    Date date2 = new Date(6, 2, 2);
+    assertEquals(DataType.getDateComparator().compare(date1, date2), 1);
     for (int i = 0; i < recordCount; i++) {
       PreparedStatement stmt = conn.prepareStatement("insert into date (id, id2, name) VALUES (?, ?, ?)");
       stmt.setDate(1, new Date(i + 1, i + 1, i + 1));
@@ -581,7 +585,9 @@ public class TestDataTypes {
     ResultSet ret = stmt.executeQuery();
 
     ret.next();
-    assertEquals(ret.getDate("id").getYear(), 5);
+    Date cmpDate = new Date(6, 6, 6);
+    Date retDate = ret.getDate("id");
+    assertEquals(retDate.getYear(), 5);
     assertEquals(ret.getInt("id2"), 4);
     assertEquals(ret.getString("name"), "name-4");
     ret.next();
@@ -607,8 +613,8 @@ public class TestDataTypes {
     }
 
     PreparedStatement stmt = conn.prepareStatement("select id, id2, name from date where id<? and id >? order by id desc");
-    stmt.setDate(1, new java.sql.Date(106, 1, 1));
-    stmt.setDate(2, new java.sql.Date(100, 1, 1));
+    stmt.setString(1, "2006-06-06");
+    stmt.setString(2, "2000-00-00");
     ResultSet ret = stmt.executeQuery();
 
     ret.next();

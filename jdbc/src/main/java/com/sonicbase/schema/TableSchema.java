@@ -91,21 +91,24 @@ public class TableSchema {
     return comparators;
   }
 
-  public List<FieldSchema> getFieldsForVersion(int schemaVersion, int serializedVersion) {
-    if (schemaVersion == serializedVersion || previousFields.isEmpty()) {
+  public List<FieldSchema> getFieldsForVersion(int schemaVersion, int savedSchemaVersion) {
+    if (schemaVersion == savedSchemaVersion || previousFields.isEmpty()) {
       return fields;
     }
+//    if (savedSchemaVersion > previousFields.get(previousFields.size() - 1).schemaVersion) {
+//      return previousFields.get(previousFields.size() - 1).fields;
+//    }
     for (int i = 0; i < previousFields.size(); i++) {
       PreviousFields prev = previousFields.get(i);
-      if (serializedVersion == prev.schemaVersion) {
+      if (savedSchemaVersion == prev.schemaVersion) {
         return prev.fields;
       }
-      if (serializedVersion < prev.schemaVersion) {
-        PreviousFields prevPrev = i + 1 < previousFields.size() ? previousFields.get(i + 1) : null;
+      if (savedSchemaVersion < prev.schemaVersion) {
+        PreviousFields prevPrev = i - 1 >= 0 ? previousFields.get(i - 1) : null;
         if (prevPrev == null) {
           return prev.fields;
         }
-        if (serializedVersion > prevPrev.schemaVersion) {
+        if (savedSchemaVersion > prevPrev.schemaVersion) {
           return prev.fields;
         }
       }

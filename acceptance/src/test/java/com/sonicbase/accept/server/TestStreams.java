@@ -334,7 +334,7 @@ public class TestStreams {
       }
     }
 
-    Thread.sleep(10_000);
+    Thread.sleep(20_000);
 
     PreparedStatement stmt = connB.prepareStatement("select * from nokey order by id, id2, socialsecuritynumber");
     ResultSet ret = stmt.executeQuery();

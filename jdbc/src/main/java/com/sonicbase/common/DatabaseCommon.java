@@ -19,8 +19,7 @@ import java.util.concurrent.locks.Lock;
 import java.util.concurrent.locks.ReadWriteLock;
 import java.util.concurrent.locks.ReentrantReadWriteLock;
 
-import static com.sonicbase.client.DatabaseClient.SERIALIZATION_VERSION;
-import static com.sonicbase.client.DatabaseClient.SERIALIZATION_VERSION_21;
+import static com.sonicbase.client.DatabaseClient.*;
 import static com.sonicbase.schema.DataType.Type.BIGINT;
 import static java.sql.Types.*;
 
@@ -31,7 +30,7 @@ import static java.sql.Types.*;
 // I don't know a good way to reduce the parameter count
 public class DatabaseCommon {
 
-  private static final String SONICBASE_SCHEMA_STR = "_sonicbase_schema";
+  public static final String SONICBASE_SCHEMA_STR = "_sonicbase_schema";
   private static final String SNAPSHOT_STR = "snapshot";
   private static final String UTF_8_STR = "utf-8";
   private static final String SCHEMA_BIN_STR = "schema.bin";
@@ -83,36 +82,6 @@ public class DatabaseCommon {
   public Map<Integer, TableSchema> getTablesById(String dbName) {
     Schema retSchema = ensureSchemaExists(dbName);
     return retSchema.getTablesById();
-  }
-
-  public TableSchema getTableSchema(String dbName, String tableName, String dataDir) {
-    if (notDurable) {
-      return getTables(dbName).get(tableName);
-    }
-
-    Schema dbSchema = schema.get(dbName);
-    if (dbSchema == null) {
-      Schema prevSchema = schema.put(dbName, new Schema());
-      if (prevSchema != null) {
-        schema.put(dbName, prevSchema);
-      }
-      dbSchema = schema.get(dbName);
-    }
-    TableSchema tableSchema = dbSchema.getTables().get(tableName);
-    if (tableSchema != null) {
-      return tableSchema;
-    }
-    File file = new File(dataDir, SNAPSHOT_STR + File.separator + shard + File.separator + replica + File.separator +
-        SONICBASE_SCHEMA_STR + File.separator + dbName);
-    File tableDir = new File(file, tableName + File.separator + "table");
-    try {
-      Set<String> newTableNames = new HashSet<>();
-      loadTableSchema(dbSchema, tableDir, newTableNames);
-    }
-    catch (IOException e) {
-      throw new DatabaseException(e);
-    }
-    return dbSchema.getTables().get(tableName);
   }
 
   public void loadSchema(String dataDir) {
@@ -180,7 +149,7 @@ public class DatabaseCommon {
     }
   }
 
-  private void loadTableSchema(Schema dbSchema, File tableFile, Set<String> newTableNames) throws IOException {
+  public void loadTableSchema(Schema dbSchema, File tableFile, Set<String> newTableNames) throws IOException {
     String tableName = tableFile.getName();
     TableSchema previousTableSchema = dbSchema.getTables().get(tableName);
     File tableDir = new File(tableFile + "/table");
@@ -302,21 +271,13 @@ public class DatabaseCommon {
     }
   }
 
-  private byte[] serializedSchema = null;
-  private int serializedSchemaVersion = 0;
-
   public byte[] serializeSchema(short serializationVersionNumber) throws IOException {
 
-    if (serializationVersionNumber == schemaVersion && serializedSchema != null) {
-      return serializedSchema;
-    }
     ByteArrayOutputStream bytesOut = new ByteArrayOutputStream();
     DataOutputStream out = new DataOutputStream(bytesOut);
     serializeSchema(out, serializationVersionNumber);
     out.close();
     byte[] ret = bytesOut.toByteArray();
-    serializedSchema = ret;
-    serializedSchemaVersion = schemaVersion;
     return ret;
   }
 
@@ -449,7 +410,11 @@ public class DatabaseCommon {
     return deserializeKey(tableSchema, bytes);
   }
 
-   public static Object[] deserializeKey(TableSchema tableSchema, byte[] bytes) throws EOFException {
+  public static Object[] deserializeKey(TableSchema tableSchema, byte[] bytes) throws EOFException {
+    return deserializeKey(tableSchema, bytes, null);
+  }
+
+   public static Object[] deserializeKey(TableSchema tableSchema, byte[] bytes, List<Object[]> reusableKeys) throws EOFException {
 
     int indexId = -1;
     try {
@@ -459,10 +424,33 @@ public class DatabaseCommon {
       DataUtils.readSignedVarLong(bytes, offset);
 
       indexId = (int) DataUtils.readSignedVarLong(bytes, offset);
+      if (tableSchema == null) {
+        logger.error("Invalid table: table=" + tableSchema.getName());
+      }
       IndexSchema indexSchema = tableSchema.getIndexesById().get(indexId);
+      if (indexSchema == null) {
+        logger.error("Invalid index: id=" + indexId + ", table=" + tableSchema.getName());
+      }
       int[] columns = indexSchema.getFieldOffsets();
+      Object[] fields = null;
       int keyLength = (int) DataUtils.readSignedVarLong(bytes, offset);
-      Object[] fields = new Object[keyLength];
+      if (reusableKeys != null) {
+        for (Object[] reusableKey : reusableKeys) {
+          if (reusableKey.length == keyLength) {
+            fields = reusableKey;
+            for (int i = 0; i < fields.length; i++) {
+              fields[i] = null;
+            }
+            break;
+          }
+        }
+      }
+      if (fields == null) {
+        fields = new Object[keyLength];
+        if (reusableKeys != null) {
+          reusableKeys.add(fields);
+        }
+      }
       for (int i = 0; i < keyLength; i++) {
         if (bytes[offset[0]++] != 0) {
           switch (tableSchema.getFields().get(columns[i]).getType()) {
@@ -505,10 +493,22 @@ public class DatabaseCommon {
             case NCLOB:
             case NVARCHAR: {
               int len = (int) DataUtils.readSignedVarLong(bytes, offset);
-              byte[] currBytes = new byte[len];
-              System.arraycopy(bytes, offset[0], currBytes, 0, len);
-              fields[i] = currBytes;
-              offset[0] += len;
+              if (serializationVersion < SERIALIZATION_VERSION_30) {
+                byte[] currBytes = new byte[len];
+                System.arraycopy(bytes, offset[0], currBytes, 0, len);
+                char[] chars = new char[len];
+                new String(currBytes).getChars(0, len, chars, 0);
+                fields[i] = chars;
+                offset[0] += len;
+              }
+              else {
+                char[] chars = new char[len];
+                for (int j = 0; j < len; j++) {
+                  chars[j] = DataUtils.bytesToChar(bytes, offset[0]);
+                  offset[0] += 2;
+                }
+                fields[i] = chars;
+              }
             }
               break;
             case LONGVARBINARY:
@@ -607,7 +607,7 @@ public class DatabaseCommon {
 
   public static Object[] deserializeKey(DataType.Type[] types, DataInputStream in) throws EOFException {
     try {
-      Varint.readSignedVarLong(in); // serializationVersion
+      int serializationVersion = (int) Varint.readSignedVarLong(in); // serializationVersion
       in.readInt();
       Varint.readSignedVarLong(in);
       Varint.readSignedVarLong(in); //indexId
@@ -652,10 +652,23 @@ public class DatabaseCommon {
             case NCLOB:
             case NVARCHAR: {
               int len = (int) Varint.readSignedVarLong(in);
-              byte[] bytes = new byte[len];
-              in.read(bytes);
-              fields[i] = bytes;
-              break;
+
+              if (serializationVersion < SERIALIZATION_VERSION_30) {
+                byte[] bytes = new byte[len];
+                in.read(bytes);
+
+                char[] chars = new char[len];
+                new String(bytes).getChars(0, len, chars, 0);
+                fields[i] = chars;
+              }
+              else {
+                char[] chars = new char[len];
+                for (int j = 0; j < len; j++) {
+                  chars[j] = in.readChar();
+                }
+                fields[i] = chars;
+              }
+            break;
             }
             case LONGVARBINARY:
             case VARBINARY:
@@ -770,20 +783,32 @@ public class DatabaseCommon {
                 case NCLOB:
                 case LONGNVARCHAR:
                 case NVARCHAR:
-                case LONGVARCHAR:
-                case LONGVARBINARY:
-                case VARBINARY:
-                case BLOB: {
-                  byte[] bytes = (byte[]) key[i];
-                  if (bytes == null) {
+                case LONGVARCHAR: {
+                  char[] chars = (char[]) key[i];
+                  if (chars == null) {
                     Varint.writeSignedVarLong(0, out);
                   }
                   else {
-                    Varint.writeSignedVarLong(bytes.length, out);
-                    out.write(bytes);
+                    Varint.writeSignedVarLong(chars.length, out);
+                    for (int j = 0; j < chars.length; j++) {
+                      out.writeChar(chars[j]);
+                    }
                   }
                   break;
                 }
+              case LONGVARBINARY:
+              case VARBINARY:
+              case BLOB: {
+                byte[] bytes = (byte[]) key[i];
+                if (bytes == null) {
+                  Varint.writeSignedVarLong(0, out);
+                }
+                else {
+                  Varint.writeSignedVarLong(bytes.length, out);
+                  out.write(bytes);
+                }
+                break;
+              }
                 case NUMERIC:
                 case DECIMAL: {
                   BigDecimal value = ((BigDecimal) key[i]);
@@ -859,7 +884,7 @@ public class DatabaseCommon {
 
       DataInputStream in = new DataInputStream(new ByteArrayInputStream(bytes));
 
-      Varint.readUnsignedVarLong(in); // serializationVersion
+      int serializationVersion = (int) Varint.readUnsignedVarLong(in); // serializationVersion
       int count = (int) Varint.readUnsignedVarLong(in);
       if (count == 0) {
         return null;
@@ -881,13 +906,34 @@ public class DatabaseCommon {
             case TINYINT:
               ret[i] = in.readByte();
               break;
+            case BLOB:
+            case LONGVARBINARY:
+            case VARBINARY: {
+              int len = (int) Varint.readSignedVarLong(in);
+              byte[] bytes1 = new byte[len];
+              in.read(bytes1);
+              ret[i] = bytes1;
+              break;
+            }
             case LONGVARCHAR:
             case VARCHAR:
             case CHAR: {
               int len = (int) Varint.readSignedVarLong(in);
-              byte[] buffer = new byte[len];
-              in.readFully(buffer);
-              ret[i] = buffer;
+              if (serializationVersion < SERIALIZATION_VERSION_30) {
+                byte[] bytes1 = new byte[len];
+                in.read(bytes1);
+
+                char[] chars = new char[len];
+                new String(bytes1).getChars(0, len, chars, 0);
+                ret[i] = chars;
+              }
+              else {
+                char[] chars = new char[len];
+                for (int j = 0; j < len; j++) {
+                  chars[j] = in.readChar();
+                }
+                ret[i] = chars;
+              }
             }
               break;
             case FLOAT:
@@ -978,6 +1024,13 @@ public class DatabaseCommon {
               Varint.writeSignedVarLong(((byte[])key[i]).length, out);
               out.write(((byte[])key[i]));
             }
+            else if (key[i] instanceof char[]) {
+              char[] chars = (char[])key[i];
+              Varint.writeSignedVarLong(chars.length, out);
+              for (int j = 0; j < chars.length; j++) {
+                out.writeChar(chars[j]);
+              }
+            }
             else if (key[i] instanceof Float) {
               out.writeFloat((Float) key[i]);
             }
@@ -1035,7 +1088,10 @@ public class DatabaseCommon {
     ByteArrayOutputStream bytesOut = new ByteArrayOutputStream();
     DataOutputStream out = new DataOutputStream(bytesOut);
 
+    Varint.writeSignedVarLong(0, out); //marker indicating we have a serialization version
+    Varint.writeSignedVarLong(SERIALIZATION_VERSION, out);
     Varint.writeSignedVarLong(schemaVersion, out);
+
 
     int offset = 0;
     for (Object field : fields) {
@@ -1089,7 +1145,20 @@ public class DatabaseCommon {
           case CLOB:
           case NCLOB:
           case LONGNVARCHAR:
-          case LONGVARCHAR:
+          case LONGVARCHAR: {
+            char[] chars = (char[]) field;
+            if (chars == null) {
+              Varint.writeSignedVarLong(0, out);
+            }
+            else {
+              Varint.writeSignedVarLong(chars.length * 2, out);
+              for (int j = 0; j < chars.length; j++) {
+                out.writeChar(chars[j]);
+              }
+            }
+            offset++;
+            break;
+          }
           case LONGVARBINARY:
           case VARBINARY:
           case BLOB: {
@@ -1160,9 +1229,18 @@ public class DatabaseCommon {
     List<FieldSchema> currFieldList = tableSchema.getFields();
     List<FieldSchema> serializedFieldList = null;
 
-    int serializedVersion = (int)Varint.readSignedVarLong(in);
+    int marker = (int) Varint.readSignedVarLong(in);
+    int serializationVersion = 0;
+    int savedSchemaVersion = 0;
+    if (marker == 0) {
+      serializationVersion = (int) Varint.readSignedVarLong(in);
+      savedSchemaVersion = (int) Varint.readSignedVarLong(in);
+    }
+    else {
+      savedSchemaVersion = marker;
+    }
 
-    serializedFieldList = tableSchema.getFieldsForVersion(schemaVersion, serializedVersion);
+    serializedFieldList = tableSchema.getFieldsForVersion(schemaVersion, savedSchemaVersion);
 
     Object[] fields = new Object[currFieldList.size()];
     int offset = 0;
@@ -1209,7 +1287,26 @@ public class DatabaseCommon {
             field.getType() == DataType.Type.CLOB ||
             field.getType() == DataType.Type.NCLOB ||
             field.getType() == DataType.Type.LONGNVARCHAR ||
-            field.getType() == DataType.Type.LONGVARCHAR ||
+            field.getType() == DataType.Type.LONGVARCHAR) {
+          int len = size;////(int) Varint.readSignedVarLong(in);
+
+          if (serializationVersion < SERIALIZATION_VERSION_30) {
+            byte[] bytes = new byte[len];
+            in.read(bytes);
+
+            char[] chars = new char[len / 2];
+            new String(bytes).getChars(0, len / 2, chars, 0);
+            fields[currOffset] = chars;
+          }
+          else {
+            char[] chars = new char[len / 2];
+            for (int j = 0; j < len / 2; j++) {
+              chars[j] = in.readChar();
+            }
+            fields[currOffset] = chars;
+          }
+        }
+        else if (
             field.getType() == DataType.Type.VARBINARY ||
             field.getType() == DataType.Type.LONGVARBINARY ||
             field.getType() == DataType.Type.BLOB) {
@@ -1362,8 +1459,8 @@ public class DatabaseCommon {
       }
       StringBuilder keyStr = new StringBuilder("[");
       for (Object curr : key) {
-        if (curr instanceof byte[]) {
-          keyStr.append(",").append(new String((byte[]) curr, UTF_8_STR));
+        if (curr instanceof char[]) {
+          keyStr.append(",").append(new String((char[]) curr));
         }
         else {
           keyStr.append(",").append(curr);

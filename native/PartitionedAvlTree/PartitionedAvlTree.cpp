@@ -4,19 +4,14 @@
  * and open the template in the editor.
  */
 
+//#include "stdafx.h"
 #include <stdio.h>
 #include <string>
 #include <stdlib.h>
-//#include <sys/time.h>
 #include <mutex>
 #include <thread>
 #include <chrono>
 #include <iomanip>
-#ifdef _WIN32
-#include "stdafx.h"
-#else
-#include <unistd.h>
-#endif
 #include <map>
 #include <iterator>
 #include <vector>
@@ -24,26 +19,27 @@
 #include <cstring>
 #include <locale>
 #include <future>
-#include <sys/time.h>
 #include <math.h>
 #include "utf8.h"
-#include "kavl.h"
 #include "BigDecimal.h"
 
 #include <jni.h>        // JNI header provided by JDK#include <stdio.h>      // C Standard IO Header
 #include "com_sonicbase_index_NativePartitionedTree.h"
 
 
-#include <pthread.h>
+//#include <pthread.h>
 
-#ifdef WIN32
+#ifdef _WIN32
 #include <WinSock2.h>
 #include <Windows.h>
 #else
+#include <sys/time.h>
 #include<pthread.h>
 #include<semaphore.h>
 #endif
+#include "kavl.h"
 
+#define SB_DEBUG 0
 
 const int PARTITION_COUNT = 16; // 64 for 17mil tailBlock reads/sec
 //const int NUM_RECORDS_PER_PARTITION =  32 + 2;
@@ -144,60 +140,11 @@ static jmethodID gBigDecimal_ctor;
 static jmethodID gBigDecimal_toPlainString_mid;
 
 
-struct rwlock {
-    pthread_mutex_t lock;
-    pthread_cond_t read, write;
-    unsigned readers, writers, read_waiters, write_waiters;
-};
-
-void reader_lock(struct rwlock *self) {
-    pthread_mutex_lock(&self->lock);
-    if (self->writers || self->write_waiters) {
-        self->read_waiters++;
-        do pthread_cond_wait(&self->read, &self->lock);
-        while (self->writers || self->write_waiters);
-        self->read_waiters--;
-    }
-    self->readers++;
-    pthread_mutex_unlock(&self->lock);
-}
-
-void reader_unlock(struct rwlock *self) {
-    pthread_mutex_lock(&self->lock);
-    self->readers--;
-    if (self->write_waiters)
-        pthread_cond_signal(&self->write);
-    pthread_mutex_unlock(&self->lock);
-}
-
-void writer_lock(struct rwlock *self) {
-    pthread_mutex_lock(&self->lock);
-    if (self->readers || self->writers) {
-        self->write_waiters++;
-        do pthread_cond_wait(&self->write, &self->lock);
-        while (self->readers || self->writers);
-        self->write_waiters--;
-    }
-    self->writers = 1;
-    pthread_mutex_unlock(&self->lock);
-}
-
-void writer_unlock(struct rwlock *self) {
-    pthread_mutex_lock(&self->lock);
-    self->writers = 0;
-    if (self->write_waiters)
-        pthread_cond_signal(&self->write);
-    else if (self->read_waiters)
-        pthread_cond_broadcast(&self->read);
-    pthread_mutex_unlock(&self->lock);
-}
-
-void rwlock_init(struct rwlock *self) {
-    self->readers = self->writers = self->read_waiters = self->write_waiters = 0;
-    pthread_mutex_init(&self->lock, NULL);
-    pthread_cond_init(&self->read, NULL);
-    pthread_cond_init(&self->write, NULL);
-}
+#ifdef _WIN32
+#define smin(x, y) min(x, y)
+#else
+#define smin(x, y) std::min(x, y)
+#endif
 
 void logError(JNIEnv *env, char msg[], std::exception e) {
 	const char *what = e.what();
@@ -213,40 +160,6 @@ void logError(JNIEnv *env, char msg[]) {
 	env->CallVoidMethod(gNativePartitioned_class, gNativePartitionedTree_logError_mid, jMsg);
 }
 
-
-//class rlock
-//{
-//    rwlock &m_;
-//
-//public:
-//    rlock(rwlock &m)
-//      : m_(m)
-//    {
-//        reader_lock(&m_);
-//    }
-//    ~rlock()
-//    {
-//        reader_unlock(&m_);
-//    }
-//};
-//
-//class wlock
-//{
-//    rwlock &m_;
-//
-//public:
-//    wlock(rwlock &m)
-//      : m_(m)
-//    {
-//        writer_lock(&m_);
-//    }
-//    ~wlock()
-//    {
-//        writer_unlock(&m_);
-//    }
-//};
-
-
 #define synchronized(m) \
     for(std::unique_lock<std::recursive_mutex> lk(m); lk; lk.unlock())
 
@@ -259,7 +172,7 @@ struct ByteArray {
 };
 
 struct sb_utf8str {
-    uint8_t *bytes;
+    uint16_t *bytes;
     int len;
 };
 
@@ -272,11 +185,11 @@ class LongComparator : public Comparator {
 			if (o1 == 0 || o2 == 0) {
 				return 0;
 			}
-			if (*((long*) o1) < *((long*) o2)) {
+			if (*((uint64_t*) o1) < *((uint64_t*) o2)) {
 			  return -1;
 			}
 			else {
-			  return *((long*) o1) > *((long*) o2) ? 1 : 0;
+			  return *((uint64_t*) o1) > *((uint64_t*) o2) ? 1 : 0;
 			}
 		}
 };
@@ -309,7 +222,25 @@ class Utf8Comparator : public Comparator {
 		sb_utf8str *o1Bytes = (sb_utf8str*)o1;
 		sb_utf8str *o2Bytes = (sb_utf8str*)o2;
 
-		return compareBytes(o1Bytes->bytes, 0, o1Bytes->len, o2Bytes->bytes, 0, o2Bytes->len);
+        int len1 = o1Bytes->len;
+        int len2 = o2Bytes->len;
+        int lim = smin(len1, len2);
+        uint16_t *v1 = o1Bytes->bytes;
+        uint16_t *v2 = o2Bytes->bytes;
+
+        int k = 0;
+        while (k < lim) {
+            uint16_t c1 = v1[k];
+            uint16_t c2 = v2[k];
+            if (c1 != c2) {
+                return c1 - c2;
+            }
+            k++;
+        }
+        return len1 - len2;
+
+
+		//return compareBytes(o1Bytes->bytes, 0, o1Bytes->len, o2Bytes->bytes, 0, o2Bytes->len);
 		//return utf8casecmp(o1Bytes->bytes, o2Bytes->bytes);
 
 		//return compareBytes(o1Bytes->bytes, 0, o1Bytes->len, o2Bytes->bytes, 0, o2Bytes->len);
@@ -429,8 +360,8 @@ class FloatComparator : public Comparator {
 class TimestampComparator : public Comparator {
 	public:
 		int compare(void *o1, void *o2) {
-			long *l1 = (long*)o1;
-			long *l2 = (long*)o2;
+			uint64_t *l1 = (uint64_t*)o1;
+			uint64_t *l2 = (uint64_t*)o2;
 			if (l1 == 0 || l2 == 0) {
 				return 0;
 			}
@@ -521,18 +452,19 @@ class KeyComparator : public Comparator {
 					comparators[i] = new Utf8Comparator();
 					break;
 				default:
-					char *buffer = new char[75];
-					sprintf(buffer, "Unsupported datatype in KeyComparator: type=%d", dataTypes[i]);
-					logError(env, buffer);
-					delete[] buffer;
+					//char *buffer = new char[75];
+					printf("Unsupported datatype in KeyComparator: type=%d", dataTypes[i]);
+					//logError(env, buffer);
+					//delete[] buffer;
 					break;
 			}
 		}
 	}
 
 	int compare(void *o1, void *o2) {
-        for (int i = 0; i < fieldCount; i++) {
-          int value = comparators[i]->compare(((void**)o1)[i], ((void**)o2)[i]);
+		int keyLen = ((Key*)o1)->len <= ((Key*)o2)->len ? ((Key*)o1)->len : ((Key*)o2)->len;
+		for (int i = 0; i < keyLen; i++) {
+          int value = comparators[i]->compare(((Key*)o1)->key[i], ((Key*)o2)->key[i]);
           if (value != 0) {
             return value;
           }
@@ -543,13 +475,47 @@ class KeyComparator : public Comparator {
 
 
 
-struct PartitionedMap {
+jint throwException(JNIEnv *env, const char *message)
+{
+	jclass exClass;
+	const char *className = "com/sonicbase/query/DatabaseException";
+
+	exClass = env->FindClass(className);
+	if (exClass == NULL) {
+		printf("class not found: com/sonicbase/query/DatabaseException");
+		fflush(stdout);
+	}
+
+	printf("got exception\n");
+	fflush(stdout);
+
+	jboolean flag = env->ExceptionCheck();
+	if (flag) {
+		env->ExceptionClear();
+		printf("cleard exception\n");
+		fflush(stdout);
+	}
+
+	jint ret = env->ThrowNew(exClass, message);
+	printf("throw exception: ret=%d\n", ret);
+	fflush(stdout);
+	return ret;
+}
+
+class PartitionedMap {
+public:
     int id = 0;
-    struct my_node * maps[PARTITION_COUNT];
+    my_node * maps[PARTITION_COUNT];
     std::mutex *locks = new std::mutex[PARTITION_COUNT];
     Comparator *comparator = 0;
 	int *dataTypes = 0;
 	int fieldCount = 0;
+
+	~PartitionedMap() {
+		delete[] locks;
+		delete comparator;
+		delete[] dataTypes;
+	}
 
     PartitionedMap(JNIEnv * env, jintArray dataTypes) {
         for (int i = 0; i < PARTITION_COUNT; i++) {
@@ -568,17 +534,17 @@ struct PartitionedMap {
 
 class PartitionResults {
   public:
-    void*** keys;
-    long* values;
+    Key **keys;
+	uint64_t* values;
     int count = -1;
     int posWithinPartition = 0;
-    void** key = 0;
-    long value = 0;
+    Key *key = 0;
+    uint64_t value = 0;
     int partition = 0;
 
     PartitionResults(int numRecordsPerPartition) {
-    	values = new long[numRecordsPerPartition];
-    	keys = new void**[numRecordsPerPartition];
+    	values = new uint64_t[numRecordsPerPartition];
+    	keys = new Key*[numRecordsPerPartition];
 
   //      key = new void*[2];
         for (int i = 0; i < numRecordsPerPartition; i++) {
@@ -586,11 +552,11 @@ class PartitionResults {
             values[i] = 0;
         }
     }
-    void** getKey() {
+    Key* getKey() {
       return  key;
     }
 
-    long getValue() {
+	uint64_t getValue() {
       return value;
     }
 
@@ -599,97 +565,47 @@ class PartitionResults {
     }
   };
 
-long readLong(uint8_t* b) {
-    long result = 0;
-    for (int i = 0; i < 8; i++) {
-      result <<= 8;
-      result |= (b[i + 0] & 0xFF);
-    }
-    return result;
-  }
-
-void** deserializeKey(uint8_t* bytes, int len) {
-    void** ret = new void*[1];
-    ret[0] = (void*) readLong(bytes);
-    return ret;
-}
-
-void writeLong(uint8_t* bytes, long v, int* offset) {
-    for (int i = 7; i >= 0; i--) {
-      bytes[i] = (uint8_t)(v & 0xFF);
-      v >>= 8;
-    }
-        *offset += 8;
-  }
-
-void writeInt(uint8_t* bytes, int v, int* offset) {
-    bytes[*offset] = (unsigned(v) >> 24) & 0xFF;
-    bytes[*offset + 1] = (unsigned(v) >> 16) & 0xFF;
-    bytes[*offset + 2] = (unsigned(v) >>  8) & 0xFF;
-    bytes[*offset + 3] = (unsigned(v) >>  0) & 0xFF;
-    *offset += 4;
-}
-
-uint8_t* serializeKey(void** key, int* size) {
-    uint8_t* ret = new uint8_t[8];
-    int offset = 0;
-    writeLong(ret, (long)key[0], &offset);
-    *size = 8;
-    return ret;
-}
-
-jbyteArray serializeKeyValue(JNIEnv* env, const struct my_node* p) {
-    int size = 0;
-    uint8_t* keyBytes = serializeKey(p->key, &size);
-    int totalBytes = 4 + size + 8;
-
-    jbyte* bytes = new jbyte[totalBytes];
-    jbyteArray ret = env->NewByteArray(totalBytes);
-
-    int offset = 0;
-    writeInt((uint8_t*)&bytes[0], 1, &offset);
-    memcpy(&bytes[4], keyBytes, size);
-    writeLong((uint8_t*)&bytes[size + 4], p->value, &offset);
-
-    env->SetByteArrayRegion(ret, 0, totalBytes, bytes);
-    delete[] bytes;
-    return ret;
-}
-
-void** getSerializedKey(JNIEnv *env, jbyteArray jkeyBytes) {
-    jsize keyLen = env->GetArrayLength(jkeyBytes);
-
-   jboolean isCopy = false;
-   jbyte *keyBytes = env->GetByteArrayElements(jkeyBytes, &isCopy);
-
-   void ** ret = deserializeKey((uint8_t*)keyBytes, (int)keyLen);
-
-   env->ReleaseByteArrayElements(jkeyBytes, keyBytes, 0);
-//   if (isCopy) {
-//   		delete[] keyBytes;
-//   }
-   return ret;
-}
-
-#define my_cmp(p, q) \
-    doCompare(p, q)
-
 float timedifference_msec(struct timeval t0, struct timeval t1)
 {
     return (t1.tv_sec - t0.tv_sec) * 1000.0f + (t1.tv_usec - t0.tv_usec) / 1000.0f;
 }
 
-bool shutdown = false;
+bool shutdownFlag = false;
 
 
+static uint64_t EXP_BIT_MASK = 9218868437227405312L;
+static uint64_t SIGNIF_BIT_MASK = 4503599627370495L;
 
+static inline uint64_t doubleToRawLongBits(double x) {
+	uint64_t bits;
+	memcpy(&bits, &x, sizeof bits);
+	return bits;
+}
 
-int hashKey(JNIEnv* env, PartitionedMap *map, void **key) {
-	int hashCode = 1;
-	for (int i = 0; i < map->fieldCount; i++) {
+static uint64_t doubleToLongBits(double value) {
+	uint64_t result = doubleToRawLongBits(value);
+	// Check for NaN based on values of bit fields, maximum
+	// exponent and nonzero significand.
+	if (((result & EXP_BIT_MASK) ==
+		EXP_BIT_MASK) &&
+		(result & SIGNIF_BIT_MASK) != 0L)
+		result = 0x7ff8000000000000L;
+	return result;
+}
+
+unsigned float_to_bits(float x)
+{
+	unsigned y;
+	memcpy(&y, &x, 4);
+	return y;
+}
+
+uint32_t hashKey(JNIEnv* env, PartitionedMap *map, Key *key) {
+	uint32_t hashCode = 1;
+	for (int i = 0; i < key->len; i++) {
 		int type = map->dataTypes[i];
-		int currHashCode = 0;
-		if (key[i] == 0) {
+		uint32_t currHashCode = 0;
+		if (key->key[i] == 0) {
 			continue;
 		}
 		switch (type) {
@@ -698,28 +614,28 @@ int hashKey(JNIEnv* env, PartitionedMap *map, void **key) {
 			case DATE:
 			case TIME:
 			{
-				currHashCode = *((long*)key[i]) ^ (*((long*)key[i]) >> 32);
+				currHashCode = (int)(*((uint64_t*)key->key[i]) ^ (*((uint64_t*)key->key[i]) >> 32));
 			}
 			break;
 			case INTEGER:
 			{
-				currHashCode = *(int*)key[i];
+				currHashCode = *(int*)key->key[i];
 			}
 			break;
 			case SMALLINT:
 			{
-				currHashCode = *(short*)key[i];
+				currHashCode = *(short*)key->key[i];
 			}
 			break;
 			case TINYINT:
 			{
-				currHashCode = *(uint8_t*)key[i];
+				currHashCode = *(uint8_t*)key->key[i];
 			}
 			break;
 			case BOOLEAN:
 			case BIT:
 			{
-				currHashCode = *(bool*)key[i] ? 1231 : 1237;
+				currHashCode = *(bool*)key->key[i] ? 1231 : 1237;
 			}
 			break;
 			case TIMESTAMP:
@@ -729,30 +645,30 @@ int hashKey(JNIEnv* env, PartitionedMap *map, void **key) {
 				//long l = ( ((long*)(key[i]))[0]);
 				//printf("hash: key=%ld", (long)l);
 				//fflush(stdout);
-				currHashCode = ((long*)key[i])[0] ^ (((long*)key[i])[0] >> 32);
+				currHashCode = (int)( ((uint64_t*)key->key[i])[0] ^ (((uint64_t*)key->key[i])[0] >> 32));
 				//currHashCode = 31 * ((long*)key[i])[1] ^ (((long*)key[i])[1] >> 32) + currHashCode;
 			}
 			break;
 			case DOUBLE:
 			case FLOAT:
 			{
-				std::hash<double> hashVal;
-				currHashCode = hashVal(*(double *)key[i]);
+				uint64_t bits = doubleToLongBits(*(double *)key->key[i]);
+				currHashCode = (uint32_t)(bits ^ (bits >> 32));
 			}
 			break;
 			case REAL:
 			{
-				std::hash<float> hashVal;
-				currHashCode = hashVal(*(float *)key[i]);
+				uint32_t bits = float_to_bits(*(float *)key->key[i]);
+				currHashCode = bits;
 			}
 			break;
 			case NUMERIC:
 			case DECIMAL:
 			{
-				std::vector<uint8_t> myVector(((std::string*)key[i])->begin(), ((std::string*)key[i])->end());
+				std::vector<uint8_t> myVector(((std::string*)key->key[i])->begin(), ((std::string*)key->key[i])->end());
 				uint8_t *p = &myVector[0];
 				currHashCode = 1;
-				int len = ((std::string*)key[i])->length();
+				size_t len = ((std::string*)key->key[i])->length();
 				for (int j = 0; j < len; j++) {
 					currHashCode = 31 * currHashCode + p[j];
 				}
@@ -766,8 +682,8 @@ int hashKey(JNIEnv* env, PartitionedMap *map, void **key) {
 			case NCLOB:
 			case VARCHAR:
 			{
-				sb_utf8str *str = (sb_utf8str*)key[i];
-				uint8_t *bytes = str->bytes;
+				sb_utf8str *str = (sb_utf8str*)key->key[i];
+				uint16_t *bytes = str->bytes;
 				currHashCode = 1;
 				int len = str->len;
 				for (int j = 0; j < len; j++) {
@@ -776,17 +692,17 @@ int hashKey(JNIEnv* env, PartitionedMap *map, void **key) {
 			}
 			break;
 			default:
-				char *buffer = new char[75];
-				sprintf(buffer, "Unsupported datatype in hashKey: type=%d", type);
-				logError(env, buffer);
-				delete[] buffer;
+				//char *buffer = new char[75];
+				printf("Unsupported datatype in hashKey: type=%d", type);
+				//logError(env, buffer);
+				//delete[] buffer;
 			break;
 
 		}
 
 		hashCode = 31 * hashCode + currHashCode;
 	}
-	return abs(hashCode);
+	return abs((int)hashCode);
 }
 
 std::string byte_seq_to_string( uint8_t bytes[], int n)
@@ -812,21 +728,23 @@ std::string byte_seq_to_string_orig( const unsigned char bytes[], std::size_t n 
 }
 */
 
-void **javaKeyToNativeKey(JNIEnv *env, PartitionedMap *map, jobjectArray jKey) {
+
+Key *javaKeyToNativeKey(JNIEnv *env, PartitionedMap *map, jobjectArray jKey) {
 	int len = env->GetArrayLength(jKey);
-	void **ret = new void*[map->fieldCount];
-	for (int i = 0; i < map->fieldCount; i++) {
+	void **ret = new void*[len];
+	for (int i = 0; i < len; i++) {
 		int type = map->dataTypes[i];
 		jobject obj = env->GetObjectArrayElement(jKey, i);
 		if (obj == 0) {
+			ret[i] = 0;
 			continue;
 		}
 		switch (type) {
 			case ROWID:
 			case BIGINT:
 			{
-				long l = env->CallLongMethod(obj, gLong_longValue_mid);
-				long *pl = new long();
+				uint64_t l = (uint64_t)env->CallLongMethod(obj, gLong_longValue_mid);
+				uint64_t *pl = new uint64_t();
 				*pl = l;
 				//printf("toNative: keyOffset=%d, long=%ld", i, l);
 				//fflush(stdout);
@@ -882,16 +800,16 @@ void **javaKeyToNativeKey(JNIEnv *env, PartitionedMap *map, jobjectArray jKey) {
 				break;
 			case DATE:
 			{
-				long l = env->CallLongMethod(obj, gDate_getTime_mid);
-				long *pl = new long();
+				uint64_t l = (uint64_t)env->CallLongMethod(obj, gDate_getTime_mid);
+				uint64_t *pl = new uint64_t();
 				*pl = l;
 				ret[i] = pl;
 			}
 			break;
 			case TIME:
 			{
-				long l = env->CallLongMethod(obj, gTime_getTime_mid);
-				long *pl = new long();
+				uint64_t l = (uint64_t)env->CallLongMethod(obj, gTime_getTime_mid);
+				uint64_t *pl = new uint64_t();
 				*pl = l;
 				ret[i] = pl;
 			}
@@ -922,11 +840,11 @@ void **javaKeyToNativeKey(JNIEnv *env, PartitionedMap *map, jobjectArray jKey) {
 				// Release the memory pinned char array
 				env->ReleaseStringUTFChars(strObj, str);
 */
-				long l = env->CallLongMethod(obj, gTimestamp_getTime_mid);
-				int iVal = env->CallIntMethod(obj, gTimestamp_getNanos_mid);
-				long *entry = new long[2];
+				uint64_t l = (uint64_t)env->CallLongMethod(obj, gTimestamp_getTime_mid);
+				int iVal = (int)env->CallIntMethod(obj, gTimestamp_getNanos_mid);
+				uint64_t *entry = new uint64_t[2];
 				entry[0] = l;
-				entry[1] = (long)iVal;
+				entry[1] = (uint64_t)iVal;
 				ret[i] = (void*)entry;
 			}
 			break;
@@ -953,13 +871,15 @@ void **javaKeyToNativeKey(JNIEnv *env, PartitionedMap *map, jobjectArray jKey) {
 			case LONGNVARCHAR:
 			case NCLOB:
 			{
-				jbyteArray objStr = (jbyteArray)obj;
-				jsize size = env->GetArrayLength(objStr);
-				jbyte *bytes = env->GetByteArrayElements(objStr, NULL);
-				uint8_t *copy = new uint8_t[size + 1];
-				memcpy( (void*)copy, (void*)bytes, size * sizeof(uint8_t));
+
+				jsize size = env->GetArrayLength((jcharArray)obj);
+				uint16_t *bytes = (uint16_t*)env->GetCharArrayElements((jcharArray)obj, NULL);
+				uint16_t *copy = new uint16_t[size + 1];
+				for (int j = 0; j < size; j++) {
+					copy[j] = (uint16_t)bytes[j];
+				}
 				copy[size] = 0;
-			    env->ReleaseByteArrayElements(objStr, bytes, 0);
+			    env->ReleaseCharArrayElements((jcharArray)obj, (jchar*)bytes, 0);
 			    sb_utf8str *str = new sb_utf8str();
 			    str->bytes = copy;
 			    str->len = size;
@@ -968,25 +888,28 @@ void **javaKeyToNativeKey(JNIEnv *env, PartitionedMap *map, jobjectArray jKey) {
 			break;
 			default:
 			{
-				char *buffer = new char[75];
-				sprintf(buffer, "Unsupported datatype in javaKeyToNativeKey: type=%d", type);
-				logError(env, buffer);
-				delete[] buffer;
+				//char *buffer = new char[75];
+				printf("Unsupported datatype in javaKeyToNativeKey: type=%d", type);
+				//logError(env, buffer);
+				//delete[] buffer;
 			}
 		}
 	}
-    return ret;
+	Key *key = new Key();
+	key->len = len;
+	key->key = ret;
+    return key;
 }
 
-jobjectArray nativeKeyToJavaKey(JNIEnv *env, PartitionedMap *map, void **key) {
+jobjectArray nativeKeyToJavaKey(JNIEnv *env, PartitionedMap *map, Key *key) {
 
-	jobjectArray ret = env->NewObjectArray(map->fieldCount, gObject_class, NULL);
+	jobjectArray ret = env->NewObjectArray(key->len, gObject_class, NULL);
     if (ret == 0) {
     	return 0;
     }
 
-	for (int i = 0; i < map->fieldCount; i++) {
-		if (key[i] == 0) {
+	for (int i = 0; i < key->len; i++) {
+		if (key->key[i] == 0) {
 			continue;
 		}
 		int type = map->dataTypes[i];
@@ -994,64 +917,64 @@ jobjectArray nativeKeyToJavaKey(JNIEnv *env, PartitionedMap *map, void **key) {
 			case ROWID:
 			case BIGINT:
 			{
-				jobject obj = env->CallStaticObjectMethod(gLong_class, gLong_valueOf_mid, *((long*)key[i]));
+				jobject obj = env->CallStaticObjectMethod(gLong_class, gLong_valueOf_mid, *((uint64_t*)key->key[i]));
 			    env->SetObjectArrayElement(ret, i, obj);
 			}
 			break;
 			case SMALLINT:
 			{
-				jobject obj = env->CallStaticObjectMethod(gShort_class, gShort_valueOf_mid, *((short*)key[i]));
+				jobject obj = env->CallStaticObjectMethod(gShort_class, gShort_valueOf_mid, *((short*)key->key[i]));
 			    env->SetObjectArrayElement(ret, i, obj);
 			}
 			break;
 			case INTEGER:
 			{
-				jobject obj = env->CallStaticObjectMethod(gInt_class, gInt_valueOf_mid, *(int*)key[i]);
+				jobject obj = env->CallStaticObjectMethod(gInt_class, gInt_valueOf_mid, *(int*)key->key[i]);
 			    env->SetObjectArrayElement(ret, i, obj);
 			}
 			break;
 			case TINYINT:
 			{
-				jobject obj = env->CallStaticObjectMethod(gInt_class, gByte_valueOf_mid, *(uint8_t*)key[i]);
+				jobject obj = env->CallStaticObjectMethod(gInt_class, gByte_valueOf_mid, *(uint8_t*)key->key[i]);
 			    env->SetObjectArrayElement(ret, i, obj);
 			}
 			break;
 			case DATE:
 			{
-				jobject obj = env->NewObject(gDate_class, gDate_ctor, *(long*)key[i]);
+				jobject obj = env->NewObject(gDate_class, gDate_ctor, *(uint64_t*)key->key[i]);
 				env->SetObjectArrayElement(ret, i, obj);
 			}
 			break;
 			case TIME:
 			{
-				jobject obj = env->NewObject(gTime_class, gTime_ctor, *(long*)key[i]);
+				jobject obj = env->NewObject(gTime_class, gTime_ctor, *(uint64_t*)key->key[i]);
 				env->SetObjectArrayElement(ret, i, obj);
 			}
 			break;
 			case TIMESTAMP:
 			{
-				jobject obj = env->NewObject(gTimestamp_class, gTimestamp_ctor, ((long*)key[i])[0]);
-                env->CallVoidMethod(obj, gTimestamp_setNanos_mid, (int)((long*)key[i])[1]);
+				jobject obj = env->NewObject(gTimestamp_class, gTimestamp_ctor, ((uint64_t*)key->key[i])[0]);
+                env->CallVoidMethod(obj, gTimestamp_setNanos_mid, (int)((uint64_t*)key->key[i])[1]);
 				env->SetObjectArrayElement(ret, i, obj);
 			}
 			break;
 			case DOUBLE:
 			case FLOAT:
 			{
-				jobject obj = env->CallStaticObjectMethod(gDouble_class, gDouble_valueOf_mid, *(double*)key[i]);
+				jobject obj = env->CallStaticObjectMethod(gDouble_class, gDouble_valueOf_mid, *(double*)key->key[i]);
 			    env->SetObjectArrayElement(ret, i, obj);
 			}
 			break;
 			case REAL:
 			{
-				jobject obj = env->CallStaticObjectMethod(gFloat_class, gFloat_valueOf_mid, *(float*)key[i]);
+				jobject obj = env->CallStaticObjectMethod(gFloat_class, gFloat_valueOf_mid, *(float*)key->key[i]);
 			    env->SetObjectArrayElement(ret, i, obj);
 			}
 			break;
 			case NUMERIC:
 			case DECIMAL:
 			{
-				jstring jstr = env->NewStringUTF(((std::string*)key[i])->c_str());
+				jstring jstr = env->NewStringUTF(((std::string*)key->key[i])->c_str());
 				jobject obj = env->NewObject(gBigDecimal_class, gBigDecimal_ctor, jstr);
 				env->SetObjectArrayElement(ret, i, obj);
 			}
@@ -1064,19 +987,20 @@ jobjectArray nativeKeyToJavaKey(JNIEnv *env, PartitionedMap *map, void **key) {
 			case LONGNVARCHAR:
 			case NCLOB:
 			{
-				if (((sb_utf8str*)key[i])->len != 0) {
-					jbyteArray arr = env->NewByteArray(((sb_utf8str*)key[i])->len);
-					env->SetByteArrayRegion(arr, 0, ((sb_utf8str*)key[i])->len, (jbyte*)((sb_utf8str*)key[i])->bytes);
+				if (((sb_utf8str*)key->key[i])->len != 0) {
+					jcharArray arr = env->NewCharArray(((sb_utf8str*)key->key[i])->len);
+					env->SetCharArrayRegion(arr, 0, ((sb_utf8str*)key->key[i])->len, (jchar*)((sb_utf8str*)key->key[i])->bytes);
 					env->SetObjectArrayElement(ret, i, (jobject)arr);
+					//printf("key=" + std::wstring(((sb_utf8str*)key[i])->bytes));
 				}
 			}
 			break;
 			default:
 			{
-				char *buffer = new char[75];
-				sprintf(buffer, "Unsupported datatype in nativeKeyToJavaKey: type=%d", type);
-				logError(env, buffer);
-				delete[] buffer;
+				//char *buffer = new char[75];
+				printf("Unsupported datatype in nativeKeyToJavaKey: type=%d", type);
+				//logError(env, buffer);
+				//delete[] buffer;
 			}
 
 		}
@@ -1084,9 +1008,9 @@ jobjectArray nativeKeyToJavaKey(JNIEnv *env, PartitionedMap *map, void **key) {
     return ret;
 }
 
-void deleteKey(JNIEnv *env, PartitionedMap *map, void **key) {
-	for (int i = 0; i < map->fieldCount; i++) {
-		if (key[i] == 0) {
+void deleteKey(JNIEnv *env, PartitionedMap *map, Key *key) {
+	for (int i = 0; i < key->len; i++) {
+		if (key->key[i] == 0) {
 			continue;
 		}
 		int type = map->dataTypes[i];
@@ -1096,20 +1020,20 @@ void deleteKey(JNIEnv *env, PartitionedMap *map, void **key) {
 			case BIGINT:
 			case DATE:
 			case TIME:
-				delete (long*)key[i];
+				delete (uint64_t*)key->key[i];
 			break;
 			case SMALLINT:
-				delete (short*)key[i];
+				delete (short*)key->key[i];
 				break;
 			case INTEGER:
-				delete (int*)key[i];
+				delete (int*)key->key[i];
 				break;
 			case TINYINT:
-				delete (uint8_t*)key[i];
+				delete (uint8_t*)key->key[i];
 				break;
 			case NUMERIC:
 			case DECIMAL:
-				delete (std::string *)key[i];
+				delete (std::string *)key->key[i];
 			break;
 			case VARCHAR:
 			case CHAR:
@@ -1119,7 +1043,7 @@ void deleteKey(JNIEnv *env, PartitionedMap *map, void **key) {
 			case LONGNVARCHAR:
 			case NCLOB:
 			{
-				sb_utf8str *str = (sb_utf8str*)key[i];
+				sb_utf8str *str = (sb_utf8str*)key->key[i];
 				delete[] str->bytes;
 				delete str;
 			}
@@ -1128,28 +1052,28 @@ void deleteKey(JNIEnv *env, PartitionedMap *map, void **key) {
 			{
 				//printf("deleting");
 				//fflush(stdout);
-				long *entry = (long*)key[i];
+				uint64_t *entry = (uint64_t*)key->key[i];
 				delete[] entry;
 			}
 			break;
 			case DOUBLE:
 			case FLOAT:
 			{
-				delete (double*)key[i];
+				delete (double*)key->key[i];
 			}
 			break;
 			case REAL:
 			{
-				delete (float*)key[i];
+				delete (float*)key->key[i];
 			}
 			break;
 			default:
 			{
 				if (env != 0) {
-					char *buffer = new char[75];
-					sprintf(buffer, "Unsupported datatype in deleteKey: type=%d", type);
-					logError(env, buffer);
-					delete[] buffer;
+					//char *buffer = new char[75];
+					printf("Unsupported datatype in deleteKey: type=%d", type);
+					//logError(env, buffer);
+					//delete[] buffer;
 				}
 			}
 
@@ -1162,12 +1086,23 @@ void deleteKey(JNIEnv *env, PartitionedMap *map, void **key) {
 class DeleteQueueEntry {
 	public:
 		PartitionedMap *map = 0;
-		void **key = 0;
-		long time = 0;
+		Key *key = 0;
+		uint64_t time = 0;
 		DeleteQueueEntry *next = 0;
 		DeleteQueueEntry *prev = 0;
 };
 
+uint64_t getCurrMillis() {
+#ifdef _WIN32
+	SYSTEMTIME time;
+	GetSystemTime(&time);
+	return (time.wSecond * 1000) + time.wMilliseconds;
+#else
+	struct timeval tp;
+	gettimeofday(&tp, NULL);
+	return (uint64_t)tp.tv_sec * 1000L + tp.tv_usec / 1000;
+#endif
+}
 class DeleteQueue {
     std::mutex queueLock;
 	DeleteQueueEntry *head = 0;
@@ -1176,11 +1111,8 @@ class DeleteQueue {
 public:
 	void push(DeleteQueueEntry *entry) {
 		{
-			struct timeval tp;
-			gettimeofday(&tp, NULL);
-			long mslong = (long long) tp.tv_sec * 1000L + tp.tv_usec / 1000; //get current timestamp in milliseconds
-
-			entry->time = mslong;
+			
+			entry->time = getCurrMillis();
 			std::lock_guard<std::mutex> lock(queueLock);
 			if (tail == 0) {
 				head = tail = entry;
@@ -1200,10 +1132,7 @@ public:
 				return 0;
 			}
 
-			struct timeval tp;
-			gettimeofday(&tp, NULL);
-			long mslong = (long long) tp.tv_sec * 1000L + tp.tv_usec / 1000; //get current timestamp in milliseconds
-			if (mslong - head->time > 10000) {
+			if (getCurrMillis() - head->time > 10000) {
 				return 0;
 			}
 
@@ -1226,7 +1155,7 @@ std::thread *deleteThread;
 void deleteRunner() {
 	printf("started runner");
 	fflush(stdout);
-	while (!shutdown) {
+	while (!shutdownFlag) {
 		DeleteQueueEntry *entry = deleteQueue->pop();
 		if (entry == 0) {
 //			printf("popped nothing");
@@ -1241,7 +1170,7 @@ void deleteRunner() {
 	}
 }
 
-void pushDelete(PartitionedMap *map, void **key) {
+void pushDelete(PartitionedMap *map, Key *key) {
 	if (deleteThread == 0) {
 		printf("creating thread");
 		fflush(stdout);
@@ -1256,22 +1185,55 @@ void pushDelete(PartitionedMap *map, void **key) {
 	deleteQueue->push(entry);
 }
 
+std::mutex partitionIdLock;
+
+PartitionedMap **allMaps = new PartitionedMap*[10000];
+uint64_t highestMapId = 0;
+
 JNIEXPORT jlong JNICALL Java_com_sonicbase_index_NativePartitionedTree_initIndex
   (JNIEnv * env, jobject obj, jintArray dataTypes) {
+	  {
+		  std::lock_guard<std::mutex> lock(partitionIdLock);
 
-    PartitionedMap *newMap = new PartitionedMap(env, dataTypes);
-    return (long)newMap;
+		  if (highestMapId == 0) {
+			 for (int i = 0; i < 10000; i++) {
+				 allMaps[i] = 0;
+			}
+		  }
+
+		  PartitionedMap *newMap = new PartitionedMap(env, dataTypes);
+		  uint64_t currMapId = highestMapId;
+		  allMaps[highestMapId] = newMap;
+		  highestMapId++;
+		  return currMapId;
+	  }
+}
+
+PartitionedMap *getIndex(JNIEnv *env, jlong indexId) {
+	PartitionedMap* map = allMaps[(int)indexId];
+	if (map == 0) {
+		throwException(env, "Invalid index id");
+	}
+	return map;
 }
 
 JNIEXPORT jlong JNICALL Java_com_sonicbase_index_NativePartitionedTree_put
   (JNIEnv * env, jobject obj, jlong indexId, jobjectArray jstartKey, jlong value) {
-        struct my_node *q, *p = new my_node;
+        my_node *q, *p = new my_node;
 
+		if (SB_DEBUG) {
+			printf("put begin\n");
+			fflush(stdout);
+		}
 	try {
-		long retValue = -1;
-		PartitionedMap* map = (PartitionedMap*)indexId;
+		uint64_t retValue = -1;
+		PartitionedMap* map = getIndex(env, indexId);
+		if (map == 0) {
+			return 0;
+		}
 
-		void** startKey = javaKeyToNativeKey(env, map, jstartKey);
+
+		Key *startKey = javaKeyToNativeKey(env, map, jstartKey);
 
 		if (startKey == 0) {
 			printf("put, null key");
@@ -1280,18 +1242,18 @@ JNIEXPORT jlong JNICALL Java_com_sonicbase_index_NativePartitionedTree_put
 		}
 
 		p->key = startKey;
-		p->value = value;
+		p->value = (uint64_t)value;
 
 		bool replaced = false;
 		int partition = hashKey(env, map, startKey) % PARTITION_COUNT;
 		{
 			std::lock_guard<std::mutex> lock(map->locks[partition]);
-			q = kavl_insert(my, &map->maps[partition], p, map->comparator, 0);
+			q = kavl_insert(&map->maps[partition], p, map->comparator, 0);
 			if (p != q && q != 0) {
 	//            	printf("replaced\n");
 	//            	fflush(stdout);
 				retValue = q->value;
-				q->value = value;
+				q->value = (uint64_t)value;
 				replaced = true;
 			}
 		}
@@ -1304,9 +1266,13 @@ JNIEXPORT jlong JNICALL Java_com_sonicbase_index_NativePartitionedTree_put
 
 		//throw std::runtime_error("Failed: ");
 
+		if (SB_DEBUG) {
+			printf("put end\n");
+			fflush(stdout);
+		}
 		return retValue;
 	}
-	catch (const std::runtime_error& e) {
+	catch (const std::runtime_error&) {
 		//logError(env, "Error in jni 'put' call: ", e);
 		return 0;
 	}
@@ -1316,8 +1282,8 @@ JNIEXPORT jlong JNICALL Java_com_sonicbase_index_NativePartitionedTree_put
  	public:
  	 SortedListNode *next = 0;
  	SortedListNode *prev = 0;
- 	void **key = 0;
- 	long value;
+ 	Key *key = 0;
+	uint64_t value;
  	int partition;
  };
 
@@ -1505,34 +1471,37 @@ class SortedList {
  };
 
 
-int nextEntries(PartitionedMap* map, int count, int numRecordsPerPartition, int partition, void*** keys, long* values, void** currKey, bool tail) {
-    struct my_node keyNode;
+int nextEntries(PartitionedMap* map, int count, int numRecordsPerPartition, int partition, Key** keys, uint64_t* values, Key *currKey, bool tail) {
+    my_node keyNode;
     keyNode.key = currKey;
     int currOffset = 0;
-    kavl_itr_t(my) itr;
+    kavl_itr itr;
     int countReturned = 0;
 
     {
         std::lock_guard<std::mutex> lock(map->locks[partition]);
 
         if (tail) {
-            kavl_itr_find(my, map->maps[partition], &keyNode, &itr, map->comparator);
+            kavl_itr_find(map->maps[partition], &keyNode, &itr, map->comparator);
         }
         else {
-            kavl_itr_find_prev(my, map->maps[partition], &keyNode, &itr, map->comparator);
-        }
+            kavl_itr_find_prev(map->maps[partition], &keyNode, &itr, map->comparator);
+		}
 
         bool found = 0;
         do {
 
-            const struct my_node *p = kavl_at(&itr);
+            const my_node *p = kavl_at(&itr);
             if (p == NULL) {
 //            	printf("at == 0\n");
 //            	fflush(stdout);
                 return countReturned;
             }
-//            printf("found=%ld", (long)p->key[0]);
+//            printf("found=%ld", (uint64_t)p->key[0]);
 //            fflush(stdout);
+
+			//printf("key: %llu | %llu\n", *(uint64_t*)p->key->key[0], *(uint64_t*)p->key->key[1]);
+			//fflush(stdout);
 
             keys[currOffset] = p->key;
             values[currOffset] = p->value;
@@ -1544,10 +1513,10 @@ int nextEntries(PartitionedMap* map, int count, int numRecordsPerPartition, int 
                 break;
             }
             if (tail) {
-				found = kavl_itr_next(my, &itr);
+				found = kavl_itr_next(&itr);
 			}
 			else {
-            	found = kavl_itr_prev(my, &itr);
+            	found = kavl_itr_prev(&itr);
 		  	}
 //		  	if (!found) {
 //		  		printf("next not found");
@@ -1563,7 +1532,7 @@ int nextEntries(PartitionedMap* map, int count, int numRecordsPerPartition, int 
 void getNextEntryFromPartition(
         PartitionedMap* map, SortedList *sortedList, SortedListNode *node, std::vector<PartitionResults*> currResults,
         int count, int numRecordsPerPartition,
-        PartitionResults* entry, int partition, void** currKey, jboolean first, bool tail) {
+        PartitionResults* entry, int partition, Key *currKey, jboolean first, bool tail) {
 
 	if (entry->count == 0) {
 //        	printf("count=0\n");
@@ -1591,11 +1560,14 @@ void getNextEntryFromPartition(
             return;
         }
 
-        if (!first || !tail) {
+
+        if (!first /*|| !tail*/) {
+			//printf("##################### !first");
             if (map->comparator->compare((void**)entry->keys[0], currKey) == 0) {
                 entry->posWithinPartition = 1;
             }
         }
+
         if (entry->posWithinPartition >= entry->count) {
 //        	printf("count=0\n");
 //        	fflush(stdout);
@@ -1610,7 +1582,7 @@ void getNextEntryFromPartition(
     entry->keys[entry->posWithinPartition] = 0;
 
     entry->value = entry->values[entry->posWithinPartition];
-//    printf("key=%ld, partition=%d, pos=%d", (long)entry->key[0], partition, entry->posWithinPartition);
+//    printf("key=%ld, partition=%d, pos=%d", (uint64_t)entry->key[0], partition, entry->posWithinPartition);
 //    fflush(stdout);
     entry->posWithinPartition++;
     entry->partition = partition;
@@ -1623,14 +1595,17 @@ void getNextEntryFromPartition(
 }
 
 bool next(PartitionedMap* map, SortedList *sortedList, std::vector<PartitionResults*> currResults,
-	int count, int numRecordsPerPartition, void*** keys, long* values,
+	int count, int numRecordsPerPartition, Key **keys, uint64_t* values,
     int* posInTopLevelArray, int* retCount, bool tail) {
 
-    void** currKey = 0;
-    long currValue = 0;
+    Key *currKey = 0;
+	uint64_t currValue = 0;
     int lowestPartition = 0;
 
     SortedListNode *node = sortedList->pop();
+	//printf("popped: %llu | %llu\n", *(uint64_t*)node->key->key[0], *(uint64_t*)node->key->key[1]);
+	//fflush(stdout);
+
     if (node == 0) {
     	return false;
     }
@@ -1656,14 +1631,21 @@ bool next(PartitionedMap* map, SortedList *sortedList, std::vector<PartitionResu
 
 jint JNICALL tailHeadlockArray
   (JNIEnv *env, jobject obj, jlong indexId, jobjectArray jstartKey, jint count, jboolean first, bool tail, jobjectArray jKeys, jlongArray jValues) {
+	if (SB_DEBUG) {
+		printf("tailHeadBlockArray begin\n");
+		fflush(stdout);
+	}
 
-	int numRecordsPerPartition = ceil((double)count / (double)PARTITION_COUNT) + 2;
+	int numRecordsPerPartition = (int)ceil((double)count / (double)PARTITION_COUNT) + 2;
 
-    PartitionedMap* map = (PartitionedMap*)indexId;
+	PartitionedMap* map = getIndex(env, indexId);
+	if (map == 0) {
+		return 0;
+	}
 
    int posInTopLevelArray = 0;
 
-   void** startKey = javaKeyToNativeKey(env, map, jstartKey);
+   Key *startKey = javaKeyToNativeKey(env, map, jstartKey);
 
 	SortedList sortedList(map, tail);
 
@@ -1675,19 +1657,21 @@ jint JNICALL tailHeadlockArray
        currResults[partition], partition, startKey, first, tail);
    }
 
+   //printf("###################### next\n");
 
-    void*** keys = new void**[count];
+
+    Key **keys = new Key*[count];
     for (int i = 0; i < count; i++) {
     	keys[i] = 0;
     }
-    long* values = new long[count];
+	uint64_t* values = new uint64_t[count];
     int retCount = 0;
     bool firstEntry = true;
     while (retCount < count) {
         if (!next(map, &sortedList, currResults, count, numRecordsPerPartition, keys, values, &posInTopLevelArray, &retCount, tail)) {
             break;
         }
-		if (firstEntry && (!first || !tail)) {
+		if (firstEntry && (!first /*|| !tail*/)) {
 			if (map->comparator->compare((void**)keys[0], startKey) == 0) {
 				retCount = 0;
 			}
@@ -1716,7 +1700,11 @@ jint JNICALL tailHeadlockArray
         delete currResults[i];
     }
 
-    return retCount;
+	if (SB_DEBUG) {
+		printf("tailHeadBlockArray end\n");
+		fflush(stdout);
+	}
+	return retCount;
   }
 
 JNIEXPORT jint JNICALL Java_com_sonicbase_index_NativePartitionedTree_headBlockArray
@@ -1731,24 +1719,34 @@ JNIEXPORT jint JNICALL Java_com_sonicbase_index_NativePartitionedTree_tailBlockA
 
 JNIEXPORT jlong JNICALL Java_com_sonicbase_index_NativePartitionedTree_remove
   (JNIEnv *env, jobject obj, jlong indexId, jobjectArray jKey) {
-    PartitionedMap* map = (PartitionedMap*)indexId;
-    void** key = javaKeyToNativeKey(env, map, jKey);
+	
+	if (SB_DEBUG) {
+		printf("remove begin\n");
+		fflush(stdout);
+	}
+
+	PartitionedMap* map = getIndex(env, indexId);
+	if (map == 0) {
+		return 0;
+	}
+
+	Key *key = javaKeyToNativeKey(env, map, jKey);
 
 	if (key == 0) {
 		printf("remove, null key");
 		fflush(stdout);
 	}
-    long retValue = -1;
+	uint64_t retValue = -1;
     int partition = hashKey(env, map, key) % PARTITION_COUNT;
-	struct my_node keyNode;
+	my_node keyNode;
     keyNode.key = key;
     {
         std::lock_guard<std::mutex> lock(map->locks[partition]);
 
-	    kavl_itr_t(my) itr;
-        if (0 != kavl_itr_find(my, map->maps[partition], &keyNode, &itr, map->comparator)) {
+	    kavl_itr itr;
+        if (0 != kavl_itr_find(map->maps[partition], &keyNode, &itr, map->comparator)) {
 
-			struct my_node* nodeRemoved = kavl_erase_my(&map->maps[partition], &keyNode, 0, map->comparator);
+			my_node* nodeRemoved = kavl_erase(&map->maps[partition], &keyNode, 0, map->comparator);
 			if (nodeRemoved != 0) {
 				if (map->comparator->compare(nodeRemoved->key, key) == 0) {
 					retValue = nodeRemoved->value;
@@ -1763,18 +1761,34 @@ JNIEXPORT jlong JNICALL Java_com_sonicbase_index_NativePartitionedTree_remove
 		}
     }
     deleteKey(env, map, key);
+	
+	if (SB_DEBUG) {
+		printf("remove end\n");
+		fflush(stdout);
+	}
+
     return retValue;
 
 }
 
-void freeNode(PartitionedMap *map, struct my_node* p) {
-    pushDelete(map, p->key);
-    delete p;
-}
+class MyFreeNode : public FreeNode {
+public:
+	void free(void *map, my_node *p) {
+		pushDelete((PartitionedMap *)map, p->key);
+		delete p;
+	}
+};
+
+FreeNode *freeNode = new MyFreeNode();
+
 
 JNIEXPORT void JNICALL Java_com_sonicbase_index_NativePartitionedTree_clear
   (JNIEnv *env, jobject obj, jlong indexId) {
-  PartitionedMap *map = (PartitionedMap*)indexId;
+ 
+	PartitionedMap* map = getIndex(env, indexId);
+	if (map == 0) {
+		return;
+	}
 
     for (int partition = 0; partition < PARTITION_COUNT; partition++) {
         while (true) {
@@ -1782,67 +1796,100 @@ JNIEXPORT void JNICALL Java_com_sonicbase_index_NativePartitionedTree_clear
                 break;
             }
             //todo: free keys
-            kavl_free(my_node, head, map, map->maps[partition], freeNode);
+            kavl_free(map, map->maps[partition], freeNode);
 
             map->maps[partition] = 0;
         }
     }
 }
 
+JNIEXPORT void JNICALL Java_com_sonicbase_index_NativePartitionedTree_delete
+(JNIEnv *env, jobject obj, jlong indexId) {
+
+	PartitionedMap* map = getIndex(env, indexId);
+	if (map == 0) {
+		return;
+	}
+
+	Java_com_sonicbase_index_NativePartitionedTree_clear(env, obj, indexId);
+	allMaps[(int)indexId] = 0;
+	delete map;
+}
+
+
 JNIEXPORT jlong JNICALL Java_com_sonicbase_index_NativePartitionedTree_get
   (JNIEnv *env, jobject obj, jlong indexId, jobjectArray jKey) {
-    long offset = 0;
-    kavl_itr_t(my) itr;
+	uint64_t offset = 0;
+    kavl_itr itr;
+	if (SB_DEBUG) {
+		printf("get begin\n");
+		fflush(stdout);
+	}
 
-    PartitionedMap* map = (PartitionedMap*)indexId;
+	PartitionedMap* map = getIndex(env, indexId);
+	if (map == 0) {
+		return 0;
+	}
 
-    void** startKey = javaKeyToNativeKey(env, map, jKey);
+    Key *startKey = javaKeyToNativeKey(env, map, jKey);
 
     int partition = hashKey(env, map, startKey) % PARTITION_COUNT;
 
-    long retValue = -1;
-    struct my_node keyNode;
+	uint64_t retValue = -1;
+    my_node keyNode;
     keyNode.key = startKey;
     {
         std::lock_guard<std::mutex> lock(map->locks[partition]);
 
-        if (0 != kavl_itr_find(my, map->maps[partition], &keyNode, &itr, map->comparator)) {
-            const struct my_node *p = kavl_at(&itr);
+        if (0 != kavl_itr_find(map->maps[partition], &keyNode, &itr, map->comparator)) {
+
+            const my_node *p = kavl_at(&itr);
             if (p != 0) {
                 retValue = p->value;
             }
         }
-
     }
     deleteKey(env, map, startKey);
-    return retValue;
+
+	if (SB_DEBUG) {
+		printf("get end\n");
+		fflush(stdout);
+	}
+	return retValue;
 }
 
 JNIEXPORT jboolean JNICALL Java_com_sonicbase_index_NativePartitionedTree_higherEntry
   (JNIEnv *env, jobject obj, jlong indexId, jobjectArray jKey, jobjectArray jKeys, jlongArray jValues) {
 
-    PartitionedMap* map = (PartitionedMap*)indexId;
+	if (SB_DEBUG) {
+		printf("higherEntry begin\n");
+		fflush(stdout);
+	}
+	PartitionedMap* map = getIndex(env, indexId);
+	if (map == 0) {
+		return 0;
+	}
 
-    void** key = javaKeyToNativeKey(env, map, jKey);
+    Key *key = javaKeyToNativeKey(env, map, jKey);
 
-    struct my_node keyNode;
+    my_node keyNode;
     keyNode.key = key;
-    const struct my_node *p = 0;
-    struct my_node lowest;
+    const my_node *p = 0;
+    my_node lowest;
     lowest.key = 0;
 
     for (int partition = 0; partition < PARTITION_COUNT; partition++) {
         {
           std::lock_guard<std::mutex> lock(map->locks[partition]);
 
-			kavl_itr_t(my) itr;
-			bool found = kavl_itr_find(my, map->maps[partition], &keyNode, &itr, map->comparator);
+			kavl_itr itr;
+			bool found = kavl_itr_find(map->maps[partition], &keyNode, &itr, map->comparator);
 
 			p = kavl_at(&itr);
 			if (p != NULL) {
 			//todo: should this return higher entry even if key doesn' exist?
 				if (found) {
-					if (kavl_itr_next(my, &itr)) {
+					if (kavl_itr_next(&itr)) {
 						p = kavl_at(&itr);
 					}
 					else {
@@ -1873,31 +1920,43 @@ JNIEXPORT jboolean JNICALL Java_com_sonicbase_index_NativePartitionedTree_higher
 
 	   	return true;
 	}
-   return false;
+	if (SB_DEBUG) {
+		printf("higherEntry end\n");
+		fflush(stdout);
+	}
+	return false;
 }
 
 JNIEXPORT jboolean JNICALL Java_com_sonicbase_index_NativePartitionedTree_lowerEntry
   (JNIEnv *env, jobject obj, jlong indexId, jobjectArray jKey, jobjectArray jKeys, jlongArray jValues) {
-    PartitionedMap* map = (PartitionedMap*)indexId;
+    
+	if (SB_DEBUG) {
+		printf("lowerEntry begin\n");
+		fflush(stdout);
+	}
+	PartitionedMap* map = getIndex(env, indexId);
+	if (map == 0) {
+		return 0;
+	}
 
-    void** key = javaKeyToNativeKey(env, map, jKey);
+	Key *key = javaKeyToNativeKey(env, map, jKey);
 
-    struct my_node keyNode;
+    my_node keyNode;
     keyNode.key = key;
-    const struct my_node *p = 0;
-    struct my_node highest;
+    const my_node *p = 0;
+    my_node highest;
     highest.key = 0;
 
     for (int partition = 0; partition < PARTITION_COUNT; partition++) {
         {
-	        kavl_itr_t(my) itr;
+	        kavl_itr itr;
     		std::lock_guard<std::mutex> lock(map->locks[partition]);
 
-            kavl_itr_find_prev(my, map->maps[partition], &keyNode, &itr, map->comparator);
+            kavl_itr_find_prev(map->maps[partition], &keyNode, &itr, map->comparator);
             p = kavl_at(&itr);
             if (p != NULL) {
                 if (map->comparator->compare(p->key, key) == 0) {
-                    if (kavl_itr_prev(my, &itr)) {
+                    if (kavl_itr_prev(&itr)) {
                         p = kavl_at(&itr);
                     }
                     else {
@@ -1925,77 +1984,117 @@ JNIEXPORT jboolean JNICALL Java_com_sonicbase_index_NativePartitionedTree_lowerE
 
 		env->ReleaseLongArrayElements(jValues, valuesArray, 0);
 
+		if (SB_DEBUG) {
+			printf("lowerEntry end\n");
+			fflush(stdout);
+		}
 		return true;
     }
 
-   	return false;
+	if (SB_DEBUG) {
+		printf("lowerEntry end\n");
+		fflush(stdout);
+	}
+	return false;
 }
 
 JNIEXPORT jboolean JNICALL Java_com_sonicbase_index_NativePartitionedTree_floorEntry
   (JNIEnv *env, jobject obj, jlong indexId, jobjectArray jKey, jobjectArray jKeys, jlongArray jValues) {
-    PartitionedMap* map = (PartitionedMap*)indexId;
 
-    void** key = javaKeyToNativeKey(env, map, jKey);
+	if (SB_DEBUG) {
+		printf("floorEntry end\n");
+		fflush(stdout);
+	}
+	PartitionedMap* map = getIndex(env, indexId);
+	if (map == 0) {
+		return 0;
+	}
 
-	struct my_node keyNode;
+    Key *key = javaKeyToNativeKey(env, map, jKey);
+
+	my_node keyNode;
     keyNode.key = key;
-    const struct my_node *p = 0;
-    struct my_node highest;
-    highest.key = 0;
+    const my_node *p = 0;
+    my_node lowest;
+    lowest.key = 0;
 
     for (int partition = 0; partition < PARTITION_COUNT; partition++) {
         {
-	        kavl_itr_t(my) itr;
+	        kavl_itr itr;
 	        std::lock_guard<std::mutex> lock(map->locks[partition]);
 
-            kavl_itr_find_prev(my, map->maps[partition], &keyNode, &itr, map->comparator);
+            kavl_itr_find(map->maps[partition], &keyNode, &itr, map->comparator);
 
             p = kavl_at(&itr);
 
-            if (highest.key == 0 && p != 0) {
-                highest.key = p->key;
-                highest.value = p->value;
-            }
-            else if (p != 0 && map->comparator->compare(p->key, highest.key) > 0) {
-                highest.key = p->key;
-                highest.value = p->value;
+            if (lowest.key == 0 && p != 0) {
+                lowest.key = p->key;
+                lowest.value = p->value;
+			}
+            else if (p != 0) {
+				//printf("checking: %llu | %llu\n", *(uint64_t*)p->key->key[0], *(uint64_t*)p->key->key[1]);
+				//fflush(stdout);
+				if (map->comparator->compare(p->key, lowest.key) < 0) {
+					lowest.key = p->key;
+					lowest.value = p->value;
+					//printf("now highest: %llu | %llu\n", *(uint64_t*)lowest.key->key[0], *(uint64_t*)lowest.key->key[1]);
+					//fflush(stdout);
+				}
             }
         }
     }
     deleteKey(env, map, key);
 
-    if (highest.key != 0) {
+    if (lowest.key != 0) {
 		jlong *valuesArray = env->GetLongArrayElements(jValues, 0);
 
-		env->SetObjectArrayElement(jKeys, 0, nativeKeyToJavaKey(env, map, highest.key));
-		valuesArray[0] = highest.value;
+		env->SetObjectArrayElement(jKeys, 0, nativeKeyToJavaKey(env, map, lowest.key));
+		valuesArray[0] = lowest.value;
 
 		env->ReleaseLongArrayElements(jValues, valuesArray, 0);
+
+		if (SB_DEBUG) {
+			printf("floorEntry end\n");
+			fflush(stdout);
+		}
 
 		return true;
     }
 
-   return false;
+	if (SB_DEBUG) {
+		printf("floorEntry end\n");
+		fflush(stdout);
+	}
+	return false;
 }
 
 JNIEXPORT jboolean JNICALL Java_com_sonicbase_index_NativePartitionedTree_ceilingEntry
   (JNIEnv *env, jobject obj, jlong indexId, jobjectArray jKey, jobjectArray jKeys, jlongArray jValues) {
 
-    PartitionedMap* map = (PartitionedMap*)indexId;
-    void** key = javaKeyToNativeKey(env, map, jKey);
+	if (SB_DEBUG) {
+		printf("ceilingEntry begin\n");
+		fflush(stdout);
+	}
 
-	struct my_node keyNode;
+	PartitionedMap* map = getIndex(env, indexId);
+	if (map == 0) {
+		return 0;
+	}
+
+	Key *key = javaKeyToNativeKey(env, map, jKey);
+
+	my_node keyNode;
     keyNode.key = key;
-    const struct my_node *p = 0;
-    struct my_node lowest;
+    const my_node *p = 0;
+    my_node lowest;
     lowest.key = 0;
 
     for (int partition = 0; partition < PARTITION_COUNT; partition++) {
         {
-	        kavl_itr_t(my) itr;
+	        kavl_itr itr;
 	        std::lock_guard<std::mutex> lock(map->locks[partition]);
 
-            if (kavl_itr_find(my, map->maps[partition], &keyNode, &itr, map->comparator)) {
+            if (kavl_itr_find(map->maps[partition], &keyNode, &itr, map->comparator)) {
             	p = kavl_at(&itr);
                 lowest.key = p->key;
                 lowest.value = p->value;
@@ -2023,26 +2122,43 @@ JNIEXPORT jboolean JNICALL Java_com_sonicbase_index_NativePartitionedTree_ceilin
 
 		env->ReleaseLongArrayElements(jValues, valuesArray, 0);
 
+		if (SB_DEBUG) {
+			printf("ceilingEntry end\n");
+			fflush(stdout);
+		}
 		return true;
     }
 
-   	return 0;
+	if (SB_DEBUG) {
+		printf("ceilingEntry end\n");
+		fflush(stdout);
+	}
+	return 0;
 }
 
 
 JNIEXPORT jboolean JNICALL Java_com_sonicbase_index_NativePartitionedTree_lastEntry2
   (JNIEnv *env, jobject obj, jlong indexId, jobjectArray jKeys, jlongArray jValues) {
-    PartitionedMap* map = (PartitionedMap*)indexId;
-    const struct my_node *p = 0;
-    struct my_node highest;
+    
+	if (SB_DEBUG) {
+		printf("lastEntry2 begin\n");
+		fflush(stdout);
+	}
+
+	PartitionedMap* map = getIndex(env, indexId);
+	if (map == 0) {
+		return 0;
+	}
+
+	const my_node *p = 0;
+    my_node highest;
     highest.key = 0;
 
     for (int partition = 0; partition < PARTITION_COUNT; partition++) {
-		kavl_itr_t(my) itr;
         {
 	        std::lock_guard<std::mutex> lock(map->locks[partition]);
 
-			p = kavl_itr_last_my(map->maps[partition]);
+			p = kavl_itr_last(map->maps[partition]);
 
 			if (highest.key == 0 && p != 0) {
 				highest.key = p->key;
@@ -2063,23 +2179,41 @@ JNIEXPORT jboolean JNICALL Java_com_sonicbase_index_NativePartitionedTree_lastEn
 
 		env->ReleaseLongArrayElements(jValues, valuesArray, 0);
 
+		if (SB_DEBUG) {
+			printf("lastEntry2 end\n");
+			fflush(stdout);
+		}
 		return true;
     }
 
-   return 0;
+	if (SB_DEBUG) {
+		printf("lastEntry2 end\n");
+		fflush(stdout);
+	}
+	return 0;
 }
 
 JNIEXPORT jboolean JNICALL Java_com_sonicbase_index_NativePartitionedTree_firstEntry2
   (JNIEnv *env, jobject obj, jlong indexId, jobjectArray jKeys, jlongArray jValues) {
-    PartitionedMap* map = (PartitionedMap*)indexId;
-    const struct my_node *p = 0;
-    struct my_node lowest;
+
+	if (SB_DEBUG) {
+		printf("firstEntry2 begin\n");
+		fflush(stdout);
+	}
+
+	PartitionedMap* map = getIndex(env, indexId);
+	if (map == 0) {
+		return 0;
+	}
+
+	const my_node *p = 0;
+    my_node lowest;
     lowest.key = 0;
     for (int partition = 0; partition < PARTITION_COUNT; partition++) {
         {
 	        std::lock_guard<std::mutex> lock(map->locks[partition]);
 
-            p = kavl_itr_first(my, map->maps[partition]);
+            p = kavl_itr_first(map->maps[partition]);
 
 			if (lowest.key == 0 && p != 0) {
 				lowest.key = p->key;
@@ -2100,12 +2234,82 @@ JNIEXPORT jboolean JNICALL Java_com_sonicbase_index_NativePartitionedTree_firstE
 
 		env->ReleaseLongArrayElements(jValues, valuesArray, 0);
 
+		if (SB_DEBUG) {
+			printf("firstEntry2 end\n");
+			fflush(stdout);
+		}
 		return true;
     }
 
+	if (SB_DEBUG) {
+		printf("firstEntry2 end\n");
+		fflush(stdout);
+	}
 
    	return 0;
 }
+
+void binarySort(PartitionedMap *map, Key **a, size_t lo, size_t hi, size_t start, bool ascend) {
+
+	if (start == lo)
+		start++;
+	for (; start < hi; start++) {
+		Key *pivot = a[start];
+
+		// Set left (and right) to the index where a[start] (pivot) belongs
+		int left = lo;
+		int right = start;
+		while (left < right) {
+			int mid = (left + right) >> 1;
+			if (ascend) {
+				if (map->comparator->compare(pivot, a[mid]) < 0)
+					right = mid;
+				else
+					left = mid + 1;
+			}
+			else {
+				if (map->comparator->compare(pivot, a[mid]) > 0)
+					right = mid;
+				else
+					left = mid + 1;
+			}
+		}
+		int n = start - left;  // The number of elements to move
+							   // Switch is just an optimization for arraycopy in default case
+		switch (n) {
+		case 2:  a[left + 2] = a[left + 1];
+		case 1:  a[left + 1] = a[left];
+			break;
+
+		default: {
+			for (int i = 0; i < n; i++) {
+				a[left + 1 + n] = a[left + n];
+			}
+		}
+		}
+		a[left] = pivot;
+	}
+}
+
+JNIEXPORT void JNICALL Java_com_sonicbase_index_NativePartitionedTree_sortKeys
+(JNIEnv *env, jobject obj, jlong indexId, jobjectArray keysObj, jboolean ascend) {
+
+	PartitionedMap *map = getIndex(env, indexId);
+
+	size_t keyCount = env->GetArrayLength(keysObj);
+	Key ** nativeKeys = new Key*[keyCount];
+	for (int i = 0; i < keyCount; i++) {
+		jobjectArray jKey = (jobjectArray)env->GetObjectArrayElement(keysObj, i);
+		nativeKeys[i] = javaKeyToNativeKey(env, map, jKey);
+	}
+
+	binarySort(map, nativeKeys, 0, keyCount, 0, ascend);
+
+	for (int i = 0; i < keyCount; i++) {
+		env->SetObjectArrayElement(keysObj, i, nativeKeyToJavaKey(env, map, nativeKeys[i]));
+	}
+}
+
 
 /**************************************************************
  * Declare JNI_VERSION for use in JNI_Onload/JNI_OnUnLoad

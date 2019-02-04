@@ -131,7 +131,7 @@ public class ResultSetImplTest {
         return new IndexLookup() {
           @Override
           public SelectContextImpl lookup(ExpressionImpl expression1, Expression topLevelExpression) {
-            assertEquals(getCount(), 1000);
+            assertEquals(getCount(), 256);
             assertEquals(getIndexName(), "_primarykey");
             assertEquals(getLeftOp(), Operator.EQUAL);
             assertEquals(getRightOp(), null);

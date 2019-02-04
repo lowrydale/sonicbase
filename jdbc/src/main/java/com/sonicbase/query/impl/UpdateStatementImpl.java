@@ -310,7 +310,7 @@ public class UpdateStatementImpl extends StatementImpl implements UpdateStatemen
           case CLOB:
           case NCLOB:
             if (value != null) {
-              String str = new String((byte[]) value, UTF_8_STR);
+              String str = new String((char[]) value);
               if (str.length() > fieldSchema.getWidth()) {
                 throw new SQLException("value too long: field=" + fieldSchema.getName() + ", width=" + fieldSchema.getWidth());
               }

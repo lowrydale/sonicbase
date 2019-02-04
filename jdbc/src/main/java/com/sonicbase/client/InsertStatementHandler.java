@@ -413,8 +413,7 @@ public class InsertStatementHandler implements StatementHandler {
         case LONGNVARCHAR:
         case CLOB:
         case NCLOB:
-          String str = new String((byte[])value, "utf-8");
-          if (str.length() > fieldSchema.getWidth()) {
+          if (((char[])value).length > fieldSchema.getWidth()) {
             throw new SQLException("value too long: field=" + fieldSchema.getName() + ", width=" + fieldSchema.getWidth());
           }
           break;
@@ -736,7 +735,7 @@ public class InsertStatementHandler implements StatementHandler {
       case CHAR:
       case LONGVARCHAR:
         try {
-          newParms.setString(parmIndex, new String((byte[]) field.getType().getConverter().convert(obj), "utf-8"));
+          newParms.setString(parmIndex, new String((char[]) field.getType().getConverter().convert(obj)));
         }
         catch (UnsupportedEncodingException e) {
           throw new DatabaseException(e);

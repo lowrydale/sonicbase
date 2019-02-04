@@ -48,6 +48,26 @@ public class NativePartitionedTreeImpl extends NativePartitionedTree implements 
   private static Object mutex = new Object();
 
   public NativePartitionedTreeImpl(int port, Index index) {
+
+    init(port);
+
+    this.port = port;
+    this.index = index;
+
+    TableSchema tableSchema = index.getTableSchema();
+    IndexSchema schema = index.getIndexSchema();
+    String[] fields = schema.getFields();
+    int[] dataTypes = new int[fields.length];
+    for (int i = 0; i < fields.length; i++) {
+      int offset = tableSchema.getFieldOffset(fields[i]);
+      FieldSchema field = tableSchema.getFields().get(offset);
+      dataTypes[i] = field.getType().getValue();
+    }
+
+    this.indexId = initIndex(dataTypes);
+  }
+
+  public static void init(int port) {
     try {
       synchronized (mutex) {
         if (!initializedNative) {
@@ -60,14 +80,11 @@ public class NativePartitionedTreeImpl extends NativePartitionedTree implements 
 
           if (isWindows()) {
             libName = "/win/SonicBase.dll";
-          }
-          else if (isCygwin()) {
+          } else if (isCygwin()) {
             libName = "/win/SonicBase.dll";
-          }
-          else if (isMac()) {
+          } else if (isMac()) {
             libName = "/mac/SonicBase.so";
-          }
-          else if (isUnix()) {
+          } else if (isUnix()) {
             libName = "/linux/SonicBase.so";
           }
           URL url = NativePartitionedTreeImpl.class.getResource(libName);
@@ -85,25 +102,10 @@ public class NativePartitionedTreeImpl extends NativePartitionedTree implements 
         }
       }
     }
-    catch (IOException e) {
+    catch (Exception e) {
       logger.error("Unable to load native library", e);
       throw new DatabaseException(e);
     }
-
-    this.port = port;
-    this.index = index;
-
-    TableSchema tableSchema = index.getTableSchema();
-    IndexSchema schema = index.getIndexSchema();
-    String[] fields = schema.getFields();
-    int[] dataTypes = new int[fields.length];
-    for (int i = 0; i < fields.length; i++) {
-      int offset = tableSchema.getFieldOffset(fields[i]);
-      FieldSchema field = tableSchema.getFields().get(offset);
-      dataTypes[i] = field.getType().getValue();
-    }
-
-    this.indexId = initIndex(dataTypes);
   }
 
   @Override
@@ -139,6 +141,10 @@ public class NativePartitionedTreeImpl extends NativePartitionedTree implements 
       return ret;
     }
     return null;
+  }
+
+  public void sortKeys(Object[][] keys, boolean ascend) {
+    sortKeys(indexId, keys, ascend);
   }
 
   @Override
@@ -261,6 +267,11 @@ public class NativePartitionedTreeImpl extends NativePartitionedTree implements 
   @Override
   public void clear() {
     clear(indexId);
+  }
+
+  @Override
+  public void delete() {
+
   }
 
 }

@@ -1,6 +1,5 @@
 package com.sonicbase.server;
 
-import com.codahale.metrics.Timer;
 import com.sonicbase.client.DatabaseClient;
 import com.sonicbase.client.InsertStatementHandler;
 import com.sonicbase.common.*;
@@ -124,7 +123,7 @@ public class UpdateManager {
     AtomicBoolean shouldExecute = new AtomicBoolean();
     AtomicBoolean shouldDeleteLock = new AtomicBoolean();
 
-    TableSchema tableSchema = server.getCommon().getTableSchema(dbName, tableName, server.getDataDir());
+    TableSchema tableSchema = server.getTableSchema(dbName, tableName, server.getDataDir());
     Record record = new Record(tableSchema);
     byte[] recordBytes = cobj.getByteArray(ComObject.Tag.RECORD_BYTES);
     record.deserialize(dbName, server.getCommon(), recordBytes, null);
@@ -266,7 +265,7 @@ public class UpdateManager {
     String tableName = cobj.getString(ComObject.Tag.TABLE_NAME);
     String indexName = cobj.getString(ComObject.Tag.INDEX_NAME);
 
-    TableSchema tableSchema = server.getCommon().getTableSchema(dbName, tableName, server.getDataDir());
+    TableSchema tableSchema = server.getTableSchema(dbName, tableName, server.getDataDir());
     String primaryKeyIndexName = getPrimaryKeyIndexName(tableSchema);
 
     Index primaryKeyIndex = server.getIndex(dbName, tableName, primaryKeyIndexName);
@@ -393,7 +392,7 @@ public class UpdateManager {
         transactionIdRet.set(transactionId);
       }
 
-      TableSchema tableSchema = server.getCommon().getTableSchema(dbName, tableName, server.getDataDir());
+      TableSchema tableSchema = server.getTableSchema(dbName, tableName, server.getDataDir());
       byte[] keyBytes = cobj.getByteArray(ComObject.Tag.KEY_BYTES);
       byte[] primaryKeyBytes = cobj.getByteArray(ComObject.Tag.PRIMARY_KEY_BYTES);
       Object[] key = DatabaseCommon.deserializeKey(tableSchema, keyBytes);
@@ -532,7 +531,7 @@ public class UpdateManager {
         transactionIdRet.set(transactionId);
       }
 
-      TableSchema tableSchema = server.getCommon().getTableSchema(dbName, tableName, server.getDataDir());
+      TableSchema tableSchema = server.getTableSchema(dbName, tableName, server.getDataDir());
       Object[] key = DatabaseCommon.deserializeKey(tableSchema, cobj.getByteArray(ComObject.Tag.KEY_BYTES));
       byte[] keyRecordBytes = cobj.getByteArray(ComObject.Tag.KEY_RECORD_BYTES);
       indexSchema = tableSchema.getIndices().get(indexName);
@@ -686,18 +685,19 @@ public class UpdateManager {
                                                      ComArray batchResponses) throws InterruptedException {
     MemoryOps memoryOps = new MemoryOps(server, isExplicitTrans);
     for (int j = 0; j < memoryOps.phaseCount; j++) {
+      List<Object[]> resuableKeys = new ArrayList<>();
       for (int i = 0; i < array.getArray().size(); i++) {
         final ComObject innerObj = (ComObject) array.getArray().get(i);
         short sequence2 = (short) i;
         if (replayedCommand) {
           InsertRequest request = new InsertRequest(innerObj, sequence0, sequence1, sequence2, replayedCommand, false);
-          doInsertIndexEntryByKeyWithRecord(cobj, request.innerObj, request.sequence0, request.sequence1, request.sequence2,
+          doInsertIndexEntryByKeyWithRecord(resuableKeys, cobj, request.innerObj, request.sequence0, request.sequence1, request.sequence2,
               request.replayedCommand, transactionId, isExplicitTrans, request.isCommitting, batchResponses, memoryOps);
         }
         else {
           throttle();
 
-          doInsertIndexEntryWIthRecordWithBatchErrorHandling(replayedCommand, sequence0, sequence1, cobj, transactionId,
+          doInsertIndexEntryWIthRecordWithBatchErrorHandling(replayedCommand, resuableKeys, sequence0, sequence1, cobj, transactionId,
               isExplicitTrans, batchResponses, innerObj, sequence2, memoryOps);
         }
         count++;
@@ -722,12 +722,12 @@ public class UpdateManager {
     return count;
   }
 
-  private void doInsertIndexEntryWIthRecordWithBatchErrorHandling(boolean replayedCommand, long sequence0,
+  private void doInsertIndexEntryWIthRecordWithBatchErrorHandling(boolean replayedCommand, List<Object[]> resuableKeys, long sequence0,
                                                                   long sequence1, ComObject cobj, long transactionId,
                                                                   boolean isExplicitTrans, ComArray batchResponses,
                                                                   ComObject innerObj, short sequence2, MemoryOps memoryOps) {
     try {
-      doInsertIndexEntryByKeyWithRecord(cobj, innerObj, sequence0, sequence1, sequence2, replayedCommand,
+      doInsertIndexEntryByKeyWithRecord(resuableKeys, cobj, innerObj, sequence0, sequence1, sequence2, replayedCommand,
           transactionId, isExplicitTrans, false, batchResponses, memoryOps);
     }
     catch (Exception e) {
@@ -798,7 +798,7 @@ public class UpdateManager {
       ComObject ret = null;
       MemoryOps memoryOps = new MemoryOps(server, isExplicitTrans);
       for (int i = 0; i < memoryOps.phaseCount; i++) {
-        ret = doInsertIndexEntryByKeyWithRecord(cobj, cobj, sequence0, sequence1, sequence2, replayedCommand,
+        ret = doInsertIndexEntryByKeyWithRecord(null, cobj, cobj, sequence0, sequence1, sequence2, replayedCommand,
             transactionId, isExplicitTrans, false, null, memoryOps);
         memoryOps.execute();
       }
@@ -817,7 +817,7 @@ public class UpdateManager {
     }
   }
 
-  public ComObject doInsertIndexEntryByKeyWithRecord(ComObject outerCobj, ComObject cobj, long sequence0, long sequence1,
+  public ComObject doInsertIndexEntryByKeyWithRecord(List<Object[]> resuableKeys, ComObject outerCobj, ComObject cobj, long sequence0, long sequence1,
                                                      short sequence2, boolean replayedCommand, long transactionId,
                                                      boolean isExpliciteTrans, boolean isCommitting, ComArray batchResponses,
                                                      MemoryOps memoryOps) {
@@ -845,7 +845,7 @@ public class UpdateManager {
       Record.setSequences(recordBytes, sequence0, sequence1, sequence2);
 
       byte[] keyBytes = cobj.getByteArray(ComObject.Tag.KEY_BYTES);
-      Object[] primaryKey = DatabaseCommon.deserializeKey(tableSchema, keyBytes);
+      Object[] primaryKey = DatabaseCommon.deserializeKey(tableSchema, keyBytes, resuableKeys);
 
       Boolean ignore = shouldIgnore(cobj);
 
@@ -1023,7 +1023,7 @@ public class UpdateManager {
       case INSERT_WITH_RECORD: {
         MemoryOps memoryOps = new MemoryOps(server, isExplicitTrans);
         for (int i = 0; i < memoryOps.phaseCount; i++) {
-          doInsertIndexEntryByKeyWithRecord(cobj, new ComObject(opBody), sequence0, sequence1, (short) 0,
+          doInsertIndexEntryByKeyWithRecord(null, cobj, new ComObject(opBody), sequence0, sequence1, (short) 0,
               op.getReplayed(), transactionId, isExplicitTrans, true, null, memoryOps);
           memoryOps.execute();
         }
@@ -1038,9 +1038,10 @@ public class UpdateManager {
           for (int j = 0; j < memoryOps.phaseCount; j++) {
             cobj = new ComObject(opBody);
             ComArray array = cobj.getArray(ComObject.Tag.INSERT_OBJECTS);
+            List<Object[]> reusableKeys = new ArrayList<>();
             for (int i = 0; i < array.getArray().size(); i++) {
               ComObject innerObj = (ComObject) array.getArray().get(i);
-              doInsertIndexEntryByKeyWithRecord(cobj, innerObj, sequence0, sequence1, (short) i, op.getReplayed(),
+              doInsertIndexEntryByKeyWithRecord(reusableKeys, cobj, innerObj, sequence0, sequence1, (short) i, op.getReplayed(),
                   transactionId, isExplicitTrans, true, null, memoryOps);
             }
             memoryOps.execute();
@@ -1101,7 +1102,7 @@ public class UpdateManager {
       boolean isExplicitTrans = cobj.getBoolean(ComObject.Tag.IS_EXCPLICITE_TRANS);
       long transactionId = cobj.getLong(ComObject.Tag.TRANSACTION_ID);
 
-      TableSchema tableSchema = server.getCommon().getTableSchema(dbName, tableName, server.getDataDir());
+      TableSchema tableSchema = server.getTableSchema(dbName, tableName, server.getDataDir());
       byte[] primaryKeyBytes = cobj.getByteArray(ComObject.Tag.PRIMARY_KEY_BYTES);
       Object[] primaryKey = DatabaseCommon.deserializeKey(tableSchema, primaryKeyBytes);
       byte[] prevKeyBytes = cobj.getByteArray(ComObject.Tag.PREV_KEY_BYTES);
@@ -1263,16 +1264,16 @@ public class UpdateManager {
     doActualInsertKey(dbName, isExplicitTrans, key, keyRecordBytes, false, tableName, index, indexSchema);
   }
 
-  void doInsertKeys(final ComObject cobj, boolean isExpliciteTrans, final String dbName, PartitionManager.MoveRequestArray moveRequests,
+  void doInsertKeys(PartitionManager.MoveRequest request, final ComObject cobj, boolean isExpliciteTrans, final String dbName,
                     final Index index,
                     final String tableName, final IndexSchema indexSchema, boolean replayedCommand,
                     final boolean movingRecord, ComArray failedKeys) {
     try {
       if (indexSchema.isPrimaryKey()) {
-        doInsertKeysForPrimaryKey(cobj, isExpliciteTrans, dbName, moveRequests, index, tableName, indexSchema, replayedCommand, movingRecord, failedKeys);
+        doInsertKeysForPrimaryKey(request, cobj, isExpliciteTrans, dbName, index, tableName, indexSchema, replayedCommand, movingRecord, failedKeys);
       }
       else {
-        doInsertKeysForNonPrimaryKey(dbName, isExpliciteTrans, moveRequests, index, tableName, indexSchema, replayedCommand, failedKeys);
+        doInsertKeysForNonPrimaryKey(request, dbName, isExpliciteTrans, index, tableName, indexSchema, replayedCommand, failedKeys);
       }
     }
     catch (Exception e) {
@@ -1280,44 +1281,38 @@ public class UpdateManager {
     }
   }
 
-  private void doInsertKeysForNonPrimaryKey(String dbName, boolean isExpliciteTrans, PartitionManager.MoveRequestArray moveRequests, Index index,
-                                            String tableName, IndexSchema indexSchema,
+  private void doInsertKeysForNonPrimaryKey(PartitionManager.MoveRequest moveRequest, String dbName, boolean isExpliciteTrans,
+                                            Index index, String tableName, IndexSchema indexSchema,
                                             boolean replayedCommand, ComArray failedKeys) {
-    for (int k = 0; k < moveRequests.getPos(); k++) {
-      PartitionManager.MoveRequest moveRequest = moveRequests.getRequests()[k];
-      try {
-        byte[][] content = moveRequest.getContent();
-        for (int i = 0; i < content.length; i++) {
-          doActualInsertKey(dbName, isExpliciteTrans, moveRequest.getKey(), content[i], true, tableName, index, indexSchema);
-        }
+    try {
+      byte[][] content = moveRequest.getContent();
+      for (int i = 0; i < content.length; i++) {
+        doActualInsertKey(dbName, isExpliciteTrans, moveRequest.getKey(), content[i], true, tableName, index, indexSchema);
       }
-      catch (Exception e) {
-        failedKeys.add(moveRequest.getKeyOffset());
-        logger.error("Error inserting secondary key: db={}, table={}, index={}, key={}", dbName, tableName,
-            indexSchema.getName(), DatabaseCommon.keyToString(moveRequest.getKey()), e);
-      }
+    }
+    catch (Exception e) {
+      failedKeys.add(moveRequest.getKeyOffset());
+      logger.error("Error inserting secondary key: db={}, table={}, index={}, key={}", dbName, tableName,
+          indexSchema.getName(), DatabaseCommon.keyToString(moveRequest.getKey()), e);
     }
   }
 
-  private void doInsertKeysForPrimaryKey(ComObject cobj, boolean isExpliciteTrans, String dbName, PartitionManager.MoveRequestArray moveRequests,
+  private void doInsertKeysForPrimaryKey(PartitionManager.MoveRequest moveRequest, ComObject cobj, boolean isExpliciteTrans, String dbName,
                                          Index index, String tableName, IndexSchema indexSchema, boolean replayedCommand,
                                          boolean movingRecord, ComArray failedKeys) {
     MemoryOps memoryOps = new MemoryOps(server, isExpliciteTrans);
     for (int j = 0; j < memoryOps.phaseCount; j++) {
-      for (int k = 0; k < moveRequests.getPos(); k++) {
-        PartitionManager.MoveRequest moveRequest = moveRequests.getRequests()[k];
-        try {
-          byte[][] content = moveRequest.getContent();
-          for (int i = 0; i < content.length; i++) {
-            doActualInsertKeyWithRecord(cobj, dbName, content[i], moveRequest.getKey(), index, tableName,
-                indexSchema.getName(), true, movingRecord, memoryOps);
-          }
+      try {
+        byte[][] content = moveRequest.getContent();
+        for (int i = 0; i < content.length; i++) {
+          doActualInsertKeyWithRecord(cobj, dbName, content[i], moveRequest.getKey(), index, tableName,
+              indexSchema.getName(), true, movingRecord, memoryOps);
         }
-        catch (Exception e) {
-          failedKeys.add(moveRequest.getKeyOffset());
-          logger.error("Error inserting record: db={}, table={}, index={}, key={}", dbName, tableName, indexSchema.getName(),
-              DatabaseCommon.keyToString(moveRequest.getKey()), e);
-        }
+      }
+      catch (Exception e) {
+        failedKeys.add(moveRequest.getKeyOffset());
+        logger.error("Error inserting record: db={}, table={}, index={}, key={}", dbName, tableName, indexSchema.getName(),
+            DatabaseCommon.keyToString(moveRequest.getKey()), e);
       }
       memoryOps.execute();
     }
@@ -1514,7 +1509,8 @@ public class UpdateManager {
         List<Integer> selectedShards = PartitionUtils.findOrderedPartitionForRecord(true, false, tableSchema,
             indexName, null, com.sonicbase.query.BinaryExpression.Operator.EQUAL, null, key, null);
 
-        if (selectedShards.get(0) != server.getShard()) {
+
+        if (!server.getSnapshotManager().isRecovering() && !server.getLogManager().isApplyingLogs() && selectedShards.get(0) != server.getShard()) {
           throw new DatabaseException("Incorrect shard: schemaShard=" + selectedShards.get(0) + ", actualShard=" + server.getShard());
         }
         Object newUnsafeRecords = server.getAddressMap().toUnsafeFromRecords(recordBytes);
@@ -1625,7 +1621,7 @@ public class UpdateManager {
     AtomicBoolean shouldExecute = new AtomicBoolean();
     AtomicBoolean shouldDeleteLock = new AtomicBoolean();
 
-    TableSchema tableSchema = server.getCommon().getTableSchema(dbName, tableName, server.getDataDir());
+    TableSchema tableSchema = server.getTableSchema(dbName, tableName, server.getDataDir());
     byte[] keyBytes = cobj.getByteArray(ComObject.Tag.KEY_BYTES);
     Object[] key = DatabaseCommon.deserializeKey(tableSchema, keyBytes);
 
@@ -1728,7 +1724,7 @@ public class UpdateManager {
   }
 
   private void truncateTable(String dbName, String table, String phase) {
-    TableSchema tableSchema = server.getCommon().getTableSchema(dbName, table, server.getDataDir());
+    TableSchema tableSchema = server.getTableSchema(dbName, table, server.getDataDir());
     if (tableSchema != null) {
       for (Map.Entry<String, IndexSchema> entry : tableSchema.getIndices().entrySet()) {
         truncateIndex(dbName, table, phase, entry.getKey());
@@ -1913,7 +1909,7 @@ public class UpdateManager {
       String fromTable = selectStatement.getFromTable();
       List<ColumnImpl> srcColumns = selectStatement.getSelectColumns();
 
-      TableSchema fromTableSchema = server.getCommon().getTableSchema(dbName, fromTable, server.getDataDir());
+      TableSchema fromTableSchema = server.getTableSchema(dbName, fromTable, server.getDataDir());
       DataType.Type[] columnTypes = new DataType.Type[srcColumns.size()];
       for (int i = 0; i < columnTypes.length; i++) {
         ColumnImpl srcColumn = srcColumns.get(i);

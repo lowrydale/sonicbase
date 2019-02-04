@@ -20,11 +20,7 @@ import java.util.concurrent.*;
 
 public class BenchHandler {
 
-  public static final String CONFIG_STR = "/config-";
-  public static final String JSON_STR = ".json";
-  public static final String UTF_8_STR = "utf-8";
   public static final String USER_DIR_STR = "user.dir";
-  public static final String CLIENTS_STR = "clients";
   public static final String PUBLIC_ADDRESS_STR = "publicAddress";
   public static final String BENCH_START_STR = "/bench/start/";
   public static final String CLUSTER_STR = "?cluster=";
@@ -84,7 +80,7 @@ public class BenchHandler {
   }
 
   private void stopBenchServer(Config config, String externalAddress, String privateAddress,
-                                      int port, String installDir) throws IOException, InterruptedException {
+                                      int port, String installDir) throws IOException, InterruptedException, UnirestException {
     String deployUser = config.getString("user");
     if (externalAddress.equals("127.0.0.1") || externalAddress.equals("localhost")) {
       ProcessBuilder builder = null;
@@ -102,22 +98,11 @@ public class BenchHandler {
       ProcessBuilder builder = null;
       Process p = null;
       if (cli.isWindows()) {
-        File file = new File("bin/remote-kill-server.ps1");
-        String str = IOUtils.toString(new FileInputStream(file), UTF_8_STR);
-        str = str.replaceAll("\\$1", new File(System.getProperty(USER_DIR_STR), "credentials/" +
-            cli.getCurrCluster() + "-" + cli.getUsername()).getAbsolutePath().replaceAll("\\\\", "/"));
-        str = str.replaceAll("\\$2", cli.getUsername());
-        str = str.replaceAll("\\$3", externalAddress);
-        str = str.replaceAll("\\$4", installDir);
-        str = str.replaceAll("\\$5", String.valueOf(port));
-        File outFile = new File("tmp/" + externalAddress + "-" + port + "-remote-kill-server.ps1");
-        outFile.getParentFile().mkdirs();
-        FileUtils.forceDelete(outFile);
-        try (BufferedWriter writer = new BufferedWriter(new OutputStreamWriter(new FileOutputStream(outFile)))) {
-          writer.write(str);
+        GetRequest request = Unirest.get("http://" + privateAddress + ":8081/stop-server?port=" + port);
+        HttpResponse<String> response = request.asString();
+        if (response.getStatus() != 200) {
+          throw new DatabaseException("Error starting server: host=" + privateAddress);
         }
-        builder = new ProcessBuilder().command("powershell", "-F", outFile.getAbsolutePath());
-        p = builder.start();
       }
       else {
         builder = new ProcessBuilder().command("ssh", "-n", "-f", "-o",
@@ -125,7 +110,9 @@ public class BenchHandler {
                 externalAddress, installDir + "/bin/kill-server", "BenchServer", String.valueOf(port), String.valueOf(port), String.valueOf(port), String.valueOf(port));
         p = builder.start();
       }
-      p.waitFor();
+      if (p != null) {
+        p.waitFor();
+      }
     }
   }
 
@@ -439,7 +426,7 @@ public class BenchHandler {
   }
 
   private void startBenchServer(Config config, String externalAddress, String privateAddress, String port, String installDir,
-                                       String cluster) throws IOException, InterruptedException {
+                                       String cluster) throws IOException, InterruptedException, UnirestException {
     String deployUser = config.getString("user");
     String maxHeap = config.getString("maxJavaHeap");
     if (port == null) {
@@ -478,22 +465,11 @@ public class BenchHandler {
     if (cli.isWindows()) {
       cli.println("starting bench server: userDir=" + System.getProperty(USER_DIR_STR));
 
-      File file = new File("bin/remote-start-bench-server.ps1");
-      String str = IOUtils.toString(new FileInputStream(file), UTF_8_STR);
-      str = str.replaceAll("\\$1", new File(System.getProperty(USER_DIR_STR), "credentials/" + cluster + "-" + cli.getUsername()).getAbsolutePath().replaceAll("\\\\", "/"));
-      str = str.replaceAll("\\$2", cli.getUsername());
-      str = str.replaceAll("\\$3", externalAddress);
-      str = str.replaceAll("\\$4", installDir);
-      str = str.replaceAll("\\$5", port);
-      File outFile = new File("tmp/" + externalAddress + "-" + port + "-remote-start-bench-server.ps1");
-      outFile.getParentFile().mkdirs();
-      FileUtils.forceDelete(outFile);
-      try (BufferedWriter writer = new BufferedWriter(new OutputStreamWriter(new FileOutputStream(outFile)))) {
-        writer.write(str);
+      GetRequest request = Unirest.get("http://" + privateAddress + ":8081/start-bench-server?port=" + port);
+      HttpResponse<String> response = request.asString();
+      if (response.getStatus() != 200) {
+        throw new DatabaseException("Error starting server: host=" + privateAddress);
       }
-
-      ProcessBuilder builder = new ProcessBuilder().command("powershell", "-F", outFile.getAbsolutePath());
-      builder.start();
     }
     else {
       ProcessBuilder builder = new ProcessBuilder().command("bash", "bin/do-start-bench", deployUser + "@" + externalAddress,

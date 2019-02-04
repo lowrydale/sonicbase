@@ -54,7 +54,9 @@ public class StatementProxyTest {
     assertEquals(parms.getValue(1), new BigDecimal(123));
 
     sp.setString(1, "123");
-    assertEquals(parms.getValue(1), "123".getBytes("utf-8"));
+    char[] chars = new char["123".length()];
+    "123".getChars(0, "123".length(), chars, 0);
+    assertEquals(parms.getValue(1), chars);
 
     sp.setBytes(1, "123".getBytes("utf-8"));
     assertEquals(parms.getValue(1), "123".getBytes("utf-8"));
@@ -69,40 +71,55 @@ public class StatementProxyTest {
     assertEquals(parms.getValue(1), new Timestamp(123));
 
     sp.setAsciiStream(1, new ByteArrayInputStream("123".getBytes("utf-8")));
-    assertEquals(parms.getValue(1), "123".getBytes("utf-8"));
+    assertEquals(new String((char[])parms.getValue(1)), "123");
 
     sp.setUnicodeStream(1, new ByteArrayInputStream("123".getBytes("utf-8")), 3);
-    assertEquals(parms.getValue(1), "123".getBytes("utf-8"));
+    assertEquals(new String((char[])parms.getValue(1)), "123");
 
     sp.setBinaryStream(1, new ByteArrayInputStream("123".getBytes("utf-8")), 3);
     assertEquals(parms.getValue(1), "123".getBytes("utf-8"));
 
-    sp.setCharacterStream(1, new InputStreamReader(new ByteArrayInputStream("123".getBytes("utf-8"))));
-    assertEquals(parms.getValue(1), "123".getBytes("utf-8"));
+    chars = new char["123".length()];
+    "123".getChars(0, "123".length(), chars, 0);
+
+    sp.setCharacterStream(1, new StringReader(new String(chars)));
+    assertEquals(new String((char[])parms.getValue(1)), "123");
 
     Blob blob = new com.sonicbase.query.impl.Blob("123".getBytes("utf-8"));
     sp.setBlob(1, blob);
     assertEquals(parms.getValue(1), "123".getBytes("utf-8"));
 
+    chars = new char["123".length()];
+    "123".getChars(0, "123".length(), chars, 0);
+
     Clob clob = new com.sonicbase.query.impl.Clob("123");
     sp.setClob(1, clob);
-    assertEquals(parms.getValue(1), "123".getBytes("utf-8"));
+    assertEquals(new String((char[])parms.getValue(1)), "123");
 
     sp.setNString(1, "123");
-    assertEquals(parms.getValue(1), "123".getBytes("utf-8"));
+    assertEquals(new String((char[])parms.getValue(1)), "123");
+
+    chars = new char["123".length()];
+    "123".getChars(0, "123".length(), chars, 0);
 
     sp.setNCharacterStream(1, new InputStreamReader(new ByteArrayInputStream("123".getBytes("utf-8"))));
-    assertEquals(parms.getValue(1), "123".getBytes("utf-8"));
+    assertEquals(new String((char[])parms.getValue(1)), "123");
 
     NClob nlob = new com.sonicbase.query.impl.NClob("123");
     sp.setNClob(1, nlob);
-    assertEquals(parms.getValue(1), "123".getBytes("utf-8"));
+    assertEquals(new String((char[])parms.getValue(1)), "123");
 
-    sp.setClob(1, new InputStreamReader(new ByteArrayInputStream("123".getBytes("utf-8"))), 3);
-    assertEquals(parms.getValue(1), "123".getBytes("utf-8"));
+    chars = new char["123".length()];
+    "123".getChars(0, "123".length(), chars, 0);
 
-    sp.setClob(1, new InputStreamReader(new ByteArrayInputStream("123".getBytes("utf-8"))));
-    assertEquals(parms.getValue(1), "123".getBytes("utf-8"));
+    sp.setClob(1, new StringReader(new String(chars)), 3);
+    assertEquals(new String((char[])parms.getValue(1)), "123");
+
+    chars = new char["123".length()];
+    "123".getChars(0, "123".length(), chars, 0);
+
+    sp.setClob(1, new StringReader(new String(chars)));
+    assertEquals(new String((char[])parms.getValue(1)), "123");
 
     sp.setBlob(1, new ByteArrayInputStream("123".getBytes("utf-8")), 3);
     assertEquals(parms.getValue(1), "123".getBytes("utf-8"));
@@ -110,26 +127,41 @@ public class StatementProxyTest {
     sp.setBlob(1, new ByteArrayInputStream("123".getBytes("utf-8")));
     assertEquals(parms.getValue(1), "123".getBytes("utf-8"));
 
-    sp.setNClob(1, new InputStreamReader(new ByteArrayInputStream("123".getBytes("utf-8"))), 3);
-    assertEquals(parms.getValue(1), "123".getBytes("utf-8"));
+    chars = new char["123".length()];
+    "123".getChars(0, "123".length(), chars, 0);
 
-    sp.setNClob(1, new InputStreamReader(new ByteArrayInputStream("123".getBytes("utf-8"))));
-    assertEquals(parms.getValue(1), "123".getBytes("utf-8"));
+    sp.setNClob(1, new StringReader(new String(chars)), 3);
+    assertEquals(new String((char[])parms.getValue(1)), "123");
+
+    chars = new char["123".length()];
+    "123".getChars(0, "123".length(), chars, 0);
+
+    sp.setNClob(1, new StringReader(new String(chars)));
+    assertEquals(new String((char[])parms.getValue(1)), "123");
 
     sp.setAsciiStream(1, new ByteArrayInputStream("123".getBytes("utf-8")), 3);
-    assertEquals(parms.getValue(1), "123".getBytes("utf-8"));
+    assertEquals(new String((char[])parms.getValue(1)), "123");
 
     sp.setBinaryStream(1, new ByteArrayInputStream("123".getBytes("utf-8")));
     assertEquals(parms.getValue(1), "123".getBytes("utf-8"));
 
-    sp.setNCharacterStream(1, new InputStreamReader(new ByteArrayInputStream("123".getBytes("utf-8"))), 3);
-    assertEquals(parms.getValue(1), "123".getBytes("utf-8"));
+    chars = new char["123".length()];
+    "123".getChars(0, "123".length(), chars, 0);
 
-    sp.setCharacterStream(1, new InputStreamReader(new ByteArrayInputStream("123".getBytes("utf-8"))), 3);
-    assertEquals(parms.getValue(1), "123".getBytes("utf-8"));
+    sp.setNCharacterStream(1, new StringReader(new String(chars)), 3);
+    assertEquals(new String((char[])parms.getValue(1)), "123");
 
-    sp.setCharacterStream(1, new InputStreamReader(new ByteArrayInputStream("123".getBytes("utf-8"))), 3L);
-    assertEquals(parms.getValue(1), "123".getBytes("utf-8"));
+    chars = new char["123".length()];
+    "123".getChars(0, "123".length(), chars, 0);
+
+    sp.setCharacterStream(1, new StringReader(new String(chars)), 3);
+    assertEquals(new String((char[])parms.getValue(1)), "123");
+
+    chars = new char["123".length()];
+    "123".getChars(0, "123".length(), chars, 0);
+
+    sp.setCharacterStream(1, new StringReader(new String(chars)), 3L);
+    assertEquals(new String((char[])parms.getValue(1)), "123");
 
   }
 

@@ -252,14 +252,18 @@ public class BInaryExpressionImplTest {
     column.setColumnName("field2");
     rightExp.setNot(false);
     rightExp.setOperator(BinaryExpression.Operator.LIKE);
-    constant.setValue("%value%".getBytes("utf-8"));
+    char[] chars = new char["%value%".length()];
+    "%value%".getChars(0, chars.length, chars, 0);
+    constant.setValue(chars);
 
     assertTrue((Boolean) expression.evaluateSingleRecord(new TableSchema[]{tableSchema}, records, null));
 
     column.setColumnName("field2");
     rightExp.setNot(true);
     rightExp.setOperator(BinaryExpression.Operator.LIKE);
-    constant.setValue("%value%".getBytes("utf-8"));
+    chars = new char["%value%".length()];
+    "%value%".getChars(0, chars.length, chars, 0);
+    constant.setValue(chars);
 
     assertFalse((Boolean) expression.evaluateSingleRecord(new TableSchema[]{tableSchema}, records, null));
 

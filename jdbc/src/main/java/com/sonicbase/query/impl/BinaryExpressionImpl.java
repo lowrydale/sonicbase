@@ -91,6 +91,9 @@ public class BinaryExpressionImpl extends ExpressionImpl implements BinaryExpres
         if (obj instanceof byte[]) {
           obj = new String((byte[]) obj, "utf-8");
         }
+        else if (obj instanceof char[]) {
+          obj = new String((char[])obj );
+        }
         leftStr = obj == null ? "null" : obj.toString();
       }
       String rightStr = rightExpression.toString();
@@ -98,6 +101,9 @@ public class BinaryExpressionImpl extends ExpressionImpl implements BinaryExpres
         Object obj = getParms().getValue(((ParameterImpl) rightExpression).getParmOffset() + 1);
         if (obj instanceof byte[]) {
           obj = new String((byte[]) obj, "utf-8");
+        }
+        else if (obj instanceof char[]) {
+          obj = new String((char[]) obj);
         }
         rightStr = obj == null ? "null" : obj.toString();
       }
@@ -1776,8 +1782,8 @@ public class BinaryExpressionImpl extends ExpressionImpl implements BinaryExpres
     if (lhsValue == null || rhsValue == null) {
       return false;
     }
-    String lhsStr = new String((byte[]) lhsValue, "utf-8");
-    String rhsStr = new String((byte[]) rhsValue, "utf-8");
+    String lhsStr = new String((char[]) lhsValue);
+    String rhsStr = new String((char[]) rhsValue);
     if (like(lhsStr, rhsStr)) {
       return !isNot;
     }

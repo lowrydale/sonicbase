@@ -1506,31 +1506,28 @@ public class ExpressionImpl implements Expression {
 
   static Object getValueFromExpression(
       ParameterHandler parms, ExpressionImpl rightExpression) {
-    try {
-      Object value = null;
-      if (rightExpression instanceof ConstantImpl) {
-        ConstantImpl cNode1 = (ConstantImpl) rightExpression;
-        value = cNode1.getValue();
-      }
-      else if (rightExpression instanceof ParameterImpl) {
-        ParameterImpl pNode = (ParameterImpl) rightExpression;
-        String parmName = pNode.getParmName();
-        if (parmName != null) {
-         value = parms.getValue(parmName);
-        }
-        else {
-          int parmNum = pNode.getParmOffset();
-          value = parms.getValue(parmNum + 1);
-        }
-      }
-      if (value instanceof String) {
-        return ((String) value).getBytes("utf-8");
-      }
-      return value;
+    Object value = null;
+    if (rightExpression instanceof ConstantImpl) {
+      ConstantImpl cNode1 = (ConstantImpl) rightExpression;
+      value = cNode1.getValue();
     }
-    catch (UnsupportedEncodingException e) {
-      throw new DatabaseException(e);
+    else if (rightExpression instanceof ParameterImpl) {
+      ParameterImpl pNode = (ParameterImpl) rightExpression;
+      String parmName = pNode.getParmName();
+      if (parmName != null) {
+       value = parms.getValue(parmName);
+      }
+      else {
+        int parmNum = pNode.getParmOffset();
+        value = parms.getValue(parmNum + 1);
+      }
     }
+    if (value instanceof String) {
+      char[] chars = new char[((String) value).length()];
+      ((String) value).getChars(0, chars.length, chars, 0);
+      return chars;
+    }
+    return value;
   }
 
   static Object[] buildKey(List<Object> values, String[] indexFields) {

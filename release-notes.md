@@ -1,3 +1,7 @@
+1.3.0
+added support for native indices
+improved support for Windows
+
 1.2.19
 fixed reading of in-process deletes file
 logstash enhancements

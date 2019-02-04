@@ -252,7 +252,9 @@ public class TransactionManager {
         lock.indexName = indexName;
         lock.primaryKey = primaryKey;
         trans.locks.add(lock);
-        tableLocks.put(primaryKey, lock);
+        Object[] key = new Object[primaryKey.length];
+        System.arraycopy(primaryKey, 0, key, 0, key.length);
+        tableLocks.put(key, lock);
         shouldExecute.set(false);
       }
       else {

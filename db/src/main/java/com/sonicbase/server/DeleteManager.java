@@ -70,6 +70,7 @@ public class DeleteManager {
   private void freeBatch(DatabaseServer databaseServer, Object obj) {
     if (obj != null) {
       final List<Object> batch = new ArrayList<>();
+      batch.add(obj);
       toFree.drainTo(batch, 1000);
       freeExecutor.submit(() -> {
         for (Object currObj : batch) {
@@ -270,11 +271,9 @@ public class DeleteManager {
     final List<Object[]> currBatch = batch;
     batch = new ArrayList<>();
     futures.add(executor.submit((Callable) () -> {
-      final List<Object> toFreeBatch = new ArrayList<>();
       for (Object[] currKey : currBatch) {
         processValue(indexSchema, index, currKey);
       }
-      doFreeMemory(toFreeBatch);
       int countToDelete = currBatch.size();
       //count was decremented at saveDeleteds and processValue
       //add back half the count so we don't get a double delete count
@@ -330,12 +329,6 @@ public class DeleteManager {
     }
     finally {
       databaseServer.setIsOpForRebalance(false);
-    }
-  }
-
-  private void doFreeMemory(final List<Object> toFreeBatch) {
-    for (Object obj : toFreeBatch) {
-      databaseServer.getAddressMap().delayedFreeUnsafeIds(obj);
     }
   }
 

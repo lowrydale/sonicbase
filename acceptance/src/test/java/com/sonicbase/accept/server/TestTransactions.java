@@ -144,7 +144,11 @@ public class TestTransactions {
     conn.setAutoCommit(false);
 
     Index index = dbServers[0].getIndices().get("test").getIndices().get("secondary_delete").get("make_model");
-    Object value = index.get(new Object[]{"make-0".getBytes("utf-8")});
+    char[] chars = new char["make-0".length()];
+    "make-0".getChars(0, chars.length, chars, 0);
+    char[] modelChars = new char["model-0".length()];
+    "model-0".getChars(0, modelChars.length, modelChars, 0);
+    Object value = index.get(new Object[]{chars, modelChars});
     byte[][] keys = dbServers[0].getAddressMap().fromUnsafeToKeys(value);
 
     index = dbServers[0].getIndices().get("test").getIndices().get("secondary_delete").get("_primarykey");

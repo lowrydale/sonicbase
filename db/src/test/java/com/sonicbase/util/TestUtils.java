@@ -85,24 +85,42 @@ public class TestUtils {
     for (int i = 0; i < records.length; i++) {
       Object[] fieldArray = new Object[28];
       fieldArray[1] = keys != null ? keys.get(i)[0] : 200L + (100 * i);
-      fieldArray[2] = ((i % 2) + "-value").getBytes("utf-8");
+      char[] chars = new char[((i % 2) + "-value").length()];
+      ((i % 2) + "-value").getChars(0, chars.length, chars, 0);
+      fieldArray[2] = chars;
       fieldArray[3] = new Timestamp(200 + (100 * i));
       fieldArray[4] = (int)(1200 + (100 * i));
       fieldArray[5] = (short)i;
       fieldArray[6] = (byte)i;
-      fieldArray[7] = (i + "-value").getBytes("utf-8");
-      fieldArray[8] = (i + "-value").getBytes("utf-8");
+      chars = new char[(i + "-value").length()];
+      (i + "-value").getChars(0, chars.length, chars, 0);
+      fieldArray[7] = chars;
+      chars = new char[(i + "-value").length()];
+      (i + "-value").getChars(0, chars.length, chars, 0);
+      fieldArray[8] = chars;
       fieldArray[9] = (double) i;
       fieldArray[10] = (float) i;
       fieldArray[11] = (double) i;
       fieldArray[12] = true;
       fieldArray[13] = true;
-      fieldArray[14] = (i + "-value").getBytes("utf-8");
-      fieldArray[15] = (i + "-value").getBytes("utf-8");
-      fieldArray[16] = (i + "-value").getBytes("utf-8");
-      fieldArray[17] = (i + "-value").getBytes("utf-8");
-      fieldArray[18] = (i + "-value").getBytes("utf-8");
-      fieldArray[19] = (i + "-value").getBytes("utf-8");
+      chars = new char[(i + "-value").length()];
+      (i + "-value").getChars(0, chars.length, chars, 0);
+      fieldArray[14] = chars;
+      chars = new char[(i + "-value").length()];
+      (i + "-value").getChars(0, chars.length, chars, 0);
+      fieldArray[15] = chars;
+      chars = new char[(i + "-value").length()];
+      (i + "-value").getChars(0, chars.length, chars, 0);
+      fieldArray[16] = chars;
+      chars = new char[(i + "-value").length()];
+      (i + "-value").getChars(0, chars.length, chars, 0);
+      fieldArray[17] = chars;
+      chars = new char[(i + "-value").length()];
+      (i + "-value").getChars(0, chars.length, chars, 0);
+      fieldArray[18] = chars;
+      chars = new char[(i + "-value").length()];
+      (i + "-value").getChars(0, chars.length, chars, 0);
+      fieldArray[19] = chars;
       fieldArray[20] = (i + "-value").getBytes("utf-8");
       fieldArray[21] = (i + "-value").getBytes("utf-8");
       fieldArray[22] = (i + "-value").getBytes("utf-8");
@@ -124,24 +142,42 @@ public class TestUtils {
     for (int i = 0; i < records.length; i++) {
       Object[] fieldArray = new Object[28];
       fieldArray[1] = 200L + (i % 3);
-      fieldArray[2] = ((i % 2) + "-value").getBytes("utf-8");
+      char[] chars = new char[((i % 2) + "-value").length()];
+      ((i % 2) + "-value").getChars(0, chars.length, chars, 0);
+      fieldArray[2] = chars;
       fieldArray[3] = new Timestamp(200 + (100 * i));
       fieldArray[4] = (int)(1200 + (100 * i));
       fieldArray[5] = (short)i;
       fieldArray[6] = (byte)i;
-      fieldArray[7] = (i + "-value").getBytes("utf-8");
-      fieldArray[8] = (i + "-value").getBytes("utf-8");
+      chars = new char[(i + "-value").length()];
+      (i + "-value").getChars(0, chars.length, chars, 0);
+      fieldArray[7] = chars;
+      chars = new char[(i + "-value").length()];
+      (i + "-value").getChars(0, chars.length, chars, 0);
+      fieldArray[8] = chars;
       fieldArray[9] = (double) i;
       fieldArray[10] = (float) i;
       fieldArray[11] = (double) i;
       fieldArray[12] = true;
       fieldArray[13] = true;
-      fieldArray[14] = (i + "-value").getBytes("utf-8");
-      fieldArray[15] = (i + "-value").getBytes("utf-8");
-      fieldArray[16] = (i + "-value").getBytes("utf-8");
-      fieldArray[17] = (i + "-value").getBytes("utf-8");
-      fieldArray[18] = (i + "-value").getBytes("utf-8");
-      fieldArray[19] = (i + "-value").getBytes("utf-8");
+      chars = new char[(i + "-value").length()];
+      (i + "-value").getChars(0, chars.length, chars, 0);
+      fieldArray[14] = chars;
+      chars = new char[(i + "-value").length()];
+      (i + "-value").getChars(0, chars.length, chars, 0);
+      fieldArray[15] = chars;
+      chars = new char[(i + "-value").length()];
+      (i + "-value").getChars(0, chars.length, chars, 0);
+      fieldArray[16] = chars;
+      chars = new char[(i + "-value").length()];
+      (i + "-value").getChars(0, chars.length, chars, 0);
+      fieldArray[17] = chars;
+      chars = new char[(i + "-value").length()];
+      (i + "-value").getChars(0, chars.length, chars, 0);
+      fieldArray[18] = chars;
+      chars = new char[(i + "-value").length()];
+      (i + "-value").getChars(0, chars.length, chars, 0);
+      fieldArray[19] = chars;
       fieldArray[20] = (i + "-value").getBytes("utf-8");
       fieldArray[21] = (i + "-value").getBytes("utf-8");
       fieldArray[22] = (i + "-value").getBytes("utf-8");
@@ -198,7 +234,9 @@ public class TestUtils {
     List<Object[]> ret = new ArrayList<>();
     for (int i = 0; i < count; i++) {
       Object[] fieldArray = new Object[1];
-      fieldArray[0] = (i  + "-value").getBytes("utf-8");
+      char[] chars = new char[((i % 2) + "-value").length()];
+      ((i % 2) + "-value").getChars(0, chars.length, chars, 0);
+      fieldArray[0] = chars;
       ret.add(fieldArray);
     }
     return ret;
@@ -639,9 +677,31 @@ public class TestUtils {
     indexSchema.setFields(new String[]{
         "field2"}, tableSchema);
 
-    indexSchema.setIndexId(1);
+    indexSchema.setIndexId(2);
     indexSchema.setIsPrimaryKey(false);
-    indexSchema.setName("_primarykey");
+    indexSchema.setName("stringIndex");
+    indexSchema.setComparators(tableSchema.getComparators(
+        new String[]{
+            "field2"}));
+
+    TableSchema.Partition[] partitions = new TableSchema.Partition[partitionCount];
+    for (int i = 0; i < partitionCount; i++) {
+      partitions[i] = new TableSchema.Partition();
+      partitions[i].setUnboundUpper(true);
+    }
+    indexSchema.setCurrPartitions(partitions);
+    tableSchema.addIndex(indexSchema);
+    return indexSchema;
+  }
+
+  public static IndexSchema createStringSecondaryIndexSchema(TableSchema tableSchema, int partitionCount) {
+    IndexSchema indexSchema = new IndexSchema();
+    indexSchema.setFields(new String[]{
+        "field2"}, tableSchema);
+
+    indexSchema.setIndexId(2);
+    indexSchema.setIsPrimaryKey(false);
+    indexSchema.setName("stringIndex");
     indexSchema.setComparators(tableSchema.getComparators(
         new String[]{
             "field2"}));

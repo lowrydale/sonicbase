@@ -571,7 +571,9 @@ public class PartitionManagerTest {
       }
 
       Object[] fieldArray = new Object[1];
-      fieldArray[0] = idString.getBytes("utf-8");
+      char[] chars = new char[idString.length()];
+      idString.getChars(0, chars.length, chars, 0);
+      fieldArray[0] = chars;
       stringKeys.add(fieldArray);
     }
 
@@ -610,6 +612,15 @@ public class PartitionManagerTest {
 
       when(server.getCommon()).thenReturn(common);
       when(server.useUnsafe()).thenReturn(true);
+
+      SnapshotManager snapshotManager = mock(SnapshotManager.class);
+      when(server.getSnapshotManager()).thenReturn(snapshotManager);
+      when(snapshotManager.isRecovering()).thenReturn(false);
+
+      LogManager logManager = mock(LogManager.class);
+      when(server.getLogManager()).thenReturn(logManager);
+      when(logManager.isApplyingLogs()).thenReturn(false);
+
 
       Indices indices = new Indices();
       indices.addIndex(server.getPort(), new HashMap<Long, Boolean>(), tableSchema, indexSchema.getName(), indexSchema.getComparators());
@@ -722,13 +733,13 @@ public class PartitionManagerTest {
             ComArray array = retObj.getArray(ComObject.Tag.KEYS);
             if (array.getArray().size() != 0) {
               byte[] bytes = (byte[]) array.getArray().get(0);
-              try {
-                Object[] key = DatabaseCommon.deserializeKey(tableSchema, bytes);
-                key = key;
-              }
-              catch (EOFException e) {
-                throw new DatabaseException(e);
-              }
+//              try {
+//                Object[] key = DatabaseCommon.deserializeKey(tableSchema, bytes);
+//                key = key;
+//              }
+//              catch (EOFException e) {
+//                throw new DatabaseException(e);
+//              }
             }
             return retObj.serialize();
           }
@@ -844,7 +855,7 @@ public class PartitionManagerTest {
 
     List<String> toRebalance = new ArrayList<>();
     toRebalance.add("table1 _primarykey");
-    toRebalance.add("table2 _primarykey");
+    toRebalance.add("table2 stringIndex");
 
     int countAdded = 0;
     int countStringAdded = 0;
@@ -977,7 +988,7 @@ public class PartitionManagerTest {
         assertEquals(count.get(), countAdded);
       }
 
-      AtomicReference<byte[]> lastStringKey = new AtomicReference<>();
+      AtomicReference<char[]> lastStringKey = new AtomicReference<>();
       for (int j = 0; j < shardCount; j++) {
         Index stringIndex = servers[j].getIndices().get("test").getIndices().get(stringTableSchema.getName()).get(stringIndexSchema.getName());
 
@@ -987,30 +998,23 @@ public class PartitionManagerTest {
         }
 
 
-        stringIndex.visitTailMap(new Object[]{idString.getBytes("utf-8")}, new Index.Visitor() {
+        char[] chars = new char[idString.length()];
+        idString.getChars(0, chars.length, chars, 0);
+        stringIndex.visitTailMap(new Object[]{chars}, new Index.Visitor() {
           @Override
           public boolean visit(Object[] key, Object value) {
 
-            try {
-              if (lastStringKey.get() != null && (new String((byte[])key[0], "utf-8").compareTo(new String(lastStringKey.get())) < 0)) {
-                fail();
-              }
+            if (lastStringKey.get() != null && (new String((char[])key[0]).compareTo(new String(lastStringKey.get())) < 0)) {
+              fail();
             }
-            catch (UnsupportedEncodingException e) {
-              e.printStackTrace();
-            }
-            lastStringKey.set((byte[])key[0]);
+            lastStringKey.set((char[])key[0]);
             String idString = String.valueOf(stringCount.get());
             for (int j = 0; j < 6 - String.valueOf(stringCount.get()).length(); j++) {
               idString = "0" + idString;
             }
 
-            try {
-              assertEquals(new String((byte[])key[0], "utf-8"), idString);
-            }
-            catch (UnsupportedEncodingException e) {
-              e.printStackTrace();
-            }
+            assertEquals(new String((char[])key[0]), idString);
+
             stringCount.incrementAndGet();
             return true;
           }

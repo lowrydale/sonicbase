@@ -23,6 +23,11 @@ public class LongIndexImpl implements IndexImpl {
     longSkipIndex.clear();
   }
 
+  @Override
+  public void delete() {
+
+  }
+
   public Object get(Object[] key) {
     return longSkipIndex.get((long) key[0]);
   }

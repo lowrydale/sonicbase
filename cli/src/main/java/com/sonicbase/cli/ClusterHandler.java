@@ -1,16 +1,21 @@
 /* © 2018 by Intellectual Reserve, Inc. All rights reserved. */
 package com.sonicbase.cli;
 
+import com.mashape.unirest.http.HttpResponse;
+import com.mashape.unirest.http.Unirest;
+import com.mashape.unirest.http.exceptions.UnirestException;
+import com.mashape.unirest.request.GetRequest;
 import com.sonicbase.client.ReconfigureResults;
 import com.sonicbase.common.ComObject;
 import com.sonicbase.common.Config;
 import com.sonicbase.jdbcdriver.ConnectionProxy;
+import com.sonicbase.query.DatabaseException;
 import org.apache.commons.io.FileUtils;
-import org.apache.commons.io.IOUtils;
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
 
 import java.io.*;
+import java.net.URLEncoder;
 import java.sql.SQLException;
 import java.util.ArrayList;
 import java.util.HashSet;
@@ -25,15 +30,7 @@ import static com.sonicbase.common.MemUtil.getMemValue;
 public class ClusterHandler {
 
   private static final Logger logger = LoggerFactory.getLogger(ClusterHandler.class);
-  private static final String INSTALL_DIRECTORY_STR = "installDirectory";
-  private static final String JSON_STR = ".json";
-  private static final String CONFIG_STR = "/config-";
-  private static final String POWERSHELL_STR = "powershell";
-  private static final String CREDENTIALS_STR = "credentials/";
-  private static final String SHARDS_STR = "shards";
-  private static final String UTF_8_STR = "utf-8";
-  private static final String REPLICAS_STR = "replicas";
-  private static final String USERS_LOWRYDA_SONICBASE_CONFIG_CONFIG_STR = "/Users/lowryda/sonicbase/config/config-";
+  public static final String INSTALL_DIRECTORY_STR = "installDirectory";
   private static final String PUBLIC_ADDRESS_STR = "publicAddress";
   private static final String PRIVATE_ADDRESS_STR = "privateAddress";
   private static final String LOCAL_HOST_NUMS_STR = "127.0.0.1";
@@ -73,7 +70,8 @@ public class ClusterHandler {
   }
 
   private void startServer(Config config, String externalAddress, String privateAddress, String port, String installDir,
-                                  String cluster, boolean disable, AtomicReference<Double> lastTotalGig) throws IOException, InterruptedException {
+                                  String cluster, boolean disable, AtomicReference<Double> lastTotalGig,
+                           int shard, int replica) throws IOException, InterruptedException, UnirestException {
     try {
       String deployUser = config.getString("user");
       String maxHeap = config.getString("maxJavaHeap");
@@ -102,6 +100,7 @@ public class ClusterHandler {
         maxHeap = cli.getMaxHeap(config);
         ProcessBuilder builder = null;
         if (cli.isCygwin() || cli.isWindows()) {
+
           builder = new ProcessBuilder().command("bin/start-db-server-task.bat", privateAddress, port, maxHeap, searchHome, cluster, disable ? "disable" : "enable");
           Process p = builder.start();
           p.waitFor();
@@ -124,36 +123,29 @@ public class ClusterHandler {
         }
       }
       else {
-        cli.println("Current working directory=" + System.getProperty(USER_DIR_STR));
         String maxStr = config.getString("maxJavaHeap");
         if (maxStr != null && maxStr.contains("%")) {
           ProcessBuilder builder = null;
           Process p = null;
+          String line = null;
           if (cli.isWindows()) {
-            File file = new File("bin/remote-get-mem-total.ps1");
-            String str = IOUtils.toString(new FileInputStream(file), UTF_8_STR);
-            str = str.replaceAll("\\$1", new File(System.getProperty(USER_DIR_STR), CREDENTIALS_STR + cluster + "-" + cli.getUsername()).getAbsolutePath().replaceAll("\\\\", "/"));
-            str = str.replaceAll("\\$2", cli.getUsername());
-            str = str.replaceAll("\\$3", externalAddress);
-            str = str.replaceAll("\\$4", installDir);
-            File outFile = new File(System.getProperty(USER_DIR_STR), "/tmp/" + externalAddress + "-" + port + "-remote-get-mem-total.ps1");
-                   outFile.getParentFile().mkdirs();
-            FileUtils.deleteQuietly(outFile);
-            try (BufferedWriter writer = new BufferedWriter(new OutputStreamWriter(new FileOutputStream(outFile)))) {
-              writer.write(str);
+            GetRequest request = Unirest.get("http://" + privateAddress + ":8081/get-mem-total?cluster=" + cluster + "&shard=" + shard + "&replica=" + replica);
+            HttpResponse<String> response = request.asString();
+            if (response.getStatus() != 200) {
+              throw new DatabaseException("Error starting server: host=" + privateAddress);
             }
-
-            builder = new ProcessBuilder().command(POWERSHELL_STR, "-F", outFile.getAbsolutePath());
-            p = builder.start();
+            line = response.getBody();
           }
           else {
             builder = new ProcessBuilder().command("bash", "bin/remote-get-mem-total", deployUser + "@" + externalAddress, installDir);
             p = builder.start();
           }
-          BufferedReader reader = new BufferedReader(new InputStreamReader(p.getInputStream()));
-          String line = reader.readLine();
+          if (p != null) {
+            BufferedReader reader = new BufferedReader(new InputStreamReader(p.getInputStream()));
+            line = reader.readLine();
+          }
           double totalGig = 0;
-          if (cli.isWindows()) {
+          if (cli.isWindows() || cli.isCygwin()) {
             totalGig = Double.valueOf(line) / 1000d / 1000d / 1000d;
           }
           else {
@@ -174,7 +166,9 @@ public class ClusterHandler {
               totalGig = lastTotalGig.get();
             }
           }
-          p.waitFor();
+          if (!cli.isWindows() && !cli.isCygwin()) {
+            p.waitFor();
+          }
           maxStr = maxStr.substring(0, maxStr.indexOf('%'));
           double maxPercent = Double.parseDouble(maxStr);
           double maxGig = totalGig * (maxPercent / 100);
@@ -183,26 +177,12 @@ public class ClusterHandler {
 
         cli.println("Started server: address=" + externalAddress + PORT_STR + port + MAX_JAVA_HEAP_STR + maxHeap);
         if (cli.isWindows()) {
-          File file = new File("bin/remote-start-db-server.ps1");
-          String str = IOUtils.toString(new FileInputStream(file), UTF_8_STR);
-          str = str.replaceAll("\\$1", new File(System.getProperty(USER_DIR_STR), CREDENTIALS_STR + cluster + "-" + cli.getUsername()).getAbsolutePath().replaceAll("\\\\", "/"));
-          str = str.replaceAll("\\$2", cli.getUsername());
-          str = str.replaceAll("\\$3", externalAddress);
-          str = str.replaceAll("\\$4", installDir);
-          str = str.replaceAll("\\$5", privateAddress);
-          str = str.replaceAll("\\$6", port);
-          str = str.replaceAll("\\$7", maxHeap);
-          str = str.replaceAll("\\$8", cluster);
-          str = str.replaceAll("\\$9", disable ? "disable" : "enable");
-          File outFile = new File("tmp/" + externalAddress + "-" + port + "-remote-start-db-server.ps1");
-          outFile.getParentFile().mkdirs();
-          FileUtils.deleteQuietly(outFile);
-          try (BufferedWriter writer = new BufferedWriter(new OutputStreamWriter(new FileOutputStream(outFile)))) {
-            writer.write(str);
+          GetRequest request = Unirest.get("http://" + privateAddress + ":8081/start-server?cluster=" + cluster + "&shard=" +
+              shard + "&replica=" + replica + "&maxHeap=" + maxHeap);
+          HttpResponse<String> response = request.asString();
+          if (response.getStatus() != 200) {
+            throw new DatabaseException("Error starting server: host=" + privateAddress);
           }
-
-          ProcessBuilder builder = new ProcessBuilder().command(POWERSHELL_STR, "-F", outFile.getAbsolutePath());
-          builder.start();
         }
         else {
           ProcessBuilder builder = new ProcessBuilder().command("bash", "bin/do-start", deployUser + "@" + externalAddress,
@@ -214,11 +194,11 @@ public class ClusterHandler {
     }
     catch (Exception e) {
       cli.println("Error starting server: publicAddress=" + externalAddress + ", internalAddress=" + privateAddress);
-      throw e;
+      throw new DatabaseException(e);
     }
   }
 
-  void startCluster() throws IOException, InterruptedException, SQLException, ClassNotFoundException, ExecutionException {
+  void startCluster() throws IOException, InterruptedException, SQLException, ClassNotFoundException, ExecutionException, UnirestException {
     final String cluster = cli.getCurrCluster();
     if (cluster == null) {
       cli.println(ERROR_NOT_USING_A_CLUSTER_STR);
@@ -236,7 +216,7 @@ public class ClusterHandler {
     final List<Config.Replica> masterReplica = shards.get(0).getReplicas();
     Config.Replica master = masterReplica.get(0);
     startServer(config, master.getString(PUBLIC_ADDRESS_STR), master.getString(PRIVATE_ADDRESS_STR),
-        String.valueOf(master.getInt("port")), installDir, cluster, false, new AtomicReference<Double>(0d));
+        String.valueOf(master.getInt("port")), installDir, cluster, false, new AtomicReference<Double>(0d), 0, 0);
     Thread.sleep(5_000);
     cli.initConnection();
 
@@ -256,7 +236,7 @@ public class ClusterHandler {
             Config.Replica replica = replicas.get(replicaOffset);
             startServer(config, replica.getString(PUBLIC_ADDRESS_STR),
                 replica.getString(PRIVATE_ADDRESS_STR), String.valueOf(replica.getInt("port")), installDir, cluster, false,
-                lastTotalGig);
+                lastTotalGig, shardOffset, replicaOffset);
             return null;
           }));
         }
@@ -360,6 +340,7 @@ public class ClusterHandler {
     final AtomicReference<Double> lastTotalGig = new AtomicReference<>(0d);
     List<Future> futures = new ArrayList<>();
     for (int i = 0; i < shards.size(); i++) {
+      final int shardOffset = i;
       final List<Config.Replica> replicas = shards.get(i).getReplicas();
       for (int j = 0; j < replicas.size(); j++) {
         final int replicaOffset = j;
@@ -370,7 +351,7 @@ public class ClusterHandler {
           Config.Replica replica1 = replicas.get(replicaOffset);
           startServer(config, replica1.getString(PUBLIC_ADDRESS_STR),
               replica1.getString(PRIVATE_ADDRESS_STR),
-              String.valueOf(replica1.getInt("port")), installDir, cluster, false, lastTotalGig);
+              String.valueOf(replica1.getInt("port")), installDir, cluster, false, lastTotalGig, shardOffset, replicaOffset);
           return null;
         }));
       }
@@ -614,7 +595,7 @@ public class ClusterHandler {
     }
   }
 
-  void stopServer(String command) throws InterruptedException, IOException {
+  void stopServer(String command) throws InterruptedException, IOException, UnirestException {
     final String cluster = cli.getCurrCluster();
     if (cluster == null) {
       cli.println(ERROR_NOT_USING_A_CLUSTER_STR);
@@ -637,7 +618,7 @@ public class ClusterHandler {
 
   }
 
-  private void stopServer(Config config, String externalAddress, String privateAddress, String port, String installDir) throws IOException, InterruptedException {
+  private void stopServer(Config config, String externalAddress, String privateAddress, String port, String installDir) throws IOException, InterruptedException, UnirestException {
     String deployUser = config.getString("user");
     if (externalAddress.equals(LOCAL_HOST_NUMS_STR) || externalAddress.equals(LOCALHOST_STR)) {
       ProcessBuilder builder = null;
@@ -654,22 +635,11 @@ public class ClusterHandler {
       ProcessBuilder builder = null;
       Process p = null;
       if (cli.isWindows()) {
-        File file = new File("bin/remote-kill-server.ps1");
-        String str = IOUtils.toString(new FileInputStream(file), UTF_8_STR);
-        str = str.replaceAll("\\$1", new File(System.getProperty(USER_DIR_STR), CREDENTIALS_STR + cli.getCurrCluster() + "-" + cli.getUsername()).getAbsolutePath().replaceAll("\\\\", "/"));
-        str = str.replaceAll("\\$2", cli.getUsername());
-        str = str.replaceAll("\\$3", externalAddress);
-        str = str.replaceAll("\\$4", installDir);
-        str = str.replaceAll("\\$5", port);
-        File outFile = new File("tmp/" + externalAddress + "-" + port + "-remote-kill-server.ps1");
-        outFile.getParentFile().mkdirs();
-        FileUtils.deleteQuietly(outFile);
-        try (BufferedWriter writer = new BufferedWriter(new OutputStreamWriter(new FileOutputStream(outFile)))) {
-          writer.write(str);
+        GetRequest request = Unirest.get("http://" + privateAddress + ":8081/stop-server?port=" + port);
+        HttpResponse<String> response = request.asString();
+        if (response.getStatus() != 200) {
+          throw new DatabaseException("Error stopping server: host=" + privateAddress + ", error=" + response.getStatus());
         }
-
-        builder = new ProcessBuilder().command(POWERSHELL_STR, "-F", outFile.getAbsolutePath());
-        p = builder.start();
       }
       else {
         builder = new ProcessBuilder().command("ssh", "-n", "-f", "-o",
@@ -677,7 +647,9 @@ public class ClusterHandler {
                 externalAddress, installDir + "/bin/kill-server", "NettyServer", "-host", privateAddress, "-port", port);
         p = builder.start();
       }
-      p.waitFor();
+      if (p != null) {
+        p.waitFor();
+      }
     }
   }
 
@@ -721,25 +693,11 @@ public class ClusterHandler {
         else {
           if (cli.isWindows()) {
             final String installDir = cli.resolvePath(config.getString(INSTALL_DIRECTORY_STR));
-
-            ProcessBuilder builder = null;
-            File file = new File("bin/remote-purge-data.ps1");
-            String str = IOUtils.toString(new FileInputStream(file), UTF_8_STR);
-            str = str.replaceAll("\\$1", new File(System.getProperty(USER_DIR_STR), CREDENTIALS_STR + cluster + "-" + cli.getUsername()).getAbsolutePath().replaceAll("\\\\", "/"));
-            str = str.replaceAll("\\$2", cli.getUsername());
-            str = str.replaceAll("\\$3", address);
-            str = str.replaceAll("\\$4", installDir);
-            str = str.replaceAll("\\$5", dataDir);
-            File outFile = new File("tmp/" + address + "-remote-purge-data.ps1");
-            outFile.getParentFile().mkdirs();
-            FileUtils.deleteQuietly(outFile);
-            try (BufferedWriter writer = new BufferedWriter(new OutputStreamWriter(new FileOutputStream(outFile)))) {
-              writer.write(str);
+            GetRequest request = Unirest.get("http://" + address + ":8081/purge-server?cluster=" + cluster + "&dataDir=" + URLEncoder.encode(dataDir));
+            HttpResponse<String> response = request.asString();
+            if (response.getStatus() != 200) {
+              throw new DatabaseException("Error purging server: host=" + address + ", error=" + response.getStatus());
             }
-
-            builder = new ProcessBuilder().command(POWERSHELL_STR, "-F", outFile.getAbsolutePath());
-            Process p = builder.start();
-            p.waitFor();
           }
           else {
             purgeSubDirectory(dataDir, address, deployUser, "deletes");
@@ -805,7 +763,7 @@ public class ClusterHandler {
     cli.println("Stopped replica: replica=" + replica);
   }
 
-  void stopShard(int shardOffset) throws IOException, InterruptedException {
+  void stopShard(int shardOffset) throws IOException, InterruptedException, UnirestException {
     String cluster = cli.getCurrCluster();
     if (cluster == null) {
       cli.println(ERROR_NOT_USING_A_CLUSTER_STR);
@@ -859,7 +817,7 @@ public class ClusterHandler {
   }
 
 
-  void startShard(int shardOffset) throws IOException, InterruptedException {
+  void startShard(int shardOffset) throws IOException, InterruptedException, UnirestException {
     String cluster = cli.getCurrCluster();
     if (cluster == null) {
       cli.println(ERROR_NOT_USING_A_CLUSTER_STR);
@@ -882,12 +840,12 @@ public class ClusterHandler {
     for (int j = 0; j < replicas.size(); j++) {
       Config.Replica replica = replicas.get(j);
       startServer(config, replica.getString(PUBLIC_ADDRESS_STR), replica.getString(PRIVATE_ADDRESS_STR),
-          String.valueOf(replica.getInt("port")), installDir, cluster, false, lastTotalGig);
+          String.valueOf(replica.getInt("port")), installDir, cluster, false, lastTotalGig, shardOffset, j);
     }
     cli.println("Finished starting servers");
   }
 
-  void reconfigureCluster() throws SQLException, ClassNotFoundException, IOException, InterruptedException, ExecutionException {
+  void reconfigureCluster() throws SQLException, ClassNotFoundException, IOException, InterruptedException, ExecutionException, UnirestException {
     String cluster = cli.getCurrCluster();
     if (cluster == null) {
       cli.println(ERROR_NOT_USING_A_CLUSTER_STR);
@@ -918,7 +876,7 @@ public class ClusterHandler {
     cli.println("Finished reconfiguring cluster");
   }
 
-  void startServer(String command) throws InterruptedException, IOException {
+  void startServer(String command) throws InterruptedException, IOException, UnirestException {
     final String cluster = cli.getCurrCluster();
     if (cluster == null) {
       cli.println(ERROR_NOT_USING_A_CLUSTER_STR);
@@ -946,7 +904,7 @@ public class ClusterHandler {
     Thread.sleep(2000);
 
     startServer(config, currReplica.getString(PUBLIC_ADDRESS_STR), currReplica.getString(PRIVATE_ADDRESS_STR),
-        String.valueOf(currReplica.getInt("port")), installDir, cluster, disable, new AtomicReference<Double>(0d));
+        String.valueOf(currReplica.getInt("port")), installDir, cluster, disable, new AtomicReference<Double>(0d), shard, replica);
 
     monitorServerStartupProgress(cli, shard, replica, currReplica);
 

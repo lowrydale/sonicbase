@@ -1,5 +1,6 @@
 package com.sonicbase.server;
 
+import com.amazonaws.services.opsworks.model.transform.OperatingSystemConfigurationManagerJsonUnmarshaller;
 import com.fasterxml.jackson.databind.JsonNode;
 import com.fasterxml.jackson.databind.ObjectMapper;
 import com.fasterxml.jackson.databind.node.ArrayNode;
@@ -22,6 +23,7 @@ import java.io.File;
 import java.io.IOException;
 import java.util.ArrayList;
 import java.util.List;
+import java.util.Random;
 
 import static org.mockito.Matchers.*;
 import static org.mockito.Mockito.doAnswer;
@@ -44,7 +46,7 @@ public class SchemaManagerTest {
     cobj.put(ComObject.Tag.MASTER_SLAVE, "master");
 
     com.sonicbase.server.DatabaseServer server = mock(com.sonicbase.server.DatabaseServer.class);
-    when(server.getDataDir()).thenReturn("/tmp");
+    when(server.getDataDir()).thenReturn(System.getProperty("java.io.tmpdir"));
     DatabaseCommon common = new DatabaseCommon();
     when(server.getCommon()).thenReturn(common);
     DatabaseClient client = mock(DatabaseClient.class);
@@ -84,7 +86,7 @@ public class SchemaManagerTest {
 
     com.sonicbase.server.DatabaseServer server = mock(com.sonicbase.server.DatabaseServer.class);
     when(server.getSnapshotManager()).thenReturn(mock(SnapshotManager.class));
-    when(server.getDataDir()).thenReturn("/tmp");
+    when(server.getDataDir()).thenReturn(System.getProperty("java.io.tmpdir"));
     DatabaseCommon common = new DatabaseCommon();
     when(server.getCommon()).thenReturn(common);
     DatabaseClient client = mock(DatabaseClient.class);
@@ -93,6 +95,14 @@ public class SchemaManagerTest {
     when(server.getDatabaseClient()).thenReturn(client);
     Indices indices = new Indices();
     when(server.getIndices(anyString())).thenReturn(indices);
+
+    when(server.getTableSchema(anyString(), anyString(), anyString())).thenAnswer(new Answer() {
+      @Override
+      public Object answer(InvocationOnMock invocationOnMock) throws Throwable {
+        TableSchema tableSchema = common.getTables("test").get("table1");
+        return tableSchema;
+      }
+    });
 
     when(client.send(   anyString(), anyInt(), anyInt(), (ComObject) anyObject(), eq(DatabaseClient.Replica.DEF))).thenReturn(
         null
@@ -194,7 +204,7 @@ public class SchemaManagerTest {
     com.sonicbase.server.DatabaseServer server = mock(com.sonicbase.server.DatabaseServer.class);
     when(server.getUpdateManager()).thenReturn(mock(UpdateManager.class));
     when(server.getSnapshotManager()).thenReturn(mock(SnapshotManager.class));
-    when(server.getDataDir()).thenReturn("/tmp");
+    when(server.getDataDir()).thenReturn(System.getProperty("java.io.tmpdir"));
     DatabaseCommon common = new DatabaseCommon();
     when(server.getCommon()).thenReturn(common);
     DatabaseClient client = mock(DatabaseClient.class);
@@ -203,6 +213,14 @@ public class SchemaManagerTest {
     when(server.getDatabaseClient()).thenReturn(client);
     Indices indices = new Indices();
     when(server.getIndices(anyString())).thenReturn(indices);
+
+    when(server.getTableSchema(anyString(), anyString(), anyString())).thenAnswer(new Answer() {
+      @Override
+      public Object answer(InvocationOnMock invocationOnMock) throws Throwable {
+        TableSchema tableSchema = common.getTables("test").get("table1");
+        return tableSchema;
+      }
+    });
 
     when(client.send(   anyString(), anyInt(), anyInt(), (ComObject) anyObject(), eq(DatabaseClient.Replica.DEF))).thenReturn(
         null
@@ -297,7 +315,7 @@ public class SchemaManagerTest {
 
     com.sonicbase.server.DatabaseServer server = mock(com.sonicbase.server.DatabaseServer.class);
     when(server.getSnapshotManager()).thenReturn(mock(SnapshotManager.class));
-    when(server.getDataDir()).thenReturn("/tmp");
+    when(server.getDataDir()).thenReturn(System.getProperty("java.io.tmpdir"));
     DatabaseCommon common = new DatabaseCommon();
     when(server.getCommon()).thenReturn(common);
     DatabaseClient client = mock(DatabaseClient.class);
@@ -306,6 +324,14 @@ public class SchemaManagerTest {
     when(server.getDatabaseClient()).thenReturn(client);
     Indices indices = new Indices();
     when(server.getIndices(anyString())).thenReturn(indices);
+
+    when(server.getTableSchema(anyString(), anyString(), anyString())).thenAnswer(new Answer() {
+                                                                                    @Override
+                                                                                    public Object answer(InvocationOnMock invocationOnMock) throws Throwable {
+                                                                                      TableSchema tableSchema = common.getTables("test").get("table1");
+                                                                                      return tableSchema;
+                                                                                    }
+                                                                                  });
 
     when(client.send(   anyString(), anyInt(), anyInt(), (ComObject) anyObject(), eq(DatabaseClient.Replica.DEF))).thenReturn(
         null
@@ -422,11 +448,14 @@ public class SchemaManagerTest {
     cobj.put(ComObject.Tag.SCHEMA_VERSION, 1000);
     cobj.put(ComObject.Tag.MASTER_SLAVE, "master");
 
+    Random rand = new Random(System.currentTimeMillis());
+    String dataDir = System.getProperty("java.io.tmpdir") + "/" + rand.nextInt(100_000) + "/database";
+
     com.sonicbase.server.DatabaseServer server = mock(DatabaseServer.class);
     when(server.getSnapshotManager()).thenReturn(mock(SnapshotManager.class));
-    when(server.getDataDir()).thenReturn("/tmp/database");
+    when(server.getDataDir()).thenReturn(System.getProperty(dataDir));
 
-    FileUtils.deleteDirectory(new File("/tmp/database"));
+    FileUtils.deleteDirectory(new File(dataDir));
     when(server.getShardCount()).thenReturn(1);
     when(server.getReplicationFactor()).thenReturn(2);
 //    doAnswer(new Answer() {
@@ -449,6 +478,14 @@ public class SchemaManagerTest {
     when(server.getDatabaseClient()).thenReturn(client);
     Indices indices = new Indices();
     when(server.getIndices(anyString())).thenReturn(indices);
+
+    when(server.getTableSchema(anyString(), anyString(), anyString())).thenAnswer(new Answer() {
+      @Override
+      public Object answer(InvocationOnMock invocationOnMock) throws Throwable {
+        TableSchema tableSchema = common.getTables("test").get("table1");
+        return tableSchema;
+      }
+    });
 
     JsonNode node = new ObjectMapper().readTree(" { \"shards\" : [\n" +
         "    {\n" +
@@ -519,7 +556,11 @@ public class SchemaManagerTest {
         new Answer() {
           public Object answer(InvocationOnMock invocation) {
             Object[] args = invocation.getArguments();
-            return schemaManager.updateIndexSchema((ComObject)args[2], false).serialize();
+            ComObject ret = schemaManager.updateIndexSchema((ComObject)args[2], false);
+            if (ret != null) {
+              return ret.serialize();
+            }
+            return null;
           }
         });
 
@@ -535,6 +576,8 @@ public class SchemaManagerTest {
       eq(DatabaseClient.Replica.SPECIFIED))).thenReturn(schemaRet.serialize());
 
     common.getTables("test").get("table1").getIndices().clear();
+    File indexDir = server.getSnapshotManager().getIndexSchemaDir("test", "table1", "index1");
+    //FileUtils.deleteDirectory(indexDir);
 
     schemaManager.reconcileSchema();
 

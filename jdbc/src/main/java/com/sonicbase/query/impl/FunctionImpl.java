@@ -150,6 +150,9 @@ public class FunctionImpl extends ExpressionImpl {
         if (classNameObj instanceof byte[]) {
           className = new String((byte[])classNameObj, UTF_8_STR);
         }
+        else if (classNameObj instanceof char[]) {
+          className = new String((char[])classNameObj);
+        }
         else {
           className = (String) classNameObj;
         }
@@ -158,6 +161,9 @@ public class FunctionImpl extends ExpressionImpl {
         String methodName;
         if (methodNameObj instanceof byte[]) {
           methodName = new String((byte[])methodNameObj, UTF_8_STR);
+        }
+        else if (methodNameObj instanceof char[]) {
+          methodName = new String((char[])methodNameObj);
         }
         else {
           methodName = (String) methodNameObj;

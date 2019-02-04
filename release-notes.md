@@ -1,5 +1,6 @@
 1.3.0
 added support for native indices
+improved unicode support
 improved support for Windows
 
 1.2.19

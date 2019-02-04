@@ -3,6 +3,7 @@ package com.sonicbase.accept.server;
 import com.sonicbase.client.DatabaseClient;
 import com.sonicbase.common.Config;
 import com.sonicbase.jdbcdriver.ConnectionProxy;
+import com.sonicbase.schema.Schema;
 import com.sonicbase.server.DatabaseServer;
 import org.apache.commons.io.IOUtils;
 import org.apache.commons.io.FileUtils;
@@ -28,6 +29,7 @@ public class TestSchema {
   private Connection conn;
   final List<Long> ids = new ArrayList<>();
   com.sonicbase.server.DatabaseServer[] dbServers;
+  private DatabaseClient client;
 
   @AfterClass(alwaysRun = true)
   public void afterClass() throws SQLException {
@@ -87,7 +89,7 @@ public class TestSchema {
 
 
 
-    DatabaseClient client = ((ConnectionProxy)conn).getDatabaseClient();
+    client = ((ConnectionProxy)conn).getDatabaseClient();
 
     PreparedStatement stmt = conn.prepareStatement("create table Persons (id BIGINT, ssn VARCHAR(64), gender VARCHAR(8), PRIMARY KEY (id))");
           stmt.executeUpdate();
@@ -117,6 +119,8 @@ public class TestSchema {
   public void test() throws SQLException {
     PreparedStatement stmt = conn.prepareStatement("alter table persons add column id2 BIGINT");
     stmt.executeUpdate();
+
+    Schema schema = client.getSchema("test");
 
     for (int i = 10; i < 20; i++) {
       stmt = conn.prepareStatement("insert into persons (id, id2, gender) VALUES (?, ?, ?)");

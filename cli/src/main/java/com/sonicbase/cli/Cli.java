@@ -5,6 +5,7 @@ import com.fasterxml.jackson.databind.ObjectMapper;
 import com.sonicbase.aws.EC2ToConfig;
 import com.sonicbase.common.ComObject;
 import com.sonicbase.common.Config;
+import com.sonicbase.index.NativePartitionedTreeImpl;
 import com.sonicbase.jdbcdriver.ConnectionProxy;
 import com.sonicbase.query.DatabaseException;
 import com.sonicbase.schema.FieldSchema;
@@ -393,6 +394,9 @@ public class Cli {
 
 
   public static void main(final String[] args) {
+
+    NativePartitionedTreeImpl.init(0); // load dll
+
     Cli cli = new Cli(args);
     cli.start();
   }
@@ -509,7 +513,7 @@ public class Cli {
     e.printStackTrace();
   }
 
-  public Config getConfig(String cluster) {
+  public static Config getConfig(String cluster) {
     try {
       InputStream in = Cli.class.getResourceAsStream(CONFIG_STR + cluster + ".yaml");
       if (in == null) {
@@ -1489,7 +1493,7 @@ public class Cli {
           }
         }
         if (remote) {
-          getCredentials(cluster);
+          //getCredentials(cluster);
         }
       }
 
@@ -1588,7 +1592,7 @@ public class Cli {
       return maxHeap;
     }
 
-    String resolvePath (String installDir){
+    public static String resolvePath(String installDir){
       if (installDir.startsWith("$HOME")) {
         installDir = installDir.substring("$HOME".length());
         if (installDir.startsWith("/")) {

@@ -9,6 +9,7 @@ import com.sonicbase.jdbcdriver.ConnectionProxy;
 import com.sonicbase.procedure.*;
 import com.sonicbase.query.DatabaseException;
 import com.sonicbase.schema.IndexSchema;
+import com.sonicbase.schema.Schema;
 import com.sonicbase.schema.TableSchema;
 import com.sonicbase.streams.StreamManager;
 import net.sf.jsqlparser.expression.*;
@@ -37,6 +38,8 @@ import java.util.concurrent.atomic.AtomicBoolean;
 import java.util.concurrent.atomic.AtomicInteger;
 import java.util.concurrent.atomic.AtomicLong;
 import java.util.concurrent.atomic.AtomicReference;
+
+import static com.sonicbase.server.SnapshotManager.SNAPSHOT_STR;
 
 @SuppressWarnings({"squid:S1172", "squid:S1168", "squid:S00107"})
 // all methods called from method invoker must have cobj and replayed command parms
@@ -669,6 +672,16 @@ public class DatabaseServer {
       streamManager.shutdown();
 
       shutdownRebalanceOpThread();
+
+      for (Map.Entry<String, Schema> db : common.getDatabases().entrySet()) {
+        for (TableSchema tableSchema : db.getValue().getTables().values()) {
+          for (IndexSchema indexSchema : tableSchema.getIndices().values()) {
+            getUpdateManager().truncateAnyIndex(db.getKey(), tableSchema.getName(), indexSchema.getName());
+            Index index = getIndices().get(db.getKey()).getIndices().get(tableSchema.getName()).get(indexSchema.getName());
+            index.delete();
+          }
+        }
+      }
 
       addressMap.shutdown();
 
@@ -1347,6 +1360,37 @@ public class DatabaseServer {
       return this.client.get();
     }
   }
+
+  public TableSchema getTableSchema(String dbName, String tableName, String dataDir) {
+    if (notDurable) {
+      return common.getTables(dbName).get(tableName);
+    }
+
+    Schema dbSchema = common.getSchema(dbName);
+    TableSchema tableSchema = dbSchema.getTables().get(tableName);
+    if (tableSchema != null) {
+      return tableSchema;
+    }
+    if (dbSchema.getTables().get(tableName) == null) {
+      getClient().syncSchema();
+      //common.saveSchema(getDataDir());
+      dbSchema = common.getSchema(dbName);
+    }
+    if (dbSchema.getTables().get(tableName) == null) {
+      File file = new File(dataDir, SNAPSHOT_STR + File.separator + shard + File.separator + replica + File.separator +
+          DatabaseCommon.SONICBASE_SCHEMA_STR + File.separator + dbName);
+      File tableDir = new File(file, tableName + File.separator + "table");
+      try {
+        Set<String> newTableNames = new HashSet<>();
+        common.loadTableSchema(dbSchema, tableDir, newTableNames);
+      }
+      catch (IOException e) {
+        throw new DatabaseException(e);
+      }
+    }
+    return dbSchema.getTables().get(tableName);
+  }
+
 
   public IndexSchema getIndexSchema(String dbName, String tableName, String indexName) {
     TableSchema tableSchema = common.getTables(dbName).get(tableName);

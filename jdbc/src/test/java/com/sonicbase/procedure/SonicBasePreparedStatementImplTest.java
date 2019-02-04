@@ -60,7 +60,7 @@ public class SonicBasePreparedStatementImplTest {
     assertEquals(statementProxy.getParms().getValue(1), new BigDecimal(103));
 
     statement.setString(1, "value");
-    assertEquals(statementProxy.getParms().getValue(1), "value".getBytes("utf-8"));
+    assertEquals(new String((char[])statementProxy.getParms().getValue(1)), "value");
 
     statement.setBytes(1, "value".getBytes("utf-8"));
     assertEquals(statementProxy.getParms().getValue(1), "value".getBytes("utf-8"));
@@ -75,10 +75,10 @@ public class SonicBasePreparedStatementImplTest {
     assertEquals(statementProxy.getParms().getValue(1), new Timestamp(0));
 
     statement.setAsciiStream(1, new ByteArrayInputStream("value".getBytes("utf-8")), "value".length());
-    assertEquals(statementProxy.getParms().getValue(1), "value".getBytes("utf-8"));
+    assertEquals(new String((char[])statementProxy.getParms().getValue(1)), "value");
 
     statement.setUnicodeStream(1, new ByteArrayInputStream("value".getBytes("utf-8")), "value".length());
-    assertEquals(statementProxy.getParms().getValue(1), "value".getBytes("utf-8"));
+    assertEquals(new String((char[])statementProxy.getParms().getValue(1)), "value");
 
     statement.setBinaryStream(1, new ByteArrayInputStream("value".getBytes("utf-8")), "value".length());
     assertEquals(statementProxy.getParms().getValue(1), "value".getBytes("utf-8"));
@@ -100,7 +100,7 @@ public class SonicBasePreparedStatementImplTest {
     }
 
     statement.setCharacterStream(1, new InputStreamReader(new ByteArrayInputStream("value".getBytes("utf-8"))), "value".length());
-    assertEquals(statementProxy.getParms().getValue(1), "value".getBytes("utf-8"));
+    assertEquals(new String((char[])statementProxy.getParms().getValue(1)), "value");
 
     try {
       statement.setRef(1, new Ref() {
@@ -136,7 +136,7 @@ public class SonicBasePreparedStatementImplTest {
 
     Clob clob = new com.sonicbase.query.impl.Clob("value");
     statement.setClob(1, clob);
-    assertEquals(statementProxy.getParms().getValue(1), "value".getBytes("utf-8"));
+    assertEquals(new String((char[])statementProxy.getParms().getValue(1)), "value");
 
     try {
       statement.setArray(1, null);
@@ -195,23 +195,23 @@ public class SonicBasePreparedStatementImplTest {
     }
 
     statement.setNString(1, "value");
-    assertEquals(statementProxy.getParms().getValue(1), "value".getBytes("utf-8"));
+    assertEquals(new String((char[])statementProxy.getParms().getValue(1)), "value");
 
     statement.setNCharacterStream(1, new StringReader("value"), "value".length());
-    assertEquals(statementProxy.getParms().getValue(1), "value".getBytes("utf-8"));
+    assertEquals(new String((char[])statementProxy.getParms().getValue(1)), "value");
 
     NClob nclob = new com.sonicbase.query.impl.NClob("value");
-    statement.setClob(1, nclob);
-    assertEquals(statementProxy.getParms().getValue(1), "value".getBytes("utf-8"));
+    statement.setNClob(1, nclob);
+    assertEquals(new String((char[])statementProxy.getParms().getValue(1)), "value");
 
     statement.setClob(1, new StringReader("value"), "value".length());
-    assertEquals(statementProxy.getParms().getValue(1), "value".getBytes("utf-8"));
+    assertEquals(new String((char[])statementProxy.getParms().getValue(1)), "value");
 
     statement.setBlob(1, new ByteArrayInputStream("value".getBytes("utf-8")), "value".length());
     assertEquals(statementProxy.getParms().getValue(1), "value".getBytes("utf-8"));
 
     statement.setNClob(1, new StringReader("value"), "value".length());
-    assertEquals(statementProxy.getParms().getValue(1), "value".getBytes("utf-8"));
+    assertEquals(new String((char[])statementProxy.getParms().getValue(1)), "value");
 
     try {
       statement.setSQLXML(1, null);
@@ -230,35 +230,35 @@ public class SonicBasePreparedStatementImplTest {
     }
 
     statement.setAsciiStream(1, new ByteArrayInputStream("value".getBytes("utf-8")), (long)"value".length());
-    assertEquals(statementProxy.getParms().getValue(1), "value".getBytes("utf-8"));
+    assertEquals(new String((char[])statementProxy.getParms().getValue(1)), "value");
 
     statement.setBinaryStream(1, new ByteArrayInputStream("value".getBytes("utf-8")), (long)"value".length());
     assertEquals(statementProxy.getParms().getValue(1), "value".getBytes("utf-8"));
 
     statement.setCharacterStream(1, new InputStreamReader(new ByteArrayInputStream("value".getBytes("utf-8"))), (long)"value".length());
-    assertEquals(statementProxy.getParms().getValue(1), "value".getBytes("utf-8"));
+    assertEquals(new String((char[])statementProxy.getParms().getValue(1)), "value");
 
 
     statement.setAsciiStream(1, new ByteArrayInputStream("value".getBytes("utf-8")));
-    assertEquals(statementProxy.getParms().getValue(1), "value".getBytes("utf-8"));
+    assertEquals(new String((char[])statementProxy.getParms().getValue(1)), "value");
 
     statement.setBinaryStream(1, new ByteArrayInputStream("value".getBytes("utf-8")));
     assertEquals(statementProxy.getParms().getValue(1), "value".getBytes("utf-8"));
 
     statement.setCharacterStream(1, new InputStreamReader(new ByteArrayInputStream("value".getBytes("utf-8"))));
-    assertEquals(statementProxy.getParms().getValue(1), "value".getBytes("utf-8"));
+    assertEquals(new String((char[])statementProxy.getParms().getValue(1)), "value");
 
     statement.setNCharacterStream(1, new StringReader("value"));
-    assertEquals(statementProxy.getParms().getValue(1), "value".getBytes("utf-8"));
+    assertEquals(new String((char[])statementProxy.getParms().getValue(1)), "value");
 
     statement.setClob(1, new InputStreamReader(new ByteArrayInputStream("value".getBytes("utf-8"))));
-    assertEquals(statementProxy.getParms().getValue(1), "value".getBytes("utf-8"));
+    assertEquals(new String((char[])statementProxy.getParms().getValue(1)), "value");
 
     statement.setBlob(1, new ByteArrayInputStream("value".getBytes("utf-8")));
     assertEquals(statementProxy.getParms().getValue(1), "value".getBytes("utf-8"));
 
     statement.setNClob(1, new InputStreamReader(new ByteArrayInputStream("value".getBytes("utf-8"))));
-    assertEquals(statementProxy.getParms().getValue(1), "value".getBytes("utf-8"));
+    assertEquals(new String((char[])statementProxy.getParms().getValue(1)), "value");
 
     try {
       statement.setObject(1, "value", JDBCType.BIGINT, 10);

@@ -111,6 +111,22 @@ JNIEXPORT jboolean JNICALL Java_com_sonicbase_index_NativePartitionedTree_lastEn
 JNIEXPORT jboolean JNICALL Java_com_sonicbase_index_NativePartitionedTree_firstEntry2
   (JNIEnv *, jobject, jlong, jobjectArray, jlongArray);
 
+/*
+ * Class:     com_sonicbase_index_NativePartitionedTree
+ * Method:    delete
+ * Signature: (J)V
+ */
+JNIEXPORT void JNICALL Java_com_sonicbase_index_NativePartitionedTree_delete
+  (JNIEnv *, jobject, jlong);
+
+/*
+ * Class:     com_sonicbase_index_NativePartitionedTree
+ * Method:    sortKeys
+ * Signature: (J[[Ljava/lang/Object;Z)V
+ */
+JNIEXPORT void JNICALL Java_com_sonicbase_index_NativePartitionedTree_sortKeys
+  (JNIEnv *, jobject, jlong, jobjectArray, jboolean);
+
 #ifdef __cplusplus
 }
 #endif

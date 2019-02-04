@@ -87,6 +87,7 @@ public class Index {
         case TIME:
         case TIMESTAMP:
           impl = new NativePartitionedTreeImpl(port, this); //new LongIndexImpl(this); //
+//          impl = new ObjectIndexImpl(this, comparators);
         break;
         default:
           impl = new ObjectIndexImpl(this, comparators);
@@ -94,7 +95,8 @@ public class Index {
       }
     }
     else {
-      impl = new ObjectIndexImpl(this, comparators);
+      impl = new NativePartitionedTreeImpl(port, this); //new LongIndexImpl(this); //
+//      impl = new ObjectIndexImpl(this, comparators);
     }
 
   }
@@ -219,6 +221,10 @@ public class Index {
 
   public TableSchema getTableSchema() {
     return tableSchema;
+  }
+
+  public void delete() {
+    impl.delete();
   }
 
   public interface Visitor {
@@ -473,10 +479,15 @@ public class Index {
 
   public boolean visitHeadMap(Object[] key, Index.Visitor visitor) {
     int blockSize = DatabaseClient.SELECT_PAGE_SIZE;
-    return visitHeadMap(key, visitor, blockSize);
+    return visitHeadMap(key, visitor, blockSize, true);
   }
 
-  public boolean visitHeadMap(Object[] key, Index.Visitor visitor, int blockSize) {
+  public boolean visitHeadMap(Object[] key, Index.Visitor visitor, boolean first) {
+    int blockSize = DatabaseClient.SELECT_PAGE_SIZE;
+    return visitHeadMap(key, visitor, blockSize, first);
+  }
+
+  public boolean visitHeadMap(Object[] key, Index.Visitor visitor, int blockSize, boolean first) {
     Object[][] keys = new Object[blockSize][];
     long[] values = new long[blockSize];
     int countRet = impl.headBlock(key, blockSize, false, keys, values);

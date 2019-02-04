@@ -21,6 +21,12 @@ public class DataUtils {
         (bytes[3 + offset] & 0xFF);
   }
 
+  public static char bytesToChar(byte[] bytes, int offset) {
+      int ch1 = bytes[offset++];
+      int ch2 = bytes[offset++];
+      return (char)((ch1 << 8) + (ch2 << 0));
+  }
+
   public static int addressToInt(long address, Unsafe unsafe) {
     return unsafe.getByte(address) << 24 |
         (unsafe.getByte(address + 1) & 0xFF) << 16 |
@@ -41,6 +47,11 @@ public class DataUtils {
 
   public static short bytesToShort(byte[] bytes, int offset) {
     return (short) (bytes[offset]<<8 | bytes[1 + offset] & 0xFF);
+  }
+
+  public final void charToBytes(char v, byte[] array, int offset) throws IOException {
+    array[offset] = (byte)((v >>> 8) & 0xFF);
+    array[offset+1] = (byte)((v >>> 0) & 0xFF);
   }
 
   public static void shortToBytes(short value, byte[] array, int offset) {

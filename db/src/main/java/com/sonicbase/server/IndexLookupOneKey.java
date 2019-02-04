@@ -4,6 +4,7 @@ import com.sonicbase.client.DatabaseClient;
 import com.sonicbase.common.DatabaseCommon;
 import com.sonicbase.index.Index;
 import com.sonicbase.query.BinaryExpression;
+import com.sonicbase.schema.TableSchema;
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
 
@@ -36,6 +37,9 @@ public class IndexLookupOneKey extends IndexLookup {
       return null;
     }
 
+    TableSchema.Partition[] partitions = indexSchema.getCurrPartitions();
+
+
     if ((ascending == null || ascending)) {
       entry = getStartingOneKeyAscending(entry);
     }
@@ -45,22 +49,24 @@ public class IndexLookupOneKey extends IndexLookup {
     if (entry != null) {
       entry = adjustStartingOneKey(entry);
 
-      Map.Entry[] entries = new Map.Entry[]{entry};
-
       Object[][] keys = new Object[count][];
       Object[] values = new Object[count];
 
+      if (entry == null) {
+        return null;
+      }
       keys[0] = entry.getKey();
       values[0] = entry.getValue();
       AtomicInteger entriesPos = new AtomicInteger(1);
 
-      entry = processEntries(entry.getKey(), entry.getValue(), countSkipped, keys, values, entriesPos);
+      entry = processEntries(partitions, entry.getKey(), entry.getValue(), countSkipped, keys, values, entriesPos);
     }
     return entry;
   }
 
 
   private class ProcessEntries {
+    private TableSchema.Partition[] partitions;
     Object[][] keys;
     Object[] values;
     AtomicInteger entriesPos;
@@ -72,7 +78,8 @@ public class IndexLookupOneKey extends IndexLookup {
     private Object[] retKey;
     private Object retValue;
 
-    ProcessEntries(Object[] key, Object value, Object[][] keys, Object[] values, AtomicInteger entriesPos, AtomicInteger countSkipped) {
+    ProcessEntries(TableSchema.Partition[] partitions, Object[] key, Object value, Object[][] keys, Object[] values, AtomicInteger entriesPos, AtomicInteger countSkipped) {
+      this.partitions = partitions;
       this.key = key;
       this.value = value;
       this.keys = keys;
@@ -94,7 +101,7 @@ public class IndexLookupOneKey extends IndexLookup {
         retKey = keys[i];
         retValue = values[i];
 
-        CheckForEndOfTraversal checkForEndOfTraversal = new CheckForEndOfTraversal(retKey, retValue, keys[i], values[i]).invoke();
+        CheckForEndOfTraversal checkForEndOfTraversal = new CheckForEndOfTraversal(partitions, retKey, retValue, keys[i], values[i]).invoke();
         retKey = checkForEndOfTraversal.getRetKey();
         retValue = checkForEndOfTraversal.getRetValue();
         if (checkForEndOfTraversal.shouldBreak()) {
@@ -131,10 +138,10 @@ public class IndexLookupOneKey extends IndexLookup {
     }
   }
 
-  private Map.Entry<Object[], Object> processEntries(Object[] key, Object value, AtomicInteger countSkipped,
+  private Map.Entry<Object[], Object> processEntries(TableSchema.Partition[] partitions, Object[] key, Object value, AtomicInteger countSkipped,
                                                      Object[][] keys, Object[] values, AtomicInteger entriesPos) {
     while (!(retRecords.size() >= count || retKeyRecords.size() >= count)) {
-      ProcessEntries process = new ProcessEntries(key, value, keys, values, entriesPos, countSkipped).invoke();
+      ProcessEntries process = new ProcessEntries(partitions, key, value, keys, values, entriesPos, countSkipped).invoke();
       key = process.getRetKey();
       value = process.getRetValue();
       entriesPos.set(0);
@@ -500,11 +507,13 @@ public class IndexLookupOneKey extends IndexLookup {
   private class CheckForEndOfTraversal {
     private final Object[] currKey;
     private final Object currValue;
+    private final TableSchema.Partition[] partitions;
     private Object[] key;
     private Object value;
     private boolean myResult;
 
-    public CheckForEndOfTraversal(Object[] key, Object value, Object[] currKey, Object currValue) {
+    public CheckForEndOfTraversal(TableSchema.Partition[] partitions, Object[] key, Object value, Object[] currKey, Object currValue) {
+      this.partitions = partitions;
       this.key = key;
       this.value = value;
       this.currKey = currKey;
@@ -540,6 +549,14 @@ public class IndexLookupOneKey extends IndexLookup {
           myResult = true;
           return this;
         }
+
+        if (keyOnDifferentServer()) {
+          key = null;
+          value = null;
+          myResult = true;
+          return this;
+        }
+
         if (handleCompareIsGreater(compare)) {
           return this;
         }
@@ -550,6 +567,33 @@ public class IndexLookupOneKey extends IndexLookup {
       }
       myResult = false;
       return this;
+    }
+
+    private boolean keyOnDifferentServer() {
+      int shard = server.getShard();
+      if (shard == 0) {
+        Object[] upperKey = partitions[shard].getUpperKey();
+        if (upperKey != null) {
+          if (DatabaseCommon.compareKey(index.getComparators(), currKey, upperKey) > 0) {
+            return true;
+          }
+        }
+      }
+      else {
+        Object[] upperKey = partitions[shard].getUpperKey();
+        if (upperKey != null) {
+          if (DatabaseCommon.compareKey(index.getComparators(), currKey, upperKey) > 0) {
+            return true;
+          }
+        }
+        Object[] lowerKey = partitions[shard - 1].getUpperKey();
+        if (lowerKey != null) {
+          if (DatabaseCommon.compareKey(index.getComparators(), currKey, lowerKey) < 0) {
+            return true;
+          }
+        }
+      }
+      return false;
     }
 
     private boolean handleCompareIsLess(int compare) {
@@ -768,13 +812,19 @@ public class IndexLookupOneKey extends IndexLookup {
     private void visitMap(Object[] key, Object value, Object[][] keys, Object[] values, AtomicInteger entriesPos, final int diff) {
       if (ascending != null && !ascending) {
         final AtomicInteger countRead = new AtomicInteger();
+        final AtomicBoolean first = new AtomicBoolean(true);
         index.visitHeadMap(key, (currKey, currValue) -> {
+//          if (first.get()) {
+//            first.set(false);
+//            return true;
+//          }
+          first.set(false);
           keys[entriesPos.get()] = currKey;
           values[entriesPos.get()] = currValue;
           entriesPos.getAndIncrement();
 
           return countRead.incrementAndGet() < count - diff;
-        });
+        }, first.get());
       }
       else {
         final AtomicInteger countRead = new AtomicInteger();

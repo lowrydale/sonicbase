@@ -34,6 +34,10 @@ public class Schema {
         out.writeShort(DatabaseClient.SERIALIZATION_VERSION);
         out.writeInt(tables.size());
         for (TableSchema table : tables.values()) {
+          if (table == null) {
+            System.out.println("broken");
+            continue;
+          }
             table.serialize(out);
         }
         if (currRecordIndexPartitions == null) {

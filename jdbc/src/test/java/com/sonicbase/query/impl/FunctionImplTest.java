@@ -230,7 +230,9 @@ public class FunctionImplTest {
   @Test
   public void testCharLengthFunc() throws UnsupportedEncodingException {
     FunctionImpl.CharLengthFunction func = new FunctionImpl.CharLengthFunction();
-    ConstantImpl constant1 = new ConstantImpl("123".getBytes("utf-8"), DataType.Type.VARCHAR.getValue());
+    char[] chars = new char["123".length()];
+    "123".getChars(0, "123".length(), chars, 0);
+    ConstantImpl constant1 = new ConstantImpl(chars, DataType.Type.VARCHAR.getValue());
     List<ExpressionImpl> expressions = new ArrayList<>();
     expressions.add(constant1);
     assertEquals(func.evaluate(tableSchemas, records, parms, expressions), 3);
@@ -239,8 +241,12 @@ public class FunctionImplTest {
   @Test
   public void testConcatFunc() throws UnsupportedEncodingException {
     FunctionImpl.ConcatFunction func = new FunctionImpl.ConcatFunction();
-    ConstantImpl constant1 = new ConstantImpl("123".getBytes("utf-8"), DataType.Type.VARCHAR.getValue());
-    ConstantImpl constant2 = new ConstantImpl("456".getBytes("utf-8"), DataType.Type.VARCHAR.getValue());
+    char[] chars = new char["123".length()];
+    "123".getChars(0, "123".length(), chars, 0);
+    ConstantImpl constant1 = new ConstantImpl(chars, DataType.Type.VARCHAR.getValue());
+    chars = new char["456".length()];
+    "456".getChars(0, "456".length(), chars, 0);
+    ConstantImpl constant2 = new ConstantImpl(chars, DataType.Type.VARCHAR.getValue());
     List<ExpressionImpl> expressions = new ArrayList<>();
     expressions.add(constant1);
     expressions.add(constant2);
@@ -372,7 +378,9 @@ public class FunctionImplTest {
   @Test
   public void testHexFunc() throws UnsupportedEncodingException {
     FunctionImpl.HexFunction func = new FunctionImpl.HexFunction();
-    ConstantImpl constant1 = new ConstantImpl("2".getBytes("utf-8"), DataType.Type.VARCHAR.getValue());
+    char[] chars = new char["2".length()];
+    "2".getChars(0, "2".length(), chars, 0);
+    ConstantImpl constant1 = new ConstantImpl(chars, DataType.Type.VARCHAR.getValue());
     List<ExpressionImpl> expressions = new ArrayList<>();
     expressions.add(constant1);
     assertEquals(func.evaluate(tableSchemas, records, parms, expressions), "32");
@@ -410,7 +418,10 @@ public class FunctionImplTest {
   @Test
   public void testLowerFunc() throws UnsupportedEncodingException {
     FunctionImpl.LowerFunction func = new FunctionImpl.LowerFunction();
-    ConstantImpl constant = new ConstantImpl("Mom".getBytes("utf-8"), DataType.Type.VARCHAR.getValue());
+    char[] chars = new char["Mom".length()];
+    "Mom".getChars(0, chars.length, chars, 0);
+
+    ConstantImpl constant = new ConstantImpl(chars, DataType.Type.VARCHAR.getValue());
     List<ExpressionImpl> expressions = new ArrayList<>();
     expressions.add(constant);
     assertEquals(func.evaluate(tableSchemas, records, parms, expressions), "mom");
@@ -419,7 +430,9 @@ public class FunctionImplTest {
   @Test
   public void testUpperFunc() throws UnsupportedEncodingException {
     FunctionImpl.UpperFunction func = new FunctionImpl.UpperFunction();
-    ConstantImpl constant = new ConstantImpl("Mom".getBytes("utf-8"), DataType.Type.VARCHAR.getValue());
+    char[] chars = new char["Mom".length()];
+    "Mom".getChars(0, chars.length, chars, 0);
+    ConstantImpl constant = new ConstantImpl(chars, DataType.Type.VARCHAR.getValue());
     List<ExpressionImpl> expressions = new ArrayList<>();
     expressions.add(constant);
     assertEquals(func.evaluate(tableSchemas, records, parms, expressions), "MOM");
@@ -428,8 +441,12 @@ public class FunctionImplTest {
   @Test
   public void testIndexOfFunc() throws UnsupportedEncodingException {
     FunctionImpl.IndexOfFunction func = new FunctionImpl.IndexOfFunction();
-    ConstantImpl constant1 = new ConstantImpl("Mom".getBytes("utf-8"), DataType.Type.VARCHAR.getValue());
-    ConstantImpl constant2 = new ConstantImpl("o".getBytes("utf-8"), DataType.Type.VARCHAR.getValue());
+    char[] chars = new char["Mom".length()];
+    "Mom".getChars(0, chars.length, chars, 0);
+    ConstantImpl constant1 = new ConstantImpl(chars, DataType.Type.VARCHAR.getValue());
+    chars = new char["o".length()];
+    "o".getChars(0, chars.length, chars, 0);
+    ConstantImpl constant2 = new ConstantImpl(chars, DataType.Type.VARCHAR.getValue());
     List<ExpressionImpl> expressions = new ArrayList<>();
     expressions.add(constant1);
     expressions.add(constant2);
@@ -439,9 +456,15 @@ public class FunctionImplTest {
   @Test
   public void testReplaceFunc() throws UnsupportedEncodingException {
     FunctionImpl.ReplaceFunction func = new FunctionImpl.ReplaceFunction();
-    ConstantImpl constant1 = new ConstantImpl("Mom".getBytes("utf-8"), DataType.Type.VARCHAR.getValue());
-    ConstantImpl constant2 = new ConstantImpl("o".getBytes("utf-8"), DataType.Type.VARCHAR.getValue());
-    ConstantImpl constant3 = new ConstantImpl("i".getBytes("utf-8"), DataType.Type.VARCHAR.getValue());
+    char[] chars = new char["Mom".length()];
+    "Mom".getChars(0, chars.length, chars, 0);
+    ConstantImpl constant1 = new ConstantImpl(chars, DataType.Type.VARCHAR.getValue());
+    chars = new char["o".length()];
+    "o".getChars(0, chars.length, chars, 0);
+    ConstantImpl constant2 = new ConstantImpl(chars, DataType.Type.VARCHAR.getValue());
+    chars = new char["i".length()];
+    "i".getChars(0, chars.length, chars, 0);
+    ConstantImpl constant3 = new ConstantImpl(chars, DataType.Type.VARCHAR.getValue());
     List<ExpressionImpl> expressions = new ArrayList<>();
     expressions.add(constant1);
     expressions.add(constant2);
@@ -513,7 +536,10 @@ public class FunctionImplTest {
   @Test
   public void testTrimFunc() throws UnsupportedEncodingException {
     FunctionImpl.TrimFunction func = new FunctionImpl.TrimFunction();
-    ConstantImpl constant = new ConstantImpl(" test\t".getBytes("utf-8"), DataType.Type.VARCHAR.getValue());
+    char[] chars = new char[" test\t".length()];
+    " test\t".getChars(0, chars.length, chars, 0);
+
+    ConstantImpl constant = new ConstantImpl(chars, DataType.Type.VARCHAR.getValue());
     List<ExpressionImpl> expressions = new ArrayList<>();
     expressions.add(constant);
     assertEquals(func.evaluate(tableSchemas, records, parms, expressions), "test");

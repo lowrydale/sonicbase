@@ -29,7 +29,6 @@ rsync -rvlLt mgmt $HOME/sonicbase
 #rsync -rvlLt /Users/lowryda/.m2/repository/org/apache/httpcomponents/httpclient/4.4/httpclient-4.4.jar $HOME/sonicbase/lib
 
 
-#rsync -rvlLt /Users/lowryda/.m2/repository/javax/servlet/javax.servlet-api/4.0.0/javax.servlet-api-4.0.0.jar $HOME/sonicbase/lib
 #rsync -rvlLt /Users/lowryda/.m2/repository/com/sun/jersey/jersey-json/1.19.4/jersey-json-1.19.4.jar $HOME/sonicbase/lib
 #rsync -rvlLt /Users/lowryda/.m2/repository/com/mashape/unirest/unirest-java/1.4.9/unirest-java-1.4.9.jar $HOME/sonicbase/lib
 #rsync -rvlLt /Users/lowryda/.m2/repository/com/google/code/gson/gson/2.2.3/gson-2.2.3.jar $HOME/sonicbase/lib
@@ -43,6 +42,7 @@ rsync -rvlLt mgmt $HOME/sonicbase
 rsync -vlLt --exclude original*sonicbase-*.jar --exclude sonicbase-*tests.jar db/target/sonicbase-*.jar $HOME/sonicbase/lib
 rsync -vlLt --exclude original*sonicbase-*.jar --exclude sonicbase-*tests.jar jdbc/target/sonicbase-*.jar $HOME/sonicbase/lib
 rsync -vlLt --exclude original*sonicbase-*.jar --exclude sonicbase-*tests.jar cli/target/sonicbase-*.jar $HOME/sonicbase/lib
+rsync -vlLt --exclude original*sonicbase-*.jar --exclude sonicbase-*tests.jar controller/target/sonicbase-*.jar $HOME/sonicbase/lib
 #rsync -vlLt repo/* $HOMdE/sonicbase/lib
 #mvn dependency:copy-dependencies -DoutputDirectory=$HOME/sonicbase/lib
 #rsync -rvlLt repo/linux64/* $HOME/sonicbase/lib/linux64
@@ -55,7 +55,7 @@ rsync -rvlLt cli/src/main/resources/init-tables.command $HOME/sonicbase/scripts
 rsync -rvlLt $HOME/Dropbox/sonicbase-config/* $HOME/sonicbase/config
 rsync -rvlLt db/src/main/resources/log4j.xml $HOME/sonicbase/config
 rsync -rvlLt db/src/main/resources/cli-log4j.xml $HOME/sonicbase/config
-rsync -rvlLt win $HOME/sonicbase/lib
+#rsync -rvlLt win $HOME/sonicbase/lib
 mkdir $HOME/sonicbase/lib/linux
 rsync -rvlLt native/PartitionedAvlTree/linux/*.so $HOME/sonicbase/lib/linux
 mkdir $HOME/sonicbase/lib/mac
@@ -101,6 +101,7 @@ rsync -rvlLt start-bench-server-task.bat $HOME/sonicbase/bin
 rsync -rvlLt start-license-server-task.bat $HOME/sonicbase/bin
 rsync -rvlLt start-bench-server.vbs $HOME/sonicbase/bin
 rsync -rvlLt start-license-server.vbs $HOME/sonicbase/bin
+rsync -rvlLt start-controller.bat $HOME/sonicbase/bin
 rsync -rvlLt remote-start-db-server $HOME/sonicbase/bin
 rsync -rvlLt remote-start-rest-server $HOME/sonicbase/bin
 rsync -rvlLt dump-threads $HOME/sonicbase/bin

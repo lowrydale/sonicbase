@@ -1312,7 +1312,7 @@ public class StreamManager {
         builder.append("\"_sonicbase_action\": \"").append(currRequest.updateType).append("\",");
         builder.append("\"before\" : {");
 
-        TableSchema tableSchema = server.getCommon().getTableSchema(currRequest.dbName, currRequest.tableName, server.getDataDir());
+        TableSchema tableSchema = server.getTableSchema(currRequest.dbName, currRequest.tableName, server.getDataDir());
         Record record = new Record(currRequest.dbName, server.getCommon(), currRequest.existingBytes);
         getJsonFromRecord(builder, tableSchema, record);
         builder.append("},");
@@ -1323,7 +1323,7 @@ public class StreamManager {
 
       }
       else {
-        TableSchema tableSchema = server.getCommon().getTableSchema(currRequest.dbName, currRequest.tableName, server.getDataDir());
+        TableSchema tableSchema = server.getTableSchema(currRequest.dbName, currRequest.tableName, server.getDataDir());
         Record record = new Record(currRequest.dbName, server.getCommon(), currRequest.recordBytes);
 
         builder.append("\"_sonicbase_clustername\": \"").append(currRequest.clusterName).append("\",");
@@ -1434,7 +1434,7 @@ public class StreamManager {
           case NVARCHAR:
           case LONGNVARCHAR:
           case NCLOB: {
-            String value = new String((byte[]) recordFields[offset], "utf-8");
+            String value = new String((char[]) recordFields[offset]);
             value = JsonEncoder.encode(value);
             builder.append("\"").append(fieldName).append("\": \"").append(value).append("\"");
           }

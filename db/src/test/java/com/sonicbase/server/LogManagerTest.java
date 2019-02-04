@@ -16,6 +16,7 @@ import org.testng.annotations.Test;
 import java.io.File;
 import java.io.IOException;
 import java.util.Map;
+import java.util.Random;
 import java.util.concurrent.atomic.AtomicLong;
 
 import static com.sonicbase.client.DatabaseClient.SERIALIZATION_VERSION;
@@ -36,9 +37,12 @@ public class LogManagerTest {
   @BeforeClass
   public void beforeClass() throws IOException {
     server = mock(DatabaseServer.class);
-    when(server.getDataDir()).thenReturn("/tmp/database");
+    Random rand = new Random(System.currentTimeMillis());
+    String dataDir = System.getProperty("java.io.tmpdir") + "/" + rand.nextLong() + "/database";
 
-    FileUtils.deleteDirectory(new File("/tmp/database"));
+    when(server.getDataDir()).thenReturn(dataDir);
+
+    FileUtils.deleteDirectory(new File(dataDir));
 
     common = new DatabaseCommon();
     when(server.getCommon()).thenReturn(common);
@@ -76,8 +80,11 @@ public class LogManagerTest {
   }
   @Test
   public void test() throws IOException, InterruptedException {
-    FileUtils.deleteDirectory(new File("/tmp/database"));
-    com.sonicbase.server.LogManager logManager = new com.sonicbase.server.LogManager(server, new File("/tmp/database"));
+    Random rand = new Random(System.currentTimeMillis());
+    String dataDir = System.getProperty("java.io.tmpdir") + "/database";
+
+    FileUtils.deleteDirectory(new File(dataDir));
+    com.sonicbase.server.LogManager logManager = new com.sonicbase.server.LogManager(server, new File(dataDir));
 
     ComObject cobj = new ComObject(4);
     cobj.put(ComObject.Tag.DB_NAME, "__none__");
@@ -114,13 +121,20 @@ public class LogManagerTest {
 
     logManager.applyLogs();
 
-    assertFalse(common.getServersConfig().getShards()[0].getReplicas()[0].isDead());
+    //assertFalse(common.getServersConfig().getShards()[0].getReplicas()[0].isDead());
+
+    logManager.shutdown();
+
+    FileUtils.deleteDirectory(new File(dataDir));
   }
 
   @Test
-  public void testPeer() throws IOException {
-    FileUtils.deleteDirectory(new File("/tmp/database"));
-    LogManager logManager = new LogManager(server, new File("/tmp/database"));
+  public void testPeer() throws IOException, InterruptedException {
+    Random rand = new Random(System.currentTimeMillis());
+    String dataDir = System.getProperty("java.io.tmpdir") +  "/database";
+
+    FileUtils.deleteDirectory(new File(dataDir));
+    LogManager logManager = new LogManager(server, new File(dataDir));
 
     ComObject cobj = new ComObject(4);
     cobj.put(ComObject.Tag.DB_NAME, "__none__");
@@ -132,15 +146,19 @@ public class LogManagerTest {
 
     logManager.logRequestForPeer(body, "DatabaseServer:updateServersConfig", 100, 100, 1);
 
-    assertTrue(0 != org.apache.commons.io.FileUtils.sizeOfDirectory(new File("/tmp/database/0/0/peer-1")));
+    Thread.sleep(2_000);
+    assertTrue(0 != org.apache.commons.io.FileUtils.sizeOfDirectory(new File(dataDir + "/0/0/peer-1")));
+    logManager.shutdown();
     logManager.deletePeerLogs(1);
-    assertTrue(0 == org.apache.commons.io.FileUtils.sizeOfDirectory(new File("/tmp/database/0/0/peer-1")));
+    assertTrue(0 == org.apache.commons.io.FileUtils.sizeOfDirectory(new File(dataDir + "/0/0/peer-1")));
   }
 
   @Test
-  public void testPeerSliceLogs() throws IOException {
-    FileUtils.deleteDirectory(new File("/tmp/database"));
-    LogManager logManager = new LogManager(server, new File("/tmp/database"));
+  public void testPeerSliceLogs() throws IOException, InterruptedException {
+    String dataDir = System.getProperty("java.io.tmpdir") + "/database";
+
+    FileUtils.deleteDirectory(new File(dataDir));
+    LogManager logManager = new LogManager(server, new File(dataDir));
 
     ComObject cobj = new ComObject(4);
     cobj.put(ComObject.Tag.DB_NAME, "__none__");
@@ -152,19 +170,26 @@ public class LogManagerTest {
 
     logManager.logRequestForPeer(body, "DatabaseServer:updateServersConfig", 100, 100, 1);
 
-    assertTrue(0 != org.apache.commons.io.FileUtils.sizeOfDirectory(new File("/tmp/database/0/0/peer-1")));
+    Thread.sleep(2_000);
+
+    assertTrue(0 != org.apache.commons.io.FileUtils.sizeOfDirectory(new File(dataDir + "/0/0/peer-1")));
 
     StringBuilder builder = new StringBuilder();
     logManager.sliceLogsForPeers(true, builder);
     String slice = builder.toString();
     assertFalse(slice.isEmpty());
     assertTrue(slice.endsWith(".bin\n"));
+
+    logManager.shutdown();
   }
 
   @Test
   public void testSliceLogs() throws IOException, InterruptedException {
-    FileUtils.deleteDirectory(new File("/tmp/database"));
-    LogManager logManager = new LogManager(server, new File("/tmp/database"));
+    Random rand = new Random(System.currentTimeMillis());
+    String dataDir = System.getProperty("java.io.tmpdir") + "/database";
+
+    FileUtils.deleteDirectory(new File(dataDir));
+    LogManager logManager = new LogManager(server, new File(dataDir));
 
     ComObject cobj = new ComObject(4);
     cobj.put(ComObject.Tag.DB_NAME, "__none__");
@@ -178,21 +203,26 @@ public class LogManagerTest {
         null, null, new AtomicLong());
     request.getLatch().await();
 
-    assertTrue(0 != org.apache.commons.io.FileUtils.sizeOfDirectory(new File("/tmp/database/0/0/self")));
+    assertTrue(0 != org.apache.commons.io.FileUtils.sizeOfDirectory(new File(dataDir + "/0/0/self")));
 
     String slice = logManager.sliceLogs(false);
     assertFalse(slice.isEmpty());
     assertTrue(slice.endsWith(".bin\n"));
 
+    logManager.shutdown();
+
     logManager.deleteLogs();
 
-    assertFalse(new File("/tmp/database/0/0/self").exists());
+    assertFalse(new File(dataDir + "/self").exists());
+
   }
 
   @Test
   public void testSendLogs() throws IOException {
-    FileUtils.deleteDirectory(new File("/tmp/database"));
-    LogManager logManager = new LogManager(server, new File("/tmp/database"));
+    String dataDir = System.getProperty("java.io.tmpdir") + "/database";
+
+    FileUtils.deleteDirectory(new File(dataDir));
+    LogManager logManager = new LogManager(server, new File(dataDir));
 
     ComObject cobj = new ComObject(4);
     cobj.put(ComObject.Tag.DB_NAME, "__none__");
@@ -204,7 +234,7 @@ public class LogManagerTest {
 
     logManager.logRequestForPeer(body, "DatabaseServer:updateServersConfig", 100, 100, 1);
 
-    assertTrue(0 != org.apache.commons.io.FileUtils.sizeOfDirectory(new File("/tmp/database/0/0/peer-1")));
+    assertTrue(0 != org.apache.commons.io.FileUtils.sizeOfDirectory(new File(dataDir + "/0/0/peer-1")));
 
     cobj = new ComObject(1);
     cobj.put(ComObject.Tag.REPLICA, 1);
@@ -213,5 +243,6 @@ public class LogManagerTest {
     assertTrue(array.getArray().size() != 0);
     assertTrue(((String)array.getArray().get(0)).endsWith(".bin"));
 
+    logManager.shutdown();
   }
 }

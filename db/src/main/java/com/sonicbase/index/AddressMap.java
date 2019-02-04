@@ -19,6 +19,7 @@ import java.util.concurrent.ConcurrentHashMap;
 import java.util.concurrent.ConcurrentLinkedQueue;
 import java.util.concurrent.atomic.AtomicInteger;
 import java.util.concurrent.atomic.AtomicLong;
+import java.util.concurrent.atomic.AtomicReference;
 import java.util.concurrent.locks.ReentrantReadWriteLock;
 
 import static com.sonicbase.server.DatabaseServer.TIME_2017;
@@ -28,6 +29,7 @@ import static com.sonicbase.server.DatabaseServer.TIME_2017;
 // I don't know a good way to reduce the parameter count
 public class AddressMap {
   private static final Logger logger = LoggerFactory.getLogger(AddressMap.class);
+  private static long TIME_BEFORE_FREE = 10_000;
 
   public static int MAX_PAGE_SIZE = 256_000;
   public static boolean MEM_OP = false;
@@ -75,6 +77,10 @@ public class AddressMap {
     startFreeThread();
   }
 
+  public static void setTimeBeforeFree(int millis) {
+    TIME_BEFORE_FREE = millis;
+  }
+
   public void stopCompactor() {
     try {
       if (compactionThread != null) {
@@ -119,7 +125,7 @@ public class AddressMap {
               Thread.sleep(1_000);
               continue;
             }
-            if (System.currentTimeMillis() - request.timeAdded < 10_000) {
+            if (System.currentTimeMillis() - request.timeAdded < TIME_BEFORE_FREE) {
               Thread.sleep(1_000);
               continue;
             }
@@ -391,9 +397,29 @@ public class AddressMap {
     return addressMap.get(outerAddress);
   }
 
+  private long currFreedBegin = System.currentTimeMillis();
+  private long lastFreedBegin = System.currentTimeMillis();
+  private AtomicReference<ConcurrentHashMap<Long, Byte>> freed = new AtomicReference<>(new ConcurrentHashMap<>());
+  private AtomicReference<ConcurrentHashMap<Long, Byte>> lastFreed = new AtomicReference<>(new ConcurrentHashMap<>());
+
   private void removeAddress(long outerAddress, Unsafe unsafe) {
     if (!MEM_OP) {
-      unsafe.freeMemory(outerAddress);
+      if (null != freed.get().put(outerAddress, (byte)1) || lastFreed.get().get(outerAddress) != null) {
+        logger.error("Attempted double free");
+      }
+      else {
+        if (System.currentTimeMillis() - currFreedBegin > 5 * 60 * 1_000) {
+          synchronized (this) {
+            if (System.currentTimeMillis() - currFreedBegin > 5 * 60 * 1_000) {
+              lastFreed.set(freed.get());
+              lastFreedBegin = currFreedBegin;
+              currFreedBegin = System.currentTimeMillis();
+              freed.set(new ConcurrentHashMap<>());
+            }
+          }
+        }
+        unsafe.freeMemory(outerAddress);
+      }
     }
     else {
       Object mutex = getMutex(outerAddress);

@@ -156,8 +156,15 @@ public class BenchmarkIdentityQuery {
                             currOffset.set(0);
                             logger.info("resetting currOffset");
                           }
-                          long id = finalIds.get(j).get(currOffset.get() + k);
-                          stmt.setLong(parm++ + 1, id);
+                          if (finalIds.size() > j) {
+                            List<Long> ids1 = finalIds.get(j);
+                            if (ids1.size() > currOffset.get() + k) {
+                              Long id = ids1.get(currOffset.get() + k);
+                              if (id != null) {
+                                stmt.setLong(parm++ + 1, id);
+                              }
+                            }
+                          }
                         }
                       }
                       currOffset.addAndGet(innerBatchSize);
@@ -645,16 +652,20 @@ public class BenchmarkIdentityQuery {
       try (PreparedStatement stmt = conn.prepareStatement("select * from persons where id1 > ?")) {
         stmt.setLong(1, lower);
         try (ResultSet rs = stmt.executeQuery()) {
-          for (int j = 0; j < 100_000; j++) {
-            if (!rs.next()) {
-              break;
-            }
-          }
+//          for (int j = 0; j < 100_000; j++) {
+//            if (!rs.next()) {
+//              break;
+//            }
+//          }
           for (int j = 0; j < 100_000; j++) {
             if (!rs.next()) {
               break;
             }
             ids.add(rs.getLong("id1"));
+
+            if (j % 1_000 == 0) {
+              System.out.println("progress: count=" + j + ", currId=" + rs.getLong("id1"));
+            }
           }
           logger.info("Retrieved ids from shard: shard=" + i + ", count=" + ids.size());
         }

@@ -49,6 +49,7 @@ public class SnapshotManager {
   private long totalBytes = 0;
   private final AtomicLong finishedBytes = new AtomicLong();
   private Exception errorRecovering = null;
+  private boolean shutdown;
 
   SnapshotManager(DatabaseServer databaseServer) {
     this.server = databaseServer;
@@ -471,7 +472,7 @@ public class SnapshotManager {
 
   private void startSnapshotThread() {
     snapshotThread = ThreadUtil.createThread(() -> {
-      while (!Thread.interrupted()) {
+      while (!shutdown) {
         try {
           long begin = System.currentTimeMillis();
 
@@ -641,6 +642,9 @@ public class SnapshotManager {
           logger.info("Snapshot progress - finished index: count={}, rate={}, duration={}, table={}, index={}",
               savedCount, ((float) savedCount.get() / (float) (System.currentTimeMillis() - subBegin) * 1000f),
               (System.currentTimeMillis() - subBegin) / 1000f, tableEntry.getKey(), indexEntry.getKey());
+          if (shutdown) {
+            return;
+          }
         }
         catch (Exception e) {
           logger.error("Error creating snapshot", e);
@@ -667,18 +671,17 @@ public class SnapshotManager {
         int bucket = (int) (countSaved.incrementAndGet() % SNAPSHOT_PARTITION_COUNT);
         byte[][] records = null;
         long updateTime = 0;
-        synchronized (index.getMutex(key)) {
-          Object currValue = index.get(key);
-          if (!(currValue == null || currValue.equals(0L))) {
-            if (isPrimaryKey) {
-              records = server.getAddressMap().fromUnsafeToRecords(currValue);
-            }
-            else {
-              records = server.getAddressMap().fromUnsafeToKeys(currValue);
-            }
-            updateTime = server.getUpdateTime(currValue);
+        Object currValue = value;
+        if (!(currValue == null || currValue.equals(0L))) {
+          if (isPrimaryKey) {
+            records = server.getAddressMap().fromUnsafeToRecords(currValue);
           }
+          else {
+            records = server.getAddressMap().fromUnsafeToKeys(currValue);
+          }
+          updateTime = server.getUpdateTime(currValue);
         }
+
 
         try {
           writeRecords(dbName, deleteIfOlder, lastLogged, tableEntry, indexEntry, fieldOffsets, subBegin, savedCount,
@@ -688,6 +691,9 @@ public class SnapshotManager {
           throw new DatabaseException(e);
         }
 
+        if (shutdown) {
+          return false;
+        }
         server.getStats().get(METRIC_SNAPSHOT_WRITE).getCount().incrementAndGet();
         return true;
       });
@@ -739,6 +745,9 @@ public class SnapshotManager {
     String[] files = snapshotRootDir.list();
     if (files != null) {
       for (String dirStr : files) {
+        if (shutdown) {
+          return;
+        }
         int dirNum = -1;
         try {
           dirNum = Integer.valueOf(dirStr);
@@ -773,6 +782,7 @@ public class SnapshotManager {
   }
 
   public void shutdown() {
+    this.shutdown = true;
     if (snapshotThread != null) {
       snapshotThread.interrupt();
       try {

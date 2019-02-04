@@ -33,6 +33,11 @@ public class ObjectIndexImpl implements IndexImpl {
     objectSkipIndex.clear();
   }
 
+  @Override
+  public void delete() {
+
+  }
+
   public Object get(Object[] key) {
     return objectSkipIndex.get(key);
   }

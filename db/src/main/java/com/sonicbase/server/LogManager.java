@@ -55,6 +55,7 @@ public class LogManager {
   private boolean shutdown;
   private final AtomicInteger countReplayed = new AtomicInteger();
   private final AtomicLong countRead = new AtomicLong();
+  private boolean applyingLogs;
 
   LogManager(com.sonicbase.server.DatabaseServer databaseServer, File rootDir) {
     this.databaseServer = databaseServer;
@@ -71,6 +72,10 @@ public class LogManager {
         throw new DatabaseException(e);
       }
     }
+    startMainLogWriters();
+  }
+
+  private void startMainLogWriters() {
     if (!server.isNotDurable()) {
       int logThreadCount = 4;
       for (int i = 0; i < logThreadCount; i++) {
@@ -141,6 +146,10 @@ public class LogManager {
   public void shutdown() {
     this.shutdown = true;
     executor.shutdownNow();
+    closeAllWritersAndSources();
+  }
+
+  private void closeAllWritersAndSources() {
     for (Thread thread : logwWriterThreads) {
       thread.interrupt();
       try {
@@ -154,19 +163,35 @@ public class LogManager {
     for (LogWriter writer : logWriters) {
       writer.shutdown();
     }
+    for (LogWriter writer : peerLogWriters) {
+      writer.shutdown();
+    }
+
+    for (LogSource source : allCurrentSources) {
+      try {
+        source.close();
+      } catch (IOException e) {
+        throw new DatabaseException(e);
+      }
+    }
+    allCurrentSources.clear();
   }
 
 
   private void startLoggingForPeer(int replicaNum) {
     synchronized (peerLogRequests) {
       if (!peerLogRequests.containsKey(replicaNum)) {
-        peerLogRequests.put(replicaNum, new ArrayBlockingQueue<LogRequest>(1000));
-        LogWriter logWriter = new LogWriter(0, replicaNum, peerLogRequests.get(replicaNum));
-        peerLogWriters.add(logWriter);
-        Thread thread = new Thread(logWriter);
-        thread.start();
+        startPeerLogWriter(replicaNum);
       }
     }
+  }
+
+  private void startPeerLogWriter(int replicaNum) {
+    peerLogRequests.put(replicaNum, new ArrayBlockingQueue<LogRequest>(1000));
+    LogWriter logWriter = new LogWriter(0, replicaNum, peerLogRequests.get(replicaNum));
+    peerLogWriters.add(logWriter);
+    Thread thread = new Thread(logWriter);
+    thread.start();
   }
 
   void skipToMaxSequenceNumber() throws IOException {
@@ -306,13 +331,21 @@ public class LogManager {
   public void deleteLogs() {
     File dir = getLogReplicaDir();
     try {
+      closeAllWritersAndSources();
+
       FileUtils.deleteDirectory(dir);
       dir.mkdirs();
+
+      startMainLogWriters();
+
+      for (int replica : peerLogRequests.keySet()) {
+        startPeerLogWriter(replica);
+      }
+
     }
     catch (IOException e) {
       throw new DatabaseException(e);
     }
-
   }
 
   public ComObject getLogFile(ComObject cobj, boolean replayedCommand) {
@@ -566,7 +599,7 @@ public class LogManager {
   public void applyLogs() {
     unbindQueues();
     try {
-
+      applyingLogs = true;
       String dataRoot = getLogReplicaDir().getAbsolutePath();
       File dataRootDir = new File(dataRoot, "self");
       dataRootDir.mkdirs();
@@ -588,8 +621,13 @@ public class LogManager {
       logger.error("Error", e);
     }
     finally {
+      applyingLogs = false;
       bindQueues();
     }
+  }
+
+  public boolean isApplyingLogs() {
+    return applyingLogs;
   }
 
   void getLogsFromPeer(int replica) {
@@ -671,6 +709,14 @@ public class LogManager {
 
     public long getCount() {
       return countRead.get();
+    }
+
+    public void close() {
+      try {
+        in.close();
+      } catch (IOException e) {
+        throw new DatabaseException(e);
+      }
     }
   }
 
@@ -823,6 +869,9 @@ public class LogManager {
     ThreadPoolExecutor localExecutor = ThreadUtil.createExecutor(32, "SonicBase LogManager replayLogs Thread");
     try {
       countReplayed.set(0);
+      for (LogSource source : allCurrentSources) {
+        source.close();
+      }
       allCurrentSources.clear();
       synchronized (logLock) {
         File[] files = dataRootDir.listFiles();
@@ -856,6 +905,10 @@ public class LogManager {
             logger.info("applyLogs - finished: count={}, rate={}", countReplayed.get(),
                 (double) countReplayed.get() / (double) (System.currentTimeMillis() - begin) * 1000d);
 
+
+            for (LogSource source : sources) {
+              source.close();
+            }
             for (LogSource source : allCurrentSources) {
               source.close();
             }
@@ -872,13 +925,14 @@ public class LogManager {
 
   private void getSliceFiles(String slicePoint, Set<String> sliceFiles) throws IOException {
     if (slicePoint != null) {
-      BufferedReader reader = new BufferedReader(new StringReader(slicePoint));
-      while (true) {
-        String line = reader.readLine();
-        if (line == null) {
-          break;
+      try (BufferedReader reader = new BufferedReader(new StringReader(slicePoint))) {
+        while (true) {
+          String line = reader.readLine();
+          if (line == null) {
+            break;
+          }
+          sliceFiles.add(line);
         }
-        sliceFiles.add(line);
       }
     }
   }
@@ -898,6 +952,7 @@ public class LogManager {
           LogSource src = new LogSource(file, server, logger, countRead);
           sources.add(src);
           allCurrentSources.add(src);
+          continue;
         }
 
         if (!beforeSlice && !sliceFiles.contains(file.getAbsolutePath())) {

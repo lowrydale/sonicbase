@@ -6,6 +6,7 @@ import com.sonicbase.common.ComObject;
 import com.sonicbase.common.Config;
 import com.sonicbase.common.DatabaseCommon;
 import com.sonicbase.embedded.EmbeddedDatabase;
+import com.sonicbase.index.AddressMap;
 import com.sonicbase.jdbcdriver.ConnectionProxy;
 import com.sonicbase.jdbcdriver.ParameterHandler;
 import com.sonicbase.query.BinaryExpression;
@@ -77,6 +78,8 @@ public class TestDatabase {
   public void beforeClass() throws Exception {
     try {
       System.setProperty("log4j.configuration", "test-log4j.xml");
+
+      AddressMap.setTimeBeforeFree(60_000);
 //      System.setProperty("log4j.configuration", "/Users/lowryda/Dropbox/git/sonicbase/db/src/main/resources/log4j.xml");
 
       String configStr = IOUtils.toString(new BufferedInputStream(getClass().getResourceAsStream("/config/config-4-servers.yaml")), "utf-8");
@@ -250,6 +253,7 @@ public class TestDatabase {
 
       Thread.sleep(5000);
 
+
       File file = new File(System.getProperty("user.home"), "/db/backup");
       File[] dirs = file.listFiles();
 
@@ -260,6 +264,7 @@ public class TestDatabase {
           break;
         }
       }
+
       dbServers[0].enableSnapshot(false);
       dbServers[1].enableSnapshot(false);
       dbServers[2].enableSnapshot(false);
@@ -638,8 +643,12 @@ public class TestDatabase {
     indexLookup.setCount(1000);
     indexLookup.setIndexName(indexSchema.getName());
     indexLookup.setLeftOp(BinaryExpression.Operator.EQUAL);
-    indexLookup.setLeftKey(new Object[]{"933-28-0".getBytes()});
-    indexLookup.setLeftOriginalKey(new Object[]{"933-28-0".getBytes()});
+    char[] chars = new char["933-28-0".length()];
+    "933-28-0".getChars(0, chars.length, chars, 0);
+    indexLookup.setLeftKey(new Object[]{chars});
+    chars = new char["933-28-0".length()];
+    "933-28-0".getChars(0, chars.length, chars, 0);
+    indexLookup.setLeftOriginalKey(new Object[]{chars});
     indexLookup.setColumnName("socialsecuritynumber");
     indexLookup.setSchemaRetryCount(0);
     indexLookup.setUsedIndex(usedIndex);

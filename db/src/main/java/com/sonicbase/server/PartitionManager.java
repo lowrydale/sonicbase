@@ -1050,7 +1050,7 @@ public class PartitionManager extends Thread {
         doProcessEntry(context, key, value1, countVisited, currEntries, countSubmitted, executor,
             fieldOffsets, cobj, countFinished);
         return true;
-      }, 5 * DatabaseClient.SELECT_PAGE_SIZE);
+      },5 * DatabaseClient.SELECT_PAGE_SIZE, true);
 
       if (currEntries.get() != null && !currEntries.get().isEmpty()) {
         long localBegin = System.currentTimeMillis();
@@ -1722,8 +1722,11 @@ public class PartitionManager extends Thread {
       try {
         if (keys != null) {
           AtomicLong srvCount = databaseServer.getStats().get(METRIC_REPART_MOVE_RCV_ENTRY).getCount();
-          logger.debug("moveIndexEntries: db={}, table={}, index={}, count={}", dbName, tableName, indexName, keys.getArray().size());
+          if (logger.isDebugEnabled()) {
+            logger.debug("moveIndexEntries: db={}, table={}, index={}, count={}", dbName, tableName, indexName, keys.getArray().size());
+          }
           int lockCount = 0;
+          List<Object[]> reusableKeys = new ArrayList<>();
           TableSchema table = common.getTables(dbName).get(tableName);
           for (int i = 0; i < keys.getArray().size(); i++) {
             try {
@@ -1735,7 +1738,7 @@ public class PartitionManager extends Thread {
 
               ComObject keyObj = (ComObject) keys.getArray().get(i);
               Object[] key = DatabaseCommon.deserializeKey(table,
-                  keyObj.getByteArray(ComObject.Tag.KEY_BYTES));
+                  keyObj.getByteArray(ComObject.Tag.KEY_BYTES), reusableKeys);
               ComArray records = keyObj.getArray(ComObject.Tag.RECORDS);
               if (records != null) {
                 byte[][] content = new byte[records.getArray().size()][];
@@ -1746,6 +1749,18 @@ public class PartitionManager extends Thread {
                 request.key = key;
                 request.content = content;
                 request.keyOffset = i;
+
+                try {
+                  Index index = databaseServer.getIndex(dbName, tableName, indexName);
+                  databaseServer.setIsOpForRebalance(true);
+                  IndexSchema indexSchema = databaseServer.getIndexSchema(dbName, tableName, indexName);
+                  databaseServer.getUpdateManager().doInsertKeys(request, cobj, false, dbName, index, tableName, indexSchema,
+                      replayedCommand, true, failedKeys);
+                }
+                finally {
+                  databaseServer.setIsOpForRebalance(false);
+                }
+
               }
             }
             catch (Exception e) {
@@ -1754,17 +1769,7 @@ public class PartitionManager extends Thread {
             }
           }
         }
-        Index index = databaseServer.getIndex(dbName, tableName, indexName);
 
-        try {
-          databaseServer.setIsOpForRebalance(true);
-          IndexSchema indexSchema = databaseServer.getIndexSchema(dbName, tableName, indexName);
-          databaseServer.getUpdateManager().doInsertKeys(cobj, false, dbName, moveRequests, index, tableName, indexSchema,
-              replayedCommand, true, failedKeys);
-        }
-        finally {
-          databaseServer.setIsOpForRebalance(false);
-        }
         return ret;
       }
       finally {

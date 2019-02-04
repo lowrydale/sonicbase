@@ -588,9 +588,24 @@ public class BulkImportManager {
     extractorForInternalByType.put(DataType.Type.DOUBLE, (ResultSet rs, String field) -> rs.getDouble(field));
     extractorForInternalByType.put(DataType.Type.NUMERIC, (ResultSet rs, String field) -> rs.getBigDecimal(field));
     extractorForInternalByType.put(DataType.Type.DECIMAL, (ResultSet rs, String field) -> rs.getBigDecimal(field));
-    extractorForInternalByType.put(DataType.Type.CHAR, (ResultSet rs, String field) -> rs.getString(field).getBytes(UTF_8_STR));
-    extractorForInternalByType.put(DataType.Type.VARCHAR, (ResultSet rs, String field) -> rs.getString(field).getBytes(UTF_8_STR));
-    extractorForInternalByType.put(DataType.Type.LONGVARCHAR, (ResultSet rs, String field) -> rs.getString(field).getBytes(UTF_8_STR));
+    extractorForInternalByType.put(DataType.Type.CHAR, (ResultSet rs, String field) -> {
+      String str = rs.getString(field);
+      char[] chars = new char[str.length()];
+      str.getChars(0, chars.length, chars, 0);
+      return chars;
+    });
+    extractorForInternalByType.put(DataType.Type.VARCHAR, (ResultSet rs, String field) -> {
+      String str = rs.getString(field);
+      char[] chars = new char[str.length()];
+      str.getChars(0, chars.length, chars, 0);
+      return chars;
+    });
+    extractorForInternalByType.put(DataType.Type.LONGVARCHAR, (ResultSet rs, String field) -> {
+      String str = rs.getString(field);
+      char[] chars = new char[str.length()];
+      str.getChars(0, chars.length, chars, 0);
+      return chars;
+    });
     extractorForInternalByType.put(DataType.Type.DATE, (ResultSet rs, String field) -> rs.getDate(field));
     extractorForInternalByType.put(DataType.Type.TIME, (ResultSet rs, String field) -> rs.getTime(field));
     extractorForInternalByType.put(DataType.Type.TIMESTAMP, (ResultSet rs, String field) -> rs.getTimestamp(field));
@@ -598,13 +613,38 @@ public class BulkImportManager {
     extractorForInternalByType.put(DataType.Type.VARBINARY, (ResultSet rs, String field) -> rs.getBytes(field));
     extractorForInternalByType.put(DataType.Type.LONGVARBINARY, (ResultSet rs, String field) -> rs.getBytes(field));
     extractorForInternalByType.put(DataType.Type.BLOB, (ResultSet rs, String field) -> rs.getBytes(field));
-    extractorForInternalByType.put(DataType.Type.CLOB, (ResultSet rs, String field) -> rs.getString(field).getBytes(UTF_8_STR));
+    extractorForInternalByType.put(DataType.Type.CLOB, (ResultSet rs, String field) -> {
+      String str = rs.getString(field);
+      char[] chars = new char[str.length()];
+      str.getChars(0, chars.length, chars, 0);
+      return chars;
+    });
     extractorForInternalByType.put(DataType.Type.BOOLEAN, (ResultSet rs, String field) -> rs.getBoolean(field));
     extractorForInternalByType.put(DataType.Type.ROWID, (ResultSet rs, String field) -> rs.getLong(field));
-    extractorForInternalByType.put(DataType.Type.NCHAR, (ResultSet rs, String field) -> rs.getString(field).getBytes(UTF_8_STR));
-    extractorForInternalByType.put(DataType.Type.NVARCHAR, (ResultSet rs, String field) -> rs.getString(field).getBytes(UTF_8_STR));
-    extractorForInternalByType.put(DataType.Type.LONGNVARCHAR, (ResultSet rs, String field) -> rs.getString(field).getBytes(UTF_8_STR));
-    extractorForInternalByType.put(DataType.Type.NCLOB, (ResultSet rs, String field) -> rs.getString(field).getBytes(UTF_8_STR));
+    extractorForInternalByType.put(DataType.Type.NCHAR, (ResultSet rs, String field) -> {
+      String str = rs.getString(field);
+      char[] chars = new char[str.length()];
+      str.getChars(0, chars.length, chars, 0);
+      return chars;
+    });
+    extractorForInternalByType.put(DataType.Type.NVARCHAR, (ResultSet rs, String field) -> {
+      String str = rs.getString(field);
+      char[] chars = new char[str.length()];
+      str.getChars(0, chars.length, chars, 0);
+      return chars;
+    });
+    extractorForInternalByType.put(DataType.Type.LONGNVARCHAR, (ResultSet rs, String field) -> {
+      String str = rs.getString(field);
+      char[] chars = new char[str.length()];
+      str.getChars(0, chars.length, chars, 0);
+      return chars;
+    });
+    extractorForInternalByType.put(DataType.Type.NCLOB, (ResultSet rs, String field) -> {
+      String str = rs.getString(field);
+      char[] chars = new char[str.length()];
+      str.getChars(0, chars.length, chars, 0);
+      return chars;
+    });
   }
 
   protected Object[] getCurrRecordFromResultSet(ResultSet rs, List<FieldSchema> fields) throws SQLException {

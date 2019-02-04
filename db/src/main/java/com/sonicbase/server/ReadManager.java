@@ -109,14 +109,14 @@ public class ReadManager {
 
     long count = 0;
     String primaryKeyIndex = null;
-    for (Map.Entry<String, IndexSchema> entry : server.getCommon().getTableSchema(dbName, fromTable,
+    for (Map.Entry<String, IndexSchema> entry : server.getTableSchema(dbName, fromTable,
         server.getDataDir()).getIndices().entrySet()) {
       if (entry.getValue().isPrimaryKey()) {
         primaryKeyIndex = entry.getValue().getName();
         break;
       }
     }
-    TableSchema tableSchema = server.getCommon().getTableSchema(dbName, fromTable, server.getDataDir());
+    TableSchema tableSchema = server.getTableSchema(dbName, fromTable, server.getDataDir());
     Index index = server.getIndex(dbName, fromTable, primaryKeyIndex);
 
     int countColumnOffset = getCountColumnOffset(countColumn, tableSchema);
@@ -232,7 +232,7 @@ public class ReadManager {
 
       String tableName = cobj.getString(ComObject.Tag.TABLE_NAME);
       String indexName = cobj.getString(ComObject.Tag.INDEX_NAME);
-      TableSchema tableSchema = server.getCommon().getTableSchema(dbName, tableName, server.getDataDir());
+      TableSchema tableSchema = server.getTableSchema(dbName, tableName, server.getDataDir());
       IndexSchema indexSchema = server.getIndexSchema(dbName, tableSchema.getName(), indexName);
       indexLookup.setTableSchema(tableSchema);
       indexLookup.setIndexSchema(indexSchema);
@@ -373,7 +373,6 @@ public class ReadManager {
       else {
         indexLookup = new IndexLookupOneKey(server);
       }
-
 
       indexLookup.setProcedureContext(procedureContext);
       count = cobj.getInt(ComObject.Tag.COUNT);
@@ -855,7 +854,7 @@ public class ReadManager {
       TableSchema[] tableSchemas = new TableSchema[tableNames.length];
       for (int i = 0; i < array.getArray().size(); i++) {
         tableNames[i] = (String)tablesArray.getArray().get(i);
-        tableSchemas[i] = server.getCommon().getTableSchema(dbName, tableNames[i], server.getDataDir());
+        tableSchemas[i] = server.getTableSchema(dbName, tableNames[i], server.getDataDir());
       }
 
       List<OrderByExpressionImpl> orderByExpressions = new ArrayList<>();
@@ -1103,7 +1102,7 @@ public class ReadManager {
 
       long viewVersion = cobj.getLong(ComObject.Tag.VIEW_VERSION);
       indexLookup.setViewVersion(viewVersion);
-      tableSchema = server.getCommon().getTableSchema(dbName, tableName, server.getDataDir());
+      tableSchema = server.getTableSchema(dbName, tableName, server.getDataDir());
       IndexSchema indexSchema = server.getIndexSchema(dbName, tableSchema.getName(), indexName);
       indexLookup.setTableSchema(tableSchema);
       indexLookup.setIndexSchema(indexSchema);
@@ -1285,7 +1284,7 @@ public class ReadManager {
       String tableName = counter.getTableName();
       String columnName = counter.getColumnName();
       String indexName = null;
-      TableSchema tableSchema = server.getCommon().getTableSchema(dbName, tableName, server.getDataDir());
+      TableSchema tableSchema = server.getTableSchema(dbName, tableName, server.getDataDir());
       for (IndexSchema indexSchema : tableSchema.getIndices().values()) {
         if (indexSchema.getFields()[0].equals(columnName)) {
           isPrimaryKey = indexSchema.isPrimaryKey();
@@ -1368,7 +1367,7 @@ public class ReadManager {
       String tableName = counter.getTableName();
       String columnName = counter.getColumnName();
       String indexName = null;
-      TableSchema tableSchema = server.getCommon().getTableSchema(dbName, tableName, server.getDataDir());
+      TableSchema tableSchema = server.getTableSchema(dbName, tableName, server.getDataDir());
       for (IndexSchema indexSchema : tableSchema.getIndices().values()) {
         if (indexSchema.isPrimaryKey()) {
           indexName = indexSchema.getName();

@@ -55,6 +55,8 @@ public class BulkImportManagerTest {
   private Index stringIndex;
   private AtomicLong transId;
   private TableSchema tableSchema2;
+  private TableSchema stringTableSchema;
+  private byte[][] stringRecords;
 
   @BeforeClass
   public void beforeClass() {
@@ -75,7 +77,8 @@ public class BulkImportManagerTest {
     Map<Integer, TableSchema> tables = new HashMap<>();
     tableSchema = TestUtils.createTable();
     indexSchema = TestUtils.createIndexSchema(tableSchema);
-    stringIndexSchema = TestUtils.createStringIndexSchema(tableSchema, 1);
+    stringTableSchema = TestUtils.createStringTable();
+    stringIndexSchema = TestUtils.createStringIndexSchema(stringTableSchema, 1);
 
     when(server.getIndexSchema(anyString(), anyString(), anyString())).thenReturn(indexSchema);
     when(server.getShardCount()).thenReturn(2);
@@ -108,9 +111,9 @@ public class BulkImportManagerTest {
 
     Indices indices = new Indices();
     indices.addIndex(server.getPort(), new HashMap<Long, Boolean>(), tableSchema, indexSchema.getName(), indexSchema.getComparators());
-    indices.addIndex(server.getPort(), new HashMap<Long, Boolean>(), tableSchema, stringIndexSchema.getName(), stringIndexSchema.getComparators());
+    indices.addIndex(server.getPort(), new HashMap<Long, Boolean>(), stringTableSchema, stringIndexSchema.getName(), stringIndexSchema.getComparators());
     index = indices.getIndices().get(tableSchema.getName()).get(indexSchema.getName());
-    stringIndex = indices.getIndices().get(tableSchema.getName()).get(stringIndexSchema.getName());
+    stringIndex = indices.getIndices().get(stringTableSchema.getName()).get(stringIndexSchema.getName());
     when(server.getIndex(anyString(), anyString(), eq(indexSchema.getName()))).thenReturn(index);
     when(server.getIndex(anyString(), anyString(), eq(stringIndexSchema.getName()))).thenReturn(stringIndex);
 
@@ -120,7 +123,8 @@ public class BulkImportManagerTest {
     when(server.getIndices(anyString())).thenReturn(map.get("test"));
 
     records = TestUtils.createRecords(common, tableSchema, 10);
-
+    List<Object[]> stringKeys = TestUtils.createKeysForStringIndex(10);
+    stringRecords = TestUtils.createStringRecords(common, stringTableSchema, 10, stringKeys);
     keys = TestUtils.createKeys(10);
 
     updateManager = new UpdateManager(server);
@@ -191,24 +195,24 @@ public class BulkImportManagerTest {
     Object[] dbFields = new Object[record.length];
     dbFields[0] = 0L;
     dbFields[1] = origDbFields[1];
-    dbFields[2] = new String((byte[]) origDbFields[2], "utf-8");
+    dbFields[2] = new String((char[])origDbFields[2]);
     dbFields[3] = origDbFields[3];
     dbFields[4] = origDbFields[4];
     dbFields[5] = origDbFields[5];
     dbFields[6] = origDbFields[6];
-    dbFields[7] = new String((byte[]) origDbFields[7], "utf-8");
-    dbFields[8] = new String((byte[]) origDbFields[8], "utf-8");
+    dbFields[7] = new String((char[]) origDbFields[7]);
+    dbFields[8] = new String((char[]) origDbFields[8]);
     dbFields[9] = origDbFields[9];
     dbFields[10] = origDbFields[10];
     dbFields[11] = origDbFields[11];
     dbFields[12] = origDbFields[12];
     dbFields[13] = origDbFields[13];
-    dbFields[14] = new String((byte[]) origDbFields[14], "utf-8");
-    dbFields[15] = new String((byte[]) origDbFields[15], "utf-8");
-    dbFields[16] = new String((byte[]) origDbFields[16], "utf-8");
-    dbFields[17] = new String((byte[]) origDbFields[17], "utf-8");
-    dbFields[18] = new String((byte[]) origDbFields[18], "utf-8");
-    dbFields[19] = new String((byte[]) origDbFields[19], "utf-8");
+    dbFields[14] = new String((char[]) origDbFields[14]);
+    dbFields[15] = new String((char[]) origDbFields[15]);
+    dbFields[16] = new String((char[]) origDbFields[16]);
+    dbFields[17] = new String((char[]) origDbFields[17]);
+    dbFields[18] = new String((char[]) origDbFields[18]);
+    dbFields[19] = new String((char[]) origDbFields[19]);
     dbFields[20] = origDbFields[20];
     dbFields[21] = origDbFields[21];
     dbFields[22] = origDbFields[22];
@@ -549,24 +553,24 @@ public class BulkImportManagerTest {
     BulkImportManager bim = new BulkImportManager(server);
 
     assertEquals(bim.getValueOfField(rs, "field1", BIGINT), 200L);
-    assertEquals(bim.getValueOfField(rs, "field2", VARCHAR), "0-value".getBytes("utf-8"));
+    assertEquals(new String((char[])bim.getValueOfField(rs, "field2", VARCHAR)), "0-value");
     assertEquals(bim.getValueOfField(rs, "field3", TIMESTAMP), new Timestamp(200));
     assertEquals(bim.getValueOfField(rs, "field4", INTEGER), 1200);
     assertEquals(bim.getValueOfField(rs, "field5", SMALLINT), (short)0);
     assertEquals(bim.getValueOfField(rs, "field6", TINYINT), (byte)0);
-    assertEquals(bim.getValueOfField(rs, "field7", CHAR), "0-value".getBytes("utf-8"));
-    assertEquals(bim.getValueOfField(rs, "field8", NCHAR), "0-value".getBytes("utf-8"));
+    assertEquals(new String((char[])bim.getValueOfField(rs, "field7", CHAR)), "0-value");
+    assertEquals(new String((char[])bim.getValueOfField(rs, "field8", NCHAR)), "0-value");
     assertEquals(bim.getValueOfField(rs, "field9", FLOAT), 0d);
     assertEquals(bim.getValueOfField(rs, "field10", REAL), 0f);
     assertEquals(bim.getValueOfField(rs, "field11", DOUBLE), 0d);
     assertEquals(bim.getValueOfField(rs, "field12", BOOLEAN), true);
     assertEquals(bim.getValueOfField(rs, "field13", BIT), true);
-    assertEquals(bim.getValueOfField(rs, "field14", VARCHAR), "0-value".getBytes("utf-8"));
-    assertEquals(bim.getValueOfField(rs, "field15", CLOB), "0-value".getBytes("utf-8"));
-    assertEquals(bim.getValueOfField(rs, "field16", NCLOB), "0-value".getBytes("utf-8"));
-    assertEquals(bim.getValueOfField(rs, "field17", LONGVARCHAR), "0-value".getBytes("utf-8"));
-    assertEquals(bim.getValueOfField(rs, "field18", NVARCHAR), "0-value".getBytes("utf-8"));
-    assertEquals(bim.getValueOfField(rs, "field19", LONGNVARCHAR), "0-value".getBytes("utf-8"));
+    assertEquals(new String((char[])bim.getValueOfField(rs, "field14", VARCHAR)), "0-value");
+    assertEquals(new String((char[])bim.getValueOfField(rs, "field15", CLOB)), "0-value");
+    assertEquals(new String((char[])bim.getValueOfField(rs, "field16", NCLOB)), "0-value");
+    assertEquals(new String((char[])bim.getValueOfField(rs, "field17", LONGVARCHAR)), "0-value");
+    assertEquals(new String((char[])bim.getValueOfField(rs, "field18", NVARCHAR)), "0-value");
+    assertEquals(new String((char[])bim.getValueOfField(rs, "field19", LONGNVARCHAR)), "0-value");
     assertEquals(bim.getValueOfField(rs, "field20", LONGVARBINARY), "0-value".getBytes("utf-8"));
     assertEquals(bim.getValueOfField(rs, "field21", VARBINARY), "0-value".getBytes("utf-8"));
     assertEquals(bim.getValueOfField(rs, "field22", BLOB), "0-value".getBytes("utf-8"));

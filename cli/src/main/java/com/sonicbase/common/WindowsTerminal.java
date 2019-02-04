@@ -1,5 +1,7 @@
 package com.sonicbase.common;
 
+import com.sonicbase.index.NativePartitionedTreeImpl;
+
 /**
  * Created by lowryda on 4/28/17.
  */
@@ -11,7 +13,8 @@ public class WindowsTerminal {
    */
 
   static {
-    System.loadLibrary("win-util"); // Load native library at runtime
+    //System.loadLibrary("win-util"); // Load native library at runtime
+    NativePartitionedTreeImpl.init(0);//load dll
     // hello.dll (Windows) or libhello.so (Unixes)
   }
 

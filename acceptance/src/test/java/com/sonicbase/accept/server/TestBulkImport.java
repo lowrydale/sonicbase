@@ -12,9 +12,7 @@ import com.sonicbase.server.DatabaseServer;
 import com.sonicbase.server.NettyServer;
 import org.apache.commons.io.IOUtils;
 import org.apache.commons.io.FileUtils;
-import org.testng.annotations.AfterClass;
-import org.testng.annotations.BeforeClass;
-import org.testng.annotations.Test;
+import org.testng.annotations.*;
 
 import java.io.BufferedInputStream;
 import java.io.File;
@@ -39,7 +37,7 @@ public class TestBulkImport {
   private NettyServer serverB1;
   private NettyServer serverB2;
 
-  @AfterClass(alwaysRun = true)
+  @AfterMethod(alwaysRun = true)
   public void afterClass() throws SQLException {
     connA.close();
     connB.close();
@@ -58,9 +56,10 @@ public class TestBulkImport {
     System.out.println("finished");
   }
 
-  @BeforeClass
+  @BeforeMethod
   public void beforeClass() throws IOException, InterruptedException, SQLException, ClassNotFoundException {
     try {
+      System.setProperty("log4j.configuration", "test-log4j.xml");
       String configStr = IOUtils.toString(new BufferedInputStream(getClass().getResourceAsStream("/config/config-2-servers-a.yaml")), "utf-8");
       Config config = new Config(configStr);
 

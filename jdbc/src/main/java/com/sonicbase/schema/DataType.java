@@ -4,7 +4,6 @@ import com.sonicbase.common.ExcludeRename;
 import com.sonicbase.query.DatabaseException;
 import com.sonicbase.util.DateUtils;
 import org.apache.commons.io.IOUtils;
-import org.apache.hadoop.io.WritableComparator;
 
 import java.io.ByteArrayOutputStream;
 import java.io.IOException;
@@ -57,20 +56,12 @@ public class DataType {
           ret = (long) (double)Double.valueOf((String) value);
         }
       }
-      else if (value instanceof byte[]) {
+      else if (value instanceof char[]) {
         try {
-          ret = (long) Long.valueOf(new String((byte[]) value, UTF_8_STR));
+          ret = (long) Long.valueOf(new String((char[]) value));
         }
         catch (NumberFormatException e) {
-          try {
-            ret = (long) (double)Double.valueOf(new String((byte[]) value, UTF_8_STR));
-          }
-          catch (UnsupportedEncodingException e1) {
-            throw new DatabaseException(e1);
-          }
-        }
-        catch (UnsupportedEncodingException e) {
-          throw new DatabaseException(e);
+          ret = (long) (double)Double.valueOf(new String((char[]) value));
         }
       }
       else if (value instanceof Float) {
@@ -108,13 +99,8 @@ public class DataType {
     if (value instanceof String) {
       return value;
     }
-    if (value instanceof byte[]) {
-      try {
-        return new String((byte[])value, UTF_8_STR);
-      }
-      catch (UnsupportedEncodingException e) {
-        throw new DatabaseException(e);
-      }
+    if (value instanceof char[]) {
+      return new String((char[])value);
     }
     if (value instanceof Date) {
       Calendar cal = Calendar.getInstance();
@@ -130,24 +116,32 @@ public class DataType {
     return String.valueOf(value);
   };
 
-  static Converter getUtf8Converter() {
-    return utf8Converter;
+  static Converter getCharArrayConverter() {
+    return charArrayConverter;
   }
 
-  private static final Converter utf8Converter = value -> {
+  private static final Converter charArrayConverter = value -> {
     if (value == null) {
       return null;
     }
     if (value instanceof byte[]) {
+      try {
+        String str = new String((byte[])value, "utf-8");
+        char[] chars = new char[str.length()];
+        str.getChars(0, str.length(), chars, 0);
+        return chars;
+      }
+      catch (UnsupportedEncodingException e) {
+        throw new DatabaseException(e);
+      }
+    }
+    if (value instanceof char[]) {
       return value;
     }
     String ret = (String)stringConverter.convert(value);
-    try {
-      return ret.getBytes(UTF_8_STR);
-    }
-    catch (UnsupportedEncodingException e) {
-      throw new DatabaseException(e);
-    }
+    char[] chars = new char[ret.length()];
+    ret.getChars(0, ret.length(), chars, 0);
+    return chars;
   };
 
   public static Converter getByteArrayConverter() {
@@ -215,13 +209,8 @@ public class DataType {
       if (value instanceof String) {
         ret = Double.valueOf((String) value);
       }
-      else if (value instanceof byte[]) {
-        try {
-          ret = Double.valueOf(new String((byte[]) value, UTF_8_STR));
-        }
-        catch (UnsupportedEncodingException e) {
-          throw new DatabaseException(e);
-        }
+      else if (value instanceof char[]) {
+        ret = Double.valueOf(new String((char[]) value));
       }
       else if (value instanceof Float) {
         ret = (double) (float) (Float) value;
@@ -290,8 +279,8 @@ public class DataType {
     if (value instanceof Boolean) {
       return value;
     }
-    if (value instanceof byte[]) {
-      return new String((byte[])value).equalsIgnoreCase("true");
+    if (value instanceof char[]) {
+      return new String((char[])value).equalsIgnoreCase("true");
     }
     if (value instanceof String) {
       return ((String)value).equalsIgnoreCase("true");
@@ -344,6 +333,9 @@ public class DataType {
       }
       if (value instanceof BigDecimal) {
         return value;
+      }
+      else if (value instanceof char[]) {
+        ret = BigDecimal.valueOf(Double.valueOf(new String((char[]) value)));
       }
       else if (value instanceof byte[]) {
         try {
@@ -400,6 +392,11 @@ public class DataType {
       Date ret = null;
       if (value instanceof String) {
         Calendar cal = DateUtils.fromDbCalString((String)value);
+        ret = new Date(cal.getTimeInMillis());
+      }
+      else if (value instanceof char[]) {
+        String str = new String((char[]) value);
+        Calendar cal = DateUtils.fromDbCalString(str);
         ret = new Date(cal.getTimeInMillis());
       }
       else if (value instanceof byte[]) {
@@ -461,6 +458,16 @@ public class DataType {
           throw new DatabaseException(e);
         }
       }
+      else if (value instanceof char[]) {
+        try {
+          String str = new String((char[]) value);
+          Calendar cal = DateUtils.fromDbTimeString(str);
+          ret = new Time(cal.getTimeInMillis());
+        }
+        catch (Exception e) {
+          throw new DatabaseException(e);
+        }
+      }
       else if (value instanceof Date) {
         ret = new Time(((Date) value).getTime());
       }
@@ -511,8 +518,21 @@ public class DataType {
           throw new DatabaseException(e);
         }
       }
+      else if (value instanceof char[]) {
+        try {
+          String str = new String((char[]) value);
+          Calendar cal = DateUtils.fromDbCalString(str);
+          ret = new Timestamp(cal.getTimeInMillis());
+        }
+        catch (Exception e) {
+          throw new DatabaseException(e);
+        }
+      }
       else if (value instanceof Long) {
         ret = new Timestamp((Long)value);
+      }
+      else if (value instanceof Integer) {
+        ret = new Timestamp((long)(int)value);
       }
       else if (value instanceof Date) {
         ret = new Timestamp(((Date) value).getTime());
@@ -801,11 +821,11 @@ public class DataType {
     }
   };
 
-  public static Comparator getUtf8Comparator() {
-    return utf8Comparator;
+  public static Comparator getCharArrayComparator() {
+    return charArrayComparator;
   }
 
-  private static class Utf8Comparator implements Comparator {
+  private static class CharArrayComparator implements Comparator {
 
     @Override
     public int compare(Object o1, Object o2) {
@@ -813,15 +833,30 @@ public class DataType {
         if (o1 == null ||  o2 == null) {
           return 0;
         }
-        if (!(o1 instanceof byte[])) {
-          o1 = utf8Converter.convert(o1);
+        if (!(o1 instanceof char[])) {
+          o1 = charArrayConverter.convert(o1);
         }
-        if (!(o2 instanceof byte[])) {
-          o2 = utf8Converter.convert(o2);
+        if (!(o2 instanceof char[])) {
+          o2 = charArrayConverter.convert(o2);
         }
-        byte[] o1Bytes = (byte[])o1;
-        byte[] o2Bytes = (byte[])o2;
-        return WritableComparator.compareBytes(o1Bytes, 0, o1Bytes.length, o2Bytes, 0, o2Bytes.length);
+        char[] o1Chars = (char[])o1;
+        char[] o2Chars = (char[])o2;
+        int len1 = o1Chars.length;
+        int len2 = o2Chars.length;
+        int lim = Math.min(len1, len2);
+        char v1[] = o1Chars;
+        char v2[] = o2Chars;
+
+        int k = 0;
+        while (k < lim) {
+          char c1 = v1[k];
+          char c2 = v2[k];
+          if (c1 != c2) {
+            return c1 - c2;
+          }
+          k++;
+        }
+        return len1 - len2;
       }
       catch (Exception e) {
         throw new DatabaseException(e);
@@ -829,7 +864,7 @@ public class DataType {
     }
   }
 
-  private static final Comparator utf8Comparator = new Utf8Comparator();
+  private static final Comparator charArrayComparator = new CharArrayComparator();
 
   static Comparator getByteComparator() {
     return byteComparator;
@@ -882,10 +917,10 @@ public class DataType {
     }
     Date lhs = (Date) dateConverter.convert(o1);
     Date rhs = (Date) dateConverter.convert(o2);
-    String l = lhs.toString();
-    String r = rhs.toString();
+    long l = lhs.getTime();
+    long r = rhs.getTime();
 
-    return l.compareTo(r);
+    return Long.compare(l, r);
   };
 
   static Comparator getTimeComparator() {
@@ -898,9 +933,9 @@ public class DataType {
     }
     Time lhs = (Time) timeConverter.convert(o1);
     Time rhs = (Time) timeConverter.convert(o2);
-    String l = lhs.toString();
-    String r = rhs.toString();
-    return l.compareTo(r);
+    long l = lhs.getTime();
+    long r = rhs.getTime();
+    return Long.compare(l, r);
   };
 
   static Comparator getTimestampComparator() {
@@ -1008,9 +1043,9 @@ public class DataType {
     DOUBLE(Types.DOUBLE, doubleComparator, doubleConverter, null, null),
     NUMERIC(Types.NUMERIC, bigDecimalComparator, bigDecimalConverter, new BigDecimal(0), bigDecimalIncrementer),
     DECIMAL(Types.DECIMAL, bigDecimalComparator, bigDecimalConverter, new BigDecimal(0), bigDecimalIncrementer),
-    CHAR(Types.CHAR, utf8Comparator, utf8Converter, null, null),
-    VARCHAR(Types.VARCHAR, utf8Comparator, utf8Converter, null, null),
-    LONGVARCHAR(Types.LONGVARCHAR, utf8Comparator, utf8Converter, null, null),
+    CHAR(Types.CHAR, charArrayComparator, charArrayConverter, null, null),
+    VARCHAR(Types.VARCHAR, charArrayComparator, charArrayConverter, null, null),
+    LONGVARCHAR(Types.LONGVARCHAR, charArrayComparator, charArrayConverter, null, null),
     DATE(Types.DATE, dateComparator, dateConverter, null, null),
     TIME(Types.TIME, timeComparator, timeConverter, null, null),
     TIMESTAMP(Types.TIMESTAMP, timestampComparator, timestampConverter, null, null),
@@ -1024,15 +1059,15 @@ public class DataType {
     STRUCT(Types.STRUCT, null, null, null, null),
     ARRAY(Types.ARRAY, null, null, null, null),
     BLOB(Types.BLOB, blobComparator, blobConverter, null, null),
-    CLOB(Types.CLOB, utf8Comparator, utf8Converter, null, null),
+    CLOB(Types.CLOB, charArrayComparator, charArrayConverter, null, null),
     REF(Types.REF, null, null, null, null),
     DATALINK(Types.DATALINK, null, null, null, null),
     BOOLEAN(Types.BOOLEAN, booleanComparator, booleanConverter, null, null),
     ROWID(Types.ROWID, longComparator, longConverter, null, null),
-    NCHAR(Types.NCHAR, utf8Comparator, utf8Converter, null, null),
-    NVARCHAR(Types.NVARCHAR, utf8Comparator, utf8Converter, null, null),
-    LONGNVARCHAR(Types.LONGNVARCHAR, utf8Comparator, utf8Converter, null, null),
-    NCLOB(Types.NCLOB, utf8Comparator, utf8Converter, null, null),
+    NCHAR(Types.NCHAR, charArrayComparator, charArrayConverter, null, null),
+    NVARCHAR(Types.NVARCHAR, charArrayComparator, charArrayConverter, null, null),
+    LONGNVARCHAR(Types.LONGNVARCHAR, charArrayComparator, charArrayConverter, null, null),
+    NCLOB(Types.NCLOB, charArrayComparator, charArrayConverter, null, null),
     SQLXML(Types.SQLXML, null, null, null, null),
     //REF_CURSOR(Types.REF_CURSOR, null, null, null),
     //TIME_WITH_TIMEZONE(Types.TIME_WITH_TIMEZONE, null, null, null),
@@ -1078,8 +1113,8 @@ public class DataType {
       if (lhsValue instanceof String) {
         return stringComparator;
       }
-      else if (lhsValue instanceof byte[]) {
-        return utf8Comparator;
+      else if (lhsValue instanceof char[]) {
+        return charArrayComparator;
       }
       if (lhsValue instanceof Long) {
         return longComparator;
@@ -1118,8 +1153,11 @@ public class DataType {
     }
 
     public static int getTypeForValue(Object lhsValue) {
-      if (lhsValue instanceof String || lhsValue instanceof byte[]) {
+      if (lhsValue instanceof String || lhsValue instanceof char[]) {
         return LONGVARCHAR.getValue();
+      }
+      if (lhsValue instanceof byte[]) {
+        return BLOB.getValue();
       }
       if (lhsValue instanceof Long) {
         return BIGINT.getValue();
@@ -1154,7 +1192,7 @@ public class DataType {
       if (lhsValue instanceof BigDecimal) {
         return DECIMAL.getValue();
       }
-      return -1;
+      return Integer.MIN_VALUE;
     }
 
     public Object getInitialValue() {

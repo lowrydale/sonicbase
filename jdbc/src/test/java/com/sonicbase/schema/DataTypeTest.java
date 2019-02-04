@@ -22,7 +22,9 @@ public class DataTypeTest {
     assertNull(c.convert(null));
     assertEquals(c.convert(1L), 1L);
     assertEquals(c.convert("1"), 1L);
-    assertEquals(c.convert("1".getBytes("utf-8")), 1L);
+    char[] chars = new char["1".length()];
+    "1".getChars(0, "1".length(), chars, 0);
+    assertEquals(c.convert(chars), 1L);
     assertEquals(c.convert(1.2f), 1L);
     assertEquals(c.convert(1.2d), 1L);
     assertEquals(c.convert(1), 1L);
@@ -43,14 +45,21 @@ public class DataTypeTest {
 
   @Test
   public void testUtf8Converter() throws UnsupportedEncodingException {
-    DataType.Converter c = DataType.getUtf8Converter();
+    DataType.Converter c = DataType.getCharArrayConverter();
 
     assertNull(c.convert(null));
-    assertEquals(c.convert(new byte[]{1, 2, 3}), new byte[]{1, 2, 3});
-    assertEquals(c.convert("1"), "1".getBytes("utf-8"));
-    assertEquals(c.convert(new Date(2018, 2, 1)), "3918-03-01 07:00:00.000+0000".getBytes("utf-8"));
-    assertEquals(c.convert(new Time(12, 10, 1)), "19:10:01.000+0000".getBytes("utf-8"));
-    assertEquals(c.convert(new Timestamp(2018, 2, 1, 12, 10, 1, 0)), "3918-03-01 19:10:01.000+0000".getBytes("utf-8"));
+    char[] chars = new char["1".length()];
+    "1".getChars(0, "1".length(), chars, 0);
+    assertEquals(new String((char[])c.convert("1")), new String(chars));
+    chars = new char["3918-03-01 07:00:00.000+0000".length()];
+    "3918-03-01 07:00:00.000+0000".getChars(0, "3918-03-01 07:00:00.000+0000".length(), chars, 0);
+    assertEquals(new String((char[])c.convert(new Date(2018, 2, 1))), "3918-03-01 07:00:00.000+0000");
+    chars = new char["19:10:01.000+0000".length()];
+    "19:10:01.000+0000".getChars(0, "19:10:01.000+0000".length(), chars, 0);
+    assertEquals(c.convert(new Time(12, 10, 1)), chars);
+    chars = new char["3918-03-01 19:10:01.000+0000".length()];
+    "3918-03-01 19:10:01.000+0000".getChars(0, "3918-03-01 19:10:01.000+0000".length(), chars, 0);
+    assertEquals(new String((char[])c.convert(new Timestamp(2018, 2, 1, 12, 10, 1, 0))), new String(chars));
   }
 
   @Test
@@ -77,7 +86,9 @@ public class DataTypeTest {
     assertNull(c.convert(null));
     assertEquals(c.convert(1L), 1d);
     assertEquals(c.convert("1"), 1d);
-    assertEquals(c.convert("1".getBytes("utf-8")), 1d);
+    char[] chars = new char["1".length()];
+    "1".getChars(0, "1".length(), chars, 0);
+    assertEquals(c.convert(chars), 1d);
     assertEquals(c.convert(1.0f), 1.0d);
     assertEquals(c.convert(1.0d), 1.0d);
     assertEquals(c.convert(1), 1d);
@@ -92,7 +103,9 @@ public class DataTypeTest {
     assertNull(c.convert(null));
     assertEquals(c.convert(1L), (short) 1);
     assertEquals(c.convert("1"), (short) 1);
-    assertEquals(c.convert("1".getBytes("utf-8")), (short) 1);
+    char[] chars = new char["1".length()];
+    "1".getChars(0, "1".length(), chars, 0);
+    assertEquals(c.convert(chars), (short) 1);
     assertEquals(c.convert(1.0f), (short) 1);
     assertEquals(c.convert(1.0d), (short) 1);
     assertEquals(c.convert(1), (short) 1);
@@ -107,7 +120,9 @@ public class DataTypeTest {
     assertNull(c.convert(null));
     assertEquals(c.convert(1L), 1);
     assertEquals(c.convert("1"), 1);
-    assertEquals(c.convert("1".getBytes("utf-8")), 1);
+    char[] chars = new char["1".length()];
+    "1".getChars(0, "1".length(), chars, 0);
+    assertEquals(c.convert(chars), 1);
     assertEquals(c.convert(1.2f), 1);
     assertEquals(c.convert(1.2d), 1);
     assertEquals(c.convert(1), 1);
@@ -122,7 +137,9 @@ public class DataTypeTest {
     assertNull(c.convert(null));
     assertEquals(c.convert(1L), true);
     assertEquals(c.convert("true"), true);
-    assertEquals(c.convert("true".getBytes("utf-8")), true);
+    char[] chars = new char["true".length()];
+    "true".getChars(0, "true".length(), chars, 0);
+    assertEquals(c.convert(chars), true);
     assertEquals(c.convert(1.0f), true);
     assertEquals(c.convert(1.0d), true);
     assertEquals(c.convert(1), true);
@@ -137,7 +154,9 @@ public class DataTypeTest {
     assertNull(c.convert(null));
     assertEquals(c.convert(1L), (byte) 1);
     assertEquals(c.convert("1"), (byte) 1);
-    assertEquals(c.convert("1".getBytes("utf-8")), (byte) 1);
+    char[] chars = new char["1".length()];
+    "1".getChars(0, "1".length(), chars, 0);
+    assertEquals(c.convert(chars), (byte) 1);
     assertEquals(c.convert(1.0f), (byte) 1);
     assertEquals(c.convert(1.0d), (byte) 1);
     assertEquals(c.convert(1), (byte) 1);
@@ -152,7 +171,9 @@ public class DataTypeTest {
     assertNull(c.convert(null));
     assertEquals(c.convert(1L), 1f);
     assertEquals(c.convert("1"), 1f);
-    assertEquals(c.convert("1".getBytes("utf-8")), 1f);
+    char[] chars = new char["1".length()];
+    "1".getChars(0, "1".length(), chars, 0);
+    assertEquals(c.convert(chars), 1f);
     assertEquals(c.convert(1.0f), 1.0f);
     assertEquals(c.convert(1.0d), 1.0f);
     assertEquals(c.convert(1), 1f);

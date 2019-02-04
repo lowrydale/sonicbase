@@ -4,6 +4,7 @@ import com.sonicbase.client.DatabaseClient;
 import com.sonicbase.common.DatabaseCommon;
 import com.sonicbase.query.BinaryExpression;
 import com.sonicbase.query.DatabaseException;
+import com.sonicbase.schema.TableSchema;
 
 import java.util.Map;
 import java.util.concurrent.atomic.AtomicBoolean;
@@ -52,7 +53,8 @@ public class IndexLookupTwoKeys extends IndexLookup {
         entry = adjustStartingKey.getEntry();
         Object[] key = adjustStartingKey.getKey();
 
-        entry = traverseIndex(entry, countSkipped, greaterOp, greaterOriginalKey, lessOp, lessOriginalKey, key);
+        TableSchema.Partition[] partitions = indexSchema.getCurrPartitions();
+        entry = traverseIndex(partitions, entry, countSkipped, greaterOp, greaterOriginalKey, lessOp, lessOriginalKey, key);
       }
     }
     catch (Exception e) {
@@ -61,7 +63,7 @@ public class IndexLookupTwoKeys extends IndexLookup {
     return entry;
   }
 
-  private Map.Entry<Object[], Object> traverseIndex(Map.Entry<Object[], Object> entry, AtomicInteger countSkipped,
+  private Map.Entry<Object[], Object> traverseIndex(TableSchema.Partition[] partitions, Map.Entry<Object[], Object> entry, AtomicInteger countSkipped,
                                                     BinaryExpression.Operator greaterOp, Object[] greaterOriginalKey,
                                                     BinaryExpression.Operator lessOp, Object[] lessOriginalKey, Object[] key) {
     while (entry != null && !(retKeyRecords.size() >= count || retRecords.size() >= count)) {
@@ -70,7 +72,7 @@ public class IndexLookupTwoKeys extends IndexLookup {
           continue;
         }
 
-        CheckIfRightIsDone checkIfRightIsDone = new CheckIfRightIsDone(entry, lessOp, lessOriginalKey).invoke();
+        CheckIfRightIsDone checkIfRightIsDone = new CheckIfRightIsDone(partitions, entry, lessOp, lessOriginalKey).invoke();
         entry = checkIfRightIsDone.getEntry();
         if (checkIfRightIsDone.is()) {
           return entry;
@@ -423,12 +425,14 @@ public class IndexLookupTwoKeys extends IndexLookup {
   }
 
   private class CheckIfRightIsDone {
+    private final TableSchema.Partition[] partitions;
     private boolean myResult;
     private Map.Entry<Object[], Object> entry;
     private final BinaryExpression.Operator lessOp;
     private final Object[] lessOriginalKey;
 
-    CheckIfRightIsDone(Map.Entry<Object[], Object> entry, BinaryExpression.Operator lessOp, Object... lessOriginalKey) {
+    CheckIfRightIsDone(TableSchema.Partition[] partitions, Map.Entry<Object[], Object> entry, BinaryExpression.Operator lessOp, Object... lessOriginalKey) {
+      this.partitions = partitions;
       this.entry = entry;
       this.lessOp = lessOp;
       this.lessOriginalKey = lessOriginalKey;
@@ -454,6 +458,11 @@ public class IndexLookupTwoKeys extends IndexLookup {
       if (lessOp.equals(BinaryExpression.Operator.LESS_EQUAL) && compareRight > 0) {
         rightIsDone = true;
       }
+      if (!rightIsDone) {
+        if (keyOnDifferentServer()) {
+          rightIsDone = true;
+        }
+      }
       if (rightIsDone) {
         entry = null;
         myResult = true;
@@ -462,7 +471,36 @@ public class IndexLookupTwoKeys extends IndexLookup {
       myResult = false;
       return this;
     }
+
+    private boolean keyOnDifferentServer() {
+      int shard = server.getShard();
+      if (shard == 0) {
+        Object[] upperKey = partitions[shard].getUpperKey();
+        if (upperKey != null) {
+          if (DatabaseCommon.compareKey(index.getComparators(), entry.getKey(), upperKey) > 0) {
+            return true;
+          }
+        }
+      }
+      else {
+        Object[] upperKey = partitions[shard].getUpperKey();
+        if (upperKey != null) {
+          if (DatabaseCommon.compareKey(index.getComparators(), entry.getKey(), upperKey) > 0) {
+            return true;
+          }
+        }
+        Object[] lowerKey = partitions[shard - 1].getUpperKey();
+        if (lowerKey != null) {
+          if (DatabaseCommon.compareKey(index.getComparators(), entry.getKey(), lowerKey) < 0) {
+            return true;
+          }
+        }
+      }
+      return false;
+    }
   }
+
+
 
   private class PostTraversal {
     private Map.Entry<Object[], Object> entry;

@@ -69,6 +69,8 @@ public class UpdateManagerTest {
   private IndexSchema stringIndexSchema;
   private Index stringIndex;
   private AtomicLong transId;
+  private TableSchema stringTableSchema;
+  private List<Object[]> stringKeys;
 
   @BeforeClass
   public void beforeClass() {
@@ -82,6 +84,9 @@ public class UpdateManagerTest {
 
   @BeforeMethod
   public void beforeMethod() throws IOException {
+
+    System.setProperty("log4j.configuration", "test-log4j.xml");
+
     server = mock(com.sonicbase.server.DatabaseServer.class);
     addressMap = new AddressMap(server);
     when(server.getAddressMap()).thenReturn(addressMap);
@@ -89,11 +94,21 @@ public class UpdateManagerTest {
     Map<Integer, TableSchema> tables = new HashMap<>();
     tableSchema = TestUtils.createTable();
     indexSchema = TestUtils.createIndexSchema(tableSchema);
-    stringIndexSchema = TestUtils.createStringIndexSchema(tableSchema, 1);
+    stringTableSchema = TestUtils.createStringTable();
+    stringIndexSchema = TestUtils.createStringSecondaryIndexSchema(tableSchema, 1);
 
+    when(server.getTableSchema(anyString(), anyString(), anyString())).thenReturn(tableSchema);
     when(server.getIndexSchema(anyString(), anyString(), anyString())).thenReturn(indexSchema);
     when(server.getShardCount()).thenReturn(2);
     when(server.getReplicationFactor()).thenReturn(1);
+
+    SnapshotManager snapshotManager = mock(SnapshotManager.class);
+    when(server.getSnapshotManager()).thenReturn(snapshotManager);
+    when(snapshotManager.isRecovering()).thenReturn(false);
+
+    LogManager logManager = mock(LogManager.class);
+    when(server.getLogManager()).thenReturn(logManager);
+    when(logManager.isApplyingLogs()).thenReturn(false);
 
     String configStr = IOUtils.toString(new BufferedInputStream(getClass().getResourceAsStream("/config/config-4-servers.yaml")), "utf-8");
     Config config = new Config(configStr);
@@ -142,6 +157,7 @@ public class UpdateManagerTest {
     records = TestUtils.createRecords(common, tableSchema, 10);
 
     keys = TestUtils.createKeys(10);
+    stringKeys = TestUtils.createKeysForStringIndex(10);
 
     updateManager = new UpdateManager(server){
       void throttle() throws InterruptedException {
@@ -378,7 +394,9 @@ public class UpdateManagerTest {
     handler.executeBatch();
 
     for (int j = 0; j < 1; j++) {
-      assertEquals(new Record("test", common, addressMap.fromUnsafeToRecords(index.get(keys.get(j)))[0]).getFields()[1],
+      Long value = (Long) index.get(keys.get(j));
+      byte[][] records = addressMap.fromUnsafeToRecords(value);
+      assertEquals(new Record("test", common, records[0]).getFields()[1],
           new Record("test", common, records[j]).getFields()[1]);
     }
   }
@@ -396,7 +414,7 @@ public class UpdateManagerTest {
     insertStatement.setColumns(columns);
     //for (int i = 0; i < keys.size(); i++) {
       insertStatement.addValue("field1", keys.get(0)[0]);
-      insertStatement.addValue("field2", String.valueOf(keys.get(0)[0]).getBytes("utf-8"));
+      insertStatement.addValue("field2", stringKeys.get(0)[0]);
     //}
 
     InsertStatementHandler.getBatch().set(new ArrayList<>());
@@ -438,7 +456,9 @@ public class UpdateManagerTest {
     }
 
     for (int j = 0; j < 1; j++) {
-      KeyRecord keyRecord = new KeyRecord(addressMap.fromUnsafeToRecords(stringIndex.get(new Object[]{String.valueOf(keys.get(j)[0]).getBytes("utf-8")}))[0]);
+      Object value = stringIndex.get(new Object[]{stringKeys.get(j)[0]});
+      byte[][] recs = addressMap.fromUnsafeToRecords(value);
+      KeyRecord keyRecord = new KeyRecord(recs[0]);
 
       assertEquals(new Record("test", common, addressMap.fromUnsafeToRecords(index.get(DatabaseCommon.deserializeKey(tableSchema, keyRecord.getPrimaryKey())))[0]).getFields()[1],
           new Record("test", common, records[j]).getFields()[1]);
@@ -478,7 +498,7 @@ public class UpdateManagerTest {
     insertStatement.setColumns(columns);
     for (int i = 0; i < keys.size(); i++) {
       insertStatement.addValue("field1", keys.get(i)[0]);
-      insertStatement.addValue("field2", String.valueOf(keys.get(i)[0]).getBytes("utf-8"));
+      insertStatement.addValue("field2", stringKeys.get(i)[0]);
     }
 
     InsertStatementHandler.getBatch().set(new ArrayList<InsertStatementHandler.InsertRequest>());
@@ -519,9 +539,9 @@ public class UpdateManagerTest {
           new Record("test", common, records[j]).getFields()[1]);
     }
 
-    assertEquals(stringIndex.size(), 0);
+    assertEquals(stringIndex.size(), 1);
 
-    TestUtils.createStringIndexSchema(tableSchema, 1);
+//    TestUtils.createStringIndexSchema(tableSchema, 1);
 
     ComObject cobj = new ComObject(3);
     cobj.put(ComObject.Tag.DB_NAME, "test");
@@ -544,7 +564,8 @@ public class UpdateManagerTest {
     updateManager.doPopulateIndex(cobj, false);
 
     for (int j = 0; j < 1; j++) {
-      KeyRecord keyRecord = new KeyRecord(addressMap.fromUnsafeToRecords(stringIndex.get(new Object[]{String.valueOf(keys.get(j)[0]).getBytes("utf-8")}))[0]);
+      Object value =  stringIndex.get(stringKeys.get(j));
+      KeyRecord keyRecord = new KeyRecord(addressMap.fromUnsafeToRecords(value)[0]);
 
       assertEquals(new Record("test", common, addressMap.fromUnsafeToRecords(index.get(DatabaseCommon.deserializeKey(tableSchema, keyRecord.getPrimaryKey())))[0]).getFields()[1],
           new Record("test", common, records[j]).getFields()[1]);
@@ -754,24 +775,40 @@ public class UpdateManagerTest {
     int i = 0;
     Object[] fieldArray = new Object[28];
     fieldArray[1] = 200L + (100 * i);
-    fieldArray[2] = "changed".getBytes("utf-8");
+    char[] chars = new char["changed".length()];
+    "changed".getChars(0, chars.length, chars, 0);
+    fieldArray[2] = chars;
     fieldArray[3] = new Timestamp(200 + (100 * i));
     fieldArray[4] = (int)(1200 + (100 * i));
     fieldArray[5] = (short)i;
     fieldArray[6] = (byte)i;
-    fieldArray[7] = (i + "-value").getBytes("utf-8");
-    fieldArray[8] = (i + "-value").getBytes("utf-8");
+    chars = new char[(i + "-value").length()];
+    (i + "-value").getChars(0, chars.length, chars, 0);
+    fieldArray[7] = chars;
+    chars = new char[(i + "-value").length()];
+    (i + "-value").getChars(0, chars.length, chars, 0);
+    fieldArray[8] = chars;
     fieldArray[9] = (double) i;
     fieldArray[10] = (float) i;
     fieldArray[11] = (double) i;
     fieldArray[12] = true;
     fieldArray[13] = true;
-    fieldArray[14] = (i + "-value").getBytes("utf-8");
-    fieldArray[15] = (i + "-value").getBytes("utf-8");
-    fieldArray[16] = (i + "-value").getBytes("utf-8");
-    fieldArray[17] = (i + "-value").getBytes("utf-8");
-    fieldArray[18] = (i + "-value").getBytes("utf-8");
-    fieldArray[19] = (i + "-value").getBytes("utf-8");
+    chars = new char[(i + "-value").length()];
+    (i + "-value").getChars(0, chars.length, chars, 0);
+    fieldArray[14] = chars;
+    fieldArray[15] = chars;
+    chars = new char[(i + "-value").length()];
+    (i + "-value").getChars(0, chars.length, chars, 0);
+    fieldArray[16] = chars;
+    chars = new char[(i + "-value").length()];
+    (i + "-value").getChars(0, chars.length, chars, 0);
+    fieldArray[17] = chars;
+    chars = new char[(i + "-value").length()];
+    (i + "-value").getChars(0, chars.length, chars, 0);
+    fieldArray[18] = chars;
+    chars = new char[(i + "-value").length()];
+    (i + "-value").getChars(0, chars.length, chars, 0);
+    fieldArray[19] = chars;
     fieldArray[20] = (i + "-value").getBytes("utf-8");
     fieldArray[21] = (i + "-value").getBytes("utf-8");
     fieldArray[22] = (i + "-value").getBytes("utf-8");

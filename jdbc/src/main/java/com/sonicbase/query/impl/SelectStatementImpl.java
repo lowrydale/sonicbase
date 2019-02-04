@@ -491,7 +491,7 @@ public class SelectStatementImpl extends StatementImpl implements SelectStatemen
       int hash = 0;
       for (int i = 0; i < distinctFields.length; i++) {
         if (isArray[distinctFields[i]]) {
-          hash += Arrays.hashCode((byte[]) record.getFields()[distinctFields[i]]);
+          hash += Arrays.hashCode((char[]) record.getFields()[distinctFields[i]]);
         }
         else {
           hash += record.getFields()[distinctFields[i]].hashCode();

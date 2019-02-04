@@ -32,6 +32,11 @@ public class StringIndexImpl implements IndexImpl {
     stringSkipIndex.clear();
   }
 
+  @Override
+  public void delete() {
+
+  }
+
   public Object get(Object[] key) {
     return stringSkipIndex.get((byte[]) key[0]);
   }

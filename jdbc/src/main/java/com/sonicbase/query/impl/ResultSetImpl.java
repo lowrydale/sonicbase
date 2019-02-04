@@ -17,6 +17,7 @@ import net.sf.jsqlparser.expression.Expression;
 import net.sf.jsqlparser.expression.LongValue;
 import net.sf.jsqlparser.expression.operators.relational.ExpressionList;
 import net.sf.jsqlparser.schema.Column;
+import net.sf.jsqlparser.schema.Database;
 import net.sf.jsqlparser.statement.select.Limit;
 import net.sf.jsqlparser.statement.select.Offset;
 import net.sf.jsqlparser.statement.select.Select;
@@ -960,13 +961,8 @@ public class ResultSetImpl implements ResultSet {
 
   private String getRetString(Object ret) {
     String retString = null;
-    if (ret instanceof byte[]) {
-      try {
-        retString = new String((byte[]) ret, UTF8_STR);
-      }
-      catch (UnsupportedEncodingException e) {
-        throw new DatabaseException(e);
-      }
+    if (ret instanceof char[]) {
+      retString = new String((char[]) ret);
     }
     return retString;
   }
@@ -1396,6 +1392,15 @@ public class ResultSetImpl implements ResultSet {
     if (ret instanceof Blob) {
       return ((Blob) ret).getData();
     }
+    if (ret instanceof char[]) {
+      String str = new String((char[])ret);
+      try {
+        return str.getBytes("utf-8");
+      }
+      catch (UnsupportedEncodingException e) {
+        throw new DatabaseException(e);
+      }
+    }
     return (byte[]) ret;
   }
 
@@ -1460,8 +1465,13 @@ public class ResultSetImpl implements ResultSet {
     ExpressionImpl.CachedRecord cachedRecord = getDirectFieldValue(columnLabel);
     if (cachedRecord != null) {
       Object obj = cachedRecord.getRecord().getFields()[fieldInfo.fieldOffset];
-      if (obj instanceof byte[]) {
-        return new ByteArrayInputStream((byte[])obj);
+      if (obj instanceof char[]) {
+        try {
+          return new ByteArrayInputStream(new String((char[])obj).getBytes("utf-8"));
+        }
+        catch (UnsupportedEncodingException e) {
+          throw new DatabaseException(e);
+        }
       }
       return (InputStream) obj;
     }
@@ -1475,8 +1485,13 @@ public class ResultSetImpl implements ResultSet {
     ExpressionImpl.CachedRecord cachedRecord = getDirectFieldValue(columnLabel);
     if (cachedRecord != null) {
       Object obj = cachedRecord.getRecord().getFields()[fieldInfo.fieldOffset];
-      if (obj instanceof byte[]) {
-        return new ByteArrayInputStream((byte[]) obj);
+      if (obj instanceof char[]) {
+        try {
+          return new ByteArrayInputStream(new String((char[])obj).getBytes("utf-8"));
+        }
+        catch (UnsupportedEncodingException e) {
+          throw new DatabaseException(e);
+        }
       }
       return (InputStream) obj;
     }
@@ -1498,6 +1513,14 @@ public class ResultSetImpl implements ResultSet {
         if (obj instanceof byte[]) {
           return new ByteArrayInputStream((byte[]) obj);
         }
+        if (obj instanceof char[]) {
+          try {
+            return new ByteArrayInputStream(new String((char[])obj).getBytes("utf-8"));
+          }
+          catch (UnsupportedEncodingException e) {
+            throw new DatabaseException(e);
+          }
+        }
         Blob blob = (Blob) obj;
         return new ByteArrayInputStream(blob.getData());
       }
@@ -1510,6 +1533,14 @@ public class ResultSetImpl implements ResultSet {
     }
     if (ret instanceof byte[]) {
       return new ByteArrayInputStream((byte[]) ret);
+    }
+    if (ret instanceof char[]) {
+      try {
+        return new ByteArrayInputStream(new String((char[])ret).getBytes("utf-8"));
+      }
+      catch (UnsupportedEncodingException e) {
+        throw new DatabaseException(e);
+      }
     }
     Blob blob = (Blob) ret;
     return new ByteArrayInputStream(blob.getData());
@@ -1524,23 +1555,38 @@ public class ResultSetImpl implements ResultSet {
       if (obj == null) {
         return null;
       }
-      return new InputStreamReader(new ByteArrayInputStream((byte[]) obj));
+      try {
+        return new InputStreamReader(new ByteArrayInputStream(new String((char[])obj).getBytes("utf-8")));
+      }
+      catch (UnsupportedEncodingException e) {
+        throw new DatabaseException(e);
+      }
     }
 
     String[] actualColumn = getActualColumn(columnLabel);
-    byte[] bytes = (byte[]) getField(actualColumn, columnLabel);
-    if (bytes == null) {
+    char[] chars = (char[]) getField(actualColumn, columnLabel);
+    if (chars == null) {
       return null;
     }
-    return new InputStreamReader(new ByteArrayInputStream(bytes));
+    try {
+      return new InputStreamReader(new ByteArrayInputStream(new String((char[])chars).getBytes("utf-8")));
+    }
+    catch (UnsupportedEncodingException e) {
+      throw new DatabaseException(e);
+    }
   }
 
   public Reader getCharacterStream(int columnIndex) {
-    byte[] bytes = (byte[]) getField(columnIndex);
-    if (bytes == null) {
+    char[] chars = (char[]) getField(columnIndex);
+    if (chars == null) {
       return null;
     }
-    return new InputStreamReader(new ByteArrayInputStream(bytes));
+    try {
+      return new InputStreamReader(new ByteArrayInputStream(new String(chars).getBytes("utf-8")));
+    }
+    catch (UnsupportedEncodingException e) {
+      throw new DatabaseException((e));
+    }
   }
 
   public BigDecimal getBigDecimal(String columnLabel) {
@@ -1662,6 +1708,15 @@ public class ResultSetImpl implements ResultSet {
     if (ret instanceof Blob) {
       return ((Blob) ret).getData();
     }
+    if (ret instanceof char[]) {
+      String str = new String((char[])ret);
+      try {
+        return str.getBytes("utf-8");
+      }
+      catch (UnsupportedEncodingException e) {
+        throw new DatabaseException(e);
+      }
+    }
     return (byte[]) ret;
   }
 
@@ -1772,6 +1827,15 @@ public class ResultSetImpl implements ResultSet {
     if (ret instanceof byte[]) {
       return new ByteArrayInputStream((byte[]) ret);
     }
+    if (ret instanceof char[]) {
+      try {
+        return new ByteArrayInputStream(new String((char[])ret).getBytes("utf-8"));
+      }
+      catch (UnsupportedEncodingException e) {
+        throw new DatabaseException(e);
+      }
+    }
+
     Blob blob = (Blob) ret;
     return new ByteArrayInputStream(blob.getData());
   }

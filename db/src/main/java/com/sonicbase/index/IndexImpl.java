@@ -31,4 +31,6 @@ public interface IndexImpl {
   Map.Entry<Object[], Object> firstEntry();
 
   void clear();
+
+  void delete();
 }

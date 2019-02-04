@@ -335,7 +335,9 @@ public class RecordImpl implements Record {
         fieldMap.put(columnLabel, value);
       }
       else {
-        record.getFields()[tableSchema.getFieldOffset(columnLabel)] = value.getBytes("utf-8");
+        char[] chars = new char[value.length()];
+        value.getChars(0, chars.length, chars, 0);
+        record.getFields()[tableSchema.getFieldOffset(columnLabel)] = chars;
       }
     }
     catch (Exception e) {

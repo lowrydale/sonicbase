@@ -6,10 +6,7 @@ import com.fasterxml.jackson.databind.node.ArrayNode;
 import com.fasterxml.jackson.databind.node.ObjectNode;
 import com.sonicbase.client.DatabaseClient;
 import com.sonicbase.client.SelectStatementHandler;
-import com.sonicbase.common.ComArray;
-import com.sonicbase.common.ComObject;
-import com.sonicbase.common.DatabaseCommon;
-import com.sonicbase.common.ServersConfig;
+import com.sonicbase.common.*;
 import com.sonicbase.index.AddressMap;
 import com.sonicbase.index.Index;
 import com.sonicbase.jdbcdriver.ParameterHandler;
@@ -25,6 +22,7 @@ import net.sf.jsqlparser.schema.Column;
 import net.sf.jsqlparser.statement.Statement;
 import net.sf.jsqlparser.statement.select.*;
 import org.mockito.stubbing.Answer;
+import org.testng.annotations.BeforeClass;
 import org.testng.annotations.Test;
 
 import java.io.IOException;
@@ -43,6 +41,11 @@ import static org.testng.Assert.assertEquals;
 
 public class ReadManagerTest {
 
+  @BeforeClass
+  public void beforeClass() {
+    System.setProperty("log4j.configuration", "test-log4j.xml");
+  }
+
   @Test
   public void testIndexLookupExpression() throws IOException {
     com.sonicbase.server.DatabaseServer server = mock(com.sonicbase.server.DatabaseServer.class);
@@ -53,6 +56,7 @@ public class ReadManagerTest {
     TableSchema tableSchema = TestUtils.createTable();
     IndexSchema indexSchema = TestUtils.createIndexSchema(tableSchema);
 
+    when(server.getTableSchema(anyString(), anyString(), anyString())).thenReturn(tableSchema);
     when(server.getIndexSchema(anyString(), anyString(), anyString())).thenReturn(indexSchema);
 
     DatabaseCommon common = TestUtils.createCommon(tableSchema);
@@ -137,6 +141,7 @@ public class ReadManagerTest {
     TableSchema tableSchema = TestUtils.createTable();
     IndexSchema indexSchema = TestUtils.createIndexSchema(tableSchema);
 
+    when(server.getTableSchema(anyString(), anyString(), anyString())).thenReturn(tableSchema);
     when(server.getIndexSchema(anyString(), anyString(), anyString())).thenReturn(indexSchema);
 
     DatabaseCommon common = TestUtils.createCommon(tableSchema);
@@ -223,6 +228,7 @@ public class ReadManagerTest {
     TableSchema tableSchema = TestUtils.createTable();
     IndexSchema indexSchema = TestUtils.createIndexSchema(tableSchema);
 
+    when(server.getTableSchema(anyString(), anyString(), anyString())).thenReturn(tableSchema);
     when(server.getIndexSchema(anyString(), anyString(), anyString())).thenReturn(indexSchema);
 
     DatabaseCommon common = TestUtils.createCommon(tableSchema);
@@ -287,6 +293,7 @@ public class ReadManagerTest {
     TableSchema tableSchema = TestUtils.createTable();
     IndexSchema indexSchema = TestUtils.createIndexSchema(tableSchema);
 
+    when(server.getTableSchema(anyString(), anyString(), anyString())).thenReturn(tableSchema);
     when(server.getIndexSchema(anyString(), anyString(), anyString())).thenReturn(indexSchema);
 
     DatabaseCommon common = TestUtils.createCommon(tableSchema);
@@ -356,6 +363,7 @@ public class ReadManagerTest {
     TableSchema tableSchema = TestUtils.createTable();
     IndexSchema indexSchema = TestUtils.createIndexSchema(tableSchema);
 
+    when(server.getTableSchema(anyString(), anyString(), anyString())).thenReturn(tableSchema);
     when(server.getIndexSchema(anyString(), anyString(), anyString())).thenReturn(indexSchema);
 
     DatabaseCommon common = TestUtils.createCommon(tableSchema);
@@ -460,6 +468,7 @@ public class ReadManagerTest {
     TableSchema tableSchema = TestUtils.createTable();
     IndexSchema indexSchema = TestUtils.createIndexSchema(tableSchema);
 
+    when(server.getTableSchema(anyString(), anyString(), anyString())).thenReturn(tableSchema);
     when(server.getIndexSchema(anyString(), anyString(), anyString())).thenReturn(indexSchema);
 
     DatabaseCommon common = TestUtils.createCommon(tableSchema);
@@ -586,10 +595,12 @@ public class ReadManagerTest {
     retObj = readManager.serverSetSelect(cobj, false);
 
     ComArray retArray = retObj.getArray(ComObject.Tag.TABLE_RECORDS);
-    for (int j = 0; j < 1000; j++) {
-      ComArray recordArray = (ComArray) retArray.getArray().get(j);
-      assertEquals(recordArray.getArray().get(0), records[j]);
-    }
-    assertEquals(retArray.getArray().size(), 1001);
+
+    ComArray recordArray = (ComArray) retArray.getArray().get(0);
+    Record retRecord = new Record("test", common, (byte[])recordArray.getArray().get(0));
+    Record origRecord = new Record("test", common, records[4]);
+    assertEquals(retRecord.getFields()[1], origRecord.getFields()[1]);
+    assertEquals(retArray.getArray().size(), 1);
+
   }
 }

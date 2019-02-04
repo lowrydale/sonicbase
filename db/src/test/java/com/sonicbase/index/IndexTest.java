@@ -119,10 +119,10 @@ public class IndexTest {
     Set<Long> keysCopy = new HashSet<>(keys);
     {
       AtomicInteger count = new AtomicInteger();
-      index.visitTailMap(new Object[]{0l}, new Index.Visitor() {
+      index.visitTailMap(new Object[]{0L}, new Index.Visitor() {
         @Override
         public boolean visit(Object[] key, Object value) {
-          assertTrue(keys.remove(key[0]));
+          assertTrue(keys.remove((long)key[0]));
           count.incrementAndGet();
           return true;
         }
@@ -182,8 +182,8 @@ public class IndexTest {
   @Test
   public void test() throws UnsupportedEncodingException {
     TableSchema tableSchema = TestUtils.createTable();
-    IndexSchema indexSchema = TestUtils.createStringIndexSchema(tableSchema, 1);
-    List<Object[]> keys = TestUtils.createKeysForStringIndex(10);
+    IndexSchema indexSchema = TestUtils.createIndexSchema(tableSchema, 1);
+    List<Object[]> keys = TestUtils.createKeys(10);
     Index index = new Index(9010, new HashMap<Long, Boolean>(), tableSchema, indexSchema.getName(), indexSchema.getComparators());
 
     index.put(keys.get(0), (long)100);
@@ -294,17 +294,23 @@ public class IndexTest {
       for (int j = 0; j < 6-len; j++) {
         value = "0" + value;
       }
-      index.put(new Object[]{value.getBytes("utf-8")}, (long)i);
+      char[] chars = new char[value.length()];
+      value.getChars(0, value.length(), chars, 0);
+      index.put(new Object[]{chars}, (long)i);
+      assertEquals((long)i, index.get(new Object[]{chars}));
     }
 
     AtomicLong offset = new AtomicLong();
-    index.visitTailMap(new Object[]{"0000".getBytes("utf-8")}, (k, v) -> {
+    String str = "0000";
+    char[] chars = new char[str.length()];
+    str.getChars(0, str.length(), chars, 0);
+    index.visitTailMap(new Object[]{chars}, (k, v) -> {
       String value = String.valueOf(offset.getAndIncrement());
       int len = value.length();
       for (int j = 0; j < 6-len; j++) {
         value = "0" + value;
       }
-      assertEquals(new String((byte[])k[0]), value);
+      assertEquals(new String((char[])k[0]), value);
       return true;
     });
   }

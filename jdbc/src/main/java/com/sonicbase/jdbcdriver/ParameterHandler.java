@@ -70,7 +70,9 @@ public class ParameterHandler {
   }
 
   public void setString(int parameterIndex, String x) throws SQLException, UnsupportedEncodingException {
-    getCurrParmsByIndex().put(parameterIndex, new Parameter.String(x.getBytes("utf-8")));
+    char[] chars = new char[x.length()];
+    x.getChars(0, x.length(), chars, 0);
+    getCurrParmsByIndex().put(parameterIndex, new Parameter.String(chars));
   }
 
   public void setBytes(int parameterIndex, byte[] x) throws SQLException {

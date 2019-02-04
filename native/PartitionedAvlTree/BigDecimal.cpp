@@ -1,7 +1,6 @@
 /*
 MIT License
 Copyright (c) 2017 Sambit Samal
-Permission is hereby granted, free of charge, to any person obtaining a copy
 of this software and associated documentation files (the "Software"), to deal
 in the Software without restriction, including without limitation the rights
 to use, copy, modify, merge, publish, distribute, sublicense, and/or sell
@@ -52,7 +51,6 @@ std::string trimTrailingZeros(std::string input)
     	if(input.find(".") != std::string::npos)
     	{
     		std::string result = "";
-    		std::size_t i;
     		std::string inp(input.rbegin(),input.rend());
     		result = inp.erase(0,std::min(inp.find_first_not_of('0'),inp.size()-1));
     		if(result.at(0) == '.')
@@ -76,7 +74,7 @@ static int parse_number (const std::string &s, int &lsign, int &lint, int &ldot,
     }
     i++;
   }
-  int len = s.length();
+  size_t len = s.length();
   if (i >= len) {
     return -1;
   }
@@ -386,8 +384,13 @@ static std::string multiply_positive (const char *lhs, int lint, int ldot, int l
 
   free(res);
 
-  char *data = (char*)malloc((result.length()+1)*sizeof(char));
-  sprintf(data, result.c_str());
+  size_t len = (result.length() + 1) * sizeof(char);
+  char *data = (char*)malloc(len);
+#ifdef _WIN32
+  sprintf_s(data, len, "%s", result.c_str());
+#else
+  sprintf(data, "%s", result.c_str());
+#endif
   std::string ret = _round (data, resint, resdot, resfrac, resscale, scale, sign, 0);
   free(data);
 
@@ -507,8 +510,14 @@ static std::string divide_positive (const char *lhs, int lint, int ldot, int lfr
   free(dividend);
   free(divider);
 
-  char *data = (char*)malloc((result.length()+1)*sizeof(char));
-  sprintf(data, result.c_str());
+  size_t len = (result.length() + 1) * sizeof(char);
+  char *data = (char*)malloc(len);
+#ifdef _WIN32
+  sprintf_s(data, len, "%s", result.c_str());
+#else
+  sprintf(data, "%s", result.c_str());
+#endif
+
   std::string ret = _round (data, resint, resdot, resfrac, resscale, scale, sign, 0);
   free(data);
 
@@ -838,14 +847,20 @@ std::string BigDecimal::round (const std::string &lhs, int scale) {
       return 0;
     }
 
-    int len = lhs.size();
+    size_t len = lhs.size();
     std::string result(len + 1, '0');
-    for(int i = len-1;i>=lint;--i) {
+    for(size_t i = len-1;i>=lint;--i) {
         result[i+1] = lhs[i];
     }
 
-    char *data = (char*)malloc((result.length()+1)*sizeof(char));
-    sprintf(data, result.c_str());
+	len = (result.length() + 1) * sizeof(char);
+	char *data = (char*)malloc(len);
+#ifdef _WIN32
+	sprintf_s(data, len, "%s", result.c_str());
+#else
+	sprintf(data, "%s", result.c_str());
+#endif
+
     std::string ret = _round (data, lint+1, ldot+1, lfrac+1, lscale, scale, lsign, 1, 1);
     free(data);
   return ret;
@@ -853,7 +868,7 @@ std::string BigDecimal::round (const std::string &lhs, int scale) {
 
 std::string BigDecimal::ln(const std::string &lhs, int scale)
 {
-
+	return std::string();
 }
 
 std::string BigDecimal::log2 (const std::string &lhs, int scale)

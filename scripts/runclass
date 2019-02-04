@@ -20,8 +20,8 @@ then
 fi
 
 #java_opts="-server  -XX:+UseShenandoahGC -XX:+UnlockExperimentalVMOptions -XX:ShenandoahUncommitDelay=1000 -XX:ShenandoahGuaranteedGCInterval=10000"
-java_opts="-server  -XX:+UseParallelGC -XX:+UseParallelOldGC -XX:ParallelGCThreads=16 -XX:NewRatio=1"
-#java_opts="-server  -XX:+UseG1GC -XX:MaxGCPauseMillis=150 -XX:-ResizePLAB"
+#java_opts="-server  -XX:+UseParallelGC -XX:+UseParallelOldGC -XX:ParallelGCThreads=16 -XX:NewRatio=1"
+java_opts="-server  -XX:+UseG1GC -XX:+UnlockExperimentalVMOptions -XX:ParallelGCThreads=16 -XX:NewRatio=5 -XX:MaxGCPauseMillis=150 -XX:-ResizePLAB"
 java_opts="$java_opts -verbose:gc -XX:+UseGCLogFileRotation -XX:NumberOfGCLogFiles=3 -XX:GCLogFileSize=2m -Xloggc:$_GC_"
 
 if [ "$_LOG4J_FILENAME_" = "" ]

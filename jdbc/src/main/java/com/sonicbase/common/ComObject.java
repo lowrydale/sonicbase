@@ -13,6 +13,7 @@ import java.sql.Time;
 import java.sql.Timestamp;
 import java.util.*;
 
+import static com.sonicbase.client.DatabaseClient.SERIALIZATION_VERSION_30;
 import static com.sonicbase.common.ComObject.Type.*;
 
 @ExcludeRename
@@ -600,8 +601,12 @@ public class ComObject {
         }
         else if (type.tag == STRING_TYPE.tag) {
           int len = (int) DataUtils.readSignedVarLong(bytes, offset);
-          value = new String(bytes, offset[0], len, UTF_8_STR);
-          offset[0] += len;
+          char[] chars = new char[len];
+          for (int j = 0; j < len; j++) {
+            chars[j] = DataUtils.bytesToChar(bytes, offset[0]);
+            offset[0] += 2;
+          }
+          value = new String(chars);
         }
         else if (type.tag == BOOLEAN_TYPE.tag) {
           value = 1 == bytes[offset[0]++];
@@ -711,9 +716,13 @@ public class ComObject {
         }
       }
       else if (tagObj.type.tag == STRING_TYPE.tag) {
-        byte[] bytes = ((String) value).getBytes(UTF_8_STR);
-        Varint.writeSignedVarLong(bytes.length, out);
-        out.write(bytes);
+        String str = ((String) value);
+        char[] chars = new char[str.length()];
+        str.getChars(0, str.length(), chars, 0);
+        Varint.writeSignedVarLong(chars.length, out);
+        for (int j = 0; j < chars.length; j++) {
+          out.writeChar(chars[j]);
+        }
       }
       else if (tagObj.type.tag == BOOLEAN_TYPE.tag) {
         out.writeBoolean((Boolean) value);

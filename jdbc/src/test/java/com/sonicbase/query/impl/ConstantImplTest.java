@@ -13,7 +13,10 @@ public class ConstantImplTest {
   @Test
   public void test() throws UnsupportedEncodingException {
 
-    ConstantImpl c = new ConstantImpl("value".getBytes("utf-8"), VARCHAR);
+    String str = "value";
+    char[] chars = new char[str.length()];
+    str.getChars(0, str.length(), chars, 0);
+    ConstantImpl c = new ConstantImpl(chars, VARCHAR);
     assertEquals(c.toString(), "value");
     c = roundTrip(c);
     assertEquals(c.toString(), "value");
@@ -30,12 +33,18 @@ public class ConstantImplTest {
     c.negate();
     assertEquals(c.toString(), "-100");
 
-    c = new ConstantImpl("value".getBytes("utf-8"), CLOB);
+    str = "value";
+    chars = new char[str.length()];
+    str.getChars(0, str.length(), chars, 0);
+    c = new ConstantImpl(chars, CLOB);
     assertEquals(c.toString(), "value");
     c = roundTrip(c);
     assertEquals(c.toString(), "value");
 
-    c = new ConstantImpl("value".getBytes("utf-8"), CHAR);
+    str = "value";
+    chars = new char[str.length()];
+    str.getChars(0, str.length(), chars, 0);
+    c = new ConstantImpl(chars, CHAR);
     assertEquals(c.toString(), "value");
     c = roundTrip(c);
     assertEquals(c.toString(), "value");

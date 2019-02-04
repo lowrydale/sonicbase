@@ -431,12 +431,10 @@ public class SelectStatementHandler implements StatementHandler {
     ExpressionImpl retExpression;
     ConstantImpl constant = new ConstantImpl();
     constant.setSqlType(Types.VARCHAR);
-    try {
-      constant.setValue(whereExpression.getValue().getBytes("utf-8"));
-    }
-    catch (UnsupportedEncodingException e) {
-      throw new DatabaseException(e);
-    }
+    String str = whereExpression.getValue();
+    char[] chars = new char[str.length()];
+    str.getChars(0, str.length(), chars, 0);
+    constant.setValue(chars);
     retExpression = constant;
     return retExpression;
   }

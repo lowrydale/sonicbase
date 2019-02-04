@@ -23,7 +23,7 @@ public class BenchmarkInsert {
 
   public static final Logger logger = LoggerFactory.getLogger(BenchmarkInsert.class);
 
-  public static boolean STRING_KEY = true;
+  public static boolean STRING_KEY = false;
 
   private static final MetricRegistry METRICS = new MetricRegistry();
 
@@ -56,13 +56,8 @@ public class BenchmarkInsert {
       if (value instanceof String) {
         ret = (long) Long.valueOf((String) value);
       }
-      else if (value instanceof byte[]) {
-        try {
-          ret = (long) Long.valueOf(new String((byte[]) value, "utf-8"));
-        }
-        catch (UnsupportedEncodingException e) {
-          throw new DatabaseException(e);
-        }
+      else if (value instanceof char[]) {
+        ret = (long) Long.valueOf(new String((char[]) value));
       }
       else if (value instanceof Float) {
         ret = (long) (float) (Float) value;

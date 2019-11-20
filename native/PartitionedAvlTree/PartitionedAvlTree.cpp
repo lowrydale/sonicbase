@@ -530,6 +530,16 @@ public:
 
 		env->ReleaseIntArrayElements(dataTypes, types, 0);
     }
+
+	PartitionedMap(int* dataTypes, int fieldCount) {
+		for (int i = 0; i < PARTITION_COUNT; i++) {
+			maps[i] = 0;
+		}
+
+		this->dataTypes = new int[fieldCount];
+		memcpy((void*)this->dataTypes, (void*)dataTypes, fieldCount * sizeof(int));
+		comparator = new KeyComparator(NULL, fieldCount, this->dataTypes);
+	}
 };
 
 class PartitionResults {
@@ -2443,3 +2453,230 @@ void JNI_OnUnload(JavaVM *vm, void *reserved) {
 
 
 
+PartitionedMap *map;
+
+
+
+
+std::atomic<unsigned long> count;
+long begin;
+
+long currMillis() {
+	unsigned long now = std::chrono::duration_cast<std::chrono::milliseconds>(std::chrono::system_clock::now().time_since_epoch()).count();
+	return now;
+}
+
+uint64_t put(PartitionedMap* map, uint64_t key, uint64_t value) {
+	my_node *q, *p = new my_node;
+
+	try {
+		uint64_t retValue = -1;
+
+		void **ret = new void*[1];
+		uint64_t *pl = new uint64_t();
+		*pl = key;
+
+		ret[0] = pl;
+		Key *startKey = new Key();
+		startKey->len = 1;
+		startKey->key = ret;
+
+		p->key = startKey;
+		p->value = (uint64_t)value;
+
+		bool replaced = false;
+		int partition = hashKey(NULL, map, startKey) % PARTITION_COUNT;
+		{
+			std::lock_guard<std::mutex> lock(map->locks[partition]);
+			q = kavl_insert(&map->maps[partition], p, map->comparator, 0);
+			if (p != q && q != 0) { 
+				retValue = q->value;
+				q->value = (uint64_t)value;
+				replaced = true;
+			}
+		}
+		if (replaced) {
+			pushDelete(map, p->key);
+			delete p;
+		}
+
+		return retValue;
+	}
+	catch (const std::runtime_error&) {
+		//logError(env, "Error in jni 'put' call: ", e);
+		return 0;
+	}
+
+}
+
+int readNext(PartitionedMap* map, uint64_t key, int count, jboolean first, bool tail, uint64_t *lastRet) {
+	int numRecordsPerPartition = (int)ceil((double)count / (double)PARTITION_COUNT) + 2;
+
+	int posInTopLevelArray = 0;
+
+	void **ret = new void*[1];
+	uint64_t *pl = new uint64_t();
+	*pl = key;
+
+	ret[0] = pl;
+	Key *startKey = new Key();
+	startKey->len = 1;
+	startKey->key = ret;
+
+	SortedList sortedList(map, tail);
+
+	std::vector<PartitionResults*> currResults(PARTITION_COUNT);
+
+	for (int partition = 0; partition < PARTITION_COUNT; partition++) {
+		currResults[partition] = new PartitionResults(numRecordsPerPartition);
+		getNextEntryFromPartition(map, &sortedList, new SortedListNode(), currResults, count, numRecordsPerPartition,
+			currResults[partition], partition, startKey, first, tail);
+	}
+
+	Key **keys = new Key*[count];
+	for (int i = 0; i < count; i++) {
+		keys[i] = 0;
+	}
+	uint64_t* values = new uint64_t[count];
+	int retCount = 0;
+	bool firstEntry = true;
+	while (retCount < count) {
+		if (!next(map, &sortedList, currResults, count, numRecordsPerPartition, keys, values, &posInTopLevelArray, &retCount, tail)) {
+			break;
+		}
+		if (firstEntry && (!first /*|| !tail*/)) {
+			if (map->comparator->compare((void**)keys[0], startKey) == 0) {
+				retCount = 0;
+			}
+			firstEntry = false;
+		}
+	}
+
+	*lastRet = values[retCount - 1];
+
+	delete[] keys;
+	delete[] values;
+	deleteKey(NULL, map, startKey);
+
+	for (int i = 0; i < PARTITION_COUNT; i++) {
+		delete[] currResults[i]->keys;
+		delete[] currResults[i]->values;
+		delete currResults[i];
+	}
+
+	return retCount;
+}
+
+
+PartitionedMap *initIndex() {
+	int *dataTypes = new int[1];
+	dataTypes[0] = BIGINT;
+	PartitionedMap *newMap = new PartitionedMap(dataTypes, 1);
+	return newMap;
+}
+
+void readThread() {
+	while (true) {
+		uint64_t currKey = 0;
+		jboolean first = true;
+		bool tail = true;
+		while (true) {
+			int c = readNext(map, currKey, 2000, first, tail, &currKey);
+			if (c < 2000) {
+				break;
+			}
+			first = false;
+			for (int i = 0; i < 2000; i++) {
+				if (count++ % 1000000 == 0) {
+					printf("progress count=%lu, rate=%f\n", count.load(), (float)((float)count.load() / (float)((currMillis() - begin)) * (float)1000));
+				}
+			}
+		}
+	}
+}
+
+std::atomic<unsigned long> pcount;
+
+void insertForever(int offset) {
+	for (int i = offset * 1000000000; ; i++) {
+		put(map, (uint64_t)i, (uint64_t)i);
+    if (pcount++ % 1000000 == 0) {
+      printf("put progress count=%lu, rate=%f\n", pcount.load(), (float)((float)pcount.load() / (float)((currMillis() - begin)) * (float)1000));
+    }
+    if (pcount.load() > 100000000) {
+      break;
+    }
+	}
+}
+
+
+class Test : public std::enable_shared_from_this<Test> {
+public:
+	void run() {
+		//ConcurrentSkipListMap<long, long> *lmap = new ConcurrentSkipListMap <long, long>();
+
+		map = initIndex();
+
+		begin = currMillis();
+
+		std::thread **pthrd = new std::thread*[10];
+		for (int i = 0; i < 10; i++) {
+			pthrd[i] = new std::thread(insertForever, i);
+		}
+
+		for (int i = 0; i < 10; i++) {
+			pthrd[i]->join();
+		}
+
+/*
+		std::thread th1(foo1);
+		std::thread th2(foo2);
+
+		th1.join();
+		th2.join();
+*/
+
+		//for (int i = 0; i < 1000; i++) {
+		//	printf("out: %u", map->get(new MyKey(i))->value);
+		//}
+		/*
+		Iterator<MyValue*> *iterator = map->valueIterator();
+		while (iterator->hasNext()) {
+		printf("%u\n", iterator->nextEntry()->value);
+		}
+
+		Iterator<MyKey*> *kiterator = map->keyIterator();
+		while (iterator->hasNext()) {
+		MyKey *entry = kiterator->nextEntry();
+		printf("%u\n", entry->value);
+		}
+		Iterator<MyKey*> *kkiterator = map->tailMap(map->firstKey())->keySet()->beginIterator();
+		while (kkiterator->hasNext()) {
+		MyKey *entry = kkiterator->nextEntry();
+		printf("%u\n", entry->value);
+		}
+		*/
+
+		begin = currMillis();
+
+		std::thread **thrd = new std::thread*[10];
+		for (int i = 0; i < 10; i++) {
+			thrd[i] = new std::thread(readThread);
+		}
+
+		for (int i = 0; i < 10; i++) {
+			thrd[i]->join();
+		}
+
+		delete map;
+	}
+};
+
+int main()
+{
+
+	Test t;
+	t.run();
+
+	return 0;
+}

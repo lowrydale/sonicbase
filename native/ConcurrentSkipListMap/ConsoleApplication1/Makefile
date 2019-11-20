@@ -33,7 +33,7 @@ DEBUGGING := -DNDEBUG
 ifeq ($(ARCH),INTEL)
 #CC          := gcc
 CC          := g++
-CFLAGS      := -fPIC -O -O2 -O3  -pthread -std=c++0x -I/opt/jdk1.8.0_192/include/linux/ -I/opt/jdk1.8.0_192/include/  -I/Library/Java/JavaVirtualMachines/jdk1.8.0_181.jdk/Contents/Home/include -I/Library/Java/JavaVirtualMachines/jdk1.8.0_181.jdk/Contents/Home/include/darwin
+CFLAGS      := -fPIC -O -O2 -O3 -pthread -std=c++0x -I/opt/jdk1.8.0_192/include/linux/ -I/opt/jdk1.8.0_192/include/  -I/Library/Java/JavaVirtualMachines/jdk1.8.0_181.jdk/Contents/Home/include -I/Library/Java/JavaVirtualMachines/jdk1.8.0_181.jdk/Contents/Home/include/darwin
 #CFLAGS	    := -Wall -g  -I/Library/Java/JavaVirtualMachines/jdk1.8.0_181.jdk/Contents/Home/include -I/Library/Java/JavaVirtualMachines/jdk1.8.0_181.jdk/Contents/Home/include/darwin
 LDFLAGS     := -Wl#-L
 endif
@@ -43,12 +43,12 @@ UNAME := $(shell uname)
 TARGETS    := $(GC_HARNESS_TARGETS)
 
 ifeq ($(UNAME), Linux)
-TARGETS    += linux/SonicBase.so linux/SonicBase
+TARGETS    += linux/SonicBase2.so linux/SonicBase2
 OUT_DIR	:= linux
 endif
 
 ifeq ($(UNAME), Darwin)
-TARGETS    += mac/SonicBase.so mac/SonicBase
+TARGETS    += mac/SonicBase2.so mac/SonicBase2
 OUT_DIR	:= mac
 endif
 
@@ -61,12 +61,12 @@ all: $(TARGETS)
 clean:
 	rm -f $(TARGETS) replay *~ core *.o *.a
 
-$(OUT_DIR)/SonicBase.so: PartitionedAvlTree.cpp BigDecimal.cpp
+$(OUT_DIR)/SonicBase2.so: ConsoleApplication1.cpp
 	echo $(OUT_DIR)
 	@mkdir -p $(@D)
-	$(CC) -shared $(CFLAGS) PartitionedAvlTree.cpp BigDecimal.cpp -o $(OUT_DIR)/SonicBase.so
+	$(CC) -shared $(CFLAGS) ConsoleApplication1.cpp -o $(OUT_DIR)/SonicBase2.so
 
-$(OUT_DIR)/SonicBase: PartitionedAvlTree.cpp BigDecimal.cpp
+$(OUT_DIR)/SonicBase2: ConsoleApplication1.cpp
 	echo $(OUT_DIR)
 	@mkdir -p $(@D)
-	$(CC) $(CFLAGS) PartitionedAvlTree.cpp BigDecimal.cpp -o $(OUT_DIR)/SonicBase
+	$(CC) $(CFLAGS) ConsoleApplication1.cpp -o $(OUT_DIR)/SonicBase2

@@ -32,11 +32,6 @@ CWindowsTerminal::CWindowsTerminal()
 #define ENABLE_VIRTUAL_TERMINAL_PROCESSING 0x0004
 #endif
 
-int main()
-{
-	return 0;
-}
-
 /*
 * Class:     com_sonicbase_common_WindowsTerminal
 * Method:    getConsoleSize

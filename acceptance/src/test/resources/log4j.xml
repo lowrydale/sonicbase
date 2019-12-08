@@ -1,0 +1,91 @@
+<!DOCTYPE log4j:configuration SYSTEM "log4j.dtd">
+<log4j:configuration debug="false" xmlns:log4j='http://jakarta.apache.org/log4j/'>
+
+
+    <appender name="roll" class="org.apache.log4j.RollingFileAppender">
+      <param name="File" value="${logfilename}"/>
+      <param name="Append" value="true" />
+      <param name="Encoding" value="UTF-8" />
+      <param name="MaxFileSize" value="1GB"/>
+      <param name="MaxBackupIndex" value="10"/>
+      <param name="threshold" value="info"/>
+      <layout class="org.apache.log4j.PatternLayout">
+          <param name="ConversionPattern" value="[%d{yyyy-MM-dd HH:mm:ss,SSS}] %-5p - %C{1}: %m%n" />
+      </layout>
+       <filter class="org.apache.log4j.varia.LevelMatchFilter">
+          <param name="LevelToMatch" value="INFO" />
+          <param name="AcceptOnMatch" value="true" />
+      </filter>
+    </appender>
+
+    <appender name="roll-errors" class="org.apache.log4j.RollingFileAppender">
+        <param name="File" value="${errorLogfilename}"/>
+        <param name="Append" value="true" />
+        <param name="Encoding" value="UTF-8" />
+        <param name="MaxFileSize" value="1GB"/>
+        <param name="MaxBackupIndex" value="10"/>
+        <param name="threshold" value="info"/>
+        <layout class="org.apache.log4j.PatternLayout">
+            <param name="ConversionPattern" value="[%d{yyyy-MM-dd HH:mm:ss,SSS}] %-5p - %C{1}: %m%n" />
+        </layout>
+        <filter class="org.apache.log4j.varia.LevelMatchFilter">
+            <param name="LevelToMatch" value="INFO" />
+            <param name="AcceptOnMatch" value="true" />
+        </filter>
+    </appender>
+
+    <appender name="roll-client-errors" class="org.apache.log4j.RollingFileAppender">
+        <param name="File" value="${clientErrorLogfilename}"/>
+        <param name="Append" value="true" />
+        <param name="Encoding" value="UTF-8" />
+        <param name="MaxFileSize" value="1GB"/>
+        <param name="MaxBackupIndex" value="10"/>
+        <param name="threshold" value="info"/>
+        <layout class="org.apache.log4j.PatternLayout">
+            <param name="ConversionPattern" value="[%d{yyyy-MM-dd HH:mm:ss,SSS}] %-5p - %C{1}: %m%n" />
+        </layout>
+        <filter class="org.apache.log4j.varia.LevelMatchFilter">
+            <param name="LevelToMatch" value="INFO" />
+            <param name="AcceptOnMatch" value="true" />
+        </filter>
+    </appender>
+
+    <appender name="console" class="org.apache.log4j.ConsoleAppender">
+        <param name="threshold" value="info"/>
+        <layout class="org.apache.log4j.PatternLayout">
+            <param name="ConversionPattern" value="[%d{yyyy-MM-dd HH:mm:ss,SSS}] %-5p - %C{1}: %m%n" />
+        </layout>
+    </appender>
+
+    <appender name="logstash" class="com.sonicbase.logger.Logger">
+        <param name="threshold" value="info"/>
+        <layout class="org.apache.log4j.PatternLayout">
+            <param name="ConversionPattern" value="%d{yyyy-MM-dd HH:mm:ss,SSS} %-5p - %C{1}: %m%n" />
+        </layout>
+    </appender>
+
+    <logger name="com.sonicbase" additivity="false">
+        <level value="info"/>
+        <appender-ref ref="roll"/>
+        <appender-ref ref="logstash"/>
+    </logger>
+
+    <logger name="com.sonicbase.logger.Logger" additivity="false">
+        <level value="info"/>
+        <appender-ref ref="roll"/>
+    </logger>
+
+    <logger name="io.netty.channel.nio.NioEventLoop" additivity="false">
+        <level value="fatal"/>
+        <appender-ref ref="roll" />
+    </logger>
+
+    <root>
+        <priority value="info" />
+        <appender-ref ref="roll" />
+        <appender-ref ref="logstash" />
+        <!--<appender-ref ref="roll-errors" />-->
+      <!--<appender-ref ref="console" />-->
+    </root>
+
+</log4j:configuration>

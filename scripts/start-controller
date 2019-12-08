@@ -1,0 +1,30 @@
+export _XMX_=$3
+export SONIC_BASE_HOME=$4
+#export MODE=yprof
+mkdir -p $4/logs
+
+#if [ $5 == "4-dale" ]
+#then
+#  export MODE=yprof
+#fi
+#if [ $5 == "4-dale-2" ]
+#then
+#  export MODE=yprof
+#fi
+
+if [ ${4:0:1} != "/" ]
+then
+  export SONIC_BASE_HOME=$HOME/$SONIC_BASE_HOME
+fi
+
+
+cd $SONIC_BASE_HOME
+echo "start-SONIC_BASE_HOME=$SONIC_BASE_HOME"
+
+export _CLIENT_ERROR_LOG4J_FILENAME_=$SONIC_BASE_HOME/logs/client-errors.log
+export _ERROR_LOG4J_FILENAME_=$SONIC_BASE_HOME/logs/errors.log
+export _LOG4J_FILENAME_=$SONIC_BASE_HOME/logs/$2.log
+export _GC_LOG_FILENAME_=$SONIC_BASE_HOME/logs/gc-$2.log
+export LOG4J_FILE="log4j.xml"
+nohup $SONIC_BASE_HOME/bin/runclass com.sonicbase.server.NettyServer -host $1 -port $2 -cluster $5 -gclog $_GC_LOG_FILENAME_ -xmx $_XMX_ -disable $6 > $SONIC_BASE_HOME/logs/$2.sysout.log 2>&1 &
+#nohup $SONIC_BASE_HOME/bin/runclass com.sonicbase.server.NettyServer -host $1 -port $2 -cluster $5 -gclog $_GC_LOG_FILENAME_ -xmx $_XMX_  &

@@ -28,13 +28,13 @@
 #  .help-impl are implemented in nbproject/makefile-impl.mk.
 #
 ARCH      := INTEL
-DEBUGGING := -DNDEBUG
+#DEBUGGING := -DNDEBUG
+DEBUGGING :=
 
 ifeq ($(ARCH),INTEL)
-#CC          := gcc
 CC          := g++
-CFLAGS      := -fPIC -O -O2 -O3 -pthread -std=c++0x -I/opt/jdk1.8.0_192/include/linux/ -I/opt/jdk1.8.0_192/include/  -I/Library/Java/JavaVirtualMachines/jdk1.8.0_181.jdk/Contents/Home/include -I/Library/Java/JavaVirtualMachines/jdk1.8.0_181.jdk/Contents/Home/include/darwin
-#CFLAGS	    := -Wall -g  -I/Library/Java/JavaVirtualMachines/jdk1.8.0_181.jdk/Contents/Home/include -I/Library/Java/JavaVirtualMachines/jdk1.8.0_181.jdk/Contents/Home/include/darwin
+CFLAGS      := -fPIC -g -O -O2 -pthread -std=c++0x -I/opt/jdk1.8.0_192/include/linux/ -I/opt/jdk1.8.0_192/include/  -I/Library/Java/JavaVirtualMachines/jdk1.8.0_181.jdk/Contents/Home/include -I/Library/Java/JavaVirtualMachines/jdk1.8.0_181.jdk/Contents/Home/include/darwin
+#CFLAGS      := -fPIC -g -O0 -pthread -std=c++0x -I/opt/jdk1.8.0_192/include/linux/ -I/opt/jdk1.8.0_192/include/  -I/Library/Java/JavaVirtualMachines/jdk1.8.0_181.jdk/Contents/Home/include -I/Library/Java/JavaVirtualMachines/jdk1.8.0_181.jdk/Contents/Home/include/darwin
 LDFLAGS     := -Wl#-L
 endif
 

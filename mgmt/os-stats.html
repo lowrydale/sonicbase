@@ -28,7 +28,6 @@
       // };
 
       var stats = "";
-      var currCluster = "";
       var group;
       var currTime = "min15";
       var cookieName = "SonicBase-OSStats";
@@ -279,7 +278,7 @@
           drawDiskAvail(stats.avg, col1x, row3y, draw, winHeight, winWidth, max, '#3ad03c');
           drawDiskAvail(stats.max, col1x, row3y, draw, winHeight, winWidth, max, '#ff0000');
 
-          var cookieValue = currTime + ":" + currCluster;
+          var cookieValue = currTime;
           createCookie(cookieName, cookieValue, 600000);
 
 
@@ -307,8 +306,6 @@
       }
 
       function refreshCluster(value) {
-          currCluster = value;
-          $('#clusters').val(value);
           getStats();
       }
 
@@ -344,11 +341,6 @@
               }
           });
 
-          if (currCluster == null || currCluster == "") {
-              currCluster = "_unknown_";
-          }
-
-
           currTime = document.getElementById("times").value;
 
           var timezone = Intl.DateTimeFormat().resolvedOptions().timeZone;
@@ -357,7 +349,7 @@
               headers:{
                   "Accept":"application/json",
                   "Content-type":"application/json"
-              },   url:"/os-stats?tz=" + timezone + "&cluster=" + currCluster + "&time=" + currTime,
+              },   url:"/os-stats?tz=" + timezone + "&time=" + currTime,
               success:callback,
               error: function(xhr) {
 
@@ -380,8 +372,6 @@
           if (cookieValue != null) {
               var parts = cookieValue.split(":");
               currTime = parts[0];
-              currCluster = parts[1];
-              //document.getElementById("clusters").value = currCluster;
               document.getElementById("times").value = currTime;
           }
 

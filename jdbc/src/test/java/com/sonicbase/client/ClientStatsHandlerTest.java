@@ -46,13 +46,13 @@ public class ClientStatsHandlerTest {
     histogramEntry.setLatencies(latencies);
     histogramEntry.setDbName("test");
     histogramEntry.setQuery("select * from persons");
-    Thread statsRecorderThread = ThreadUtil.createThread(new ClientStatsHandler.QueryStatsRecorder(client, "test", 5), "SonicBase Stats Recorder");
+    Thread statsRecorderThread = ThreadUtil.createThread(new ClientStatsHandler.QueryStatsRecorder(client, 5), "SonicBase Stats Recorder");
     statsRecorderThread.start();
     handler.registerCompletedQueryForStats(histogramEntry, System.nanoTime());
     //Thread.sleep(500);
 
-    handler.registerQueryForStats("test", "test", "select * from persons");
-    handler.registerQueryForStats("test", "test", "select * from persons");
+    handler.registerQueryForStats("test", "select * from persons");
+    handler.registerQueryForStats("test", "select * from persons");
     assertTrue(called.get());
 
     statsRecorderThread.interrupt();

@@ -43,7 +43,7 @@ public class TestStoredProcedures {
     serverA1.shutdown();
     serverA2.shutdown();
 
-    System.out.println("client refCount=" + DatabaseClient.clientRefCount.get() + ", sharedClients=" + DatabaseClient.sharedClients.size());
+    System.out.println("client refCount=" + DatabaseClient.clientRefCount.get());
     for (DatabaseClient client : DatabaseClient.allClients) {
       System.out.println("Stack:\n" + client.getAllocatedStack());
     }
@@ -67,12 +67,13 @@ public class TestStoredProcedures {
 
     String role = "primaryMaster";
 
+    Config.copyConfig("2-servers-a");
 
     final CountDownLatch latch = new CountDownLatch(4);
     serverA1 = new NettyServer(128);
     Thread thread = new Thread(() -> {
       serverA1.startServer(new String[]{"-port", String.valueOf(9010), "-host", "localhost",
-          "-mport", String.valueOf(9010), "-mhost", "localhost", "-cluster", "2-servers-a", "-shard", String.valueOf(0)});
+          "-mport", String.valueOf(9010), "-mhost", "localhost", "-shard", String.valueOf(0)});
       latch.countDown();
     });
     thread.start();
@@ -86,7 +87,7 @@ public class TestStoredProcedures {
     serverA2 = new NettyServer(128);
     thread = new Thread(() -> {
       serverA2.startServer(new String[]{"-port", String.valueOf(9060), "-host", "localhost",
-          "-mport", String.valueOf(9060), "-mhost", "localhost", "-cluster", "2-servers-a", "-shard", String.valueOf(1)});
+          "-mport", String.valueOf(9060), "-mhost", "localhost", "-shard", String.valueOf(1)});
       latch.countDown();
     });
     thread.start();

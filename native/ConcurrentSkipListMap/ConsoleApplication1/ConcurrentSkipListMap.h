@@ -23,6 +23,10 @@
 #include <random>
 #include <iostream>
 
+#ifndef INT_MAX
+#define INT_MAX  ((1 << (sizeof(int)*8 - 2)) - 1 + (1 << (sizeof(int)*8 - 2)))
+#endif
+
 //JAVA TO C++ CONVERTER NOTE: Forward class declarations:
 
 namespace skiplist { template<typename K, typename V>class HeadIndex; }
@@ -792,13 +796,13 @@ namespace skiplist
 								//delete r->node->key;
 								//delete (V)r->node->value.get();
 								//delete r->node;
-								delete r;
+								//delete r;
 								break; // restart
 							}
 							//delete r->node->key;
 							//delete (V)r->node->value.get();
 							//delete r->node;
-							delete r;
+							//delete r;
 							r = q->right.get(); // reread r
 							continue;
 						}
@@ -888,9 +892,9 @@ namespace skiplist
 					if (v->get() == NULL)
 					{ // n is deleted
 						n->helpDelete(b, f);
-						delete n->key;
-						delete (V)n->value.get();
-						delete n;
+						//delete n->key;
+						//delete (V)n->value.get();
+						//delete n;
 						break;
 					}
 					if (v->get() == n || b->value.get() == NULL) // b is deleted
@@ -1045,9 +1049,9 @@ namespace skiplist
 						if (v->get() == NULL)
 						{ // n is deleted
 							n->helpDelete(b, f);
-							delete n->key;
-							delete (V)n->value.get();
-							delete n;
+							//delete n->key;
+							//delete (V)n->value.get();
+							//delete n;
 							break;
 						}
 						if (v->get() == n || b->value.get() == NULL) // b is deleted
@@ -1107,10 +1111,10 @@ namespace skiplist
 			x ^= x << 13;
 			x ^= static_cast<int>(static_cast<unsigned int>(x) >> 17);
 			randomSeed = x ^= x << 5;
-			if ((x & 0x8001) != 0) // test highest and lowest bits
-			{
+			//if ((x & 0x8001) != 0) // test highest and lowest bits
+			//{
 			//	return 0;
-			}
+			//}
 			int level = 0;// 1;
 			while (((x = static_cast<int>(static_cast<unsigned int>(x) >> 1)) & 1) != 0)
 			{
@@ -1321,9 +1325,9 @@ namespace skiplist
 					if (v->get() == NULL)
 					{ // n is deleted
 						n->helpDelete(b, f);
-						delete n->key;
-						delete (V)n->value.get();
-						delete n;
+						//delete n->key;
+						//delete (V)n->value.get();
+						//delete n;
 						break;
 					}
 					if (v->get() == n || b->value.get() == NULL) // b is deleted
@@ -1457,9 +1461,9 @@ namespace skiplist
 				if (v->get() == NULL)
 				{
 					n->helpDelete(b, f);
-					delete n->key;
-					delete (V)n->value.get();
-					delete n;
+					//delete n->key;
+					//delete (V)n->value.get();
+					//delete n;
 					continue;
 				}
 				void *prev = v->get();
@@ -1559,9 +1563,9 @@ namespace skiplist
 						if (v->get() == NULL)
 						{ // n is deleted
 							n->helpDelete(b, f);
-							delete n->key;
-							delete (V)n->value.get();
-							delete n;
+							//delete n->key;
+							//delete (V)n->value.get();
+							//delete n;
 							break;
 						}
 						if (v->get() == n || b->value.get() == NULL) // b is deleted
@@ -1652,9 +1656,9 @@ namespace skiplist
 					if (v->get() == NULL)
 					{ // n is deleted
 						n->helpDelete(b, f);
-						delete n->key;
-						delete (V)n->value.get();
-						delete n;
+						//delete n->key;
+						//delete (V)n->value.get();
+						//delete n;
 						break;
 					}
 					if (v->get() == n || b->value.get() == NULL) // b is deleted
@@ -1730,9 +1734,9 @@ namespace skiplist
 					if (v->get() == NULL)
 					{ // n is deleted
 						n->helpDelete(b, f);
-						delete n->key;
-						delete (V)n->value.get();
-						delete n;
+						//delete n->key;
+						//delete (V)n->value.get();
+						//delete n;
 						break;
 					}
 					if (v->get() == n || b->value.get() == NULL) // b is deleted

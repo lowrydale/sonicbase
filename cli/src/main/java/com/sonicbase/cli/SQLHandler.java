@@ -8,8 +8,6 @@ import java.sql.PreparedStatement;
 import java.sql.SQLException;
 
 public class SQLHandler {
-
-  public static final String ERROR_NOT_USING_A_CLUSTER_STR = "Error, not using a cluster";
   public static final String ERROR_NOT_USING_A_DATABASE_STR = "Error, not using a database";
   private final Cli cli;
 
@@ -19,11 +17,6 @@ public class SQLHandler {
 
   void select(String command) throws SQLException, JSQLParserException, ClassNotFoundException, IOException,
       InterruptedException {
-    String cluster = cli.getCurrCluster();
-    if (cluster == null) {
-      cli.println(ERROR_NOT_USING_A_CLUSTER_STR);
-      return;
-    }
 
     if (cli.getCurrDbName() == null) {
       cli.println(ERROR_NOT_USING_A_DATABASE_STR);
@@ -43,12 +36,6 @@ public class SQLHandler {
   }
 
   public void insert(String command) throws SQLException, ClassNotFoundException {
-    String cluster = cli.getCurrCluster();
-    if (cluster == null) {
-      cli.println(ERROR_NOT_USING_A_CLUSTER_STR);
-      return;
-    }
-
     if (cli.getCurrDbName() == null) {
       cli.println(ERROR_NOT_USING_A_DATABASE_STR);
       return;
@@ -64,12 +51,6 @@ public class SQLHandler {
   }
 
   public void delete(String command) throws SQLException, ClassNotFoundException {
-    String cluster = cli.getCurrCluster();
-    if (cluster == null) {
-      cli.println(ERROR_NOT_USING_A_CLUSTER_STR);
-      return;
-    }
-
     if (cli.getCurrDbName() == null) {
       cli.println(ERROR_NOT_USING_A_DATABASE_STR);
       return;
@@ -85,12 +66,6 @@ public class SQLHandler {
   }
 
   void truncate(String command) throws SQLException, ClassNotFoundException {
-    String cluster = cli.getCurrCluster();
-    if (cluster == null) {
-      cli.println(ERROR_NOT_USING_A_CLUSTER_STR);
-      return;
-    }
-
     if (cli.getCurrDbName() == null) {
       cli.println(ERROR_NOT_USING_A_DATABASE_STR);
       return;
@@ -106,12 +81,6 @@ public class SQLHandler {
   }
 
   void drop(String command) throws SQLException, ClassNotFoundException {
-    String cluster = cli.getCurrCluster();
-    if (cluster == null) {
-      cli.println(ERROR_NOT_USING_A_CLUSTER_STR);
-      return;
-    }
-
     if (cli.getCurrDbName() == null) {
       cli.println(ERROR_NOT_USING_A_DATABASE_STR);
       return;
@@ -127,12 +96,6 @@ public class SQLHandler {
   }
 
   void create(String command) throws SQLException, ClassNotFoundException {
-    String cluster = cli.getCurrCluster();
-    if (cluster == null) {
-      cli.println(ERROR_NOT_USING_A_CLUSTER_STR);
-      return;
-    }
-
     cli.initConnection();
 
     if (command.startsWith("create database")) {
@@ -155,12 +118,6 @@ public class SQLHandler {
   }
 
   void alter(String command) throws SQLException, ClassNotFoundException {
-    String cluster = cli.getCurrCluster();
-    if (cluster == null) {
-      cli.println(ERROR_NOT_USING_A_CLUSTER_STR);
-      return;
-    }
-
     if (cli.getCurrDbName() == null) {
       cli.println(ERROR_NOT_USING_A_DATABASE_STR);
       return;

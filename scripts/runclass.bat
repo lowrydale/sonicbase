@@ -37,13 +37,7 @@ SET java_opts=%java_opts% -XX:+HeapDumpOnOutOfMemoryError  -Djava.net.preferIPv4
 SET java_opts=%java_opts% -XX:+PrintGCDetails -XX:+PrintGCTimeStamps
 SET java_opts=%java_opts% -XX:-OmitStackTraceInFastThrow -XX:-UseLoopPredicate
 SET java_opts=%java_opts% -Xmx%_XMX_% -XX:MaxDirectMemorySize=2g
-SET java_opts=%java_opts% -Dfamilysearch.search.disable.foreign.node.registration -Dfamilysearch.search.disable.central.log
-if "%OS%"=="64BIT" (
-    SET java_opts=%java_opts% -Djava.library.path=%SONIC_BASE_HOME%/lib/win/x64
-)
-if "%OS%"=="32BIT" (
-    SET java_opts=%java_opts% -Djava.library.path=%SONIC_BASE_HOME%/lib/win/x86
-)
+SET java_opts=%java_opts% -Djava.library.path=%SONIC_BASE_HOME%/lib/win
 
 if "%LOG4J_FILE%" == "cli-log4j.xml" (
     SET java_opts=%java_opts% -Dlog4j.configuration=cli-log4j.xml

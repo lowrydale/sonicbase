@@ -372,7 +372,7 @@ public class Index {
         return curr.get() != offsets.size();
       }
       return true;
-    }, 45 * DatabaseClient.SELECT_PAGE_SIZE);
+    }, 8 * DatabaseClient.SELECT_PAGE_SIZE);
   }
 
   private Object[] getFloorKey(Object[] minKey) {

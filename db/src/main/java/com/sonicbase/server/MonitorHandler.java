@@ -40,8 +40,8 @@ public class MonitorHandler extends AbstractHandler {
   private static Logger logger = LoggerFactory.getLogger(MonitorHandler.class);
 
   private final DatabaseServer server;
-  private static ConcurrentHashMap<String, Connection> connections = new ConcurrentHashMap<>();
   private final ProServer proServer;
+  private static Connection connection;
 
 
   public MonitorHandler(ProServer proServer, DatabaseServer server) {
@@ -93,7 +93,6 @@ public class MonitorHandler extends AbstractHandler {
       }
 
       if (uri.startsWith("/query-stats")) {
-        String cluster = request.getParameter("cluster");
         String orderBy = request.getParameter("order_by");
         String pageSize = request.getParameter("page_size");
         String offset = request.getParameter("offset");
@@ -102,25 +101,23 @@ public class MonitorHandler extends AbstractHandler {
         String currentDate = request.getParameter("currDate");
         String timezone = request.getParameter("tz");
         String searchStr = request.getParameter("search");
-        String data = getQueryStats(cluster, offset, pageSize, orderBy, asc, date, currentDate, timezone, searchStr);
+        String data = getQueryStats(offset, pageSize, orderBy, asc, date, currentDate, timezone, searchStr);
         response.setContentType("application/json; charset=utf-8");
         response.setStatus(HttpServletResponse.SC_OK);
         IOUtils.write(data, response.getOutputStream(), "utf-8");
         response.getOutputStream().flush();
       }
       else if (uri.startsWith("/os-stats")) {
-        String cluster = request.getParameter("cluster");
         String time = request.getParameter("time");
         String timezone = request.getParameter("tz");
-        String data = getOSStats(cluster, time, timezone);
+        String data = getOSStats(time, timezone);
         response.setContentType("application/json; charset=utf-8");
         response.setStatus(HttpServletResponse.SC_OK);
         IOUtils.write(data, response.getOutputStream(), "utf-8");
         response.getOutputStream().flush();
       }
       else if (uri.startsWith("/health")) {
-        String cluster = request.getParameter("cluster");
-        String data = getServerHealth(cluster);
+        String data = getServerHealth();
         response.setContentType("application/json; charset=utf-8");
         response.setStatus(HttpServletResponse.SC_OK);
         IOUtils.write(data, response.getOutputStream(), "utf-8");
@@ -151,46 +148,11 @@ public class MonitorHandler extends AbstractHandler {
     }
   }
 
-  private static ArrayNode getClusters(ObjectNode node) {
-    ArrayNode clusters = node.putArray("clusters");
-
-    File binDir = new File(System.getProperty("user.dir"));
-
-    File dir = new File(binDir, "config");
-    if (!dir.exists()) {
-      dir = new File(binDir.getParentFile(), "config");
-    }
-    //System.out.println("Checking dir for clusters: dir=" + dir.getAbsolutePath());
-    File[] files = dir.listFiles();
-    if (files != null) {
-      for (File file : files) {
-        String name = file.getName();
-        if (name.contains("config-license-server")) {
-          continue;
-        }
-        if (name.contains("config-mgmt-server")) {
-          continue;
-        }
-        if (name.startsWith("config-")) {
-          String clusterName = name.substring("config-".length(), name.lastIndexOf('.'));
-          clusters.add(clusterName);
-        }
-      }
-    }
-    return clusters;
-  }
-
-  public String getOSStats(String cluster, String time, String timezone) {
+  public String getOSStats(String time, String timezone) {
     ObjectMapper mapper = new ObjectMapper();
     ObjectNode node = mapper.createObjectNode();
     try {
-      getClusters(node);
-
-      //if (cluster == null || cluster.length() == 0 || cluster.equals("_unknown_")) {
-      cluster = server.getCluster();
-      //}
-
-      Connection conn = getDbConnection(cluster);
+      Connection conn = getDbConnection();
 
       double maxMem = 0;
       double maxDisk = 0;
@@ -466,13 +428,12 @@ public class MonitorHandler extends AbstractHandler {
   }
 
   public void shutdown() {
-    for (Connection conn : connections.values()) {
-      try {
-        conn.close();
-      }
-      catch (SQLException e) {
-        logger.error("Error shutting down monitor handler", e);
-      }
+
+    try {
+      connection.close();
+    }
+    catch (SQLException e) {
+      logger.error("Error shutting down monitor handler", e);
     }
   }
 
@@ -508,16 +469,12 @@ public class MonitorHandler extends AbstractHandler {
   }
 
 
-  public String getQueryStats(String cluster, String offset, String page_size, String orderBy,
+  public String getQueryStats(String offset, String page_size, String orderBy,
                               String asc, String date, String currentDate, String timezone, String searchStr) throws IOException {
     ObjectMapper mapper = new ObjectMapper();
     ObjectNode node = mapper.createObjectNode();
     try {
-      getClusters(node);
-
-      cluster = server.getCluster();
-
-      Connection conn = getDbConnection(cluster);
+      Connection conn = getDbConnection();
 
       SimpleDateFormat df = new SimpleDateFormat(DAY_FORMAT_STR);
 
@@ -611,30 +568,23 @@ public class MonitorHandler extends AbstractHandler {
     return node.toString();
   }
 
-  private Connection getDbConnection(String cluster) {
+  private Connection getDbConnection() {
     try {
-      Connection conn = null;
       synchronized (this) {
-        conn = connections.get(cluster);
-        if (conn != null) {
-          return conn;
+        if (connection != null) {
+          return connection;
         }
         Config config = proServer.getConfig();
 
         List<Config.Shard> array = config.getShards();
         Config.Shard shard = array.get(0);
         List<Config.Replica> replicasArray = shard.getReplicas();
-        Boolean node = config.getBoolean("clientIsPrivate");
-        final String address = node != null && node ?
-            replicasArray.get(0).getString("privateAddress") :
-            replicasArray.get(0).getString("publicAddress");
+        final String address = replicasArray.get(0).getString("address");
         final int port = replicasArray.get(0).getInt("port");
 
         Class.forName("com.sonicbase.jdbcdriver.Driver");
-        conn = DriverManager.getConnection("jdbc:sonicbase:" + address + ":" + port + "/_sonicbase_sys");
-
-        connections.put(cluster, conn);
-        return conn;
+        connection = DriverManager.getConnection("jdbc:sonicbase:" + address + ":" + port + "/_sonicbase_sys");
+        return connection;
       }
     }
     catch (Exception e) {
@@ -645,15 +595,11 @@ public class MonitorHandler extends AbstractHandler {
   }
 
 
-  private String getServerHealth(String cluster) {
+  private String getServerHealth() {
     ObjectMapper mapper = new ObjectMapper();
     ObjectNode node = mapper.createObjectNode();
     try {
-      getClusters(node);
-
-      cluster = server.getCluster();
-
-      Connection conn = getDbConnection(cluster);
+      Connection conn = getDbConnection();
 
       DatabaseClient client = ((ConnectionProxy)conn).getDatabaseClient();
       client.syncSchema();
@@ -667,7 +613,7 @@ public class MonitorHandler extends AbstractHandler {
         for (int i = 0; i < replicas.length; i++) {
           ObjectNode replicaNode = replicasArray.addObject();
           ServersConfig.Host replica = replicas[i];
-          replicaNode.put("host", replica.getPrivateAddress() + ":" + replica.getPort());
+          replicaNode.put("host", replica.getaddress() + ":" + replica.getPort());
           replicaNode.put("shard", String.valueOf(j));
           replicaNode.put("replica", String.valueOf(i));
           replicaNode.put("dead", String.valueOf(replica.isDead()));

@@ -1,0 +1,6 @@
+#!/bin/bash
+rm -rf $1/deletes
+rm -rf $1/log
+rm -rf $1/lrc
+rm -rf $1/snapshot
+rm -rf $1/nextRecordId

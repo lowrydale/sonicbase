@@ -9,5 +9,5 @@ cd $SONIC_BASE_HOME
 
 mkdir -p $SONIC_BASE_HOME/logs
 
-nohup $SONIC_BASE_HOME/bin/runclass com.sonicbase.cli.Deploy $1 $2 > $SONIC_BASE_HOME/logs/deploy.log 2>&1 &
+nohup $SONIC_BASE_HOME/bin/runclass com.sonicbase.cli.Deploy $1 $2 $3 > $SONIC_BASE_HOME/logs/deploy.log 2>&1 &
 

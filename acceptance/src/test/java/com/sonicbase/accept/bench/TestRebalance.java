@@ -38,7 +38,8 @@ public class TestRebalance {
       futures.add(executor.submit((Callable) () -> {
         String role = "primaryMaster";
         dbServers[shard] = new DatabaseServer();
-        dbServers[shard].setConfig(config, "test", "localhost", 9010 + (50 * shard), true, new AtomicBoolean(true), new AtomicBoolean(true),null, false);
+        Config.copyConfig("test");
+        dbServers[shard].setConfig(config, "localhost", 9010 + (50 * shard), true, new AtomicBoolean(true), new AtomicBoolean(true),null, false);
         dbServers[shard].setRole(role);
         return null;
       }));

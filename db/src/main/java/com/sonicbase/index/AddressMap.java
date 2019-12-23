@@ -751,6 +751,8 @@ public class AddressMap {
         if (innerAddress == null || (long) innerAddress == -1L) {
           return null;
         }
+        System.out.println("outer=" + obj + ", inner=" + innerAddress);
+        System.out.flush();
 
         int offset = 0;
         offset += 1;//single allocation
@@ -780,6 +782,9 @@ public class AddressMap {
       if (innerAddress == null || (long) innerAddress == -1L) {
         return null;
       }
+
+//      System.out.println("inner=" + innerAddress);
+//      System.out.flush();
 
       int offset = 0;
       offset += 8; //update time

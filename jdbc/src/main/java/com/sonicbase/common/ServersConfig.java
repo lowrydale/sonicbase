@@ -12,7 +12,6 @@ import java.util.List;
 // I don't know a good way to reduce the parameter count
 public class ServersConfig {
   private boolean optimizeForThroughput;
-  private String cluster;
   private Shard[] shards;
   private boolean clientIsInternal;
 
@@ -27,45 +26,32 @@ public class ServersConfig {
     this.shards = shards;
   }
 
-  public void setCluster(String cluster) {
-    this.cluster = cluster;
-  }
-
-
   public static class Host {
-    private String publicAddress;
-    private String privateAddress;
+    private String address;
     private int port;
     private boolean dead;
 
-    private Host(String publicAddress, String privateAddress, int port) {
-      this.publicAddress = publicAddress;
-      this.privateAddress = privateAddress;
+    private Host(String address, int port) {
+      this.address = address;
       this.port = port;
     }
 
-    public String getPublicAddress() {
-      return publicAddress;
-    }
-
-    public String getPrivateAddress() {
-      return privateAddress;
+    public String getaddress() {
+      return address;
     }
 
     public int getPort() {
       return port;
     }
 
-    public Host(String publicAddress, String privateAddress, int port, boolean dead) {
-      this.publicAddress = publicAddress;
-      this.privateAddress = privateAddress;
+    public Host(String address, int port, boolean dead) {
+      this.address = address;
       this.port = port;
       this.dead = dead;
     }
 
     public Host(DataInputStream in, short serializationVersionNumber) throws IOException {
-      publicAddress = in.readUTF();
-      privateAddress = in.readUTF();
+      address = in.readUTF();
       port = in.readInt();
       if (serializationVersionNumber >= DatabaseClient.SERIALIZATION_VERSION_21) {
         dead = in.readBoolean();
@@ -73,8 +59,7 @@ public class ServersConfig {
     }
 
     public void serialize(DataOutputStream out, short serializationVersionNumber) throws IOException {
-      out.writeUTF(publicAddress);
-      out.writeUTF(privateAddress);
+      out.writeUTF(address);
       out.writeInt(port);
       if (serializationVersionNumber >= DatabaseClient.SERIALIZATION_VERSION_21) {
         out.writeBoolean(dead);
@@ -129,7 +114,7 @@ public class ServersConfig {
 
     public boolean contains(String host, int port) {
       for (int i = 0; i < replicas.length; i++) {
-        if (replicas[i].privateAddress.equals(host) && replicas[i].port == port) {
+        if (replicas[i].address.equals(host) && replicas[i].port == port) {
           return true;
         }
       }
@@ -147,8 +132,9 @@ public class ServersConfig {
   }
 
   public ServersConfig(DataInputStream in, short serializationVersion) throws IOException {
-    if (serializationVersion >= DatabaseClient.SERIALIZATION_VERSION_21) {
-      cluster = in.readUTF();
+    if (serializationVersion >= DatabaseClient.SERIALIZATION_VERSION_21 &&
+        serializationVersion < DatabaseClient.SERIALIZATION_VERSION_31) {
+      in.readUTF();
     }
     int count = in.readInt();
     shards = new Shard[count];
@@ -170,7 +156,6 @@ public class ServersConfig {
   }
 
   public void serialize(DataOutputStream out, short serializationVersionNumber) throws IOException {
-    out.writeUTF(cluster);
     out.writeInt(shards.length);
     for (Shard shard : shards) {
       shard.serialize(out, serializationVersionNumber);
@@ -187,19 +172,14 @@ public class ServersConfig {
     return shards.length;
   }
 
-  public String getCluster() {
-    return cluster;
-  }
-
-  public ServersConfig(String cluster, ArrayNode inShards, boolean clientIsInternal, boolean optimizedForThroughput) {
-    this.cluster = cluster;
+  public ServersConfig(ArrayNode inShards, boolean clientIsInternal, boolean optimizedForThroughput) {
     int shardCount = inShards.size();
     shards = new Shard[shardCount];
     for (int i = 0; i < shardCount; i++) {
       ArrayNode replicas = (ArrayNode) inShards.get(i).withArray("replicas");
       Host[] hosts = new Host[replicas.size()];
       for (int j = 0; j < hosts.length; j++) {
-        hosts[j] = new Host(replicas.get(j).get("publicAddress").asText(), replicas.get(j).get("privateAddress").asText(),
+        hosts[j] = new Host(replicas.get(j).get("address").asText(),
             (int) replicas.get(j).get("port").asLong());
       }
       shards[i] = new Shard(hosts);
@@ -210,15 +190,14 @@ public class ServersConfig {
   }
 
 
-  public ServersConfig(String cluster, List<Config.Shard> inShards, boolean clientIsInternal, boolean optimizedForThroughput) {
-    this.cluster = cluster;
+  public ServersConfig(List<Config.Shard> inShards, boolean clientIsInternal, boolean optimizedForThroughput) {
     int shardCount = inShards.size();
     shards = new Shard[shardCount];
     for (int i = 0; i < shardCount; i++) {
       List<Config.Replica> replicas = inShards.get(i).getReplicas();
       Host[] hosts = new Host[replicas.size()];
       for (int j = 0; j < hosts.length; j++) {
-        hosts[j] = new Host(replicas.get(j).getString("publicAddress"), replicas.get(j).getString("privateAddress"),
+        hosts[j] = new Host(replicas.get(j).getString("address"),
             replicas.get(j).getInt("port"));
       }
       shards[i] = new Shard(hosts);
@@ -232,7 +211,7 @@ public class ServersConfig {
     for (int i = 0; i < shards.length; i++) {
       for (int j = 0; j < shards[i].replicas.length; j++) {
         Host currHost = shards[i].replicas[j];
-        if (currHost.privateAddress.equals(host) && currHost.port == port) {
+        if (currHost.address.equals(host) && currHost.port == port) {
           return j;
         }
       }

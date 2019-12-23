@@ -72,20 +72,24 @@
   <PropertyGroup Label="UserMacros" />
   <PropertyGroup Condition="'$(Configuration)|$(Platform)'=='Debug|Win32'">
     <LinkIncremental>true</LinkIncremental>
+    <IncludePath>$(VC_IncludePath);$(WindowsSDK_IncludePath);C:\Program Files\Java\jdk1.8.0_191\include;C:\Program Files\Java\jdk1.8.0_191\include\win32;lze-2.10\src;$(IncludePath)</IncludePath>
   </PropertyGroup>
   <PropertyGroup Condition="'$(Configuration)|$(Platform)'=='Debug|x64'">
     <LinkIncremental>true</LinkIncremental>
+    <IncludePath>$(VC_IncludePath);$(WindowsSDK_IncludePath);C:\Program Files\Java\jdk1.8.0_191\include;C:\Program Files\Java\jdk1.8.0_191\include\win32;lze-2.10\src;$(IncludePath)</IncludePath>
   </PropertyGroup>
   <PropertyGroup Condition="'$(Configuration)|$(Platform)'=='Release|Win32'">
     <LinkIncremental>false</LinkIncremental>
+    <IncludePath>$(VC_IncludePath);$(WindowsSDK_IncludePath);C:\Program Files\Java\jdk1.8.0_191\include;C:\Program Files\Java\jdk1.8.0_191\include\win32;lze-2.10\src;$(IncludePath)</IncludePath>
   </PropertyGroup>
   <PropertyGroup Condition="'$(Configuration)|$(Platform)'=='Release|x64'">
     <LinkIncremental>false</LinkIncremental>
     <TargetName>SonicBase</TargetName>
+    <IncludePath>$(VC_IncludePath);$(WindowsSDK_IncludePath);C:\Program Files\Java\jdk1.8.0_191\include;C:\Program Files\Java\jdk1.8.0_191\include\win32;lze-2.10\src;$(IncludePath)</IncludePath>
   </PropertyGroup>
   <ItemDefinitionGroup Condition="'$(Configuration)|$(Platform)'=='Debug|Win32'">
     <ClCompile>
-      <PrecompiledHeader>Use</PrecompiledHeader>
+      <PrecompiledHeader>NotUsing</PrecompiledHeader>
       <WarningLevel>Level3</WarningLevel>
       <Optimization>Disabled</Optimization>
       <SDLCheck>true</SDLCheck>
@@ -99,7 +103,7 @@
   </ItemDefinitionGroup>
   <ItemDefinitionGroup Condition="'$(Configuration)|$(Platform)'=='Debug|x64'">
     <ClCompile>
-      <PrecompiledHeader>Use</PrecompiledHeader>
+      <PrecompiledHeader>NotUsing</PrecompiledHeader>
       <WarningLevel>Level3</WarningLevel>
       <Optimization>Disabled</Optimization>
       <SDLCheck>true</SDLCheck>
@@ -113,7 +117,7 @@
   </ItemDefinitionGroup>
   <ItemDefinitionGroup Condition="'$(Configuration)|$(Platform)'=='Release|Win32'">
     <ClCompile>
-      <PrecompiledHeader>Use</PrecompiledHeader>
+      <PrecompiledHeader>NotUsing</PrecompiledHeader>
       <WarningLevel>Level3</WarningLevel>
       <Optimization>MaxSpeed</Optimization>
       <FunctionLevelLinking>true</FunctionLevelLinking>
@@ -152,20 +156,18 @@
   <ItemGroup>
     <ClInclude Include="BigDecimal.h" />
     <ClInclude Include="com_sonicbase_index_NativePartitionedTree.h" />
-    <ClInclude Include="WindowsTerminal.h" />
+    <ClInclude Include="win-src\stdafx.h" />
+    <ClInclude Include="win-src\targetver.h" />
+    <ClInclude Include="win-src\utf8.h" />
+    <ClInclude Include="win-src\WindowsTerminal.h" />
     <ClInclude Include="kavl.h" />
-    <ClInclude Include="utf8.h" />
   </ItemGroup>
   <ItemGroup>
     <ClCompile Include="BigDecimal.cpp" />
-    <ClCompile Include="dllmain.cpp" />
     <ClCompile Include="PartitionedAvlTree.cpp" />
-    <ClCompile Include="Main.cpp" />
-    <ClCompile Include="WindowsTerminal.cpp" />
-    <ClCompile Include="stdafx.cpp" />
-  </ItemGroup>
-  <ItemGroup>
-    <None Include="Makefile" />
+    <ClCompile Include="win-src\dllmain.cpp" />
+    <ClCompile Include="win-src\stdafx.cpp" />
+    <ClCompile Include="win-src\WindowsTerminal.cpp" />
   </ItemGroup>
   <Import Project="$(VCTargetsPath)\Microsoft.Cpp.targets" />
   <ImportGroup Label="ExtensionTargets">

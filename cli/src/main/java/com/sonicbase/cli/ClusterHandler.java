@@ -31,14 +31,12 @@ public class ClusterHandler {
 
   private static final Logger logger = LoggerFactory.getLogger(ClusterHandler.class);
   public static final String INSTALL_DIRECTORY_STR = "installDirectory";
-  private static final String PUBLIC_ADDRESS_STR = "publicAddress";
-  private static final String PRIVATE_ADDRESS_STR = "privateAddress";
+  private static final String ADDRESS_STR = "address";
   private static final String LOCAL_HOST_NUMS_STR = "127.0.0.1";
   private static final String LOCALHOST_STR = "localhost";
   private static final String USER_HOME_STR = "user.home";
   private static final String USER_DIR_STR = "user.dir";
   private static final String PORT_STR = ", port=";
-  private static final String ERROR_NOT_USING_A_CLUSTER_STR = "Error, not using a cluster";
   private static final String MAX_JAVA_HEAP_STR = ", maxJavaHeap=";
   private static final String NONE_STR = "__none__";
   private static final String DATABASE_SERVER_HEALTH_CHECK_STR = "DatabaseServer:healthCheck";
@@ -55,22 +53,22 @@ public class ClusterHandler {
     this.cli = cli;
   }
 
-  void deploy() {
-    String cluster = cli.getCurrCluster();
-    if (cluster == null) {
-      cli.println(ERROR_NOT_USING_A_CLUSTER_STR);
-      return;
-    }
-    cli.println("deploying: cluster=" + cluster);
+  void deploy(String command) {
+    command = command.trim();
+    String[] parts = command.split("\\s+");
+    final String gatewayServer = parts[2];
+    final String installDir = parts[3];
+
+    cli.println("deploying");
 
     Deploy deploy = new Deploy();
-    deploy.deploy(cli.getCurrCluster(), "0");
+    deploy.deploy(gatewayServer, installDir,"0");
 
-    cli.println("Finished deploy: cluster=" + cluster);
+    cli.println("Finished deploy");
   }
 
-  private void startServer(Config config, String externalAddress, String privateAddress, String port, String installDir,
-                                  String cluster, boolean disable, AtomicReference<Double> lastTotalGig,
+  private void startServer(Config config, String address, String port,
+                                  boolean disable, AtomicReference<Double> lastTotalGig,
                            int shard, int replica) throws IOException, InterruptedException, UnirestException {
     try {
       String deployUser = config.getString("user");
@@ -78,36 +76,21 @@ public class ClusterHandler {
       if (port == null) {
         port = "9010";
       }
-      String searchHome = installDir;
-      if (externalAddress.equals(LOCAL_HOST_NUMS_STR) || externalAddress.equals(LOCALHOST_STR)) {
+      if (address.equals(LOCAL_HOST_NUMS_STR) || address.equals(LOCALHOST_STR)) {
         maxHeap = cli.getMaxHeap(config);
-        if (cli.isWindows()) {
-          if (!searchHome.substring(1, 2).equals(":")) {
-            File file = new File(System.getProperty(USER_HOME_STR), searchHome);
-            searchHome = file.getAbsolutePath();
-          }
-        }
-        else {
-          if (!searchHome.startsWith("/")) {
-            File file = new File(System.getProperty(USER_HOME_STR), searchHome);
-            searchHome = file.getAbsolutePath();
-          }
-        }
       }
-      cli.println("Home=" + searchHome);
-      if (externalAddress.equals(LOCAL_HOST_NUMS_STR) || externalAddress.equals(LOCALHOST_STR)) {
-        searchHome = new File(System.getProperty(USER_DIR_STR)).getAbsolutePath();
+      if (address.equals(LOCAL_HOST_NUMS_STR) || address.equals(LOCALHOST_STR)) {
         maxHeap = cli.getMaxHeap(config);
         ProcessBuilder builder = null;
         if (cli.isCygwin() || cli.isWindows()) {
-
-          builder = new ProcessBuilder().command("bin/start-db-server-task.bat", privateAddress, port, maxHeap, searchHome, cluster, disable ? "disable" : "enable");
+          builder = new ProcessBuilder().command("bin/start-db-server-task.bat", address, port, maxHeap, disable ? "disable" : "enable");
           Process p = builder.start();
           p.waitFor();
-          cli.println("Started server: address=" + externalAddress + PORT_STR + port + MAX_JAVA_HEAP_STR + maxHeap);
+          cli.println("Started server: address=" + address + PORT_STR + port + MAX_JAVA_HEAP_STR + maxHeap);
         }
         else {
-          builder = new ProcessBuilder().command("bash", "bin/start-db-server", privateAddress, port, maxHeap, searchHome, cluster, disable ? "disable" : "enable");
+          builder = new ProcessBuilder().command("bash", "bin/start-db-server",
+              address, port, maxHeap, disable ? "disable" : "enable");
           Process p = builder.start();
           StringBuilder sbuilder = new StringBuilder();
           InputStream in = p.getInputStream();
@@ -119,7 +102,7 @@ public class ClusterHandler {
             sbuilder.append(String.valueOf((char) b));
           }
           cli.println(sbuilder.toString());
-          cli.println("Started server - linux: address=" + externalAddress + PORT_STR + port + MAX_JAVA_HEAP_STR + maxHeap + ", searchHome=" + searchHome + ", cluster=" + cluster);
+          cli.println("Started server - linux: address=" + address + PORT_STR + port + MAX_JAVA_HEAP_STR + maxHeap);
         }
       }
       else {
@@ -128,22 +111,22 @@ public class ClusterHandler {
           ProcessBuilder builder = null;
           Process p = null;
           String line = null;
-          if (cli.isWindows()) {
-            GetRequest request = Unirest.get("http://" + privateAddress + ":8081/get-mem-total?cluster=" + cluster + "&shard=" + shard + "&replica=" + replica);
+          //if (cli.isWindows()) {
+            GetRequest request = Unirest.get("http://" + address + ":8081/get-mem-total?shard=" + shard + "&replica=" + replica);
             HttpResponse<String> response = request.asString();
             if (response.getStatus() != 200) {
-              throw new DatabaseException("Error starting server: host=" + privateAddress);
+              throw new DatabaseException("Error starting server: host=" + address);
             }
             line = response.getBody();
-          }
-          else {
-            builder = new ProcessBuilder().command("bash", "bin/remote-get-mem-total", deployUser + "@" + externalAddress, installDir);
-            p = builder.start();
-          }
-          if (p != null) {
-            BufferedReader reader = new BufferedReader(new InputStreamReader(p.getInputStream()));
-            line = reader.readLine();
-          }
+//          }
+//          else {
+//            builder = new ProcessBuilder().command("bash", "bin/remote-get-mem-total", deployUser + "@" + address, installDir);
+//            p = builder.start();
+//          }
+//          if (p != null) {
+//            BufferedReader reader = new BufferedReader(new InputStreamReader(p.getInputStream()));
+//            line = reader.readLine();
+//          }
           double totalGig = 0;
           if (cli.isWindows() || cli.isCygwin()) {
             totalGig = Double.valueOf(line) / 1000d / 1000d / 1000d;
@@ -175,38 +158,31 @@ public class ClusterHandler {
           maxHeap = (int) Math.floor(maxGig * 1024d) + "m";
         }
 
-        cli.println("Started server: address=" + externalAddress + PORT_STR + port + MAX_JAVA_HEAP_STR + maxHeap);
-        if (cli.isWindows()) {
-          GetRequest request = Unirest.get("http://" + privateAddress + ":8081/start-server?cluster=" + cluster + "&shard=" +
+        cli.println("Started server: address=" + address + PORT_STR + port + MAX_JAVA_HEAP_STR + maxHeap);
+//        if (cli.isWindows()) {
+          GetRequest request = Unirest.get("http://" + address + ":8081/start-server?shard=" +
               shard + "&replica=" + replica + "&maxHeap=" + maxHeap);
           HttpResponse<String> response = request.asString();
           if (response.getStatus() != 200) {
-            throw new DatabaseException("Error starting server: host=" + privateAddress);
+            throw new DatabaseException("Error starting server: host=" + address);
           }
-        }
-        else {
-          ProcessBuilder builder = new ProcessBuilder().command("bash", "bin/do-start", deployUser + "@" + externalAddress,
-              installDir, privateAddress, port, maxHeap, searchHome, cluster, disable ? "disable" : "enable");
-          Process p = builder.start();
-          p.waitFor();
-        }
+//        }
+//        else {
+//          ProcessBuilder builder = new ProcessBuilder().command("bash", "bin/do-start", deployUser + "@" + address,
+//              installDir, address, port, maxHeap, searchHome, cluster, disable ? "disable" : "enable");
+//          Process p = builder.start();
+//          p.waitFor();
+//        }
       }
     }
     catch (Exception e) {
-      cli.println("Error starting server: publicAddress=" + externalAddress + ", internalAddress=" + privateAddress);
+      cli.println("Error starting server: internalAddress=" + address);
       throw new DatabaseException(e);
     }
   }
 
   void startCluster() throws IOException, InterruptedException, SQLException, ClassNotFoundException, ExecutionException, UnirestException {
-    final String cluster = cli.getCurrCluster();
-    if (cluster == null) {
-      cli.println(ERROR_NOT_USING_A_CLUSTER_STR);
-      return;
-    }
-
-    Config config = cli.getConfig(cluster);
-    final String installDir = cli.resolvePath(config.getString(INSTALL_DIRECTORY_STR));
+    Config config = cli.getConfig();
     List<Config.Shard> shards = config.getShards();
 
     stopCluster();
@@ -215,8 +191,8 @@ public class ClusterHandler {
 
     final List<Config.Replica> masterReplica = shards.get(0).getReplicas();
     Config.Replica master = masterReplica.get(0);
-    startServer(config, master.getString(PUBLIC_ADDRESS_STR), master.getString(PRIVATE_ADDRESS_STR),
-        String.valueOf(master.getInt("port")), installDir, cluster, false, new AtomicReference<Double>(0d), 0, 0);
+    startServer(config, master.getString(ADDRESS_STR),
+        String.valueOf(master.getInt("port")), false, new AtomicReference<Double>(0d), 0, 0);
     Thread.sleep(5_000);
     cli.initConnection();
 
@@ -234,8 +210,7 @@ public class ClusterHandler {
           }
           futures.add(executor.submit((Callable) () -> {
             Config.Replica replica = replicas.get(replicaOffset);
-            startServer(config, replica.getString(PUBLIC_ADDRESS_STR),
-                replica.getString(PRIVATE_ADDRESS_STR), String.valueOf(replica.getInt("port")), installDir, cluster, false,
+            startServer(config, replica.getString(ADDRESS_STR), String.valueOf(replica.getInt("port")), false,
                 lastTotalGig, shardOffset, replicaOffset);
             return null;
           }));
@@ -272,7 +247,7 @@ public class ClusterHandler {
               }
               else {
                 cli.println("Server not healthy: shard=" + shardOffset + ", replica=" + replicaOffset +
-                    ", privateAddress=" + replica.getString(PRIVATE_ADDRESS_STR));
+                    ", address=" + replica.getString(ADDRESS_STR));
               }
             }
             catch (Exception e) {
@@ -289,7 +264,7 @@ public class ClusterHandler {
                 Boolean error = retObj.getBoolean(ComObject.Tag.ERROR);
 
                 percentComplete *= 100d;
-                cli.println(WAITING_FOR_STR + replica.getString(PRIVATE_ADDRESS_STR) + " to start: stage=" +
+                cli.println(WAITING_FOR_STR + replica.getString(ADDRESS_STR) + " to start: stage=" +
                     stage + ", percentComplete=" + String.format("%.2f", percentComplete) + (error != null && error ? ERROR_TRUE_STR : ""));
                 try {
                   Thread.sleep(2000);
@@ -301,7 +276,7 @@ public class ClusterHandler {
               }
               catch (Exception e1) {
                 if (!printedFinished.get()) {
-                  cli.println(WAITING_FOR_STR + replica.getString(PRIVATE_ADDRESS_STR) + " to start: percentComplete=?");
+                  cli.println(WAITING_FOR_STR + replica.getString(ADDRESS_STR) + " to start: percentComplete=?");
                 }
                 try {
                   Thread.sleep(2000);
@@ -335,8 +310,59 @@ public class ClusterHandler {
     cli.println("Finished starting servers");
   }
 
-  private void startReplica(final int replica, final Config config, final List<Config.Shard> shards,
-                            final String installDir, final String cluster) throws InterruptedException, ExecutionException {
+  void startControllers() throws InterruptedException, ExecutionException, IOException {
+    Config config = cli.getConfig();
+    List<Config.Shard> shards = config.getShards();
+
+    Set<String> uniqueAddresses = new HashSet<>();
+    for (Config.Shard shard : shards) {
+      for (Config.Replica replica : shard.getReplicas()) {
+        uniqueAddresses.add(replica.getString(ADDRESS_STR));
+      }
+    }
+
+    for (Config.Client client : config.getClients()) {
+      uniqueAddresses.add(client.getString(ADDRESS_STR));
+    }
+
+    stopControllers();
+
+    Thread.sleep(2000);
+
+    ThreadPoolExecutor executor = new ThreadPoolExecutor(4, 4, 10_000, TimeUnit.MILLISECONDS, new ArrayBlockingQueue<>(1000), new ThreadPoolExecutor.CallerRunsPolicy());
+    try {
+      final AtomicReference<Double> lastTotalGig = new AtomicReference<>(0d);
+      List<Future> futures = new ArrayList<>();
+
+      for (String address : uniqueAddresses) {
+        futures.add(executor.submit((Callable) () -> {
+          startController(config, address, String.valueOf(8081));
+          return null;
+        }));
+      }
+      for (Future future : futures) {
+        future.get();
+      }
+    }
+    finally {
+      executor.shutdownNow();
+    }
+
+    cli.println("Finished starting controllers");
+  }
+
+  private void startController(Config config, String address, String port) throws IOException, InterruptedException {
+    String deployUser = config.getString("user");
+
+    ProcessBuilder builder = new ProcessBuilder().command("bash", "bin/do-start-controller",
+        deployUser + "@" + address, address, port);
+    Process p = builder.start();
+    p.waitFor();
+
+    System.out.println("started controller: " + address);
+  }
+
+  private void startReplica(final int replica, final Config config, final List<Config.Shard> shards) throws InterruptedException, ExecutionException {
     final AtomicReference<Double> lastTotalGig = new AtomicReference<>(0d);
     List<Future> futures = new ArrayList<>();
     for (int i = 0; i < shards.size(); i++) {
@@ -349,9 +375,8 @@ public class ClusterHandler {
         }
         futures.add(cli.getExecutor().submit((Callable) () -> {
           Config.Replica replica1 = replicas.get(replicaOffset);
-          startServer(config, replica1.getString(PUBLIC_ADDRESS_STR),
-              replica1.getString(PRIVATE_ADDRESS_STR),
-              String.valueOf(replica1.getInt("port")), installDir, cluster, false, lastTotalGig, shardOffset, replicaOffset);
+          startServer(config, replica1.getString(ADDRESS_STR),
+              String.valueOf(replica1.getInt("port")), false, lastTotalGig, shardOffset, replicaOffset);
           return null;
         }));
       }
@@ -386,7 +411,7 @@ public class ClusterHandler {
               }
               else {
                 cli.println("Server not healthy: shard=" + shardOffset + ", replica=" + replicaOffset +
-                    ", privateAddress=" + replicaDict.getString(PRIVATE_ADDRESS_STR));
+                    ", address=" + replicaDict.getString(ADDRESS_STR));
               }
             }
             catch (Exception e) {
@@ -403,7 +428,7 @@ public class ClusterHandler {
                 Boolean error = retObj.getBoolean(ComObject.Tag.ERROR);
 
                 percentComplete *= 100d;
-                cli.println("Waiting for servers to start... server=" + replicaDict.getString(PRIVATE_ADDRESS_STR) +
+                cli.println("Waiting for servers to start... server=" + replicaDict.getString(ADDRESS_STR) +
                     ", stage=" + stage + ", percentComplete=" + String.format("%.2f", percentComplete) + (error != null && error ? ERROR_TRUE_STR : ""));
                 try {
                   Thread.sleep(2000);
@@ -414,7 +439,7 @@ public class ClusterHandler {
                 }
               }
               catch (Exception e1) {
-                cli.println("Waiting for servers to start... server=" + replicaDict.getString(PRIVATE_ADDRESS_STR) + ", percentComplete=?");
+                cli.println("Waiting for servers to start... server=" + replicaDict.getString(ADDRESS_STR) + ", percentComplete=?");
                 try {
                   Thread.sleep(2000);
                 }
@@ -441,12 +466,6 @@ public class ClusterHandler {
   }
 
   private void reloadServerStatus(String command) throws SQLException, ClassNotFoundException {
-    String cluster = cli.getCurrCluster();
-    if (cluster == null) {
-      cli.println(ERROR_NOT_USING_A_CLUSTER_STR);
-      return;
-    }
-
     cli.initConnection();
 
     command = command.trim();
@@ -472,12 +491,6 @@ public class ClusterHandler {
   }
 
   void reloadServer(String command) throws SQLException, ClassNotFoundException, InterruptedException {
-    String cluster = cli.getCurrCluster();
-    if (cluster == null) {
-      cli.println(ERROR_NOT_USING_A_CLUSTER_STR);
-      return;
-    }
-
     cli.initConnection();
 
     if (command.startsWith("reload server status")) {
@@ -490,9 +503,9 @@ public class ClusterHandler {
     final int shard = Integer.parseInt(parts[2]);
     final int replica = Integer.parseInt(parts[3]);
 
-    reloadServer(cli, cluster, cli.getConn(), shard, replica);
+    reloadServer(cli, cli.getConn(), shard, replica);
 
-    Config config = cli.getConfig(cluster);
+    Config config = cli.getConfig();
     List<Config.Shard> shards = config.getShards();
     final List<Config.Replica> masterReplica = shards.get(shard).getReplicas();
     final Config.Replica currReplica = masterReplica.get(replica);
@@ -501,12 +514,6 @@ public class ClusterHandler {
   }
 
   void reloadReplica(String command) throws SQLException, ClassNotFoundException, ExecutionException, InterruptedException {
-    String cluster = cli.getCurrCluster();
-    if (cluster == null) {
-      cli.println(ERROR_NOT_USING_A_CLUSTER_STR);
-      return;
-    }
-
     cli.initConnection();
 
     if (command.startsWith("reload replica status")) {
@@ -524,7 +531,7 @@ public class ClusterHandler {
       for (int shard = 0; shard < cli.getConn().getShardCount(); shard++) {
         final int finalShard = shard;
         futures.add(executor.submit((Callable) () -> {
-          reloadServer(cli, cluster, cli.getConn(), finalShard, replica);
+          reloadServer(cli, cli.getConn(), finalShard, replica);
           return null;
         }));
       }
@@ -532,7 +539,7 @@ public class ClusterHandler {
         future.get();
       }
       for (int shard = 0; shard < cli.getConn().getShardCount(); shard++) {
-        Config config = cli.getConfig(cluster);
+        Config config = cli.getConfig();
         List<Config.Shard> shards = config.getShards();
         final List<Config.Replica> masterReplica = shards.get(shard).getReplicas();
         final Config.Replica currReplica = masterReplica.get(replica);
@@ -546,12 +553,6 @@ public class ClusterHandler {
   }
 
   private void getReplicaReloadStatus(String command) throws SQLException, ClassNotFoundException {
-    String cluster = cli.getCurrCluster();
-    if (cluster == null) {
-      cli.println(ERROR_NOT_USING_A_CLUSTER_STR);
-      return;
-    }
-
     cli.initConnection();
 
     command = command.trim();
@@ -568,7 +569,7 @@ public class ClusterHandler {
   }
 
 
-  private static void reloadServer(Cli cli, String cluster, ConnectionProxy conn, int shard, int replica) throws InterruptedException {
+  private static void reloadServer(Cli cli, ConnectionProxy conn, int shard, int replica) throws InterruptedException {
     ComObject cobj = new ComObject(2);
     cobj.put(ComObject.Tag.DB_NAME, NONE_STR);
     cobj.put(ComObject.Tag.SCHEMA_VERSION, conn.getSchemaVersion());
@@ -577,18 +578,11 @@ public class ClusterHandler {
 
 
   void rollingRestart() throws IOException, InterruptedException, SQLException, ClassNotFoundException, ExecutionException {
-    final String cluster = cli.getCurrCluster();
-    if (cluster == null) {
-      cli.println(ERROR_NOT_USING_A_CLUSTER_STR);
-      return;
-    }
-
-    Config config = cli.getConfig(cluster);
-    final String installDir = cli.resolvePath(config.getString(INSTALL_DIRECTORY_STR));
+    Config config = cli.getConfig();
     List<Config.Shard> shards = config.getShards();
 
     if (shards.get(0).getReplicas().size() > 1) {
-      rollingRestart(config, shards, installDir, cluster);
+      rollingRestart(config, shards);
     }
     else {
       cli.println("Cannot restart a cluster with one replica. Call 'start cluster'.");
@@ -596,37 +590,30 @@ public class ClusterHandler {
   }
 
   void stopServer(String command) throws InterruptedException, IOException, UnirestException {
-    final String cluster = cli.getCurrCluster();
-    if (cluster == null) {
-      cli.println(ERROR_NOT_USING_A_CLUSTER_STR);
-      return;
-    }
-
     command = command.trim();
     String[] parts = command.split("\\s+");
     final int shard = Integer.parseInt(parts[2]);
     final int replica = Integer.parseInt(parts[3]);
 
-    Config config = cli.getConfig(cluster);
-    final String installDir = cli.resolvePath(config.getString(INSTALL_DIRECTORY_STR));
+    Config config = cli.getConfig();
     List<Config.Shard> shards = config.getShards();
     final List<Config.Replica> masterReplica = shards.get(shard).getReplicas();
     Config.Replica currReplica = masterReplica.get(replica);
 
-    stopServer(config, currReplica.getString(PUBLIC_ADDRESS_STR), currReplica.getString(PRIVATE_ADDRESS_STR),
-        String.valueOf(currReplica.getInt("port")), installDir);
+    stopServer(config, currReplica.getString(ADDRESS_STR),
+        String.valueOf(currReplica.getInt("port")));
 
   }
 
-  private void stopServer(Config config, String externalAddress, String privateAddress, String port, String installDir) throws IOException, InterruptedException, UnirestException {
+  private void stopController(Config config, String address, String port) throws IOException, InterruptedException, UnirestException {
     String deployUser = config.getString("user");
-    if (externalAddress.equals(LOCAL_HOST_NUMS_STR) || externalAddress.equals(LOCALHOST_STR)) {
+    if (address.equals(LOCAL_HOST_NUMS_STR) || address.equals(LOCALHOST_STR)) {
       ProcessBuilder builder = null;
       if (cli.isCygwin() || cli.isWindows()) {
         builder = new ProcessBuilder().command("bin/kill-server.bat", port);
       }
       else {
-        builder = new ProcessBuilder().command("bash", "bin/kill-server", "NettyServer", "-host", privateAddress, "-port", port);
+        builder = new ProcessBuilder().command("bash", "bin/kill-server", "controller.HttpServer", String.valueOf(port), String.valueOf(port), String.valueOf(port), String.valueOf(port));
       }
       Process p = builder.start();
       p.waitFor();
@@ -635,16 +622,17 @@ public class ClusterHandler {
       ProcessBuilder builder = null;
       Process p = null;
       if (cli.isWindows()) {
-        GetRequest request = Unirest.get("http://" + privateAddress + ":8081/stop-server?port=" + port);
+        GetRequest request = Unirest.get("http://" + address + ":8081/stop-server?port=" + port + "&address=" + address);
         HttpResponse<String> response = request.asString();
         if (response.getStatus() != 200) {
-          throw new DatabaseException("Error stopping server: host=" + privateAddress + ", error=" + response.getStatus());
+          throw new DatabaseException("Error stopping server: host=" + address + ", error=" + response.getStatus());
         }
       }
       else {
+        final String installDir = cli.resolvePath(config.getString(INSTALL_DIRECTORY_STR));
         builder = new ProcessBuilder().command("ssh", "-n", "-f", "-o",
             USER_KNOWN_HOSTS_FILE_DEV_NULL_STR, "-o", STRICT_HOST_KEY_CHECKING_NO_STR, deployUser + "@" +
-                externalAddress, installDir + "/bin/kill-server", "NettyServer", "-host", privateAddress, "-port", port);
+                address, installDir + "/bin/kill-server", "controller.HttpServer", "controller.HttpServer", "controller.HttpServer", "controller.HttpServer", "controller.HttpServer");
         p = builder.start();
       }
       if (p != null) {
@@ -654,18 +642,54 @@ public class ClusterHandler {
   }
 
 
-  void purgeCluster() throws IOException, InterruptedException, ExecutionException {
-    final String cluster = cli.getCurrCluster();
-    if (cluster == null) {
-      cli.println(ERROR_NOT_USING_A_CLUSTER_STR);
-      return;
+  private void stopServer(Config config, String address, String port) throws IOException, InterruptedException, UnirestException {
+    String deployUser = config.getString("user");
+    if (address.equals(LOCAL_HOST_NUMS_STR) || address.equals(LOCALHOST_STR)) {
+      ProcessBuilder builder = null;
+      if (cli.isCygwin() || cli.isWindows()) {
+        builder = new ProcessBuilder().command("bin/kill-server.bat", port);
+      }
+      else {
+        builder = new ProcessBuilder().command("bash", "bin/kill-server", "NettyServer", "-host", address, "-port", port);
+      }
+      Process p = builder.start();
+      p.waitFor();
     }
+    else {
+      ProcessBuilder builder = null;
+      Process p = null;
+//      if (cli.isWindows()) {
+        GetRequest request = Unirest.get("http://" + address + ":8081/stop-server?port=" + port + "&address=" + address);
+        HttpResponse<String> response = request.asString();
+        if (response.getStatus() != 200) {
+          throw new DatabaseException("Error stopping server: host=" + address + ", error=" + response.getStatus());
+        }
+//      }
+//      else {
+//        GetRequest request = Unirest.get("http://" + address + ":8081/stop-server?port=" + port + "&address=" + address);
+//        HttpResponse<String> response = request.asString();
+//        if (response.getStatus() != 200) {
+//          throw new DatabaseException("Error stopping server: host=" + address + ", error=" + response.getStatus());
+//        }
+//
+////        builder = new ProcessBuilder().command("ssh", "-n", "-f", "-o",
+////            USER_KNOWN_HOSTS_FILE_DEV_NULL_STR, "-o", STRICT_HOST_KEY_CHECKING_NO_STR, deployUser + "@" +
+////                address, installDir + "/bin/kill-server", "NettyServer", "-host", address, "-port", port);
+////        p = builder.start();
+//      }
+//      if (p != null) {
+//        p.waitFor();
+//      }
+    }
+  }
 
-    cli.println("Stopping cluster: cluster=" + cluster);
+
+  void purgeCluster() throws IOException, InterruptedException, ExecutionException {
+    cli.println("Stopping cluster");
     stopCluster();
-    cli.println("Starting purge: cluster=" + cluster);
+    cli.println("Starting purge");
 
-    Config config = cli.getConfig(cluster);
+    Config config = cli.getConfig();
     final String dataDir = cli.resolvePath(config.getString("dataDirectory"));
     List<Config.Shard> shards = config.getShards();
     Set<String> addresses = new HashSet<>();
@@ -673,7 +697,7 @@ public class ClusterHandler {
       final List<Config.Replica> replicas = shards.get(i).getReplicas();
       for (int j = 0; j < replicas.size(); j++) {
         Config.Replica replica = replicas.get(j);
-        addresses.add(replica.getString(PUBLIC_ADDRESS_STR));
+        addresses.add(replica.getString("address"));
       }
     }
     List<Future> futures = new ArrayList<>();
@@ -691,21 +715,21 @@ public class ClusterHandler {
           FileUtils.deleteDirectory(lastFile);
         }
         else {
-          if (cli.isWindows()) {
+//          if (cli.isWindows()) {
             final String installDir = cli.resolvePath(config.getString(INSTALL_DIRECTORY_STR));
-            GetRequest request = Unirest.get("http://" + address + ":8081/purge-server?cluster=" + cluster + "&dataDir=" + URLEncoder.encode(dataDir));
+            GetRequest request = Unirest.get("http://" + address + ":8081/purge-server?dataDir=" + URLEncoder.encode(dataDir));
             HttpResponse<String> response = request.asString();
             if (response.getStatus() != 200) {
               throw new DatabaseException("Error purging server: host=" + address + ", error=" + response.getStatus());
             }
-          }
-          else {
-            purgeSubDirectory(dataDir, address, deployUser, "deletes");
-            purgeSubDirectory(dataDir, address, deployUser, "log");
-            purgeSubDirectory(dataDir, address, deployUser, "lrc");
-            purgeSubDirectory(dataDir, address, deployUser, "snapshot");
-            purgeSubDirectory(dataDir, address, deployUser, "nextRecordId");
-          }
+//          }
+//          else {
+//            purgeSubDirectory(dataDir, address, deployUser, "deletes");
+//            purgeSubDirectory(dataDir, address, deployUser, "log");
+//            purgeSubDirectory(dataDir, address, deployUser, "lrc");
+//            purgeSubDirectory(dataDir, address, deployUser, "snapshot");
+//            purgeSubDirectory(dataDir, address, deployUser, "nextRecordId");
+//          }
         }
         return null;
       }));
@@ -713,7 +737,7 @@ public class ClusterHandler {
     for (Future future : futures) {
       future.get();
     }
-    cli.println("Finished purging: cluster=" + cluster);
+    cli.println("Finished purging");
   }
 
   private void purgeSubDirectory(String dataDir, String address, String deployUser, String subDir) throws IOException, InterruptedException {
@@ -733,8 +757,7 @@ public class ClusterHandler {
     p.waitFor();
   }
 
-  private void stopReplica(final int replica, final Config config, final List<Config.Shard> shards,
-                                  final String installDir) throws InterruptedException, ExecutionException {
+  private void stopReplica(final int replica, final Config config, final List<Config.Shard> shards) throws InterruptedException, ExecutionException {
     List<Future> futures = new ArrayList<>();
     for (int i = 0; i < shards.size(); i++) {
       Config.Shard shard = shards.get(i);
@@ -746,11 +769,11 @@ public class ClusterHandler {
         }
         futures.add(cli.getExecutor().submit((Callable) () -> {
           Config.Replica replica1 = replicas.get(replicaOffset);
-          cli.println("Stopping server: address=" + replica1.getString(PUBLIC_ADDRESS_STR) +
+          cli.println("Stopping server: address=" + replica1.getString("address") +
               PORT_STR + String.valueOf(replica1.getInt("port")));
-          stopServer(config, replica1.getString(PUBLIC_ADDRESS_STR), replica1.getString(PRIVATE_ADDRESS_STR),
-              String.valueOf(replica1.getInt("port")), installDir);
-          cli.println("Stopped server: address=" + replica1.getString(PUBLIC_ADDRESS_STR) +
+          stopServer(config, replica1.getString(ADDRESS_STR),
+              String.valueOf(replica1.getInt("port")));
+          cli.println("Stopped server: address=" + replica1.getString("address") +
               PORT_STR + String.valueOf(replica1.getInt("port")));
           return null;
         }));
@@ -764,32 +787,19 @@ public class ClusterHandler {
   }
 
   void stopShard(int shardOffset) throws IOException, InterruptedException, UnirestException {
-    String cluster = cli.getCurrCluster();
-    if (cluster == null) {
-      cli.println(ERROR_NOT_USING_A_CLUSTER_STR);
-      return;
-    }
-    Config config = cli.getConfig(cluster);
-    String installDir = config.getString(INSTALL_DIRECTORY_STR);
-    installDir = cli.resolvePath(installDir);
+    Config config = cli.getConfig();
     List<Config.Shard> shards = config.getShards();
     Config.Shard shard = shards.get(shardOffset);
     List<Config.Replica> replicas = shard.getReplicas();
     for (int j = 0; j < replicas.size(); j++) {
       Config.Replica replica = replicas.get(j);
-      stopServer(config, replica.getString(PUBLIC_ADDRESS_STR), replica.getString(PRIVATE_ADDRESS_STR),
-          String.valueOf(replica.getInt("port")), installDir);
+      stopServer(config, replica.getString(ADDRESS_STR),
+          String.valueOf(replica.getInt("port")));
     }
   }
 
-  void stopCluster() throws IOException, InterruptedException, ExecutionException {
-    String cluster = cli.getCurrCluster();
-    if (cluster == null) {
-      cli.println(ERROR_NOT_USING_A_CLUSTER_STR);
-      return;
-    }
-    Config config = cli.getConfig(cluster);
-    final String installDir = cli.resolvePath(config.getString(INSTALL_DIRECTORY_STR));
+  void stopCluster() throws InterruptedException, ExecutionException {
+    Config config = cli.getConfig();
     List<Config.Shard> shards = config.getShards();
     List<Future> futures = new ArrayList<>();
     for (int i = 0; i < shards.size(); i++) {
@@ -799,11 +809,11 @@ public class ClusterHandler {
         final int replicaOffset = j;
         futures.add(cli.getExecutor().submit((Callable) () -> {
           Config.Replica replica = replicas.get(replicaOffset);
-          cli.println("Stopping server: address=" + replica.getString(PUBLIC_ADDRESS_STR) +
+          cli.println("Stopping server: address=" + replica.getString("address") +
               PORT_STR + replica.getInt("port"));
-          stopServer(config, replica.getString(PUBLIC_ADDRESS_STR),
-              replica.getString(PRIVATE_ADDRESS_STR), String.valueOf(replica.getInt("port")), installDir);
-          cli.println("Stopped server: address=" + replica.getString(PUBLIC_ADDRESS_STR) +
+          stopServer(config,
+              replica.getString(ADDRESS_STR), String.valueOf(replica.getInt("port")));
+          cli.println("Stopped server: address=" + replica.getString("address") +
               PORT_STR + replica.getInt("port"));
           return null;
         }));
@@ -816,44 +826,63 @@ public class ClusterHandler {
     cli.println("Stopped cluster");
   }
 
+  void stopControllers() throws IOException, InterruptedException, ExecutionException {
+    Config config = cli.getConfig();
+    final String installDir = cli.resolvePath(config.getString(INSTALL_DIRECTORY_STR));
+    List<Config.Shard> shards = config.getShards();
+    List<Future> futures = new ArrayList<>();
+    Set<String> uniqueAdresses = new HashSet<>();
+    for (int i = 0; i < shards.size(); i++) {
+      Config.Shard shard = shards.get(i);
+      final List<Config.Replica> replicas = shard.getReplicas();
+      for (Config.Replica replica : replicas) {
+        uniqueAdresses.add(replica.getString("address"));
+      }
+    }
+    for (Config.Client client : config.getClients()) {
+      uniqueAdresses.add(client.getString(ADDRESS_STR));
+    }
+    for (String address : uniqueAdresses) {
+      futures.add(cli.getExecutor().submit((Callable) () -> {
+        cli.println("Stopping controller: address=" + address +
+            PORT_STR + 8081);
+        stopController(config, address, String.valueOf(8081));
+        return null;
+      }));
+
+    }
+    for (Future future : futures) {
+      future.get();
+    }
+
+    cli.println("Stopped cluster");
+  }
 
   void startShard(int shardOffset) throws IOException, InterruptedException, UnirestException {
-    String cluster = cli.getCurrCluster();
-    if (cluster == null) {
-      cli.println(ERROR_NOT_USING_A_CLUSTER_STR);
-      return;
-    }
-    Config config = cli.getConfig(cluster);
-    String installDir = config.getString(INSTALL_DIRECTORY_STR);
-    installDir = cli.resolvePath(installDir);
+    Config config = cli.getConfig();
     List<Config.Shard> shards = config.getShards();
     Config.Shard shard = shards.get(shardOffset);
     List<Config.Replica> replicas = shard.getReplicas();
     for (int j = 0; j < replicas.size(); j++) {
       Config.Replica replica = replicas.get(j);
-      stopServer(config, replica.getString(PUBLIC_ADDRESS_STR), replica.getString(PRIVATE_ADDRESS_STR),
-          String.valueOf(replica.getInt("port")), installDir);
+      stopServer(config, replica.getString(ADDRESS_STR),
+          String.valueOf(replica.getInt("port")));
     }
     Thread.sleep(2000);
     final AtomicReference<Double> lastTotalGig = new AtomicReference<>(0d);
     replicas = shard.getReplicas();
     for (int j = 0; j < replicas.size(); j++) {
       Config.Replica replica = replicas.get(j);
-      startServer(config, replica.getString(PUBLIC_ADDRESS_STR), replica.getString(PRIVATE_ADDRESS_STR),
-          String.valueOf(replica.getInt("port")), installDir, cluster, false, lastTotalGig, shardOffset, j);
+      startServer(config, replica.getString(ADDRESS_STR),
+          String.valueOf(replica.getInt("port")), false, lastTotalGig, shardOffset, j);
     }
     cli.println("Finished starting servers");
   }
 
   void reconfigureCluster() throws SQLException, ClassNotFoundException, IOException, InterruptedException, ExecutionException, UnirestException {
-    String cluster = cli.getCurrCluster();
-    if (cluster == null) {
-      cli.println(ERROR_NOT_USING_A_CLUSTER_STR);
-      return;
-    }
     cli.closeConnection();
     cli.initConnection();
-    deploy();
+    //deploy(currCommand);
 
     ReconfigureResults results = cli.getConn().reconfigureCluster();
     if (!results.isHandedOffToMaster()) {
@@ -862,7 +891,7 @@ public class ClusterHandler {
     else {
       int shardCount = results.getShardCount();
       if (shardCount > 0) {
-        Config config = cli.getConfig(cluster);
+        Config config = cli.getConfig();
         List<Config.Shard> shards = config.getShards();
         int startedCount = 0;
         for (int i = shards.size() - 1; i >= 0; i--) {
@@ -877,12 +906,6 @@ public class ClusterHandler {
   }
 
   void startServer(String command) throws InterruptedException, IOException, UnirestException {
-    final String cluster = cli.getCurrCluster();
-    if (cluster == null) {
-      cli.println(ERROR_NOT_USING_A_CLUSTER_STR);
-      return;
-    }
-
     command = command.trim();
     String[] parts = command.split("\\s+");
     final int shard = Integer.parseInt(parts[2]);
@@ -892,19 +915,18 @@ public class ClusterHandler {
       disable = "disable".equals(parts[4]);
     }
 
-    Config config = cli.getConfig(cluster);
-    final String installDir = cli.resolvePath(config.getString(INSTALL_DIRECTORY_STR));
+    Config config = cli.getConfig();
     List<Config.Shard> shards = config.getShards();
     final List<Config.Replica> masterReplica = shards.get(shard).getReplicas();
     final Config.Replica currReplica = masterReplica.get(replica);
 
-    stopServer(config, currReplica.getString(PUBLIC_ADDRESS_STR), currReplica.getString(PRIVATE_ADDRESS_STR),
-        String.valueOf(currReplica.getInt("port")), installDir);
+    stopServer(config, currReplica.getString(ADDRESS_STR),
+        String.valueOf(currReplica.getInt("port")));
 
     Thread.sleep(2000);
 
-    startServer(config, currReplica.getString(PUBLIC_ADDRESS_STR), currReplica.getString(PRIVATE_ADDRESS_STR),
-        String.valueOf(currReplica.getInt("port")), installDir, cluster, disable, new AtomicReference<Double>(0d), shard, replica);
+    startServer(config, currReplica.getString(ADDRESS_STR),
+        String.valueOf(currReplica.getInt("port")), disable, new AtomicReference<Double>(0d), shard, replica);
 
     monitorServerStartupProgress(cli, shard, replica, currReplica);
 
@@ -948,7 +970,7 @@ public class ClusterHandler {
             Boolean error = retObj.getBoolean(ComObject.Tag.ERROR);
 
             percentComplete *= 100d;
-            cli.println(WAITING_FOR_STR + currReplica.getString(PRIVATE_ADDRESS_STR) + " to start: stage=" +
+            cli.println(WAITING_FOR_STR + currReplica.getString(ADDRESS_STR) + " to start: stage=" +
                 stage + ", " + String.format("%.2f", percentComplete) + "%" + (error != null && error ? ERROR_TRUE_STR : ""));
             try {
               Thread.sleep(2000);
@@ -959,7 +981,7 @@ public class ClusterHandler {
             }
           }
           catch (Exception e1) {
-            cli.println(WAITING_FOR_STR + currReplica.getString(PRIVATE_ADDRESS_STR) + " to start: percentComplete=?");
+            cli.println(WAITING_FOR_STR + currReplica.getString(ADDRESS_STR) + " to start: percentComplete=?");
             try {
               Thread.sleep(2000);
             }
@@ -976,7 +998,7 @@ public class ClusterHandler {
     }
   }
 
-  private void rollingRestart(Config config, List<Config.Shard> shards, String installDir, String cluster) throws InterruptedException, ExecutionException, IOException, SQLException, ClassNotFoundException {
+  private void rollingRestart(Config config, List<Config.Shard> shards) throws InterruptedException, ExecutionException, IOException, SQLException, ClassNotFoundException {
     int replicaCount = cli.getConn().getReplicaCount();
 
     boolean allHealthy = cli.healthCheck();
@@ -994,9 +1016,9 @@ public class ClusterHandler {
       markReplicaDead(i);
       try {
         Thread.sleep(5000);
-        stopReplica(i, config, shards, installDir);
+        stopReplica(i, config, shards);
         Thread.sleep(5000);
-        startReplica(i, config, shards, installDir, cluster);
+        startReplica(i, config, shards);
       }
       finally {
         markReplicaAlive(i);

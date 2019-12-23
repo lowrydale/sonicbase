@@ -37,7 +37,7 @@ public class AWSSQSProducer implements StreamsProducer {
   }
 
   @Override
-  public void init(String cluster, Config config, Map<String, Object> streamConfig) {
+  public void init(Config config, String installDir, Map<String, Object> streamConfig) {
     try {
       logger.info("aws sqs producer init - begin");
       final ClientConfiguration clientConfig = new ClientConfiguration();
@@ -47,8 +47,7 @@ public class AWSSQSProducer implements StreamsProducer {
 
       AmazonSQSClientBuilder builder = AmazonSQSClient.builder();
 
-      File installDir = getInstallDir(config);
-      File keysFile = new File(installDir, "/keys/" + cluster + "-awskeys");
+      File keysFile = new File(installDir, "/keys/sonicbase-awskeys");
       if (!keysFile.exists()) {
         builder.setCredentials(new InstanceProfileCredentialsProvider(true));
       }

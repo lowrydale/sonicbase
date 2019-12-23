@@ -51,7 +51,7 @@ public class TestBulkImport {
     serverB1.shutdown();
     serverB2.shutdown();
 
-    System.out.println("client refCount=" + DatabaseClient.getClientRefCount().get() + ", sharedClients=" + DatabaseClient.getSharedClients().size());
+    System.out.println("client refCount=" + DatabaseClient.getClientRefCount().get());
 
     System.out.println("finished");
   }

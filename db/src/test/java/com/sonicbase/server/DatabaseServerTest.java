@@ -77,7 +77,8 @@ public class  DatabaseServerTest {
         return mockLogger;
       }
     };
-    server.setConfig(config, "test", "localhost", 9010, true, new AtomicBoolean(), new AtomicBoolean(), "gc.log", false);
+    Config.copyConfig("test");
+    server.setConfig(config, "localhost", 9010, true, new AtomicBoolean(), new AtomicBoolean(), "gc.log", false);
     server.setIsRunning(true);
     DatabaseClient client = mock(DatabaseClient.class);
     server.setDatabaseClient(client);
@@ -205,7 +206,8 @@ public class  DatabaseServerTest {
     String configStr = IOUtils.toString(DatabaseServerTest.class.getResourceAsStream("/config/config-1-local.yaml"), "utf-8");
     Config config = new Config(configStr);
     DatabaseServer server = new DatabaseServer();
-    server.setConfig(config, "test", "localhost", 9010, true, new AtomicBoolean(), new AtomicBoolean(), "gc.log", false);
+    Config.copyConfig("test");
+    server.setConfig(config, "localhost", 9010, true, new AtomicBoolean(), new AtomicBoolean(), "gc.log", false);
 
     DatabaseClient client = mock(DatabaseClient.class);
     server.setDatabaseClient(client);
@@ -277,7 +279,8 @@ public class  DatabaseServerTest {
         calledPush.set(true);
       }
     };
-    server.setConfig(config, "test", "localhost", 9010, true, new AtomicBoolean(), new AtomicBoolean(), "gc.log", false);
+    Config.copyConfig("test");
+    server.setConfig(config, "localhost", 9010, true, new AtomicBoolean(), new AtomicBoolean(), "gc.log", false);
 
     config.getShards().get(0).getReplicas().get(0).put("port", 50);
 
@@ -300,7 +303,8 @@ public class  DatabaseServerTest {
     String configStr = IOUtils.toString(DatabaseServerTest.class.getResourceAsStream("/config/config-1-local.yaml"), "utf-8");
     Config config = new Config(configStr);
     DatabaseServer server = new DatabaseServer();
-    server.setConfig(config, "test", "localhost", 9010, true, new AtomicBoolean(), new AtomicBoolean(), "gc.log", false);
+    Config.copyConfig("test");
+    server.setConfig(config, "localhost", 9010, true, new AtomicBoolean(), new AtomicBoolean(), "gc.log", false);
 
     DatabaseClient client = mock(DatabaseClient.class);
     server.setDatabaseClient(client);
@@ -326,7 +330,8 @@ public class  DatabaseServerTest {
     String configStr = IOUtils.toString(DatabaseServerTest.class.getResourceAsStream("/config/config-1-local.yaml"), "utf-8");
     Config config = new Config(configStr);
     DatabaseServer server = new DatabaseServer();
-    server.setConfig(config, "test", "localhost", 9010, true, new AtomicBoolean(), new AtomicBoolean(), "gc.log", false);
+    Config.copyConfig("test");
+    server.setConfig(config, "localhost", 9010, true, new AtomicBoolean(), new AtomicBoolean(), "gc.log", false);
 
     DatabaseClient client = mock(DatabaseClient.class);
     server.setDatabaseClient(client);
@@ -359,7 +364,8 @@ public class  DatabaseServerTest {
         }
       }
     };
-    server.setConfig(config, "test", "localhost", 9010, true, new AtomicBoolean(), new AtomicBoolean(), "gc.log", false);
+    Config.copyConfig("test");
+    server.setConfig(config, "localhost", 9010, true, new AtomicBoolean(), new AtomicBoolean(), "gc.log", false);
     server.setShard(1);
     server.setReplica(1);
     DatabaseClient client = mock(DatabaseClient.class);

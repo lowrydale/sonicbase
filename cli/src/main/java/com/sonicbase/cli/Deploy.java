@@ -1,13 +1,8 @@
 package com.sonicbase.cli;
 
-import com.fasterxml.jackson.databind.ObjectMapper;
-import com.fasterxml.jackson.databind.node.ArrayNode;
-import com.fasterxml.jackson.databind.node.ObjectNode;
 import com.sonicbase.common.Config;
 import org.apache.commons.io.IOUtils;
 
-import java.io.File;
-import java.io.FileInputStream;
 import java.io.IOException;
 import java.io.InputStream;
 import java.util.ArrayList;
@@ -28,10 +23,11 @@ public class Deploy {
   }
 
   public static void main(String[] args) {
-    final String cluster = args[0];
-    final String thisNode = args[1];
+    final String thisNode = args[0];
+    final String gatewayAddress = args[1];
+    final String installDir = args[2];
     Deploy deploy = new Deploy();
-    deploy.deploy(cluster, thisNode);
+    deploy.deploy(gatewayAddress, installDir, thisNode);
   }
 
   private void printException(Exception e) {
@@ -46,17 +42,13 @@ public class Deploy {
     System.out.write(b);
   }
 
-  void deploy(final String cluster, final String thisNodeId) {
+  void deploy(String gatewayAddress, String installDir, final String thisNodeId) {
     try {
       List<Node> nodes = new ArrayList<>();
-      InputStream in = Cli.class.getResourceAsStream("/config-" + cluster + ".yaml");
-      if (in == null) {
-        in = new FileInputStream(new File(System.getProperty(USER_DIR_STR), "../config/config-" + cluster + ".yaml"));
-      }
+      InputStream in = Config.getConfigStream();
       String json = IOUtils.toString(in, "utf-8");
       Config config = new Config(json);
       final String deployUser = config.getString("user");
-      final String installDir = resolvePath(config.getString("installDirectory"));
       int nodeCount = 0;
 
       List<Config.Client> clients = config.getClients();
@@ -67,10 +59,10 @@ public class Deploy {
         for (int j = 0; j < replicas.size(); j++) {
           Node node = new Node();
           if (nodeCount == 0) {
-            node.address = replicas.get(j).getString("publicAddress");
+            node.address = gatewayAddress;
           }
           else {
-            node.address = replicas.get(j).getString("privateAddress");
+            node.address = replicas.get(j).getString("address");
           }
           nodes.add(node);
           nodeCount++;
@@ -80,7 +72,7 @@ public class Deploy {
       for (int i = 0; i < clients.size(); i++) {
         Config.Client client = clients.get(i);
         Node node = new Node();
-        node.address = client.getString("privateAddress");
+        node.address = client.getString("address");
         nodes.add(node);
         nodeCount++;
       }
@@ -95,7 +87,7 @@ public class Deploy {
         println("id=" + node.id + ", address=" + node.address);
       }
       if (thisNodeId.equals("0")) {
-        deployToAServer(deployUser, nodes.get(0), installDir, cluster);
+        deployToAServer(deployUser, nodes.get(0), gatewayAddress, installDir);
       }
       else {
         List<Future> futures = new ArrayList<>();
@@ -106,7 +98,7 @@ public class Deploy {
             println("node.id=" + node.id + ", thisNodeId=" + thisNodeId);
             if (node.id.equals(thisNodeId + "." + offset)) {
               futures.add(executor.submit((Callable) () -> {
-                deployToAServer(deployUser, node, installDir, cluster);
+                deployToAServer(deployUser, node, gatewayAddress, installDir);
 
                 return null;
               }));
@@ -130,7 +122,7 @@ public class Deploy {
     }
   }
 
-  private void deployToAServer(String deployUser, Node node, String installDir, String cluster) throws IOException, InterruptedException {
+  private void deployToAServer(String deployUser, Node node, String gatewayAddress, String installDir) throws IOException, InterruptedException {
     println("Deploying to a server: id=" + node.id + ", address=" + node.address + ", userDir=" + System.getProperty(USER_DIR_STR) + ", command=" + "bin/do-rsync " + deployUser + "@" + node.address + ":" + installDir);
     ProcessBuilder builder = new ProcessBuilder().command("bash", "bin/do-rsync", deployUser + "@" + node.address, installDir);
     Process p = builder.start();
@@ -144,7 +136,7 @@ public class Deploy {
     }
     p.waitFor();
 
-    builder = new ProcessBuilder().command("bash", "bin/do-deploy", deployUser + "@" + node.address, installDir, cluster, node.id, "placeholder", installDir);
+    builder = new ProcessBuilder().command("bash", "bin/do-deploy", deployUser + "@" + node.address, installDir, node.id, gatewayAddress, installDir);
     p = builder.start();
     in = p.getInputStream();
     while (true) {
@@ -163,22 +155,6 @@ public class Deploy {
       write(b);
     }
     p.waitFor();
-  }
-
-  private static String resolvePath(String installDir) {
-    if (installDir.startsWith("$HOME")) {
-      installDir = installDir.substring("$HOME".length());
-      if (installDir.startsWith("/")) {
-        installDir = installDir.substring(1);
-      }
-    }
-    else if (installDir.startsWith("$WORKING_DIR")) {
-      installDir = installDir.replace("$WORKING_DIR", System.getProperty(USER_DIR_STR));
-      if (installDir.startsWith("/")) {
-        installDir = installDir.substring(1);
-      }
-    }
-    return installDir;
   }
 
   private static void recurse(String id, List<Node> nodes, List<String> stack) {

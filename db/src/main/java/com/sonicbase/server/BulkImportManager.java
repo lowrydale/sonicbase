@@ -487,9 +487,7 @@ public class BulkImportManager {
       List<Config.Shard> shards = config.getShards();
       Config.Shard shard = shards.get(0);
       List<Config.Replica> replicasArray = shard.getReplicas();
-      final String address = config.getBoolean("clientIsPrivate") ?
-          replicasArray.get(0).getString("privateAddress") :
-          replicasArray.get(0).getString("publicAddress");
+      final String address = replicasArray.get(0).getString("address");
       final int port = replicasArray.get(0).getInt("port");
 
       Class.forName("com.sonicbase.jdbcdriver.Driver");
@@ -873,9 +871,7 @@ public class BulkImportManager {
       List<Config.Shard> array = config.getShards();
       Config.Shard shard = array.get(0);
       List<Config.Replica> replicasArray = shard.getReplicas();
-      final String address = config.getBoolean("clientIsPrivate") ?
-          replicasArray.get(0).getString("privateAddress") :
-          replicasArray.get(0).getString("publicAddress");
+      final String address = replicasArray.get(0).getString("address");
       final int port = replicasArray.get(0).getInt("port");
 
       Class.forName("com.sonicbase.jdbcdriver.Driver");

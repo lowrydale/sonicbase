@@ -47,20 +47,17 @@ public class SelectStatementHandlerTest {
         "    {\n" +
         "      \"replicas\": [\n" +
         "        {\n" +
-        "          \"publicAddress\": \"localhost\",\n" +
-        "          \"privateAddress\": \"localhost\",\n" +
+        "          \"address\": \"localhost\",\n" +
         "          \"port\": 9010,\n" +
         "          \"httpPort\": 8080\n" +
         "        },\n" +
         "        {\n" +
-        "          \"publicAddress\": \"localhost\",\n" +
-        "          \"privateAddress\": \"localhost\",\n" +
+        "          \"address\": \"localhost\",\n" +
         "          \"port\": 9020,\n" +
         "          \"httpPort\": 8080\n" +
         "        },\n" +
         "        {\n" +
-        "          \"publicAddress\": \"localhost\",\n" +
-        "          \"privateAddress\": \"localhost\",\n" +
+        "          \"address\": \"localhost\",\n" +
         "          \"port\": 9030,\n" +
         "          \"httpPort\": 8080\n" +
         "        }\n" +
@@ -69,31 +66,28 @@ public class SelectStatementHandlerTest {
         "    {\n" +
         "      \"replicas\": [\n" +
         "        {\n" +
-        "          \"publicAddress\": \"localhost\",\n" +
-        "          \"privateAddress\": \"localhost\",\n" +
+        "          \"address\": \"localhost\",\n" +
         "          \"port\": 10010,\n" +
         "          \"httpPort\": 8080\n" +
         "        },\n" +
         "        {\n" +
-        "          \"publicAddress\": \"localhost\",\n" +
-        "          \"privateAddress\": \"localhost\",\n" +
+        "          \"address\": \"localhost\",\n" +
         "          \"port\": 10020,\n" +
         "          \"httpPort\": 8080\n" +
         "        },\n" +
         "        {\n" +
-        "          \"publicAddress\": \"localhost\",\n" +
-        "          \"privateAddress\": \"localhost\",\n" +
+        "          \"address\": \"localhost\",\n" +
         "          \"port\": 10030,\n" +
         "          \"httpPort\": 8080\n" +
         "        }\n" +
         "      ]\n" +
         "    }\n" +
         "  ]}\n");
-    serversConfig = new ServersConfig("test", (ArrayNode) ((ObjectNode) node).withArray("shards"), true, true);
+    serversConfig = new ServersConfig((ArrayNode) ((ObjectNode) node).withArray("shards"), true, true);
     common.setServersConfig(serversConfig);
 
     final AtomicInteger callCount = new AtomicInteger();
-    client = new DatabaseClient(null, "localhost", 9010, 0, 0, false, common, null) {
+    client = new DatabaseClient("localhost", 9010, 0, 0, false, common, null) {
 
       public byte[] sendToMaster(ComObject body) {
         return null;
@@ -194,10 +188,6 @@ public class SelectStatementHandlerTest {
           return retObj.serialize();
         }
         return null;
-      }
-
-      public String getCluster() {
-        return "test";
       }
     };
 

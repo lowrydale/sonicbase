@@ -1,30 +1,27 @@
-export _XMX_=$3
-export SONIC_BASE_HOME=$4
-#export MODE=yprof
-mkdir -p $4/logs
+#!/bin/bash
 
-#if [ $5 == "4-dale" ]
+export SONIC_BASE_HOME="$(dirname $( cd "$( dirname "${BASH_SOURCE[0]}" )" && pwd ))"
+
+#export SONIC_BASE_HOME=$(dirname $(pwd)/$(dirname "$0"))
+#xport dir1=$(dirname "$0")
+#if [ "$dir1" == "." ]
 #then
-#  export MODE=yprof
-#fi
-#if [ $5 == "4-dale-2" ]
-#then
-#  export MODE=yprof
+#  export SONIC_BASE_HOME=$(dirname $(pwd))
 #fi
 
-if [ ${4:0:1} != "/" ]
-then
-  export SONIC_BASE_HOME=$HOME/$SONIC_BASE_HOME
-fi
+export _XMX_=512m
 
+#if [ ${4:0:1} != "/" ]
+#then
+#  export SONIC_BASE_HOME=$HOME/$SONIC_BASE_HOME
+#fi
+
+mkdir -p $SONIC_BASE_HOME/logs
 
 cd $SONIC_BASE_HOME
-echo "start-SONIC_BASE_HOME=$SONIC_BASE_HOME"
 
-export _CLIENT_ERROR_LOG4J_FILENAME_=$SONIC_BASE_HOME/logs/client-errors.log
-export _ERROR_LOG4J_FILENAME_=$SONIC_BASE_HOME/logs/errors.log
-export _LOG4J_FILENAME_=$SONIC_BASE_HOME/logs/$2.log
-export _GC_LOG_FILENAME_=$SONIC_BASE_HOME/logs/gc-$2.log
+export _LOG4J_FILENAME_=$SONIC_BASE_HOME/logs/controller.log
+export _GC_LOG_FILENAME_=$SONIC_BASE_HOME/logs/gc-controller.log
 export LOG4J_FILE="log4j.xml"
-nohup $SONIC_BASE_HOME/bin/runclass com.sonicbase.server.NettyServer -host $1 -port $2 -cluster $5 -gclog $_GC_LOG_FILENAME_ -xmx $_XMX_ -disable $6 > $SONIC_BASE_HOME/logs/$2.sysout.log 2>&1 &
-#nohup $SONIC_BASE_HOME/bin/runclass com.sonicbase.server.NettyServer -host $1 -port $2 -cluster $5 -gclog $_GC_LOG_FILENAME_ -xmx $_XMX_  &
+
+nohup $SONIC_BASE_HOME/bin/runclass com.sonicbase.controller.HttpServer $SONIC_BASE_HOME > $SONIC_BASE_HOME/logs/controller-sysout.log 2>&1 &

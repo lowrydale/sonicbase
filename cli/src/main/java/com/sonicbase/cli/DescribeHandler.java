@@ -15,7 +15,6 @@ import java.util.concurrent.ExecutionException;
 
 class DescribeHandler {
 
-  public static final String ERROR_NOT_USING_A_CLUSTER_STR = "Error, not using a cluster";
   public static final String ERROR_NOT_USING_A_DATABASE_STR = "Error, not using a database";
   public static final String ADDRESS_STR = "Address";
   public static final String SHARD_STR = "shard";
@@ -37,12 +36,6 @@ class DescribeHandler {
   }
 
   private void describeShards(String command) throws IOException, SQLException, ClassNotFoundException, InterruptedException {
-    String cluster = cli.getCurrCluster();
-    if (cluster == null) {
-      cli.println(ERROR_NOT_USING_A_CLUSTER_STR);
-      return;
-    }
-
     if (cli.getCurrDbName() == null) {
       cli.println(ERROR_NOT_USING_A_DATABASE_STR);
       return;
@@ -74,12 +67,6 @@ class DescribeHandler {
   }
 
   private void describeRepartitioner(String command) throws IOException, SQLException, ClassNotFoundException, InterruptedException {
-    String cluster = cli.getCurrCluster();
-    if (cluster == null) {
-      cli.println(ERROR_NOT_USING_A_CLUSTER_STR);
-      return;
-    }
-
     if (cli.getCurrDbName() == null) {
       cli.println(ERROR_NOT_USING_A_DATABASE_STR);
       return;
@@ -109,12 +96,6 @@ class DescribeHandler {
   }
 
   void describe(String command) throws SQLException, ClassNotFoundException, IOException, InterruptedException {
-    String cluster = cli.getCurrCluster();
-    if (cluster == null) {
-      cli.println(ERROR_NOT_USING_A_CLUSTER_STR);
-      return;
-    }
-
     if (cli.getCurrDbName() == null) {
       cli.println(ERROR_NOT_USING_A_DATABASE_STR);
       return;
@@ -165,12 +146,6 @@ class DescribeHandler {
   }
 
   private void describeServerStats(String command) throws SQLException, ClassNotFoundException, IOException, InterruptedException {
-    String cluster = cli.getCurrCluster();
-    if (cluster == null) {
-      cli.println(ERROR_NOT_USING_A_CLUSTER_STR);
-      return;
-    }
-
     if (cli.getCurrDbName() == null) {
       cli.println(ERROR_NOT_USING_A_DATABASE_STR);
       return;
@@ -230,12 +205,6 @@ class DescribeHandler {
   }
 
   private void describeServerHealth(String command) throws SQLException, ClassNotFoundException, IOException, InterruptedException {
-    String cluster = cli.getCurrCluster();
-    if (cluster == null) {
-      cli.println(ERROR_NOT_USING_A_CLUSTER_STR);
-      return;
-    }
-
     cli.initConnection();
 
     PreparedStatement stmt = cli.getConn().prepareStatement(command);
@@ -282,12 +251,6 @@ class DescribeHandler {
 
 
   private void describeSchemaVersion(String command) throws SQLException, ClassNotFoundException, IOException, InterruptedException {
-    String cluster = cli.getCurrCluster();
-    if (cluster == null) {
-      cli.println(ERROR_NOT_USING_A_CLUSTER_STR);
-      return;
-    }
-
     cli.initConnection();
 
     PreparedStatement stmt = cli.getConn().prepareStatement(command);

@@ -59,7 +59,7 @@ public class IndexLocalServerBench {
       server.shutdown();
     }
 
-    System.out.println("client refCount=" + DatabaseClient.getClientRefCount().get() + ", sharedClients=" + DatabaseClient.getSharedClients().size() + ", class=TestDatabase");
+    System.out.println("client refCount=" + DatabaseClient.getClientRefCount().get() + ", class=TestDatabase");
     for (DatabaseClient client : DatabaseClient.getAllClients()) {
       System.out.println("Stack:\n" + client.getAllocatedStack());
     }
@@ -91,7 +91,8 @@ public class IndexLocalServerBench {
         //          String role = "primaryMaster";
 
         dbServers[i] = new DatabaseServer();
-        dbServers[i].setConfig(config, "4-servers", "localhost", 9010 + (50 * i), true, new AtomicBoolean(true), new AtomicBoolean(true),null, false);
+        Config.copyConfig("4-servers");
+        dbServers[i].setConfig(config, "localhost", 9010 + (50 * i), true, new AtomicBoolean(true), new AtomicBoolean(true),null, false);
         dbServers[i].setRole(role);
 
 //        if (shard == 0) {

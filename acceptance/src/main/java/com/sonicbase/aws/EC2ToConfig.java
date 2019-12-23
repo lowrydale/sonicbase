@@ -83,24 +83,13 @@ public class EC2ToConfig {
 
     int replicationFactor = config.getInt("replicationFactor");
 
-    boolean haveFirst = false;
     List<Node> servers = new ArrayList<>();
     for (Reservation reservation : reservations) {
       List<Instance> instances = reservation.getInstances();
       for (Instance instance : instances) {
         if (instance.getState().getName().equals("running")) {
-          String publicAddress = instance.getPublicIpAddress();
-          if (publicAddress == null || publicAddress.length() == 0) {
-            publicAddress = instance.getPrivateIpAddress();
-          }
-          if (!haveFirst && !publicAddress.equals(instance.getPrivateIpAddress())) {
-            haveFirst = true;
-            servers.add(0, new Node(publicAddress, instance.getPrivateIpAddress()));
-          }
-          else {
-            servers.add(new Node(publicAddress, instance.getPrivateIpAddress()));
-          }
-          System.out.println("publicIp=" + publicAddress + ", privateIp=" + instance.getPrivateIpAddress());
+          servers.add(new Node(instance.getPrivateIpAddress()));
+          System.out.println("privateIp=" + instance.getPrivateIpAddress());
         }
       }
     }
@@ -119,8 +108,7 @@ public class EC2ToConfig {
         Config.Replica replica = new Config.Replica(new HashMap<>());
         replicas.add(replica);
 
-        replica.put("publicAddress", servers.get(nodeOffset).publicAddress);
-        replica.put("privateAddress", servers.get(nodeOffset).privateAddress);
+        replica.put("address", servers.get(nodeOffset).address);
         replica.put("port", 9010);
         replica.put("httpPort", 8080);
         nodeOffset++;
@@ -145,12 +133,8 @@ public class EC2ToConfig {
       List<Instance> instances = reservation.getInstances();
       for (Instance instance : instances) {
         if (instance.getState().getName().equals("running")) {
-          String publicAddress = instance.getPublicIpAddress();
-          if (publicAddress == null || publicAddress.length() == 0) {
-            publicAddress = instance.getPrivateIpAddress();
-          }
-          clients.add(new Node(publicAddress, instance.getPrivateIpAddress()));
-          System.out.println("publicIp=" + publicAddress + ", privateIp=" + instance.getPrivateIpAddress());
+          clients.add(new Node(instance.getPrivateIpAddress()));
+          System.out.println("privateIp=" + instance.getPrivateIpAddress());
         }
       }
     }
@@ -160,8 +144,7 @@ public class EC2ToConfig {
     for (int i = 0; i < clients.size(); i++) {
       Config.Client client = new Config.Client(new HashMap<>());
       clientArray.add(client);
-      client.put("publicAddress", clients.get(nodeOffset).publicAddress);
-      client.put("privateAddress", clients.get(nodeOffset).privateAddress);
+      client.put("address", clients.get(nodeOffset).address);
       client.put("port", 8080);
       nodeOffset++;
     }
@@ -169,12 +152,10 @@ public class EC2ToConfig {
   }
 
   static class Node {
-    public final String privateAddress;
-    public final String publicAddress;
+    public final String address;
 
-    Node(String publicIpAddress, String privateIpAddress) {
-      this.publicAddress = publicIpAddress;
-      this.privateAddress = privateIpAddress;
+    Node(String privateIpAddress) {
+      this.address = privateIpAddress;
     }
   }
 }

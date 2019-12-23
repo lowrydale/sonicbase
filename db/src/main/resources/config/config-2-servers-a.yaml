@@ -17,19 +17,16 @@ shards:
 - shard:
     replicas:
     - replica:
-        publicAddress: localhost
-        privateAddress: localhost
+        address: localhost
         port: 9010
         httpPort: 8080
 - shard:
     replicas:
     - replica:
-        publicAddress: localhost
-        privateAddress: localhost
+        address: localhost
         port: 9060
         httpPort: 8080
 clients:
 - client:
-    publicAddress: localhost
-    privateAddress: localhost
+    address: localhost
     port: 8090

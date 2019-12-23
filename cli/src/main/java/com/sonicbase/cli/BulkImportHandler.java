@@ -21,12 +21,6 @@ class BulkImportHandler {
 
   //bulk import status
   void bulkImportStatus() throws SQLException, ClassNotFoundException {
-    String cluster = cli.getCurrCluster();
-    if (cluster == null) {
-      cli.println(ERROR_NOT_USING_A_CLUSTER_STR);
-      return;
-    }
-
     cli.initConnection();
 
     if (cli.getCurrDbName() == null) {
@@ -71,12 +65,6 @@ class BulkImportHandler {
 
   //start bulk import from persons(com.sonicbase.jdbcdriver.Driver, jdbc:sonicbase:localhost:9010/db, <user>, <password>) where <expression>
   void startBulkImport(String command) throws SQLException, ClassNotFoundException {
-    String cluster = cli.getCurrCluster();
-    if (cluster == null) {
-      cli.println(ERROR_NOT_USING_A_CLUSTER_STR);
-      return;
-    }
-
     cli.initConnection();
 
     if (cli.getCurrDbName() == null) {
@@ -124,12 +112,6 @@ class BulkImportHandler {
   }
 
   void cancelBulkImport() {
-    String cluster = cli.getCurrCluster();
-    if (cluster == null) {
-      cli.println(ERROR_NOT_USING_A_CLUSTER_STR);
-      return;
-    }
-
     if (cli.getCurrDbName() == null) {
       cli.println(ERROR_NOT_USING_A_DATABASE_STR);
       return;

@@ -1,6 +1,5 @@
 replicationFactor: 1
 dataDirectory: $WORKING_DIR/db-data
-installDirectory: $WORKING_DIR
 compressRecords: false
 useUnsafe: true
 maxJavaHeap: 20%
@@ -20,6 +19,5 @@ servers:
     address: localhost
 clients:
 - client:
-    publicAddress: localhost
-    privateAddress: localhost
+    address: localhost
     port: 8090

@@ -13,18 +13,16 @@ import java.util.*;
 public class BuildConfig {
 
   static class Node {
-    public final String privateAddress;
-    public final String publicAddress;
+    public final String address;
 
-    Node(String publicIpAddress, String privateIpAddress) {
-      this.publicAddress = publicIpAddress;
-      this.privateAddress = privateIpAddress;
+    Node(String privateIpAddress) {
+      this.address = privateIpAddress;
     }
   }
 
-  void buildConfig(String cluster, String filename) throws IOException {
-    File file = new File(System.getProperty("user.dir"), "config/config-" + cluster + ".yaml");
-    InputStream in = new FileInputStream(file);
+  void buildConfig(String filename) throws IOException {
+    File file = new File(System.getProperty("user.dir"), "config/config.yaml");
+    InputStream in = Config.getConfigStream();
     String json = IOUtils.toString(in, "utf-8");
     Config config = new Config(json);
 
@@ -79,7 +77,7 @@ public class BuildConfig {
     try (BufferedReader reader = new BufferedReader(new InputStreamReader(new FileInputStream(filename)))) {
       String line = null;
       while ((line = reader.readLine()) != null) {
-        servers.add(new Node(line, line));
+        servers.add(new Node(line));
       }
     }
     int replicationFactor = config.getInt("replicationFactor");
@@ -98,8 +96,7 @@ public class BuildConfig {
       for (int j = 0; j < replicationFactor; j++) {
         Config.Replica replica = new Config.Replica(new LinkedHashMap<>());
         replicas.add(replica);
-        replica.put("publicAddress", servers.get(nodeOffset).publicAddress);
-        replica.put("privateAddress", servers.get(nodeOffset).privateAddress);
+        replica.put("address", servers.get(nodeOffset).address);
         replica.put("port", 9010);
         replica.put("httpPort", 8080);
         nodeOffset++;

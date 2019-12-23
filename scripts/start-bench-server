@@ -1,14 +1,9 @@
 export _XMX_=2048m
-export SONIC_BASE_HOME=$4
-#export MODE=yprof
-mkdir $4/logs
-
+#export SONIC_BASE_HOME=$4
 #export MODE=yprof
 
-if [ ${4:0:1} != "/" ]
-then
-  export SONIC_BASE_HOME=$HOME/$SONIC_BASE_HOME
-fi
+export SONIC_BASE_HOME="$(dirname $( cd "$( dirname "${BASH_SOURCE[0]}" )" && pwd ))"
+mkdir $SONIC_BASE_HOME/logs
 
 cd $SONIC_BASE_HOME
 echo "start-SONIC_BASE_HOME=$SONIC_BASE_HOME"

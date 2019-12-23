@@ -14,7 +14,7 @@ public class LocalProducer implements StreamsProducer {
   }
 
   @Override
-  public void init(String cluster, Config config, Map<String, Object> streamConfig) {
+  public void init(Config config, String installDir, Map<String, Object> streamConfig) {
   }
 
   @Override

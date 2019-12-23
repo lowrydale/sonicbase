@@ -18,11 +18,10 @@ import com.sonicbase.server.DatabaseServer;
 import com.sonicbase.server.UpdateManager;
 import com.sonicbase.util.DateUtils;
 import com.sun.jersey.json.impl.writer.JsonEncoder;
+import org.apache.commons.codec.binary.Base64;
 import org.apache.commons.lang.exception.ExceptionUtils;
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
-import sun.misc.BASE64Decoder;
-import sun.misc.BASE64Encoder;
 
 import java.io.BufferedWriter;
 import java.io.File;
@@ -208,7 +207,6 @@ public class StreamManager {
       return;
     }
     MessageRequest request = new MessageRequest();
-    request.clusterName = server.getCluster();
     request.dbName = dbName;
     request.tableName = tableName;
     request.recordBytes = recordBytes;
@@ -459,7 +457,7 @@ public class StreamManager {
             }
           }
 
-          int threadCount = consumer.init(server.getCluster(), config, stream);
+          int threadCount = consumer.init(config, server.getInstallDir(), stream);
 
           for (int j = 0; j < threadCount; j++) {
             Thread thread = new Thread(() -> {
@@ -855,9 +853,7 @@ public class StreamManager {
       List<Config.Shard> array = config.getShards();
       Config.Shard shard = array.get(0);
       List<Config.Replica> replicasArray = shard.getReplicas();
-      final String address = config.getBoolean("clientIsPrivate") ?
-          replicasArray.get(0).getString("privateAddress") :
-          replicasArray.get(0).getString("publicAddress");
+      final String address = replicasArray.get(0).getString("address");
       final int port = replicasArray.get(0).getInt("port");
 
       Class.forName("com.sonicbase.jdbcdriver.Driver");
@@ -1059,7 +1055,7 @@ public class StreamManager {
             if (node != null) {
               String value = node.asText();
               if (value != null) {
-                currRecord[offset] = new BASE64Decoder().decodeBuffer(value);
+                currRecord[offset] = new Base64().decode(value);
               }
             }
           }
@@ -1069,7 +1065,7 @@ public class StreamManager {
             if (node != null) {
               String value = node.asText();
               if (value != null) {
-                currRecord[offset] = new BASE64Decoder().decodeBuffer(value);
+                currRecord[offset] = new Base64().decode(value);
               }
             }
           }
@@ -1079,7 +1075,7 @@ public class StreamManager {
             if (node != null) {
               String value = node.asText();
               if (value != null) {
-                currRecord[offset] = new BASE64Decoder().decodeBuffer(value);
+                currRecord[offset] = new Base64().decode(value);
               }
             }
           }
@@ -1089,7 +1085,7 @@ public class StreamManager {
             if (node != null) {
               String value = node.asText();
               if (value != null) {
-                currRecord[offset] = new BASE64Decoder().decodeBuffer(value);
+                currRecord[offset] = new Base64().decode(value);
               }
             }
           }
@@ -1176,7 +1172,6 @@ public class StreamManager {
   }
 
   class MessageRequest {
-    private String clusterName;
     private String dbName;
     private String tableName;
     private byte[] recordBytes;
@@ -1213,7 +1208,7 @@ public class StreamManager {
             logger.info("starting stream producer: config=" + stream.toString());
             StreamsProducer producer = (StreamsProducer) Class.forName(className).newInstance();
 
-            producer.init(server.getCluster(), config, stream);
+            producer.init(config, server.getInstallDir(), stream);
 
             producers.add(producer);
           }
@@ -1306,7 +1301,6 @@ public class StreamManager {
       builder.append("{");
 
       if (currRequest.updateType == UpdateManager.UpdateType.UPDATE) {
-        builder.append("\"_sonicbase_clustername\": \"").append(currRequest.clusterName).append("\",");
         builder.append("\"_sonicbase_dbname\": \"").append(currRequest.dbName).append("\",");
         builder.append("\"_sonicbase_tablename\": \"").append(currRequest.tableName).append("\",");
         builder.append("\"_sonicbase_action\": \"").append(currRequest.updateType).append("\",");
@@ -1325,8 +1319,6 @@ public class StreamManager {
       else {
         TableSchema tableSchema = server.getTableSchema(currRequest.dbName, currRequest.tableName, server.getDataDir());
         Record record = new Record(currRequest.dbName, server.getCommon(), currRequest.recordBytes);
-
-        builder.append("\"_sonicbase_clustername\": \"").append(currRequest.clusterName).append("\",");
         builder.append("\"_sonicbase_dbname\": \"").append(currRequest.dbName).append("\",");
         builder.append("\"_sonicbase_tablename\": \"").append(currRequest.tableName).append("\",");
         builder.append("\"_sonicbase_action\": \"").append(currRequest.updateType).append("\",");
@@ -1394,7 +1386,6 @@ public class StreamManager {
       }
 
       MessageRequest request = new MessageRequest();
-      request.clusterName = server.getCluster();
       request.dbName = dbName;
       request.tableName = tableName;
       request.recordBytes = recordBytes;
@@ -1479,7 +1470,7 @@ public class StreamManager {
           case LONGVARBINARY:
           case BLOB:
             builder.append("\"").append(fieldName).append("\": \"").append(
-                new BASE64Encoder().encode((byte[]) recordFields[offset])).append("\"");
+                new Base64().encode((byte[]) recordFields[offset])).append("\"");
             break;
         }
       }

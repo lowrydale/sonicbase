@@ -60,7 +60,7 @@ public class ConnectionProxy implements Connection {
         db = outerParts[1];
         db = db.toLowerCase();
       }
-      client = new DatabaseClient(null, hosts, DatabaseServerProxy.getShard(server), DatabaseServerProxy.getReplica(server),
+      client = new DatabaseClient(hosts, DatabaseServerProxy.getShard(server), DatabaseServerProxy.getReplica(server),
           true, DatabaseServerProxy.getCommon(server), server, false);
       if (db != null) {
         client.initDb();
@@ -496,7 +496,7 @@ public class ConnectionProxy implements Connection {
   }
 
   public int getHoldability() throws SQLException {
-    throw new NotImplementedException();
+    return ResultSet.HOLD_CURSORS_OVER_COMMIT;
   }
 
   public Savepoint setSavepoint() throws SQLException {

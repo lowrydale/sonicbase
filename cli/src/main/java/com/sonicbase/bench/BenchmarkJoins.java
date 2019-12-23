@@ -31,7 +31,7 @@ public class BenchmarkJoins {
   final AtomicLong selectOffset = new AtomicLong();
   final AtomicLong maxDuration = new AtomicLong();
 
-  public void start(String address, final String cluster, final int shardCount, final Integer shard, final long count, final String queryType) {
+  public void start(String address, final int shardCount, final Integer shard, final long count, final String queryType) {
     shutdown = false;
     selectBegin.set(System.currentTimeMillis());
     doResetStats();
@@ -39,15 +39,6 @@ public class BenchmarkJoins {
       try {
         final AtomicInteger cycle = new AtomicInteger();
         final long startId = shard * count;
-
-        File file = new File(System.getProperty("user.dir"), "config/config-" + cluster + ".yaml");
-        if (!file.exists()) {
-          file = new File(System.getProperty("user.dir"), "db/src/main/resources/config/config-" + cluster + ".yaml");
-          logger.info("Loaded config resource dir");
-        }
-        else {
-          logger.info("Loaded config default dir");
-        }
 
         logger.info("Using address: address={}", address);
 

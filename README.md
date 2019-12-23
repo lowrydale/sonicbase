@@ -19,11 +19,6 @@ Windows: Unzip the file sonicbase-&lt;version&gt;.zip in the parent directory wh
 ### Start Admin Client
 Change to the sonicbase/bin directory and type "./cli" for MacOS and Linux and "./cli.bat" for cygwin and "cli.bat" for Windows. This will start the SonicBase admin client.
 
-### Use Cluster
-In the client, type:
-    "use cluster 1-local"
-This will allow you to use the "1-local" cluster. All subsequent operations will be performed on this cluster. You can create other clusters by adding a config file for each cluster in the sonicbase/config directory. The name of the file must be "config-&lt;cluster name&gt;.json". 
-
 ### Start Cluster
 In the client, type:
     "start cluster"

@@ -48,7 +48,8 @@ public class TestSnapshotManager {
         //          String role = "primaryMaster";
 
         dbServers[i] = new com.sonicbase.server.DatabaseServer();
-        dbServers[i].setConfig(config, "4-servers", "localhost", 9010 + (50 * i), true, new AtomicBoolean(true), new AtomicBoolean(true), null, false);
+        Config.copyConfig("4-servers");
+        dbServers[i].setConfig(config, "localhost", 9010 + (50 * i), true, new AtomicBoolean(true), new AtomicBoolean(true), null, false);
         dbServers[i].setRole(role);
 
         //          return null;
@@ -255,7 +256,7 @@ public class TestSnapshotManager {
       for (com.sonicbase.server.DatabaseServer server : dbServers) {
         server.shutdown();
       }
-      System.out.println("client refCount=" + DatabaseClient.clientRefCount.get() + ", sharedClients=" + DatabaseClient.sharedClients.size() + ", class=TestSnapshotManager");
+      System.out.println("client refCount=" + DatabaseClient.clientRefCount.get() + ", class=TestSnapshotManager");
       for (DatabaseClient client : DatabaseClient.allClients) {
         System.out.println("Stack:\n" + client.getAllocatedStack());
       }
@@ -286,7 +287,8 @@ public class TestSnapshotManager {
         //          String role = "primaryMaster";
 
         dbServers[i] = new com.sonicbase.server.DatabaseServer();
-        dbServers[i].setConfig(config, "4-servers", "localhost", 9010 + (50 * i), true, new AtomicBoolean(true), new AtomicBoolean(true),null, false);
+        Config.copyConfig("4-servers");
+        dbServers[i].setConfig(config, "localhost", 9010 + (50 * i), true, new AtomicBoolean(true), new AtomicBoolean(true),null, false);
         dbServers[i].setRole(role);
         //        }
         //      }));
@@ -358,7 +360,7 @@ public class TestSnapshotManager {
         server.shutdown();
       }
 
-      System.out.println("client refCount=" + DatabaseClient.clientRefCount.get() + ", sharedClients=" + DatabaseClient.sharedClients.size() + ", class=TestSnapshotManager");
+      System.out.println("client refCount=" + DatabaseClient.clientRefCount.get() + ", class=TestSnapshotManager");
       for (DatabaseClient client : DatabaseClient.allClients) {
         System.out.println("Stack:\n" + client.getAllocatedStack());
       }
@@ -390,7 +392,8 @@ public class TestSnapshotManager {
         //          String role = "primaryMaster";
 
         dbServers[i] = new com.sonicbase.server.DatabaseServer();
-        dbServers[i].setConfig(config, "4-servers", "localhost", 9010 + (50 * i), true, new AtomicBoolean(true), new AtomicBoolean(true),null, false);
+        Config.copyConfig("4-servers");
+        dbServers[i].setConfig(config, "localhost", 9010 + (50 * i), true, new AtomicBoolean(true), new AtomicBoolean(true),null, false);
         dbServers[i].setRole(role);
         //          return null;
         //        }
@@ -572,7 +575,7 @@ public class TestSnapshotManager {
         server.shutdown();
       }
 
-      System.out.println("client refCount=" + DatabaseClient.clientRefCount.get() + ", sharedClients=" + DatabaseClient.sharedClients.size() + ", class=TestSnapshotManager");
+      System.out.println("client refCount=" + DatabaseClient.clientRefCount.get() + ", class=TestSnapshotManager");
       for (DatabaseClient client : DatabaseClient.allClients) {
         System.out.println("Stack:\n" + client.getAllocatedStack());
       }
@@ -604,7 +607,8 @@ public class TestSnapshotManager {
         //          String role = "primaryMaster";
 
         dbServers[i] = new com.sonicbase.server.DatabaseServer();
-        dbServers[i].setConfig(config, "4-servers", "localhost", 9010 + (50 * i), true, new AtomicBoolean(true),new AtomicBoolean(true), null, false);
+        Config.copyConfig("4-servers");
+        dbServers[i].setConfig(config, "localhost", 9010 + (50 * i), true, new AtomicBoolean(true),new AtomicBoolean(true), null, false);
         dbServers[i].setRole(role);
         //          return null;
         //        }
@@ -788,7 +792,7 @@ public class TestSnapshotManager {
         server.shutdown();
       }
 
-      System.out.println("client refCount=" + DatabaseClient.clientRefCount.get() + ", sharedClients=" + DatabaseClient.sharedClients.size() + ", class=TestSnapshotManager");
+      System.out.println("client refCount=" + DatabaseClient.clientRefCount.get() + ", class=TestSnapshotManager");
       for (DatabaseClient client : DatabaseClient.allClients) {
         System.out.println("Stack:\n" + client.getAllocatedStack());
       }

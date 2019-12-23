@@ -102,7 +102,7 @@ public class PartitionManager extends Thread {
     ServersConfig config = databaseServer.getCommon().getServersConfig();
     for (ServersConfig.Shard shard : config.getShards()) {
       for (ServersConfig.Host host : shard.getReplicas()) {
-        if (!addresses.add(host.getPrivateAddress())) {
+        if (!addresses.add(host.getaddress())) {
           sharedHost = true;
           break;
         }
@@ -1987,7 +1987,7 @@ public class PartitionManager extends Thread {
         }
       }
 
-      ServersConfig newConfig = new ServersConfig(databaseServer.getCluster(),
+      ServersConfig newConfig = new ServersConfig(
           config.getShards(), isInternal, optimizedForThroughput);
       ServersConfig.Shard[] newShards = newConfig.getShards();
 

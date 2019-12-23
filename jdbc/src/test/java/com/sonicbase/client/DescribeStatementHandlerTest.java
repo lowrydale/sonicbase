@@ -173,12 +173,12 @@ public class DescribeStatementHandlerTest {
           public Object answer(InvocationOnMock invocationOnMock) throws Throwable {
             ServersConfig.Shard[] shards = new ServersConfig.Shard[]{
                 new ServersConfig.Shard(new ServersConfig.Host[]{
-                    new ServersConfig.Host("localhost", "localhost", 9010, true),
-                    new ServersConfig.Host("localhost", "localhost", 9060, false)
+                    new ServersConfig.Host("localhost", 9010, true),
+                    new ServersConfig.Host("localhost", 9060, false)
                 }),
                 new ServersConfig.Shard(new ServersConfig.Host[]{
-                    new ServersConfig.Host("localhost", "localhost", 10010, false),
-                    new ServersConfig.Host("localhost", "localhost", 10060, true)
+                    new ServersConfig.Host("localhost", 10010, false),
+                    new ServersConfig.Host("localhost", 10060, true)
                 })
               };
             return shards;
@@ -280,12 +280,12 @@ public class DescribeStatementHandlerTest {
           public Object answer(InvocationOnMock invocationOnMock) throws Throwable {
             ServersConfig.Shard[] shards = new ServersConfig.Shard[]{
                 new ServersConfig.Shard(new ServersConfig.Host[]{
-                    new ServersConfig.Host("localhost", "localhost", 9010, false),
-                    new ServersConfig.Host("localhost", "localhost", 9060, false)
+                    new ServersConfig.Host("localhost", 9010, false),
+                    new ServersConfig.Host("localhost", 9060, false)
                 }),
                 new ServersConfig.Shard(new ServersConfig.Host[]{
-                    new ServersConfig.Host("localhost", "localhost", 10010, false),
-                    new ServersConfig.Host("localhost", "localhost", 10060, false)
+                    new ServersConfig.Host("localhost", 10010, false),
+                    new ServersConfig.Host("localhost", 10060, false)
                 })
             };
             return shards;
@@ -341,12 +341,12 @@ public class DescribeStatementHandlerTest {
           public Object answer(InvocationOnMock invocationOnMock) throws Throwable {
             ServersConfig.Shard[] shards = new ServersConfig.Shard[]{
                 new ServersConfig.Shard(new ServersConfig.Host[]{
-                    new ServersConfig.Host("localhost", "localhost", 9010, true),
-                    new ServersConfig.Host("localhost", "localhost", 9060, false)
+                    new ServersConfig.Host("localhost", 9010, true),
+                    new ServersConfig.Host("localhost", 9060, false)
                 }),
                 new ServersConfig.Shard(new ServersConfig.Host[]{
-                    new ServersConfig.Host("localhost", "localhost", 10010, false),
-                    new ServersConfig.Host("localhost", "localhost", 10060, true)
+                    new ServersConfig.Host("localhost", 10010, false),
+                    new ServersConfig.Host("localhost", 10060, true)
                 })
             };
             return shards;
@@ -398,8 +398,7 @@ public class DescribeStatementHandlerTest {
             "  \"installDirectory\": \"$HOME/sonicbase\",\n" +
             "  \"user\": \"ec2-user\",\n" +
             "  \"server\": {\n" +
-            "    \"publicAddress\": \"localhost\",\n" +
-            "    \"privateAddress\": \"localhost\",\n" +
+            "    \"address\": \"localhost\",\n" +
             "    \"port\": 8443\n" +
             "  }\n" +
             "}";

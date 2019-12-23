@@ -24,7 +24,8 @@ public class HttpServer {
 
   public static void main(String[] args) {
     HttpServer server = new HttpServer();
-    server.startControllerServer(8081);
+    String installDir = args[0];
+    server.startControllerServer(8081, installDir);
   }
 
   public void shutdown() {
@@ -44,10 +45,11 @@ public class HttpServer {
     }
   }
 
-  public void startControllerServer(final int port) {
+  public void startControllerServer(final int port, String installDir) {
     mainThread = ThreadUtil.createThread(() -> {
       try {
         Server server = new Server(port);
+        handler.setInstallDir(installDir);
         server.setHandler(handler);
 
         server.start();

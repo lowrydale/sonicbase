@@ -9,10 +9,9 @@
 
   <script>
 
-    var currCluster = "";
     var draw;
 
-      // replicaNode.put("host", replica.getPrivateAddress() + ":" + replica.getPort());
+      // replicaNode.put("host", replica.getaddress() + ":" + replica.getPort());
       // replicaNode.put("shard", String.valueOf(j));
       // replicaNode.put("replica", String.valueOf(i));
       // replicaNode.put("dead", String.valueOf(replica.isDead()));
@@ -81,8 +80,6 @@
       }
 
       function refreshCluster(value) {
-          currCluster = value;
-          $('#clusters').val(value);
           getHealth();
       }
 
@@ -93,15 +90,11 @@
                   alert('Request Status: ' + xhr.status + ' Status Text: ' + xhr.statusText + ' ' + xhr.responseText);
               }
           });
-
-          if (currCluster == null || currCluster == "") {
-              currCluster = "_unknown_";
-          }
           $.ajax({
               headers:{
                   "Accept":"application/json",
                   "Content-type":"application/json"
-              },   url:"/health?cluster=" + currCluster,
+              },   url:"/health",
               success:callback,
               error: function(xhr) {
 

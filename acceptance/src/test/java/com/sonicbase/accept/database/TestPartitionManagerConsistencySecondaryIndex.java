@@ -58,7 +58,8 @@ public class TestPartitionManagerConsistencySecondaryIndex {
 
       for (int i = 0; i < dbServers.length; i++) {
         dbServers[i] = new DatabaseServer();
-        dbServers[i].setConfig(config, "4-servers", "localhost", 9010 + (50 * i), true, new AtomicBoolean(true), new AtomicBoolean(true),null, false);
+        Config.copyConfig("4-servers");
+        dbServers[i].setConfig(config, "localhost", 9010 + (50 * i), true, new AtomicBoolean(true), new AtomicBoolean(true),null, false);
         dbServers[i].setRole(role);
       }
 

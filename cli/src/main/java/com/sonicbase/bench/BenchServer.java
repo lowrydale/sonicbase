@@ -30,33 +30,21 @@ public class BenchServer {
   static final BenchmarkJoins benchJoins = new BenchmarkJoins();
   static final AtomicLong insertBegin = new AtomicLong();
   static final AtomicLong insertHighest = new AtomicLong();
-  public static final String CLUSTER_STR = "cluster";
   public static final String SHARD_STR = "shard";
   public static final String COUNT_STR = "count";
   public static final String SHARD_COUNT_STR = "shardCount";
   public static final String USER_DIR_STR = "user.dir";
 
   private static String getAddress(HttpServletRequest request) throws IOException {
-    String cluster = request.getParameter(CLUSTER_STR);
-    if (cluster == null) {
-      return null;
-    }
     logger.info("userDir={}", System.getProperty(USER_DIR_STR));
-    File file = new File(System.getProperty(USER_DIR_STR), "config/config-" + cluster + ".yaml");
-    if (!file.exists()) {
-      file = new File(System.getProperty(USER_DIR_STR), "db/src/main/resources/config/config-" + cluster + ".yaml");
-    }
-    String configStr = IOUtils.toString(new BufferedInputStream(new FileInputStream(file)), "utf-8");
+    String configStr = IOUtils.toString(new BufferedInputStream(Config.getConfigStream()), "utf-8");
     Config config = new Config(configStr);
     List<Config.Shard> array = config.getShards();
     Config.Shard shard = array.get(0);
     List<Config.Replica> replicasArray = shard.getReplicas();
-    String address = replicasArray.get(0).getString("publicAddress");
-    if (config.getBoolean("clientIsPrivate")) {
-      address = replicasArray.get(0).getString("privateAddress");
-    }
-    return address;
+    return replicasArray.get(0).getString("address");
   }
+
   public static class HelloHandler extends AbstractHandler {
     public void handle(String target, Request baseRequest, HttpServletRequest request, HttpServletResponse response)
         throws IOException {
@@ -70,13 +58,13 @@ public class BenchServer {
       String uri = request.getRequestURI();
       String ret = "";
       if (uri.startsWith("/bench/start/insert")) {
-        benchInsert.start(getAddress(request), insertBegin, insertHighest, request.getParameter(CLUSTER_STR),
+        benchInsert.start(getAddress(request), insertBegin, insertHighest,
             Integer.valueOf(request.getParameter(SHARD_STR)),
             Long.valueOf(request.getParameter("offset")),
             Long.valueOf(request.getParameter(COUNT_STR)), false);
       }
       else if (uri.startsWith("/bench/start/delete")) {
-        benchDelete.start(getAddress(request), request.getParameter(CLUSTER_STR), Integer.valueOf(request.getParameter(SHARD_COUNT_STR)),
+        benchDelete.start(getAddress(request), Integer.valueOf(request.getParameter(SHARD_COUNT_STR)),
             Integer.valueOf(request.getParameter(SHARD_STR)),
             Long.valueOf(request.getParameter(COUNT_STR)));
       }
@@ -87,7 +75,7 @@ public class BenchServer {
         benchDelete.stop();
       }
       else if (uri.startsWith("/bench/start/check")) {
-        benchCheck.start(getAddress(request), insertBegin, insertHighest, request.getParameter(CLUSTER_STR), Integer.valueOf(request.getParameter(SHARD_COUNT_STR)),
+        benchCheck.start(getAddress(request), insertBegin, insertHighest, Integer.valueOf(request.getParameter(SHARD_COUNT_STR)),
             Integer.valueOf(request.getParameter(SHARD_STR)),
             Long.valueOf(request.getParameter(COUNT_STR)));
       }
@@ -95,7 +83,7 @@ public class BenchServer {
         benchCheck.stop();
       }
       else if (uri.startsWith("/bench/start/identity")) {
-        benchIdentity.start(getAddress(request), request.getParameter(CLUSTER_STR), Integer.valueOf(request.getParameter(SHARD_COUNT_STR)),
+        benchIdentity.start(getAddress(request), Integer.valueOf(request.getParameter(SHARD_COUNT_STR)),
             Integer.valueOf(request.getParameter(SHARD_STR)),
             Long.valueOf(request.getParameter(COUNT_STR)), request.getParameter("queryType"));
       }
@@ -103,7 +91,7 @@ public class BenchServer {
         benchIdentity.stop();
       }
       else if (uri.startsWith("/bench/start/range")) {
-        benchRange.start(getAddress(request), request.getParameter(CLUSTER_STR), Integer.valueOf(request.getParameter(SHARD_COUNT_STR)),
+        benchRange.start(getAddress(request), Integer.valueOf(request.getParameter(SHARD_COUNT_STR)),
             Integer.valueOf(request.getParameter(SHARD_STR)),
             Long.valueOf(request.getParameter(COUNT_STR)));
       }
@@ -111,7 +99,7 @@ public class BenchServer {
         benchRange.stop();
       }
       else if (uri.startsWith("/bench/start/joins")) {
-        benchJoins.start(getAddress(request), request.getParameter(CLUSTER_STR), Integer.valueOf(request.getParameter(SHARD_COUNT_STR)),
+        benchJoins.start(getAddress(request), Integer.valueOf(request.getParameter(SHARD_COUNT_STR)),
             Integer.valueOf(request.getParameter(SHARD_STR)),
             Long.valueOf(request.getParameter(COUNT_STR)), request.getParameter("queryType"));
       }
@@ -169,30 +157,19 @@ public class BenchServer {
       }
       String shardStr = request.getParameter(SHARD_STR);
       if (shardStr != null) {
-        String cluster = request.getParameter(CLUSTER_STR);
-        if (cluster != null) {
-          try {
-            InputStream in = null;
-            File file = new File(System.getProperty("user.dir"), "config/config-" + cluster + ".yaml");
-            if (file.exists()) {
-              in = new FileInputStream(file);
-            }
+        try {
+          InputStream in = Config.getConfigStream();
+          String configStr = IOUtils.toString(new BufferedInputStream(in), "utf-8");
 
-            if (in == null) {
-              in = NettyServer.class.getResourceAsStream("/config/config-" + cluster + ".yaml");
-            }
-            String configStr = IOUtils.toString(new BufferedInputStream(in), "utf-8");
+          Config config = new Config(configStr);
 
-            Config config = new Config(configStr);
+          initializedLogger = true;
 
-            initializedLogger = true;
-
-            int shard = Integer.parseInt(shardStr);
-            com.sonicbase.logger.Logger.init(cluster, shard + 10_000, 0, count, config.getString("logstashServers"));
-          }
-          catch (Exception e) {
-            logger.error("error initializing logger", e);
-          }
+          int shard = Integer.parseInt(shardStr);
+          com.sonicbase.logger.Logger.init(shard + 10_000, 0, count, config.getString("logstashServers"));
+        }
+        catch (Exception e) {
+          logger.error("error initializing logger", e);
         }
       }
 

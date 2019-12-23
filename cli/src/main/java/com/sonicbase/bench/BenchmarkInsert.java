@@ -143,7 +143,7 @@ public class BenchmarkInsert {
   private final ConcurrentHashMap<Integer, Long> threadLiveliness = new ConcurrentHashMap<>();
   private int countDead = 0;
 
-  public void start(String address, final AtomicLong insertBegin, final AtomicLong insertHighest, final String cluster,
+  public void start(String address, final AtomicLong insertBegin, final AtomicLong insertHighest,
                     final int shard, final long offset,
                     final long count, final boolean simulate) {
     shutdown = false;
@@ -201,7 +201,7 @@ public class BenchmarkInsert {
           insertBegin.set(startId);
           List<Thread> threads = new ArrayList<>();
           final AtomicLong currOffset = new AtomicLong(startId);
-          final int threadCount = (batch ? 8 : 256);
+          final int threadCount = (batch ? 6 : 256);
           for (int i = 0; i < threadCount; i++) {
             final int threadOffset = i;
             final AtomicLong lastLogged = new AtomicLong(System.currentTimeMillis());

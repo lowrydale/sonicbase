@@ -29,17 +29,10 @@ public class AWSKinesisProducer implements StreamsProducer {
   private AmazonKinesis kinesisClient;
   private String streamName;
 
-  public File getInstallDir(Config config) {
-    String dir = config.getString("installDirectory");
-    return new File(dir.replace("$HOME", System.getProperty("user.home")));
-  }
-
   @Override
-  public void init(String cluster, Config config, Map<String, Object> queueConfig) {
+  public void init(Config config, String installDir, Map<String, Object> queueConfig) {
     try {
-
       logger.info("aws kinesis producer init - begin");
-      File installDir = getInstallDir(config);
 
       final ClientConfiguration clientConfig = new ClientConfiguration();
       clientConfig.setMaxConnections(100);
@@ -48,7 +41,7 @@ public class AWSKinesisProducer implements StreamsProducer {
 
       AmazonKinesisClientBuilder clientBuilder = AmazonKinesisClientBuilder.standard();
 
-      File keysFile = new File(installDir, "/keys/" + cluster + "-awskeys");
+      File keysFile = new File(installDir, "/keys/sonicbase-awskeys");
       if (!keysFile.exists()) {
         clientBuilder.setCredentials(new InstanceProfileCredentialsProvider(true));
       }

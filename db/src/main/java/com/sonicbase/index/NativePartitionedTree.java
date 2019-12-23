@@ -15,9 +15,13 @@ public class NativePartitionedTree {
 
   public native void clear(long indexId);
 
-  public native int tailBlockArray(long indexId, Object[] startKey, int count, boolean first, Object[][] keys, long[] values);
+  public native byte[] getResultsBytes(long indexId, Object[] startKey, int count, boolean first);
 
-  public native int headBlockArray(long indexId, Object[] startKey, int count, boolean first, Object[][] keys, long[] values);
+  public native int getResultsObjects(long indexId, Object[] startKey, int count, boolean first, Object[][] keys, long[] values);
+
+  public native boolean tailBlockArray(long indexId, Object[] startKey, int count, boolean first, byte[] out, int length);
+
+  public native boolean headBlockArray(long indexId, Object[] startKey, int count, boolean first, byte[] out, int length);
 
   public native boolean higherEntry(long indexId, Object[] key, Object[][] retKey, long[] retValue);
 

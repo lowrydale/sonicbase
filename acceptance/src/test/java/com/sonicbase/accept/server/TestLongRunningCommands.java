@@ -32,7 +32,8 @@ public class TestLongRunningCommands {
 
     com.sonicbase.server.DatabaseServer server = new com.sonicbase.server.DatabaseServer();
     try {
-      server.setConfig(config, "4-servers", "localhost", 9010, true, new AtomicBoolean(true), new AtomicBoolean(true), null, false);
+      Config.copyConfig("4-servers");
+      server.setConfig(config, "localhost", 9010, true, new AtomicBoolean(true), new AtomicBoolean(true), null, false);
       server.shutdownRepartitioner();
 
       ComObject cobj = new ComObject(2);
@@ -95,7 +96,8 @@ public class TestLongRunningCommands {
 
     try {
       server = new DatabaseServer();
-      server.setConfig(config, "4-servers", "localhost", 9010, true, new AtomicBoolean(true), new AtomicBoolean(true), null, false);
+      Config.copyConfig("4-servers");
+      server.setConfig(config, "localhost", 9010, true, new AtomicBoolean(true), new AtomicBoolean(true), null, false);
       server.shutdownRepartitioner();
 
       Thread.sleep(1000);
@@ -105,7 +107,7 @@ public class TestLongRunningCommands {
     finally {
       server.shutdown();
 
-      System.out.println("client refCount=" + DatabaseClient.clientRefCount.get() + ", sharedClients=" + DatabaseClient.sharedClients.size() + ", class=TestLongRunningCommands");
+      System.out.println("client refCount=" + DatabaseClient.clientRefCount.get() + ", class=TestLongRunningCommands");
       for (DatabaseClient client : DatabaseClient.allClients) {
         System.out.println("Stack:\n" + client.getAllocatedStack());
       }

@@ -49,8 +49,9 @@ public class EmbeddedDatabase {
       config.put("useUnsafe", useUnsafe);
 
       server = new DatabaseServer();
-      server.setConfig(config, "1-local", "localhost", 8999, true,
-          new AtomicBoolean(true), new AtomicBoolean(true), "", "", notDurable, true);
+      String installDir = new File(System.getProperty("user.dir")).getAbsolutePath();
+      server.setConfig(config, "localhost", 8999, true,
+          new AtomicBoolean(true), new AtomicBoolean(true), "", "", notDurable, true, installDir);
 
       if (!notDurable) {
         server.recoverFromSnapshot();

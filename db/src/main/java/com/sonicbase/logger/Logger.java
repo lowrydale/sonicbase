@@ -128,10 +128,9 @@ public class Logger extends AppenderSkeleton {
     }
   }
 
-  public static void init(String cluster, int shard, int replica, AtomicLong count, String serversStr) {
+  public static void init(int shard, int replica, AtomicLong count, String serversStr) {
     try {
       Logger.countLogged = count;
-      Logger.cluster = cluster;
       Logger.shard = shard;
       Logger.replica = replica;
       if (serversStr == null) {

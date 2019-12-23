@@ -176,7 +176,7 @@ void insertForever(int offset) {
 				printf("put progress count=%lu, rate=%f\n", pcount.load(), (float)((float)pcount.load() / (float)((currMillis() - begin)) * (float)1000));
 			}
 		}
-		if (pcount.load() > 50000000) {
+		if (pcount.load() > 25000000) {
 			break;
 		}
 	}
@@ -225,7 +225,6 @@ public:
 		}
 		Iterator<MyKey*> *kkiterator = map->tailMap(map->firstKey())->keySet()->beginIterator();
 		while (kkiterator->hasNext()) {
-			MyKey *entry = kkiterator->nextEntry();
 			printf("%u\n", entry->value);
 		}
 		*/

@@ -3,7 +3,7 @@
 
 
     <appender name="roll" class="org.apache.log4j.RollingFileAppender">
-      <param name="File" value="${logfilename}"/>
+      <param name="File" value="/tmp/log.log"/>
       <param name="Append" value="true" />
       <param name="Encoding" value="UTF-8" />
       <param name="MaxFileSize" value="1GB"/>
@@ -19,7 +19,7 @@
     </appender>
 
     <appender name="roll-errors" class="org.apache.log4j.RollingFileAppender">
-        <param name="File" value="${errorLogfilename}"/>
+        <param name="File" value="/tmp/log.log"/>
         <param name="Append" value="true" />
         <param name="Encoding" value="UTF-8" />
         <param name="MaxFileSize" value="1GB"/>

@@ -1,12 +1,10 @@
 /* © 2019 by Intellectual Reserve, Inc. All rights reserved. */
-package com.sonicbase;
+package com.sonicbase.index;
 
 //
 // Source code recreated from a .class file by IntelliJ IDEA
 // (powered by Fernflower decompiler)
 //
-
-package org.anarres.lzo;
 
 import java.io.IOException;
 import java.io.InputStream;
@@ -26,7 +24,7 @@ import org.apache.commons.logging.LogFactory;
 
 public class LzopInputStream extends LzoInputStream {
   private static final Log LOG = LogFactory.getLog(org.anarres.lzo.LzopInputStream.class);
-  private final int flags = this.readHeader();
+  private final int flags = 0;
   private final CRC32 c_crc32_c;
   private final CRC32 c_crc32_d;
   private final Adler32 c_adler32_c;
@@ -94,81 +92,6 @@ public class LzopInputStream extends LzoInputStream {
     crc32.update(buf, 0, len);
     Arrays.fill(buf, (byte)0);
     return ret;
-  }
-
-  protected int readHeader() throws IOException {
-    byte[] buf = new byte[9];
-    this.readBytes(buf, 0, 9);
-    if (!Arrays.equals(buf, LzopConstants.LZOP_MAGIC)) {
-      throw new IOException("Invalid LZO header");
-    } else {
-      Arrays.fill(buf, (byte)0);
-      Adler32 adler = new Adler32();
-      CRC32 crc32 = new CRC32();
-      int hitem = this.readHeaderItem(buf, 2, adler, crc32);
-      if (hitem > 4112) {
-        LOG.debug("Compressed with later version of lzop: " + Integer.toHexString(hitem) + " (expected 0x" + Integer.toHexString(4112) + ")");
-      }
-
-      hitem = this.readHeaderItem(buf, 2, adler, crc32);
-      if (hitem > 8272) {
-        throw new IOException("Compressed with incompatible lzo version: 0x" + Integer.toHexString(hitem) + " (expected 0x" + Integer.toHexString(8272) + ")");
-      } else {
-        hitem = this.readHeaderItem(buf, 2, adler, crc32);
-        if (hitem > 4112) {
-          throw new IOException("Compressed with incompatible lzop version: 0x" + Integer.toHexString(hitem) + " (expected 0x" + Integer.toHexString(4112) + ")");
-        } else {
-          hitem = this.readHeaderItem(buf, 1, adler, crc32);
-          switch(hitem) {
-            case 1:
-            case 2:
-            case 3:
-              this.readHeaderItem(buf, 1, adler, crc32);
-              int flags = this.readHeaderItem(buf, 4, adler, crc32);
-              boolean useCRC32 = ((long)flags & 4096L) != 0L;
-              boolean extraField = ((long)flags & 64L) != 0L;
-              if (((long)flags & 1024L) != 0L) {
-                throw new IOException("Multipart lzop not supported");
-              } else if (((long)flags & 2048L) != 0L) {
-                throw new IOException("lzop filter not supported");
-              } else if (((long)flags & 1032192L) != 0L) {
-                throw new IOException("Unknown flags in header");
-              } else {
-                this.readHeaderItem(buf, 4, adler, crc32);
-                this.readHeaderItem(buf, 4, adler, crc32);
-                this.readHeaderItem(buf, 4, adler, crc32);
-                hitem = this.readHeaderItem(buf, 1, adler, crc32);
-                if (hitem > 0) {
-                  byte[] tmp = hitem > buf.length ? new byte[hitem] : buf;
-                  this.readHeaderItem(tmp, hitem, adler, crc32);
-                }
-
-                int checksum = (int)(useCRC32 ? crc32.getValue() : adler.getValue());
-                hitem = this.readHeaderItem(buf, 4, adler, crc32);
-                if (hitem != checksum) {
-                  throw new IOException("Invalid header checksum: " + Long.toHexString((long)checksum) + " (expected 0x" + Integer.toHexString(hitem) + ")");
-                } else {
-                  if (extraField) {
-                    LOG.debug("Extra header field not processed");
-                    adler.reset();
-                    crc32.reset();
-                    hitem = this.readHeaderItem(buf, 4, adler, crc32);
-                    this.readHeaderItem(new byte[hitem], hitem, adler, crc32);
-                    checksum = (int)(useCRC32 ? crc32.getValue() : adler.getValue());
-                    if (checksum != this.readHeaderItem(buf, 4, adler, crc32)) {
-                      throw new IOException("Invalid checksum for extra header field");
-                    }
-                  }
-
-                  return flags;
-                }
-              }
-            default:
-              throw new IOException("Invalid strategy " + Integer.toHexString(hitem));
-          }
-        }
-      }
-    }
   }
 
   private int readChecksum(@CheckForNull Checksum csum) throws IOException {

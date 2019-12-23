@@ -203,7 +203,7 @@
         <dependency>
             <groupId>commons-io</groupId>
             <artifactId>commons-io</artifactId>
-            <scope>provided</scope> <!-- by jdbc jar -->
+            <version>${commons-io.version}</version>
         </dependency>
 
         <!--Apache 2.0 - license confirmed-->

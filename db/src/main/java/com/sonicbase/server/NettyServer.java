@@ -718,23 +718,15 @@ public class NettyServer {
 
       String portStr = line.getOptionValue(PORT_STR);
       String host = line.getOptionValue(HOST_STR);
-      String cluster = line.getOptionValue(CLUSTER_STR);
       this.port = Integer.valueOf(portStr);
       String gclog = line.getOptionValue(GCLOG_STR);
       String xmx = line.getOptionValue(XMX_STR);
       String disableStr = line.getOptionValue(DISABLE_STR);
+      String installDir = line.getOptionValue("installDir");
       boolean disable = DISABLE_STR.equals(disableStr);
       String configStr;
 
-      InputStream in = null;
-      File file = new File(USER_DIR, "config/config-" + cluster + ".yaml");
-      if (file.exists()) {
-        in = new FileInputStream(file);
-      }
-
-      if (in == null) {
-        in = NettyServer.class.getResourceAsStream("/config/config-" + cluster + ".yaml");
-      }
+      InputStream in = Config.getConfigStream();
       try {
         configStr = IOUtils.toString(new BufferedInputStream(in), UTF8_STR);
 
@@ -744,7 +736,7 @@ public class NettyServer {
 
         int localPort = Integer.parseInt(portStr);
 
-        doStartServer(host, cluster, gclog, xmx, config, role, localPort, disable);
+        doStartServer(host, gclog, xmx, config, role, localPort, disable, installDir);
 
         nettyThread.join();
         logger.info("joined netty thread");
@@ -761,11 +753,12 @@ public class NettyServer {
     logger.info("exiting netty server");
   }
 
-  private void doStartServer(String host, String cluster, String gclog, String xmx, Config config, String role, int localPort, boolean disable) {
+  private void doStartServer(String host, String gclog, String xmx, Config config, String role, int localPort,
+                             boolean disable, String installDir) {
     try {
       final DatabaseServer localDatabaseServer = new DatabaseServer();
 
-      localDatabaseServer.setConfig(config, cluster, host, localPort, isRunning, isRecovered, gclog, xmx);
+      localDatabaseServer.setConfig(config, host, localPort, isRunning, isRecovered, gclog, xmx, installDir);
       localDatabaseServer.setRole(role);
 
       setDatabaseServer(localDatabaseServer);
@@ -858,6 +851,9 @@ public class NettyServer {
     op.setRequired(false);
     options.addOption(op);
     op = new Option("d", DISABLE_STR, true, DISABLE_STR);
+    op.setRequired(false);
+    options.addOption(op);
+    op = new Option("i", "installDir", true, "installDir");
     op.setRequired(false);
     options.addOption(op);
 

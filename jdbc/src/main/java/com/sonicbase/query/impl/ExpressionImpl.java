@@ -15,7 +15,6 @@ import com.sonicbase.schema.TableSchema;
 import com.sonicbase.util.PartitionUtils;
 import net.sf.jsqlparser.statement.select.Limit;
 import net.sf.jsqlparser.statement.select.Offset;
-import sun.nio.ch.ThreadPool;
 
 import java.io.*;
 import java.util.*;

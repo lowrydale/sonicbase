@@ -60,21 +60,19 @@ public class LogManagerTest {
         "    {\n" +
         "      \"replicas\": [\n" +
         "        {\n" +
-        "          \"publicAddress\": \"localhost\",\n" +
-        "          \"privateAddress\": \"localhost\",\n" +
+        "          \"address\": \"localhost\",\n" +
         "          \"port\": 9010,\n" +
         "          \"httpPort\": 8080\n" +
         "        },\n" +
         "        {\n" +
-        "          \"publicAddress\": \"localhost\",\n" +
-        "          \"privateAddress\": \"localhost\",\n" +
+        "          \"address\": \"localhost\",\n" +
         "          \"port\": 9010,\n" +
         "          \"httpPort\": 8080\n" +
         "        }\n" +
         "      ]\n" +
         "    }\n" +
         "  ]}\n");
-    serversConfig = new ServersConfig("test", (ArrayNode) ((ObjectNode)node).withArray("shards"), true, true);
+    serversConfig = new ServersConfig((ArrayNode) ((ObjectNode)node).withArray("shards"), true, true);
     common.setServersConfig(serversConfig);
 
   }

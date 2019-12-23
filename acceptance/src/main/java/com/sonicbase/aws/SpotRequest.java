@@ -38,13 +38,12 @@ public class SpotRequest {
         .build();
 
     //servers
-    requestInstances(ec2, "sonicbase-server", "4-dale", "0.20", 4, "ami-0c94f6d107c7019fa", //"ami-2cd41851", //ami-a12c15da (2k iops)
-        "r4.2xlarge", "us-east-1b", true);
+    requestInstances(ec2, "sonicbase-server", "4-dale", "0.30", 4, "ami-09c35f79935d5105f", //"ami-2cd41851", //ami-a12c15da (2k iops)
+        "r5n.large", "us-east-1b", true);
 
     //clients
-    requestInstances(ec2, "sonicbase-client", "4-dale", "0.8", 8, "ami-0c94f6d107c7019fa", //"ami-9ed519e3",
-        "r4.xlarge", "us-east-1b", false);
-
+    requestInstances(ec2, "sonicbase-client", "4-dale", "0.8", 4, "ami-09c35f79935d5105f", //"ami-9ed519e3",
+        "m5a.large", "us-east-1b", false);
   }
 
   private static void requestInstances(AmazonEC2 ec2, String tag, String cluster, String price, int count,
@@ -102,6 +101,10 @@ public class SpotRequest {
 
         // are any requests open?
         for (SpotInstanceRequest describeResponse : describeResponses) {
+          SpotInstanceStateFault fault = describeResponse.getFault();
+          if (fault != null) {
+            System.out.println("fault: " + fault.getMessage());
+          }
           if (describeResponse.getState().equals("open")) {
             anyOpen = true;
             break;
@@ -121,7 +124,7 @@ public class SpotRequest {
       }
     } while (anyOpen);
 
-    ArrayList<Tag> requestTags = new ArrayList<Tag>();
+    ArrayList<Tag> requestTags = new ArrayList<>();
     requestTags.add(new Tag(tag, cluster));
 
     CreateTagsRequest createTagsRequest_requests = new CreateTagsRequest();

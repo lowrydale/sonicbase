@@ -25,7 +25,8 @@ public class LongRunningCallsTest {
     String configStr = IOUtils.toString(DatabaseServerTest.class.getResourceAsStream("/config/config-1-local.yaml"), "utf-8");
     Config config = new Config(configStr);
     DatabaseServer server = new DatabaseServer();
-    server.setConfig(config, "test", "localhost", 9010, true, new AtomicBoolean(), new AtomicBoolean(), "gc.log", false);
+    Config.copyConfig("test");
+    server.setConfig(config, "localhost", 9010, true, new AtomicBoolean(), new AtomicBoolean(), "gc.log", false);
     server.setRecovered(true);
 
     DatabaseClient client = mock(DatabaseClient.class);

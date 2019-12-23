@@ -371,15 +371,14 @@ public class ReadManagerTest {
         "    {\n" +
         "      \"replicas\": [\n" +
         "        {\n" +
-        "          \"publicAddress\": \"localhost\",\n" +
-        "          \"privateAddress\": \"localhost\",\n" +
+        "          \"address\": \"localhost\",\n" +
         "          \"port\": 9010,\n" +
         "          \"httpPort\": 8080\n" +
         "        }\n" +
         "      ]\n" +
         "    }\n" +
         "  ]}\n");
-    ServersConfig serversConfig = new ServersConfig("test", (ArrayNode) ((ObjectNode)node).withArray("shards"), true, true);
+    ServersConfig serversConfig = new ServersConfig((ArrayNode) ((ObjectNode)node).withArray("shards"), true, true);
     common.setServersConfig(serversConfig);
     when(server.getCommon()).thenReturn(common);
 
@@ -476,15 +475,14 @@ public class ReadManagerTest {
         "    {\n" +
         "      \"replicas\": [\n" +
         "        {\n" +
-        "          \"publicAddress\": \"localhost\",\n" +
-        "          \"privateAddress\": \"localhost\",\n" +
+        "          \"address\": \"localhost\",\n" +
         "          \"port\": 9010,\n" +
         "          \"httpPort\": 8080\n" +
         "        }\n" +
         "      ]\n" +
         "    }\n" +
         "  ]}\n");
-    ServersConfig serversConfig = new ServersConfig("test", (ArrayNode) ((ObjectNode)node).withArray("shards"), true, true);
+    ServersConfig serversConfig = new ServersConfig((ArrayNode) ((ObjectNode)node).withArray("shards"), true, true);
     common.setServersConfig(serversConfig);
     when(server.getCommon()).thenReturn(common);
 

@@ -23,7 +23,7 @@ public class KafkaProducer implements StreamsProducer {
   private Producer<String, String> producer;
 
   @Override
-  public void init(String cluster, Config config, Map<String, Object> streamConfig) {
+  public void init(Config config, String installDir, Map<String, Object> streamConfig) {
 
     try {
       logger.info("kafka producer init - begin");

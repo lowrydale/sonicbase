@@ -25,14 +25,32 @@ import static com.sonicbase.cli.ClusterHandler.INSTALL_DIRECTORY_STR;
 public class ControllerHandler extends AbstractHandler {
 
   private static Logger logger = LoggerFactory.getLogger(ControllerHandler.class);
+  private static String OS = System.getProperty("os.name").toLowerCase();
+  private static final String CYGWIN_STR = "cygwin";
 
 
   private AtomicInteger count = new AtomicInteger();
-
-  private ConcurrentMap<String, Config> configs = new ConcurrentHashMap<>();
+  private String installDir;
 
   public ControllerHandler() {
   }
+
+  public boolean isWindows() {
+    return !OS.contains(CYGWIN_STR) && OS.contains("win");
+  }
+
+  public boolean isCygwin() {
+    return OS.contains(CYGWIN_STR);
+  }
+
+  public boolean isMac() {
+    return OS.contains("mac");
+  }
+
+  public boolean isUnix() {
+    return OS.contains("nux");
+  }
+
 
   public void handle(String target, Request baseRequest, HttpServletRequest request, HttpServletResponse response)
       throws IOException {
@@ -42,13 +60,11 @@ public class ControllerHandler extends AbstractHandler {
     //InputStream in = HttpServer.class.getResourceAsStream(uri);
     try {
       if (uri.startsWith("/start-server")) {
-        String cluster = request.getParameter("cluster");
         int shard = Integer.parseInt(request.getParameter("shard"));
         int replica = Integer.parseInt(request.getParameter("replica"));
 
-        Config config = configs.computeIfAbsent(cluster, k -> Cli.getConfig(cluster));
+        Config config = Cli.getConfig();
 
-        final String installDir = Cli.resolvePath(config.getString(INSTALL_DIRECTORY_STR));
         List<Config.Shard> shards = config.getShards();
 
         final List<Config.Replica> replicaObj = shards.get(shard).getReplicas();
@@ -59,13 +75,21 @@ public class ControllerHandler extends AbstractHandler {
         if (port == null) {
           port = 9010;
         }
-        String address = currReplica.getString("privateAddress");
+        String address = currReplica.getString("address");
 
-        String searchHome = new File(System.getProperty(USER_DIR_STR)).getAbsolutePath();
-
-        System.out.println("Server start command: bin/start-db-server-task.bat " + address + " " + port + " " + maxHeap + " " + searchHome + " " + cluster + " enable");
-        ProcessBuilder builder = new ProcessBuilder().command("bin/start-db-server-task.bat", address, String.valueOf(port),
-            maxHeap, searchHome, cluster, "enable");
+        ProcessBuilder builder;
+        if (isWindows()) {
+          System.out.println("Server start command: bin/start-db-server-task.bat " + address + " " + port + " " +
+              maxHeap + " enable");
+          builder = new ProcessBuilder().command(installDir + "/bin/start-db-server-task.bat", address,
+              String.valueOf(port), maxHeap, "enable");
+        }
+        else {
+          System.out.println("Server start command: bin/start-db-server " + address + " " + port + " " +
+              maxHeap + " enable");
+          builder = new ProcessBuilder().command("bash", installDir + "/bin/start-db-server", address,
+              String.valueOf(port), maxHeap, "enable");
+        }
         Process p = builder.start();
         StringBuilder sbuilder = new StringBuilder();
         InputStream procIn = p.getInputStream();
@@ -74,7 +98,7 @@ public class ControllerHandler extends AbstractHandler {
           if (b == -1) {
             break;
           }
-          sbuilder.append(String.valueOf((char) b));
+          sbuilder.append((char) b);
         }
         p.waitFor();
 
@@ -90,10 +114,15 @@ public class ControllerHandler extends AbstractHandler {
       else if (uri.startsWith("/start-bench-server")) {
         int port = Integer.parseInt(request.getParameter("port"));
 
-        String searchHome = new File(System.getProperty(USER_DIR_STR)).getAbsolutePath();
-
-        System.out.println("start-bench-server.bat " + port + " " + searchHome);
-        ProcessBuilder builder = new ProcessBuilder().command("bin/start-bench-server-task.bat", String.valueOf(port), searchHome);
+        ProcessBuilder builder;
+        if (isWindows()) {
+          System.out.println("start-bench-server.bat " + port);
+          builder = new ProcessBuilder().command(installDir + "/bin/start-bench-server-task.bat", String.valueOf(port));
+        }
+        else {
+          System.out.println("do-start-bench " + port);
+          builder = new ProcessBuilder().command("bash", installDir + "/bin/start-bench-server", String.valueOf(port), "placeholder");
+        }
         Process p = builder.start();
         StringBuilder sbuilder = new StringBuilder();
         InputStream procIn = p.getInputStream();
@@ -102,7 +131,7 @@ public class ControllerHandler extends AbstractHandler {
           if (b == -1) {
             break;
           }
-          sbuilder.append(String.valueOf((char) b));
+          sbuilder.append((char) b);
         }
         p.waitFor();
 
@@ -116,7 +145,13 @@ public class ControllerHandler extends AbstractHandler {
         System.out.println("Started bench server: port=" + port);
       }
       else if (uri.startsWith("/get-mem-total")) {
-        ProcessBuilder builder = new ProcessBuilder().command("bin/get-mem-total.bat");
+        ProcessBuilder builder;
+        if (isWindows()) {
+          builder = new ProcessBuilder().command(installDir + "/bin/get-mem-total.bat");
+        }
+        else {
+          builder = new ProcessBuilder().command("bash", installDir + "/bin/get-mem-total");
+        }
         Process p = builder.start();
         StringBuilder sbuilder = new StringBuilder();
         InputStream procIn = p.getInputStream();
@@ -125,7 +160,7 @@ public class ControllerHandler extends AbstractHandler {
           if (b == -1) {
             break;
           }
-          sbuilder.append(String.valueOf((char) b));
+          sbuilder.append((char) b);
         }
         response.setContentType("application/json; charset=utf-8");
         response.setStatus(HttpServletResponse.SC_OK);
@@ -137,7 +172,14 @@ public class ControllerHandler extends AbstractHandler {
       else if (uri.startsWith("/stop-server")) {
         System.out.println("pwd=" + System.getProperty("user.dir"));
         int port = Integer.parseInt(request.getParameter("port"));
-        ProcessBuilder builder = new ProcessBuilder().command("bin/kill-server.bat ", String.valueOf(port));
+        ProcessBuilder builder;
+        if (isWindows()) {
+          builder = new ProcessBuilder().command(installDir + "/bin/kill-server.bat", String.valueOf(port));
+        }
+        else {
+          String address = request.getParameter("address");
+          builder = new ProcessBuilder().command("bash", installDir + "/bin/kill-server", "NettyServer", "-host", address, "-port", String.valueOf(port));
+        }
         Process p = builder.start();
         StringBuilder sbuilder = new StringBuilder();
         InputStream procIn = p.getInputStream();
@@ -146,12 +188,37 @@ public class ControllerHandler extends AbstractHandler {
           if (b == -1) {
             break;
           }
-          sbuilder.append(String.valueOf((char) b));
+          sbuilder.append((char) b);
         }
         response.setContentType("application/json; charset=utf-8");
         response.setStatus(HttpServletResponse.SC_OK);
         response.getOutputStream().flush();
         System.out.println("Stopped server");
+      }
+      else if (uri.startsWith("/bench-stop-server")) {
+        System.out.println("pwd=" + System.getProperty("user.dir"));
+        int port = Integer.parseInt(request.getParameter("port"));
+        ProcessBuilder builder;
+        if (isWindows()) {
+          builder = new ProcessBuilder().command(installDir + "/bin/kill-server.bat", String.valueOf(port));
+        }
+        else {
+          builder = new ProcessBuilder().command("bash", installDir + "/bin/kill-server", "BenchServer", String.valueOf(port), String.valueOf(port), String.valueOf(port), String.valueOf(port));
+        }
+        Process p = builder.start();
+        StringBuilder sbuilder = new StringBuilder();
+        InputStream procIn = p.getInputStream();
+        while (true) {
+          int b = procIn.read();
+          if (b == -1) {
+            break;
+          }
+          sbuilder.append((char) b);
+        }
+        response.setContentType("application/json; charset=utf-8");
+        response.setStatus(HttpServletResponse.SC_OK);
+        response.getOutputStream().flush();
+        System.out.println("Stopped bench server");
       }
       else if (uri.startsWith("/purge-server")) {
         String dataDir = URLDecoder.decode(request.getParameter("dataDir"));
@@ -165,7 +232,13 @@ public class ControllerHandler extends AbstractHandler {
 
         dataDir = dataDir.replaceAll("/", "\\\\");
 
-        ProcessBuilder builder = new ProcessBuilder().command("bin/purge-data.bat ", dataDir);
+        ProcessBuilder builder;;
+        if (isWindows()) {
+          builder = new ProcessBuilder().command(installDir + "/bin/purge-data.bat", dataDir);
+        }
+        else {
+          builder = new ProcessBuilder().command(installDir + "/bin/purge-data", dataDir);
+        }
         Process p = builder.start();
         StringBuilder sbuilder = new StringBuilder();
         InputStream procIn = p.getInputStream();
@@ -174,7 +247,7 @@ public class ControllerHandler extends AbstractHandler {
           if (b == -1) {
             break;
           }
-          sbuilder.append(String.valueOf((char) b));
+          sbuilder.append((char) b);
         }
         response.setContentType("application/json; charset=utf-8");
         response.setStatus(HttpServletResponse.SC_OK);
@@ -192,5 +265,9 @@ public class ControllerHandler extends AbstractHandler {
 
   public void shutdown() {
 
+  }
+
+  public void setInstallDir(String installDir) {
+    this.installDir = installDir;
   }
 }

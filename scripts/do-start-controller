@@ -1,2 +1,4 @@
 #!/bin/bash
-ssh -n -f -o UserKnownHostsFile=/dev/null -o StrictHostKeyChecking=no $1 nohup bash $2/bin/start-controller
+export SONIC_BASE_HOME="$(dirname $( cd "$( dirname "${BASH_SOURCE[0]}" )" && pwd ))"
+
+ssh -n -f -o UserKnownHostsFile=/dev/null -o StrictHostKeyChecking=no $1 nohup bash $SONIC_BASE_HOME/bin/start-controller

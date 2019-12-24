@@ -121,7 +121,7 @@ public class ControllerHandler extends AbstractHandler {
         }
         else {
           System.out.println("do-start-bench " + port);
-          builder = new ProcessBuilder().command("bash", installDir + "/bin/start-bench-server", String.valueOf(port), "placeholder");
+          builder = new ProcessBuilder().command("bash", installDir + "/bin/start-bench-server", String.valueOf(port));
         }
         Process p = builder.start();
         StringBuilder sbuilder = new StringBuilder();
@@ -230,7 +230,9 @@ public class ControllerHandler extends AbstractHandler {
           return;
         }
 
-        dataDir = dataDir.replaceAll("/", "\\\\");
+//        if (isWindows()) {
+//          dataDir = dataDir.replaceAll("/", "\\\\");
+//        }
 
         ProcessBuilder builder;;
         if (isWindows()) {

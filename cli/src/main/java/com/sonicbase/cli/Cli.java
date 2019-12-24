@@ -1438,10 +1438,7 @@ public class Cli {
 
     public static String resolvePath(String installDir){
       if (installDir.startsWith("$HOME")) {
-        installDir = installDir.substring("$HOME".length());
-        if (installDir.startsWith("/")) {
-          installDir = installDir.substring(1);
-        }
+        installDir = installDir.replace("$HOME", System.getProperty("user.home"));
       }
       else if (installDir.startsWith("$WORKING_DIR")) {
         installDir = installDir.replace("$WORKING_DIR", System.getProperty(USER_DIR_STR));

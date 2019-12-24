@@ -15,7 +15,7 @@ if "%_GC_LOG_FILENAME_%" == "" (
 )
 
 SET java_opts=-server  -XX:NewRatio=2 -XX:SurvivorRatio=10 -XX:+UseG1GC -XX:MaxGCPauseMillis=150 -XX:-ResizePLAB -XX:ParallelGCThreads=4 -XX:ConcGCThreads=2 -XX:-OmitStackTraceInFastThrow
-SET java_opts=%java_opts% -verbose:gc -XX:+UseGCLogFileRotation -XX:NumberOfGCLogFiles=3 -XX:GCLogFileSize=2m -Xloggc:%_GC_%
+SET java_opts=%java_opts% -verbose:gc -Xloggc:%_GC_%
 
 if "%_LOG4J_FILENAME_%" == "" (
   SET _LOG4J_FILENAME_=out.log
@@ -34,7 +34,7 @@ SET java_opts=%java_opts% -Dlogfilename=%_LOG4J_FILENAME_% -DerrorLogfilename=%_
 
 SET java_opts=%java_opts% -XX:PermSize=256m -XX:MaxPermSize=356m -XX:+CMSClassUnloadingEnabled -XX:+PrintGCDetails  -XX:-UseLargePagesIndividualAllocation
 SET java_opts=%java_opts% -XX:+HeapDumpOnOutOfMemoryError  -Djava.net.preferIPv4Stack=true
-SET java_opts=%java_opts% -XX:+PrintGCDetails -XX:+PrintGCTimeStamps
+SET java_opts=%java_opts% -XX:+PrintGCDetails
 SET java_opts=%java_opts% -XX:-OmitStackTraceInFastThrow -XX:-UseLoopPredicate
 SET java_opts=%java_opts% -Xmx%_XMX_% -XX:MaxDirectMemorySize=2g
 SET java_opts=%java_opts% -Djava.library.path=%SONIC_BASE_HOME%/lib/win

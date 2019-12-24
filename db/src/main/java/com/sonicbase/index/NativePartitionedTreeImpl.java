@@ -28,10 +28,13 @@ import java.util.List;
 import java.util.Map;
 import java.util.concurrent.ConcurrentLinkedQueue;
 
+import static java.sql.Types.*;
+
 public class NativePartitionedTreeImpl extends NativePartitionedTree implements IndexImpl {
   private static final Logger logger = LoggerFactory.getLogger(NativePartitionedTreeImpl.class);
 
   private final int port;
+  private final int[] dataTypes;
 
   public static boolean isWindows() {
     return !OS.contains("cygwin") && OS.contains("win");
@@ -74,6 +77,7 @@ public class NativePartitionedTreeImpl extends NativePartitionedTree implements 
     }
 
     this.indexId = initIndex(dataTypes);
+    this.dataTypes = dataTypes;
   }
 
   public static void init(int port) {
@@ -162,95 +166,113 @@ public class NativePartitionedTreeImpl extends NativePartitionedTree implements 
   }
 
 
-  Object[] deserializeKey(Object[] types, byte[] bytes, int[] offset) {
+  Object[] deserializeKey(byte[] bytes, int[] offset) {
 
-    if (types.length == 0) {
-      throw new DatabaseException("bogus key");
-    }
-    Object[] ret = new Object[types.length];
+    Object[] ret = new Object[dataTypes.length];
     for (int i = 0; i < ret.length; i++) {
       byte hasValue = bytes[offset[0]++];
       if (hasValue == 0) {
         continue;
       }
-      if (types[i] instanceof Long) {
-        long v = DataUtils.bytesToLong(bytes, offset[0]);
-        offset[0] += 8;
-        ret[i] = v;
-      }
-      else if (types[i] instanceof Integer) {
-        int v = (int) DataUtils.bytesToInt(bytes, offset[0]);
-        offset[0] += 4;
-        ret[i] = v;
-      }
-      else if (types[i] instanceof Short) {
-        short v = (short) DataUtils.bytesToShort(bytes, offset[0]);
-        offset[0] += 2;
-        ret[i] = v;
-      }
-      else if (types[i] instanceof Byte) {
-        ret[i] = bytes[offset[0]++];
-      }
-      else if (types[i] instanceof Date) {
-        long v = DataUtils.bytesToLong(bytes, offset[0]);
-        offset[0] += 8;
-        Date d = new Date(v);
-        ret[i] = d;
-      }
-      else if (types[i] instanceof Time) {
-        long v = DataUtils.bytesToLong(bytes, offset[0]);
-        offset[0] += 8;
-        Time t = new Time(0);
-        t.setTime(v);
-        ret[i] = t;
-      }
-      else if (types[i] instanceof Timestamp) {
-        long v1 = DataUtils.bytesToLong(bytes, offset[0]);
-        offset[0] += 8;
-        long v2 = (int) DataUtils.bytesToInt(bytes, offset[0]);
-        offset[0] += 4;
-        Timestamp t = new Timestamp(0);
-        t.setTime(v1);
-        t.setNanos((int) v2);
-        ret[i] = t;
-      }
-      else if (types[i] instanceof Double) {
-        long value = DataUtils.bytesToLong(bytes, offset[0]);
-        offset[0] += 8;
-        ret[i] = Double.longBitsToDouble(value);
-      }
-      else if (types[i] instanceof Float) {
-        int value = DataUtils.bytesToInt(bytes, offset[0]);
-        offset[0] += 4;
-        ret[i] = Float.intBitsToFloat(value);
-      }
-      else if (types[i] instanceof BigDecimal) {
-        long len = DataUtils.bytesToLong(bytes, offset[0]);
-        offset[0] += 8;
-        char[] chars = new char[(int) len];
-        for (int j = 0; j < len; j++) {
-          byte b1 = bytes[offset[0]++];
-          byte b2 = bytes[offset[0]++];
-          char c = (char) ((b1 & 0xFF) << 8 | (b2 & 0xFF));
-          chars[j] = c;
+      switch (dataTypes[i]) {
+        case ROWID:
+        case BIGINT: {
+          long v = DataUtils.bytesToLong(bytes, offset[0]);
+          offset[0] += 8;
+          ret[i] = v;
         }
-        BigDecimal b = new BigDecimal(new String(chars));
-        ret[i] = b;
-      }
-      else if (types[i] instanceof char[]) {
-        long len = DataUtils.bytesToLong(bytes, offset[0]);
-        offset[0] += 8;
-        char[] chars = new char[(int) len];
-        for (int j = 0; j < len; j++) {
-          byte b1 = bytes[offset[0]++];
-          byte b2 = bytes[offset[0]++];
-          char c = (char) ((b1 & 0xFF) << 8 | (b2 & 0xFF));
-          chars[j] = c;
+          break;
+        case INTEGER: {
+          int v = (int) DataUtils.bytesToInt(bytes, offset[0]);
+          offset[0] += 4;
+          ret[i] = v;
         }
-        ret[i] = chars;
-      }
-      else {
-        throw new DatabaseException("unsupported type: type=" + types[i].getClass().getName());
+          break;
+        case SMALLINT: {
+          short v = (short) DataUtils.bytesToShort(bytes, offset[0]);
+          offset[0] += 2;
+          ret[i] = v;
+        }
+          break;
+        case TINYINT: {
+          ret[i] = bytes[offset[0]++];
+        }
+          break;
+        case DATE: {
+          long v = DataUtils.bytesToLong(bytes, offset[0]);
+          offset[0] += 8;
+          Date d = new Date(v);
+          ret[i] = d;
+        }
+          break;
+        case TIME: {
+          long v = DataUtils.bytesToLong(bytes, offset[0]);
+          offset[0] += 8;
+          Time t = new Time(0);
+          t.setTime(v);
+          ret[i] = t;
+        }
+          break;
+        case TIMESTAMP: {
+          long v1 = DataUtils.bytesToLong(bytes, offset[0]);
+          offset[0] += 8;
+          long v2 = (int) DataUtils.bytesToInt(bytes, offset[0]);
+          offset[0] += 4;
+          Timestamp t = new Timestamp(0);
+          t.setTime(v1);
+          t.setNanos((int) v2);
+          ret[i] = t;
+        }
+          break;
+        case DOUBLE:
+        case FLOAT: {
+          long value = DataUtils.bytesToLong(bytes, offset[0]);
+          offset[0] += 8;
+          ret[i] = Double.longBitsToDouble(value);
+        }
+          break;
+        case REAL: {
+          int value = DataUtils.bytesToInt(bytes, offset[0]);
+          offset[0] += 4;
+          ret[i] = Float.intBitsToFloat(value);
+        }
+          break;
+        case NUMERIC:
+        case DECIMAL: {
+          long len = DataUtils.bytesToLong(bytes, offset[0]);
+          offset[0] += 8;
+          char[] chars = new char[(int) len];
+          for (int j = 0; j < len; j++) {
+            byte b1 = bytes[offset[0]++];
+            byte b2 = bytes[offset[0]++];
+            char c = (char) ((b1 & 0xFF) << 8 | (b2 & 0xFF));
+            chars[j] = c;
+          }
+          BigDecimal b = new BigDecimal(new String(chars));
+          ret[i] = b;
+        }
+          break;
+        case VARCHAR:
+        case CHAR:
+        case LONGVARCHAR:
+        case NCHAR:
+        case NVARCHAR:
+        case LONGNVARCHAR:
+        case NCLOB: {
+          long len = DataUtils.bytesToLong(bytes, offset[0]);
+          offset[0] += 8;
+          char[] chars = new char[(int) len];
+          for (int j = 0; j < len; j++) {
+            byte b1 = bytes[offset[0]++];
+            byte b2 = bytes[offset[0]++];
+            char c = (char) ((b1 & 0xFF) << 8 | (b2 & 0xFF));
+            chars[j] = c;
+          }
+          ret[i] = chars;
+        }
+          break;
+        default:
+        throw new DatabaseException("unsupported type: type=" + dataTypes[i]);
       }
     }
     return ret;
@@ -294,7 +316,7 @@ public class NativePartitionedTreeImpl extends NativePartitionedTree implements 
       offset[0] += 8;
 //
       for (int i = 0; i < retCount; i++) {
-        keys[i] = deserializeKey(startKey, bytes, offset);
+        keys[i] = deserializeKey(bytes, offset);
         values[i] = DataUtils.bytesToLong(bytes, offset[0]);
         offset[0] += 8;
       }
@@ -364,7 +386,7 @@ public class NativePartitionedTreeImpl extends NativePartitionedTree implements 
       offset[0] += 8;
 //
       for (int i = 0; i < retCount; i++) {
-        keys[i] = deserializeKey(startKey, bytes, offset);
+        keys[i] = deserializeKey(bytes, offset);
         values[i] = DataUtils.bytesToLong(bytes, offset[0]);
         offset[0] += 8;
       }

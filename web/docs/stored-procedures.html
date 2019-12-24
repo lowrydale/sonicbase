@@ -1,0 +1,200 @@
+<!doctype html>
+<html>
+<head>
+  <link rel="canonical" href="http://sonicbase.com/docs/stored-procedures.html"/>
+
+  <meta charset="UTF-8">
+<title>SonicBase - In-Memory Database. Stored Procedures</title>
+    <meta http-equiv="X-UA-Compatible" content="IE=edge">
+    <meta name="viewport" content="width=device-width, initial-scale=1">
+    <meta name="description" content="A description how how stored procedures are supported by SonicBase.">
+    <link href="../css/singlePageTemplate.css" rel="stylesheet" type="text/css">
+    <script type="text/javascript" src="../javascript/main.js"></script>
+    <link rel="stylesheet" href="../css/tomorrow-night-bright.css">
+    <script src="../javascript/highlight.min.js"></script>
+    <script>hljs.initHighlightingOnLoad();</script>
+
+    <!-- Global site tag (gtag.js) - Google Analytics -->
+    <script async src="https://www.googletagmanager.com/gtag/js?id=UA-109032274-1"></script>
+    <script>
+        window.dataLayer = window.dataLayer || [];
+        function gtag(){dataLayer.push(arguments);}
+        gtag('js', new Date());
+
+        gtag('config', 'UA-109032274-1');
+        ga('require', 'displayfeatures');
+    </script>
+</head>
+
+<body>
+<div class="container">
+    <header id="myHeader">
+        <div class="mobile">
+            <a href="../index.html">
+                <h4 class="logo">SonicBase™</h4>
+            </a>
+        </div>
+
+        <div class="desktop">
+            <a href="../index.html">
+                <img style="margin-top:3px" src="../images/logo-white.gif" width="50px"/><h4 class="logo">SonicBase™</h4>
+            </a>
+        <nav>
+            <ul>
+                <li><a href="../index.html">HOME</a></li>
+                <li> <a href="../documentation.html">DOCUMENTATION</a></li>
+                <li><a href="../contact.html">CONTACT</a></li>
+            </ul>
+        </nav>
+        </div>
+    </header>
+
+    <script>
+        if (isFramed()) {
+            document.getElementById("myHeader").style.display = "none";
+        }
+    </script>
+
+    <div class="main-page-text">
+      <div class="intro">SonicBase. In-memory embedded or distributed streaming sql database</div>
+
+
+<h1>Stored Procedures</h1>
+
+        Stored procedures allow you to embed code in the SonicBase database for manipulating queries and result sets. Stored
+        procedures are written in Java. The stored procedure "execute" method is invoked on one replica of every shard. Additionally, there is
+        an "init" and "finalize" method that are called once on a random server in the cluster. The init is called on the same server
+        as the finalize. Inside the stored procedure you have access to a database connection, which allows
+        you to perform any query on the database. This connection also has the ability to allow you to restrict queries
+        to the server it is running on. This is important for performance. This allows you to traverse the database
+        without going off-box which would incur communication penalties.
+        <br/><br/>
+        With this database connection you can provide a "RecordEvaluator" class that will be called on every record that
+        meets your query criteria. You can indicate the record should be included in the results by returning "true" from your
+        RecordEvaluator. Or you can return "false" to not include the record in the results. Additionally, you can do whatever
+        you want with the record, like insert it into another table. Note that the query you issue in your stored procedure
+        should narrow the results as much as possible so you aren't just doing a table scan.
+        <br/><br/>
+        There are a couple of different ways to handle results returned to the client. If you have a large results set
+        you need to store the results in a temporary table and allow the client to traverse that table to get the results. If
+        you have a small results set(less than 50k results) you can directly return the results to the client.
+        <br/><br/>
+        On the client, you pass in a sql statement of the form "call procedure '[class_name]', [parm1], [parm2],...". The
+        parameters are available on the server in the StoredProcedureContext passed into the stored procedure.
+        <br/><br/>
+        You must place the jar containing your stored procedure in the sonicbase/lib directory and deploy it across the cluster. It is
+        highly recommended that you throroughly test your stored procedure on a small cluster that you can quickly
+        restart and reload your class.
+        <h2>Interfaces</h2>
+        <h3>StoredProcedureContext</h3>
+        <pre class="java"><code>
+public interface StoredProcedureContext {
+
+  /**
+   * @return the shard this stored procedure is running on
+   */
+  int getShard();
+
+  /**
+   * @return the replica this stored procedure is running on
+   */
+  int getReplica();
+
+  /**
+   * @return the configuration object for this cluster
+   */
+  ObjectNode getConfig();
+
+  /**
+   * @return a number that uniquely identifies this stored procedure
+   */
+  long getStoredProdecureId();
+
+  /**
+   * @return a SonicBaseConnection
+   */
+  SonicBaseConnection getConnection();
+
+  /**
+   * @return a new StoredProcedureResponse
+   */
+  StoredProcedureResponse createResponse();
+
+  /**
+   * @return a new Record
+   */
+  Record createRecord();
+
+  /**
+   * @return parameters passed to the stored procedure from the client
+   */
+  Parameters getParameters();
+}
+        </code></pre>
+        <h3>RecordEvaluator</h3>
+
+        <pre class="java"><code>
+public interface RecordEvaluator {
+    /**
+    * @param context StoredProcedureContext
+    * @param record Record to evaluate
+    * @return true if the record should be included in the results
+    */
+    boolean evaluate(final StoredProcedureContext context, Record record);
+}
+        </code></pre>
+
+        <h3>StoredProcedure</h3>
+
+        <pre class="java"><code>
+public interface StoredProcedure {
+
+  /**
+   * Called once an a random server.
+   * @param context StoredProcedureContext
+   */
+  void init(StoredProcedureContext context);
+
+  /**
+   * Called once on a replica of every shard.
+   * @param context StoredProcedureContext
+   * @return StoredProcedureResponse including results that should be returned the the client
+   */
+  StoredProcedureResponse execute(StoredProcedureContext context);
+
+  /**
+   * Called once on the server where init was called.
+   * @param context StoredProcedureContext
+   * @param responses list of StoredProcedureResponses that were returned from each of the execute calls
+   * @return StoredProcedureResponse including results that should be returned the the client
+   */
+  StoredProcedureResponse finalize(StoredProcedureContext context, List<StoredProcedureResponse> responses);
+
+}
+        </code></pre>
+
+
+        <h3>StoredProcedureResponse</h3>
+        <pre class="java"><code>
+public interface StoredProcedureResponse {
+
+    /**
+    * @return list of Records that will be returned to the client
+    */
+    List<Record> getRecords();
+
+    /**
+    * @param records list of records to set in the response
+    */
+    void setRecords(List<Record> records);
+
+    /**
+    * @param record a Record to add to the results
+    */
+    void addRecord(Record record);
+
+}
+    </div>
+</div>
+</body>
+</html>

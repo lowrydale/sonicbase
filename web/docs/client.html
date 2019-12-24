@@ -1,0 +1,157 @@
+<!doctype html>
+<html>
+<head>
+  <link rel="canonical" href="http://sonicbase.com/docs/cient.html"/>
+
+  <meta charset="UTF-8">
+    <meta name="description" content="SonicBase administration client. Use the client to deploy, start and stop cluster. You may also issue SQL statements from the client">
+
+    <title>SonicBase - In-Memory Database. Administrative Client</title>
+    <meta http-equiv="X-UA-Compatible" content="IE=edge">
+    <meta name="viewport" content="width=device-width, initial-scale=1">
+    <link href="../css/singlePageTemplate.css" rel="stylesheet" type="text/css">
+    <script type="text/javascript" src="../javascript/main.js"></script>
+    <!-- Global site tag (gtag.js) - Google Analytics -->
+    <script async src="https://www.googletagmanager.com/gtag/js?id=UA-109032274-1"></script>
+    <script>
+        window.dataLayer = window.dataLayer || [];
+        function gtag(){dataLayer.push(arguments);}
+        gtag('js', new Date());
+
+        gtag('config', 'UA-109032274-1');
+        ga('require', 'displayfeatures');
+    </script>
+</head>
+<body>
+<div class="container">
+    <header id="myHeader">
+        <div class="mobile">
+            <a href="../index.html">
+                <h4 class="logo">SonicBase™</h4>
+            </a>
+        </div>
+
+        <div class="desktop">
+            <a href="../index.html">
+                <img style="margin-top:3px" src="../images/logo-white.gif" width="50px"/><h4 class="logo">SonicBase™</h4>
+            </a>
+        <nav>
+            <ul>
+                <li><a href="../index.html">HOME</a></li>
+                <li> <a href="../documentation.html">DOCUMENTATION</a></li>
+                <li><a href="../contact.html">CONTACT</a></li>
+            </ul>
+        </nav>
+        </div>
+    </header>
+
+    <script>
+        if (isFramed()) {
+            document.getElementById("myHeader").style.display = "none";
+        }
+    </script>
+
+    <div class="main-page-text">
+      <div class="intro">SonicBase. In-memory embedded or distributed streaming sql database</div>
+
+
+        <div class="mylink">
+
+            <h1>Administrative Client</h1>
+          <h2>Commandline Mode</h2>
+          You can use the client in a non-interactive mode. The commandline options are:<br/>
+          <ul>
+            <li>--cluster=[cluster name]</li>
+            <li>--db=[db name]</li>
+            <li>--command=[command]</li>
+          </ul>
+          <h2>Interactive Mode</h2>
+Start the interactive client by typing, from the bin subdirectory of the install directory, "./cli" for mac or linux and "./cli.bat" for cygwin and "cli.bat" for Windows.<br/>
+<br/>
+<h2>Plain Client</h2>
+If you are having problems with the colors, text positiong or windows resizing, you may wan to use the plain client.
+To run the plain client, add "--plain" to the cli command.
+<br/>
+<h2>Run a Script</h2>
+          A command script consists of a list of commands separated by a newline. You can run a script of commands
+          by entering the command "run script [script name]". Script name is either the fully qualified path name
+          or it is just the filename if the file is located in the sonicbase/scripts directory.<br/>
+          <br/>
+          You can run a script from the comand line using the following option: "--script=[script name]"
+<h2>Start Cluster</h2>
+To start a cluster type "start cluster".
+<br/>
+        <h2>Start Server</h2>
+        To start a single server type "start server &lt;shard&gt; &ltreplica&gt;". Where shard and replica indicate
+        which server to start.
+
+          <h2>Start Server and Disable it</h2>
+          To start a single server that is disabled type "start server &lt;shard&gt; &ltreplica&gt; disable". Where shard and replica indicate
+          which server to start. You may want to start a server disabled if the server is being replaced and has no
+          data on it. Follow this command with the "reload server" command.
+
+          <h2>Stop Cluster</h2>
+        To stop the cluster type "stop cluster".
+        <h2>Stop Server</h2>
+        To stop a single server type "stop server &lt;shard&gt; &ltreplica&gt;". Where shard and replica indicate
+        which server to stop.
+<h2>Purge Cluster</h2>
+To purge a cluster type "purge cluster". This will purge and stop the cluster.
+<br/>
+<h2>Create a Database</h2>
+You must create a database in order to insert data. Type "create database &lt;database name&gt;".
+<br/>
+<h2>Use a Database</h2>
+To use a database type "use database &lt;database name&gt;" You must use a database in order to operate on it.
+<br/>
+<h2>SQL Commands Available</h2>
+The following sql commands may be entered in the client.<br/>
+select<br/>
+delete<br/>
+insert<br/>
+create table<br/>
+create index<br/>
+update<br/>
+describe<br/>
+        alter<br/>
+        truncate<br/>
+
+        <h2>Restart Cluster</h2>
+        To do a rolling restart of the cluster, type "restart cluster". This command is only available in
+        the Pro version.
+        <h2>Start Backup</h2>
+        See <a href="backup-restore.html?framed=true">Backup and Restore</a>.
+        <h2>Backup Status</h2>
+        See <a href="backup-restore.html?framed=true">Backup and Restore</a>.
+        <h2>Start Restore</h2>
+        See <a href="backup-restore.html?framed=true">Backup and Restore</a>.
+        <h2>Restore Status</h2>
+        See <a href="backup-restore.html?framed=true">Backup and Restore</a>.
+        <h2>Disable Server</h2>
+          To disable a server, type "disable server [shard] [replica]. This will prevent it from accepting further commands.
+        <h2>Enable Server</h2>
+          To enable a server, type "enable server [shard] [replica]. This will allow a server to start accepting commands.
+        <h2>Purge Install</h2>
+        To purge the install directory across the cluster, type "purge install".
+        <h2>Quit or Exit</h2>
+        To exit the client, type "quit" or type "exit".
+        <h2>Healthcheck</h2>
+        To run a healthcheck across the cluster, type "healthcheck".
+        <h2>Clear</h2>
+        To clear the screen, type "clear".
+        <h2>Gather Diagnostics</h2>
+        See <a href="diagnostics.html?framed=true">Diagnostics</a>.
+        <h2>Build Config</h2>
+          For non-aws config building:<br/>
+          Create a text file listing the address of each server you want in the cluster. Type the following command:<br/>
+          &nbsp;&nbsp;build config [path to text file]<br/>
+          <br/>
+          For aws-based config bulding:<br/>
+          See <a href="aws-integration.html?framed=true">AWS Integration</a>.
+        <h2>Reconfigure Cluster</h2>
+        To reconfigure the cluster based on the current config file, type "reconfigure cluster". This needs
+        to be done, for example, if you change the addresses of your servers.
+</div>
+</div>
+</body>
+</html>

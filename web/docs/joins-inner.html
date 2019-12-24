@@ -1,0 +1,95 @@
+<!doctype html>
+<html>
+<head>
+    <link rel="canonical" href="http://sonicbase.com/docs/joins-inner.html"/>
+
+    <meta charset="UTF-8">
+<title>SonicBase - In-Memory Database. Select SQL Syntax For Inner Joins</title>
+    <meta http-equiv="X-UA-Compatible" content="IE=edge">
+    <meta name="viewport" content="width=device-width, initial-scale=1">
+    <meta name="description" content="Shown is the SQL syntax for a join where all records in the left table and right table must match the join criteria for SonicBase.">
+    <link href="../css/singlePageTemplate.css" rel="stylesheet" type="text/css">
+    <script type="text/javascript" src="../javascript/main.js"></script>
+
+    <link rel="stylesheet" href="../css/tomorrow-night-bright.css">
+    <script src="../javascript/highlight.min.js"></script>
+    <script>hljs.initHighlightingOnLoad();</script>
+    <!-- Global site tag (gtag.js) - Google Analytics -->
+    <script async src="https://www.googletagmanager.com/gtag/js?id=UA-109032274-1"></script>
+    <script>
+        window.dataLayer = window.dataLayer || [];
+        function gtag(){dataLayer.push(arguments);}
+        gtag('js', new Date());
+
+        gtag('config', 'UA-109032274-1');
+        ga('require', 'displayfeatures');
+    </script>
+</head>
+
+<body>
+<div class="container">
+    <header id="myHeader">
+        <div class="mobile">
+            <a href="../index.html">
+                <h4 class="logo">SonicBase™</h4>
+            </a>
+        </div>
+        <div class="desktop">
+            <a href="../index.html">
+                <img style="margin-top:3px" src="../images/logo-white.gif" width="50px"/><h4 class="logo">SonicBase™</h4>
+            </a>
+        <nav>
+            <ul>
+                <li><a href="../index.html">HOME</a></li>
+                <li> <a href="../documentation.html">DOCUMENTATION</a></li>
+                <li><a href="../contact.html">CONTACT</a></li>
+            </ul>
+        </nav>
+        </div>
+    </header>
+
+    <script>
+        if (isFramed()) {
+            document.getElementById("myHeader").style.display = "none";
+        }
+    </script>
+
+    <div class="main-page-text">
+        <div class="intro">SonicBase. In-memory embedded or distributed streaming sql database</div>
+
+<h1>SQL Inner Join Statement</h1>
+<br/>
+Performs a join where all records in the left table and right table must match the join criteria.
+
+<br/>
+<h3>Syntax</h3>
+<table class="border-table" border="1"><tr><td> <table class="syntax-table" cellpadding="4">
+    <tbody>
+  
+    <tr class="syntax-main">
+           <td width="512" colspan=2 >
+            SELECT select_columns FROM table_name INNER JOIN join_table ON join_criteria
+		</td>
+	  </tr>
+	  <tr><td><table cellpadding=4 cellspacing=0>
+          <tr><td align="right">join_table:&nbsp;&nbsp;</td><td width="430"> table to join with</td></tr>
+          <tr><td align="right">join_criteria:&nbsp;&nbsp;</td><td width="430"> where clause that specifies how records must match between the tables</td></tr>
+	  </table></td></tr>
+  </tbody>
+</table>
+</td>
+</tr>
+</table>
+
+<h3>Example</h3>
+        <pre class="java"><code>
+PreparedStatement stmt = conn.prepareStatement(
+    "select persons.id, persons.socialsecuritynumber, memberships.membershipname from persons
+    inner join Memberships on persons.id = Memberships.PersonId where persons.id<5  order by persons.id desc");
+<br/>
+ResultSet ret = stmt.executeQuery();<br/>
+</code></pre>
+</div>
+</div>
+</body>
+</html>

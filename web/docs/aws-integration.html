@@ -1,0 +1,108 @@
+<!doctype html>
+<html>
+<head>
+  <link rel="canonical" href="http://sonicbase.com/docs/aws-integration.html"/>
+
+  <meta charset="UTF-8">
+    <meta name="description" content="SonicBase integration with AWS. Configuration files can be generated based on tags on the server instances.">
+
+    <title>SonicBase - In-Memory Database. Amazon Web Services Integration</title>
+    <meta http-equiv="X-UA-Compatible" content="IE=edge">
+    <meta name="viewport" content="width=device-width, initial-scale=1">
+    <link href="../css/singlePageTemplate.css" rel="stylesheet" type="text/css">
+    <script type="text/javascript" src="../javascript/main.js"></script>
+
+    <link rel="stylesheet" href="../css/tomorrow-night-bright.css">
+    <script src="../javascript/highlight.min.js"></script>
+    <script>hljs.initHighlightingOnLoad();</script>
+    <!-- Global site tag (gtag.js) - Google Analytics -->
+    <script async src="https://www.googletagmanager.com/gtag/js?id=UA-109032274-1"></script>
+    <script>
+        window.dataLayer = window.dataLayer || [];
+        function gtag(){dataLayer.push(arguments);}
+        gtag('js', new Date());
+
+        gtag('config', 'UA-109032274-1');
+        ga('require', 'displayfeatures');
+    </script>
+</head>
+<body>
+<div class="container">
+    <header id="myHeader">
+        <div class="mobile">
+            <a href="../index.html">
+                <h4 class="logo">SonicBase™</h4>
+            </a>
+        </div>
+
+        <div class="desktop">
+            <a href="../index.html">
+                <img style="margin-top:3px" src="../images/logo-white.gif" width="50px"/><h4 class="logo">SonicBase™</h4>
+            </a>
+        <nav>
+            <ul>
+                <li><a href="../index.html">HOME</a></li>
+                <li> <a href="../documentation.html">DOCUMENTATION</a></li>
+                <li><a href="../contact.html">CONTACT</a></li>
+            </ul>
+        </nav>
+        </div>
+    </header>
+
+    <script>
+        if (isFramed()) {
+            document.getElementById("myHeader").style.display = "none";
+        }
+    </script>
+
+    <div class="main-page-text">
+      <div class="intro">SonicBase. In-memory embedded or distributed streaming sql database</div>
+
+        <h1>AWS Integration</h1>
+<h2>Config Builder</h2>
+SonicBase will automatically create a config file based on the servers tagged in AWS. Machines
+you desire to be servers need the tag "sonicbase-server" with a value of the name of the cluster.
+Machines you desire to be clients need the tag "sonicbase-client with a value of the name of the cluster.
+A config file for the cluster must exist in the config directory, but doesn't need to have servers or
+clients previously configured. The existing config file will be updated with the tagged servers.<br/>
+<br/>
+To build your config file type "build config aws" in the client.<br/>
+        <h3>Recommendations</h3>
+        It is recommended that you instantiate the servers using the AWS api. You can then easily tag all your
+        servers and clients with code like the following:<br/><br/>
+
+        <pre class="java"><code>
+ArrayList&lt;Tag&gt; requestTags = new ArrayList&lt;<>&gt;();
+requestTags.add(new Tag("sonicbase-server, "my-cluster"));
+<br/>
+CreateTagsRequest createTagsRequest_requests = new CreateTagsRequest();
+createTagsRequest_requests.setResources(instanceIds);
+createTagsRequest_requests.setTags(requestTags);
+<br/>
+ec2.createTags(createTagsRequest_requests);<br/>
+</code></pre>
+        <h2>Prerequisites</h2>
+In order for AWS integration to work you must have a file named "&lt;cluster&gt;-awskeys" located in the
+        "keys" subdirectory of the install directory.
+The first line of the file is the aws access key. The second line of the file is the aws secret key.<br/>
+
+
+        <h2>Backup and Restore</h2>
+
+        <div class="mylink">
+        In the Pro version you may backup and restore to AWS. See <a href="backup-restore.html?framed=true">Backup and Restore</a>
+        for details.
+        </div>
+
+        <h2>Streams Integration</h2>
+
+        <div class="mylink">
+            In the Pro version you may publish and receive inserts, updates and deletes from the Kinesis and Simple Message Queue Service.
+            See <a href=streaming-producer.html?framed=true">Producers</a> and
+            <a href=streaming-consumer.html?framed=true">Consumers</a>
+            for details.
+        </div>
+    </div>
+</div>
+</body>
+</html>

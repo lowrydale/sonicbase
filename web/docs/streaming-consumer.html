@@ -1,0 +1,338 @@
+<!doctype html>
+<html>
+<head>
+  <link rel="canonical" href="http://sonicbase.com/docs/streaming-consumer.html"/>
+
+  <meta charset="UTF-8">
+<title>SonicBase - In-Memory Database. Streaming Consumers</title>
+    <meta http-equiv="X-UA-Compatible" content="IE=edge">
+    <meta name="viewport" content="width=device-width, initial-scale=1">
+    <meta name="description" content="Streaming consumer documentation for SonicBase.">
+    <link href="../css/singlePageTemplate.css" rel="stylesheet" type="text/css">
+
+
+    <script type="text/javascript" src="../javascript/main.js"></script>
+
+    <link rel="stylesheet" href="../css/tomorrow-night-bright.css">
+    <script src="../javascript/highlight.min.js"></script>
+    <script>hljs.initHighlightingOnLoad();</script>
+    <!-- Global site tag (gtag.js) - Google Analytics -->
+    <script async src="https://www.googletagmanager.com/gtag/js?id=UA-109032274-1"></script>
+    <script>
+        window.dataLayer = window.dataLayer || [];
+        function gtag(){dataLayer.push(arguments);}
+        gtag('js', new Date());
+
+        gtag('config', 'UA-109032274-1');
+        ga('require', 'displayfeatures');
+    </script>
+
+</head>
+
+<body>
+<div class="container">
+    <header id="myHeader">
+        <div class="mobile">
+            <a href="../index.html">
+                <h4 class="logo">SonicBase™</h4>
+            </a>
+        </div>
+
+        <div class="desktop">
+            <a href="../index.html">
+                <img style="margin-top:3px" src="../images/logo-white.gif" width="50px"/><h4 class="logo">SonicBase™</h4>
+            </a>
+        <nav>
+            <ul>
+                <li><a href="../index.html">HOME</a></li>
+                <li> <a href="../documentation.html">DOCUMENTATION</a></li>
+                <li><a href="../contact.html">CONTACT</a></li>
+            </ul>
+        </nav>
+        </div>
+    </header>
+
+    <script>
+        if (isFramed()) {
+            document.getElementById("myHeader").style.display = "none";
+        }
+    </script>
+
+    <div class="main-page-text">
+      <div class="intro">SonicBase. In-memory embedded or distributed streaming sql database</div>
+
+      <h1>Streaming Consumer</h1>
+        <h2>Overview</h2>
+        With SonicBase you can consume messages from an external data source. This is very useful where SonicBase
+        is used as an analytics database. The current streams platforms that are supported include Kafka, Amazon Web Services Kinesis
+        and Amazon Web Services Simple Queue Services. Additionally, we support custom streams providers.
+        To initiate an insert, update or a delete you will publish a message to your stream in the format specified below.
+        <h2>Configuration</h2>
+        You configure streams in the cluster config file. In the configuration you create a "streams" section where you specify
+        an array of "consumer"s. Each consumer has a "className" and provider specific config.
+
+        <h3>Streams Configuration Examples</h3>
+        <pre class="JSON"><code>
+dataDirectory: $HOME/db-data
+    ...
+streams:
+  consumers:
+  - consumer:
+      className: com.sonicbase.streams.AWSSQSConsumer
+      threadCount: 1
+      url: https://sqs.us-east-1.amazonaws.com/6/benchmark-queue
+  - consumer:
+      className: com.sonicbase.streams.KafkaConsumer
+      servers: 10.0.0.195:9092
+      topic: test
+  - consumer:
+      className: com.sonicbase.streams.AWSKinesisConsumer
+      region: us-east-1
+      streamName: sonicbase-test-stream23
+      getRecordsSleepMillis: 200
+      getRecordsRequestCount: 1000
+</code></pre>
+        <h2>Message Format</h2>
+        <br/>
+        The "events" section contains an array of actions to perform. For "insert", the records contain the fields you
+        want to store on the record. For "update" you specify the record as it appeared before the update (fields you want the candidate
+        record to match) and the record
+        as you want it to appear after the update. For "delete", the record contains the fields you want the candidate record to match.<br/>
+        <br/>
+        Binary fields must be base64 encoded.
+
+        <h3>Example Message</h3>
+        <pre class="JSON"><code>
+{
+    "events": [
+        {
+            "_sonicbase_dbname": "db",
+            "_sonicbase_tablename": "my_table",
+            "_sonicbase_action": "insert"
+            "id": 123,
+            "name": "bob"
+        },
+        {
+            "_sonicbase_dbname": "db",
+            "_sonicbase_tablename": "my_table",
+            "_sonicbase_action": "update",
+            "before": {
+                "id": 124,
+                "name": "sue"
+            },
+            "after": {
+                "id": 124,
+                "name": "new name"
+            }
+        },
+        {
+            "_sonicbase_dbname": "db",
+            "_sonicbase_tablename": "my_table",
+            "_sonicbase_action": "delete"
+            "id": 123,
+            "name": "bob"
+        }
+    ]
+}
+        </code></pre>
+        <h3>Consumer Specifics</h3>
+        <h4>AWSSQSConsumer</h4>
+        The message is sent as an attribute named "message". The content of the attribute is a binary gzipped message string.
+        <h4>KafkaConsumer</h4>
+        The message is sent a string message.
+        <h4>AWSKinesisConsumer</h4>
+        The message is sent as a binary gzipped message string.
+
+        <h2>Administration</h2>
+        In order for AWS integration to work you must have a file named "&lt;cluster&gt;-awskeys" located in the
+        "keys" subdirectory of the install directory. This file contains the accesskey on the first line and the
+        secret key on the second line.
+
+        <h3>Start Consuming</h3>
+        When the cluster starts, consumers are disabled. To start consuming, type "start streams consumers" in the admin client.
+        <h3>Stop Consuming</h3>
+        In the admin client type "stop streams consumers" to stop consuming across the cluster.
+
+        <h2>Error Handling</h2>
+        When an error occurs, the message is logged to disk for later processing. The log files are located at
+        &lt;dataDirectory&gt;/stream_errors/&lt;shard&gt;/&lt;replica&gt;/&lt;date&gt;.error.<br/>
+        <br/>
+        Additionally, the "handleError" method on your consumer will be called for the messages that got an error.
+        <h2>Custom Streams Providers</h2>
+        You can hook into any streams system by providing a custom provider. Your class must implement the following
+        interface located in sonicbase-&lt;version&gt;.jar.<br/><br/>
+
+        <pre class="java"><code>
+package com.sonicbase.streams;
+
+public interface StreamsConsumer {<br/>
+
+    int init(String cluster, String installDir, String jsonConfig, String jsonStreamConfig);<br/>
+
+    void initThread();<br/>
+
+    List&lt;Message&gt; receive();<br/>
+
+    void acknowledgeMessages(List&lt;Message&gt; messages);<br/>
+
+    void handleError(List&lt;Message&gt; messages, Exception e);<br/>
+
+    void shutdown();<br/>
+}<br/>
+            </code></pre>
+        "init" is called once per consumer. You need to return the number of threads you want created for your consumer.<br/>
+        <br/>
+        "initThread" is called once per thread that is owned by your consumer.<br/>
+        <br/>
+        "receive" is called for you to return messages from your provider.<br/>
+        <br/>
+        "acknowledgeMessages" is called for you to acknowledge the messages with your provider if applicable.<br/>
+        <br/>
+        "handleError" is called when there is an exception processing your messages.
+        <br/>
+        "shutdown" is called for you to disconnect from your provider.<br/>
+        <br/>
+        The supporting class "Message" is shown below. You may create a derived class from Message to store other
+        message details specific to your provider (like receipt).<br/>
+        <br/>
+        <pre class="java"><code>
+public class Message {
+    private String body;<br/>
+
+    public Message() { }<br/>
+
+    public Message(String body) {
+        this.body = body;
+    }<br/>
+
+    public void setBody(String body) {
+        this.body = body;
+    }<br/>
+
+    public String getBody() {
+        return body;
+    }
+}
+</code></pre>
+
+        <h2>Example Custom Provider</h2>
+        Below is an example provider that is based on the Amazon Web Services Simple Queue Service provider built into
+        SonicBase. For your provider to work, you must place the jar containing your code and any dependencies in the "lib"
+        directory under the install directory and deploy it across the cluster.<br/>
+        <pre class="java"><code>
+package com.sonicbase.streams;
+
+public class AWSSQSConsumer implements StreamsConsumer {
+
+  private static org.apache.log4j.Logger logger = org.apache.log4j.Logger.getLogger(AWSSQSConsumer.class);
+
+  private String url;
+  private AmazonSQS sqsClient;
+  private boolean shutdown;
+
+  class AWSMessage extends Message {
+    private final com.amazonaws.services.sqs.model.Message message;
+
+    public AWSMessage(com.amazonaws.services.sqs.model.Message message, String body) {
+      super(body);
+      this.message = message;
+    }
+  }
+
+  public void shutdown() {
+    this.shutdown = true;
+    sqsClient.shutdown();
+  }
+
+  @Override
+  public int init(String cluster, String installDir, String jsonConfig, String jsonStreamConfig) {
+    try {
+      logger.info("aws sqs init - begin");
+      final ClientConfiguration clientConfig = new ClientConfiguration();
+      clientConfig.setMaxConnections(100);
+      clientConfig.setRequestTimeout(20_000);
+      clientConfig.setConnectionTimeout(60_000);
+
+      AmazonSQSClientBuilder builder = AmazonSQSClient.builder();
+
+      ObjectMapper mapper = new ObjectMapper();
+      ObjectNode config = (ObjectNode) mapper.readTree(jsonConfig);
+
+      File keysFile = new File(installDir, "/keys/" + cluster + "-awskeys");
+      if (!keysFile.exists()) {
+        builder.setCredentials(new InstanceProfileCredentialsProvider(true));
+      }
+      else {
+        try (BufferedReader reader = new BufferedReader(new InputStreamReader(new FileInputStream(keysFile)))) {
+          String accessKey = reader.readLine();
+          String secretKey = reader.readLine();
+
+          BasicAWSCredentials awsCredentials = new BasicAWSCredentials(accessKey, secretKey);
+          builder.setCredentials(new AWSStaticCredentialsProvider(awsCredentials));
+        }
+        catch (IOException e) {
+          throw new DatabaseException(e);
+        }
+      }
+      builder.setClientConfiguration(clientConfig);
+      sqsClient = builder.build();
+
+      ObjectNode streamConfig = (ObjectNode) mapper.readTree(jsonStreamConfig);
+      url = streamConfig.get("url").asText();
+
+      logger.info("aws sqs init - end: url=" + url);
+      return streamConfig.get("threadCount").asInt();
+    }
+    catch (Exception e) {
+      throw new DatabaseException(e);
+    }
+  }
+
+  @Override
+  public void initThread() {
+  }
+
+  @Override
+  public List&lt;Message&gt; receive() {
+    try {
+      ReceiveMessageRequest request = new ReceiveMessageRequest(url);
+      request.setMaxNumberOfMessages(10);
+      request.setWaitTimeSeconds(10);
+      ReceiveMessageResult receivedMessages = sqsClient.receiveMessage(request.withMessageAttributeNames("All"));
+
+      List&lt;com.amazonaws.services.sqs.model.Message&gt; innerMessages = receivedMessages.getMessages();
+      List&lt;Message&gt; resultMessages = new ArrayList&lt;&gt;();
+      for (com.amazonaws.services.sqs.model.Message message : innerMessages) {
+        ByteBuffer buffer = message.getMessageAttributes().get("message").getBinaryValue();
+        byte[] bytes = new byte[buffer.remaining()];
+        buffer.get(bytes);
+
+        GZIPInputStream in = new GZIPInputStream(new ByteArrayInputStream(bytes));
+        bytes = IOUtils.toByteArray(in);
+
+        resultMessages.add(new AWSMessage(message, new String(bytes, "utf-8")));
+      }
+      return resultMessages;
+    }
+    catch (Exception e) {
+      throw new DatabaseException(e);
+    }
+  }
+
+  @Override
+  public void acknowledgeMessages(List&lt;Message&gt; messages) {
+    for (Message message : messages) {
+      sqsClient.deleteMessage(url, ((AWSMessage) message).message.getReceiptHandle());
+    }
+  }
+
+  @Override
+  public void handleError(List&lt;Message&gt; messages, Exception e) {
+  }<br/>
+}
+            </code></pre>
+
+    </div>
+</div>
+</body>
+</html>

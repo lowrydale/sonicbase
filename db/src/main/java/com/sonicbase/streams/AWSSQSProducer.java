@@ -31,11 +31,6 @@ public class AWSSQSProducer implements StreamsProducer {
   private String url;
   private AmazonSQS sqsClient;
 
-  public File getInstallDir(Config config) {
-    String dir = config.getString("installDirectory");
-    return new File(dir.replace("$HOME", System.getProperty("user.home")));
-  }
-
   @Override
   public void init(Config config, String installDir, Map<String, Object> streamConfig) {
     try {

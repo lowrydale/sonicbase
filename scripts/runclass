@@ -19,9 +19,7 @@ then
   export _GC_="$SONIC_BASE_HOME/logs/gc.log"
 fi
 
-#java_opts="-server  -XX:+UseShenandoahGC -XX:+UnlockExperimentalVMOptions -XX:ShenandoahUncommitDelay=1000 -XX:ShenandoahGuaranteedGCInterval=10000"
-#java_opts="-server  -XX:+UseParallelGC -XX:+UseParallelOldGC -XX:ParallelGCThreads=16 -XX:NewRatio=1"
-java_opts="-server  -XX:+UseG1GC -XX:+UnlockExperimentalVMOptions -XX:ParallelGCThreads=16 -XX:NewRatio=5 -XX:MaxGCPauseMillis=150 -XX:-ResizePLAB"
+java_opts="-server -XX:+UseG1GC -XX:+UnlockExperimentalVMOptions -XX:ParallelGCThreads=16 -XX:NewRatio=5 -XX:MaxGCPauseMillis=150 -XX:-ResizePLAB"
 
 export ver1=$(java -version 2>&1 | grep -i version)
 

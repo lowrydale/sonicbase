@@ -112,7 +112,7 @@ public class ClusterHandler {
           Process p = null;
           String line = null;
           //if (cli.isWindows()) {
-            GetRequest request = Unirest.get("http://" + address + ":8081/get-mem-total?shard=" + shard + "&replica=" + replica);
+            GetRequest request = Unirest.get("http://" + address + ":" + getControllerPort() + "/get-mem-total?shard=" + shard + "&replica=" + replica);
             HttpResponse<String> response = request.asString();
             if (response.getStatus() != 200) {
               throw new DatabaseException("Error starting server: host=" + address);
@@ -160,7 +160,7 @@ public class ClusterHandler {
 
         cli.println("Started server: address=" + address + PORT_STR + port + MAX_JAVA_HEAP_STR + maxHeap);
 //        if (cli.isWindows()) {
-          GetRequest request = Unirest.get("http://" + address + ":8081/start-server?shard=" +
+          GetRequest request = Unirest.get("http://" + address + ":" + getControllerPort() + "/start-server?shard=" +
               shard + "&replica=" + replica + "&maxHeap=" + maxHeap);
           HttpResponse<String> response = request.asString();
           if (response.getStatus() != 200) {
@@ -334,9 +334,10 @@ public class ClusterHandler {
       final AtomicReference<Double> lastTotalGig = new AtomicReference<>(0d);
       List<Future> futures = new ArrayList<>();
 
+      Integer port = getControllerPort();
       for (String address : uniqueAddresses) {
         futures.add(executor.submit((Callable) () -> {
-          startController(config, address, String.valueOf(8081));
+          startController(config, address, String.valueOf(port));
           return null;
         }));
       }
@@ -622,7 +623,7 @@ public class ClusterHandler {
       ProcessBuilder builder = null;
       Process p = null;
       if (cli.isWindows()) {
-        GetRequest request = Unirest.get("http://" + address + ":8081/stop-server?port=" + port + "&address=" + address);
+        GetRequest request = Unirest.get("http://" + address + ":" + getControllerPort() + "/stop-server?port=" + port + "&address=" + address);
         HttpResponse<String> response = request.asString();
         if (response.getStatus() != 200) {
           throw new DatabaseException("Error stopping server: host=" + address + ", error=" + response.getStatus());
@@ -659,7 +660,7 @@ public class ClusterHandler {
       ProcessBuilder builder = null;
       Process p = null;
 //      if (cli.isWindows()) {
-        GetRequest request = Unirest.get("http://" + address + ":8081/stop-server?port=" + port + "&address=" + address);
+        GetRequest request = Unirest.get("http://" + address + ":" + getControllerPort() + "/stop-server?port=" + port + "&address=" + address);
         HttpResponse<String> response = request.asString();
         if (response.getStatus() != 200) {
           throw new DatabaseException("Error stopping server: host=" + address + ", error=" + response.getStatus());
@@ -691,6 +692,7 @@ public class ClusterHandler {
 
     Config config = cli.getConfig();
     final String dataDir = cli.resolvePath(config.getString("dataDirectory"));
+    System.out.println("raw data directory=" + config.getString("dataDirectory"));
     List<Config.Shard> shards = config.getShards();
     Set<String> addresses = new HashSet<>();
     for (int i = 0; i < shards.size(); i++) {
@@ -703,7 +705,6 @@ public class ClusterHandler {
     List<Future> futures = new ArrayList<>();
     for (final String address : addresses) {
       futures.add(cli.getExecutor().submit((Callable) () -> {
-        String deployUser = config.getString("user");
         if (address.equals(LOCAL_HOST_NUMS_STR) || address.equals(LOCALHOST_STR)) {
           File file = new File(dataDir);
           if (!cli.isWindows() && !dataDir.startsWith("/")) {
@@ -716,8 +717,7 @@ public class ClusterHandler {
         }
         else {
 //          if (cli.isWindows()) {
-            final String installDir = cli.resolvePath(config.getString(INSTALL_DIRECTORY_STR));
-            GetRequest request = Unirest.get("http://" + address + ":8081/purge-server?dataDir=" + URLEncoder.encode(dataDir));
+            GetRequest request = Unirest.get("http://" + address + ":" + getControllerPort() + "/purge-server?dataDir=" + URLEncoder.encode(dataDir));
             HttpResponse<String> response = request.asString();
             if (response.getStatus() != 200) {
               throw new DatabaseException("Error purging server: host=" + address + ", error=" + response.getStatus());
@@ -738,6 +738,15 @@ public class ClusterHandler {
       future.get();
     }
     cli.println("Finished purging");
+  }
+
+  private Integer getControllerPort() {
+    Config config = Cli.getConfig();
+    Integer port = config.getInt("defaultControllerPort");
+    if (port == null) {
+      port = 8081;
+    }
+    return port;
   }
 
   private void purgeSubDirectory(String dataDir, String address, String deployUser, String subDir) throws IOException, InterruptedException {
@@ -842,11 +851,12 @@ public class ClusterHandler {
     for (Config.Client client : config.getClients()) {
       uniqueAdresses.add(client.getString(ADDRESS_STR));
     }
+    Integer port = getControllerPort();
     for (String address : uniqueAdresses) {
       futures.add(cli.getExecutor().submit((Callable) () -> {
         cli.println("Stopping controller: address=" + address +
-            PORT_STR + 8081);
-        stopController(config, address, String.valueOf(8081));
+            PORT_STR + port);
+        stopController(config, address, String.valueOf(port));
         return null;
       }));
 

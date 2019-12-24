@@ -91,7 +91,7 @@ public class BenchHandler {
       ProcessBuilder builder = null;
       Process p = null;
 //      if (cli.isWindows()) {
-        GetRequest request = Unirest.get("http://" + address + ":8081/bench-stop-server?port=" + port);
+        GetRequest request = Unirest.get("http://" + address + ":" + getControllerPort() + "/bench-stop-server?port=" + port);
         HttpResponse<String> response = request.asString();
         if (response.getStatus() != 200) {
           throw new DatabaseException("Error starting server: host=" + address);
@@ -411,6 +411,15 @@ public class BenchHandler {
 
   }
 
+  private Integer getControllerPort() {
+    Config config = Cli.getConfig();
+    Integer port = config.getInt("defaultControllerPort");
+    if (port == null) {
+      port = 8081;
+    }
+    return port;
+  }
+
   private void startBenchServer(Config config, String address, String port) throws IOException, InterruptedException, UnirestException {
     String deployUser = config.getString("user");
     String maxHeap = config.getString("maxJavaHeap");
@@ -429,10 +438,10 @@ public class BenchHandler {
         p.waitFor();
       }
       else {
-        builder = new ProcessBuilder().command("bash", "bin/start-bench-server", address, port, maxHeap);
+        builder = new ProcessBuilder().command("bash", "bin/start-bench-server", port);
         builder.start();
       }
-      cli.println("Started server: address=" + address + ", port=" + port + ", maxJavaHeap=" + maxHeap);
+      cli.println("Started server: address=" + address + ", port=" + port);
       return;
     }
     maxHeap = cli.getMaxHeap(config);
@@ -440,7 +449,7 @@ public class BenchHandler {
     //if (cli.isWindows()) {
       cli.println("starting bench server: userDir=" + System.getProperty(USER_DIR_STR));
 
-      GetRequest request = Unirest.get("http://" + address + ":8081/start-bench-server?port=" + port);
+      GetRequest request = Unirest.get("http://" + address + ":" + getControllerPort() + "/start-bench-server?port=" + port);
       HttpResponse<String> response = request.asString();
       if (response.getStatus() != 200) {
         throw new DatabaseException("Error starting server: host=" + address);

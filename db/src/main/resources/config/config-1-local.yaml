@@ -1,10 +1,10 @@
 replicationFactor: 1
 dataDirectory: $HOME/db-data
-installDirectory: $WORKING_DIR
 maxJavaHeap: 20%
 user: ubuntu
 defaultPort: 9010
 defaultHttpPort: 8080
+defaultControllerPort: 8081
 servers:
 - server:
     address: localhost

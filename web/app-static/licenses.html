@@ -1,0 +1,263 @@
+<!doctype html>
+<html>
+<head>
+    <meta http-equiv="X-UA-Compatible" content="IE=edge">
+    <meta name="viewport" content="width=device-width, initial-scale=1">
+    <meta name="description" content="Manage SonicBase licenses.">
+
+    <link href="../css/singlePageTemplate.css" rel="stylesheet" type="text/css">
+
+    <!-- Global site tag (gtag.js) - Google Analytics -->
+    <script async src="https://www.googletagmanager.com/gtag/js?id=UA-109032274-1"></script>
+    <script>
+        window.dataLayer = window.dataLayer || [];
+        function gtag(){dataLayer.push(arguments);}
+        gtag('js', new Date());
+
+        gtag('config', 'UA-109032274-1');
+        ga('require', 'displayfeatures');
+    </script>
+    <meta charset="UTF-8">
+    <title>SonicBase - License Manager</title>
+    <script type="text/javascript" src="../javascript/jquery-3.2.1.min.js"></script>
+    <script type="text/javascript" src="../javascript/main.js"></script>
+    <script>
+        function downloadPackage(url) {
+
+            if (!confirm("Agree to license terms?")) {
+                return;
+            }
+
+            window.location.href = url;
+        }
+        function loadLicenses() {
+
+            $.ajaxSetup({
+                error: function(xhr){
+                    alert('Request Status: ' + xhr.status + ' Status Text: ' + xhr.statusText + ' ' + xhr.responseText);
+                }
+            });
+
+            var sessionId = readCookie("SBSessionId");
+
+            $.ajax({
+                headers:{
+                    "Accept":"application/json",
+                    "Content-type":"application/json"
+                },   url:"/app/license/licenses?sessionId=" + sessionId,
+                success:function(response){
+                    touchCookie("SBSessionId");
+                    var table = document.getElementById("licenses");
+
+                    while(table.rows.length > 1) {
+                        table.deleteRow(1);
+                    }
+                    var r = response;//JSON.parse(response);
+                    var size = r.licenses.length;
+                    for (var i = 0; i < size; i++) {
+                        var cores = r.licenses[i].cores;
+                        var expireDate = r.licenses[i].expireDate;
+
+                        var rowCount = table.rows.length;
+                        var row = table.insertRow(rowCount);
+                        var c1 = row.insertCell(0);
+                        var c2 = row.insertCell(1);
+                        c1.innerHTML=cores;
+                        c2.innerHTML=expireDate;
+                    }
+                },
+                error: function(xhr) {
+
+                    if (xhr.status == 401) {
+                        alert("Session has timed out. Please login again.");
+                        window.location.href = "/app-static/login.html";
+                    }
+                    else {
+                        // revert to default
+                        ajaxError.apply(this, arguments);
+                    }
+                }
+            });
+        }
+
+
+        function requestTrial() {
+
+            $.ajaxSetup({
+                error: function(xhr){
+                    alert('Request Status: ' + xhr.status + ' Status Text: ' + xhr.statusText + ' ' + xhr.responseText);
+                }
+            });
+
+            var sessionId = readCookie("SBSessionId");
+
+            $.ajax({
+                headers:{
+                    "Accept":"application/json",
+                    "Content-type":"application/json"
+                },   url:"/app/license/requestTrial?sessionId=" + sessionId,
+                success:function(response){
+                    touchCookie("SBSessionId");
+                    loadLicenses()
+                    alert("Trial license granted");
+                },
+                error: function(xhr) {
+
+                    if (xhr.status == 401) {
+                        alert("Session has timed out. Please login again.");
+                    }
+                    else if (xhr.status == 402) {
+                        alert('Trial license already used for this account.');
+                    }
+                    else {
+                        // revert to default
+                        ajaxError.apply(this, arguments);
+                    }
+                }
+            });
+        }
+
+        function getAccountKey() {
+
+            $.ajaxSetup({
+                error: function(xhr){
+                    alert('Request Status: ' + xhr.status + ' Status Text: ' + xhr.statusText + ' ' + xhr.responseText);
+                }
+            });
+
+            var sessionId = readCookie("SBSessionId");
+
+            $.ajax({
+                headers:{
+                    "Accept":"application/text",
+                    "Content-type":"application/json"
+                },   url:"/app/account/key?sessionId=" + sessionId,
+                success:function(response){
+                    touchCookie("SBSessionId");
+                    alert("key=" + response);
+                },
+                error: function(xhr) {
+
+                    if (xhr.status == 401) {
+                        alert("Session has timed out. Please login again.");
+                        window.location.href = "/app-static/login.html";
+                    }
+                    else if (xhr.status == 500) {
+                        alert("Server error");
+                    }
+                    else {
+                        // revert to default
+                        ajaxError.apply(this, arguments);
+                    }
+                }
+            });
+        }
+
+        function purchase(form) {
+            window.location.href = "/app-static/purchase.html";
+        }
+    </script>
+
+</head>
+
+<body>
+
+<script>
+    loadLicenses();
+</script>
+
+<div class="container">
+    <header>
+        <div class="mobile">
+            <a href="../index.html">
+                <h4 class="logo">SonicBase™</h4>
+            </a>
+        </div>
+        <div class="desktop">
+            <a href="../index.html">
+                <img style="margin-top:3px" src="../images/logo-white.gif" width="50px"/><h4 class="logo">SonicBase™</h4>
+            </a>
+
+        <nav>
+            <ul>
+                <li><a href="../index.html">HOME</a></li>
+                <li><a href="../documentation.html">DOCUMENTATION</a></li>
+                <li><a href="../downloads.html">DOWNLOADS</a></li>
+                <li><a href="../contact.html">CONTACT</a></li>
+            </ul>
+        </nav>
+        </div>
+    </header>
+
+    <div class="main-page-text">
+
+    <br/>
+        <br/>
+        <br/>
+        <br/>
+        <table><tr><td>
+    <button type="button" onclick="purchase()">Purchase Licenses</button><br/>
+    <button type="button" onclick="requestTrial()">Request 30-day Trial License</button><br/>
+    <button type="button" onclick="getAccountKey()">Get Account Key</button><br/>
+    <br/>
+
+    <h2>Existing Licenses</h2>
+    <table id="licenses" class="syntax-table" border="1" cellpadding=2 cellspacing="0">
+        <tr class="syntax-main">
+            <td># Cores</td>
+            <td>Expire Date</td>
+        </tr>
+    </table>
+        </td>
+            <td>
+                <div class="desktop">
+
+                <table width="100%">
+                    <tr>
+                        <td colspan="2">
+                            <h1>Downloads</h1>
+                        </td>
+                    </tr>
+                    <tr>
+                        <td><div class="mylink"><a href="../license-agreement.html">license agreement</a></div></td>
+                    </tr>
+                    <tr>
+                        <td>
+                          <div class="mylink">&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;sonicbase-pro-1.2.17&nbsp;&nbsp;<a href="#" onclick="downloadPackage('https://sonicbase-downloads.s3.amazonaws.com/sonicbase-pro-1.2.17.tgz')">tgz</a>&nbsp;&nbsp;<a href="#" onclick="downloadPackage('https://sonicbase-downloads.s3.amazonaws.com/sonicbase-pro-1.2.17.zip')">zip</a></div>
+                            <div class="mylink">&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;sonicbase-pro-1.2.16&nbsp;&nbsp;<a href="#" onclick="downloadPackage('https://sonicbase-downloads.s3.amazonaws.com/sonicbase-pro-1.2.16.tgz')">tgz</a>&nbsp;&nbsp;<a href="#" onclick="downloadPackage('https://sonicbase-downloads.s3.amazonaws.com/sonicbase-pro-1.2.16.zip')">zip</a></div>
+                            <div class="mylink">&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;sonicbase-pro-1.2.15&nbsp;&nbsp;<a href="#" onclick="downloadPackage('https://sonicbase-downloads.s3.amazonaws.com/sonicbase-pro-1.2.15.tgz')">tgz</a>&nbsp;&nbsp;<a href="#" onclick="downloadPackage('https://sonicbase-downloads.s3.amazonaws.com/sonicbase-pro-1.2.15.zip')">zip</a></div>
+                            <div class="mylink">&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;sonicbase-pro-1.2.14&nbsp;&nbsp;<a href="#" onclick="downloadPackage('https://sonicbase-downloads.s3.amazonaws.com/sonicbase-pro-1.2.14.tgz')">tgz</a>&nbsp;&nbsp;<a href="#" onclick="downloadPackage('https://sonicbase-downloads.s3.amazonaws.com/sonicbase-pro-1.2.14.zip')">zip</a></div>
+                            <div class="mylink">&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;sonicbase-pro-1.2.13&nbsp;&nbsp;<a href="#" onclick="downloadPackage('https://sonicbase-downloads.s3.amazonaws.com/sonicbase-pro-1.2.13.tgz')">tgz</a>&nbsp;&nbsp;<a href="#" onclick="downloadPackage('https://sonicbase-downloads.s3.amazonaws.com/sonicbase-pro-1.2.13.zip')">zip</a></div>
+                            <div class="mylink">&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;sonicbase-1.2.12&nbsp;&nbsp;<a href="#" onclick="downloadPackage('https://sonicbase-downloads.s3.amazonaws.com/sonicbase-1.2.12.tgz')">tgz</a>&nbsp;&nbsp;<a href="#" onclick="downloadPackage('https://sonicbase-downloads.s3.amazonaws.com/sonicbase-1.2.12.zip')">zip</a></div>
+                            <div class="mylink">&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;sonicbase-1.2.11&nbsp;&nbsp;<a href="#" onclick="downloadPackage('https://sonicbase-downloads.s3.amazonaws.com/sonicbase-1.2.11.tgz')">tgz</a>&nbsp;&nbsp;<a href="#" onclick="downloadPackage('https://sonicbase-downloads.s3.amazonaws.com/sonicbase-1.2.11.zip')">zip</a></div>
+                            <div class="mylink">&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;sonicbase-1.2.10&nbsp;&nbsp;<a href="#" onclick="downloadPackage('https://sonicbase-downloads.s3.amazonaws.com/sonicbase-1.2.10.tgz')">tgz</a>&nbsp;&nbsp;<a href="#" onclick="downloadPackage('https://sonicbase-downloads.s3.amazonaws.com/sonicbase-1.2.10.zip')">zip</a></div>
+                            <div class="mylink">&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;sonicbase-1.2.9&nbsp;&nbsp;<a href="#" onclick="downloadPackage('https://sonicbase-downloads.s3.amazonaws.com/sonicbase-1.2.9.tgz')">tgz</a>&nbsp;&nbsp;<a href="#" onclick="downloadPackage('https://sonicbase-downloads.s3.amazonaws.com/sonicbase-1.2.9.zip')">zip</a></div>
+                            <div class="mylink">&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;sonicbase-1.2.8&nbsp;&nbsp;<a href="#" onclick="downloadPackage('https://sonicbase-downloads.s3.amazonaws.com/sonicbase-1.2.8.tgz')">tgz</a>&nbsp;&nbsp;<a href="#" onclick="downloadPackage('https://sonicbase-downloads.s3.amazonaws.com/sonicbase-1.2.8.zip')">zip</a></div>
+                            <div class="mylink">&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;sonicbase-1.2.7&nbsp;&nbsp;<a href="#" onclick="downloadPackage('https://sonicbase-downloads.s3.amazonaws.com/sonicbase-1.2.7.tgz')">tgz</a>&nbsp;&nbsp;<a href="#" onclick="downloadPackage('https://sonicbase-downloads.s3.amazonaws.com/sonicbase-1.2.7.zip')">zip</a></div>
+                        </td>
+                        <td>
+                            &nbsp;&nbsp;&nbsp;&nbsp;10/07/2018<br/>
+                            &nbsp;&nbsp;&nbsp;&nbsp;9/23/2018<br/>
+                            &nbsp;&nbsp;&nbsp;&nbsp;9/11/2018<br/>
+                            &nbsp;&nbsp;&nbsp;&nbsp;8/15/2018<br/>
+                            &nbsp;&nbsp;&nbsp;&nbsp;8/8/2018<br/>
+                            &nbsp;&nbsp;&nbsp;&nbsp;4/29/2018<br/>
+                            &nbsp;&nbsp;&nbsp;&nbsp;3/30/2018<br/>
+                            &nbsp;&nbsp;&nbsp;&nbsp;3/20/2018<br/>
+                            &nbsp;&nbsp;&nbsp;&nbsp;1/17/2018<br/>
+                            &nbsp;&nbsp;&nbsp;&nbsp;12/23/2017<br/>
+                            &nbsp;&nbsp;&nbsp;&nbsp;11/28/2017<br/>
+                        </td>
+                    </tr>
+                </table>
+                </div>
+            </td>
+        </tr>
+        </table>
+    </div>
+</div>
+<footer>
+    <script type="text/javascript" src="https://cdn.ywxi.net/js/1.js" async></script>
+</footer>
+</body>
+</html>

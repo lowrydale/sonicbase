@@ -1,0 +1,184 @@
+<!doctype html>
+<html>
+<head>
+  <link rel="canonical" href="http://sonicbase.com/docs/benchmarks-range-query.html"/>
+
+  <meta charset="UTF-8">
+<title>SonicBase - In-Memory Database. Benchmarks For Range Query</title>
+    <meta http-equiv="X-UA-Compatible" content="IE=edge">
+    <meta name="viewport" content="width=device-width, initial-scale=1">
+    <meta name="description" content="In this benchmark we create a range query that selects the entire database and we iterate over all the results on a 4, 8, 16 and 32 server SonicBase cluster.">
+    <link href="../css/singlePageTemplate.css" rel="stylesheet" type="text/css">
+    <script type="text/javascript" src="../javascript/main.js"></script>
+
+    <link rel="stylesheet" href="../css/tomorrow-night-bright.css">
+    <script src="../javascript/highlight.min.js"></script>
+    <script>hljs.initHighlightingOnLoad();</script>
+    <!-- Global site tag (gtag.js) - Google Analytics -->
+    <script async src="https://www.googletagmanager.com/gtag/js?id=UA-109032274-1"></script>
+    <script>
+        window.dataLayer = window.dataLayer || [];
+        function gtag(){dataLayer.push(arguments);}
+        gtag('js', new Date());
+
+        gtag('config', 'UA-109032274-1');
+        ga('require', 'displayfeatures');
+    </script>
+</head>
+
+<body>
+<div class="container">
+    <header id="myHeader">
+        <div class="mobile">
+            <a href="../index.html">
+                <h4 class="logo">SonicBase™</h4>
+            </a>
+        </div>
+
+        <div class="desktop">
+            <a href="../index.html">
+                <img style="margin-top:3px" src="../images/logo-white.gif" width="50px"/><h4 class="logo">SonicBase™</h4>
+            </a>
+        <nav>
+            <ul>
+                <li><a href="../index.html">HOME</a></li>
+                <li> <a href="../documentation.html">DOCUMENTATION</a></li>
+                <li><a href="../contact.html">CONTACT</a></li>
+            </ul>
+        </nav>
+        </div>
+    </header>
+
+    <script>
+        if (isFramed()) {
+            document.getElementById("myHeader").style.display = "none";
+        }
+    </script>
+
+    <div class="main-page-text">
+      <div class="intro">SonicBase. In-memory embedded or distributed streaming sql database</div>
+
+<h1>Range Query Benchmark</h1>
+In this benchmark we create a range query that selects the entire database and we iterate over all the results on a 4, 8, 16, and 32 server cluster.<br/>
+<br/>
+        <pre class="java"><code>
+PreparedStatement stmt = con.prepareStatement("select persons.id1, id2 from persons where id1 >= 0 order by id1 asc);
+ResultSet rs = stmt.executeQuery();
+for (int i = 0; ; i++) {
+    if (!rs.next()) {
+        break;
+    }
+}
+            <br/>
+	</code></pre>
+		<div class="mylink">
+	<a href="benchmarks-schema.html?framed=true">Schema and Insert Code</a><br/><br/>
+	</div>
+
+<table class="syntax-table" border="1" cellpadding=2 cellspacing="0">
+    <tbody>
+    <tr class="syntax-main">
+      <td>Metric</td>
+      <td>4-server</td>
+        <td>8-server</td>
+        <td>16-server</td>
+        <td>32-server</td>
+    </tr>
+    <tr>
+      <td>Record size</td>
+      <td>120 bytes</td>
+        <td>120 bytes</td>
+        <td>120 bytes</td>
+        <td>120 bytes</td>
+    </tr>
+    <tr>
+      <td>Record count</td>
+      <td>750 million</td>
+        <td>1.5 billion</td>
+        <td>3 billion</td>
+        <td>6 billion</td>
+    </tr>
+    <tr>
+      <td>Server total mem</td>
+      <td>60g</td>
+        <td>60g</td>
+        <td>60g</td>
+        <td>60g</td>
+    </tr>
+    <tr>
+      <td>Server xmx</td>
+      <td>36g</td>
+        <td>36g</td>
+        <td>36g</td>
+        <td>36g</td>
+    </tr>
+    <tr>
+      <td>Resident mem</td>
+      <td>52g</td>
+        <td>52g</td>
+        <td>52g</td>
+        <td>52g</td>
+    </tr>
+    <tr>
+      <td>Client machine count</td>
+      <td>8</td>
+        <td>16</td>
+        <td>32</td>
+        <td>64</td>
+    </tr>
+        <tr>
+      <td>Cores per client machine</td>
+      <td>4</td>
+            <td>4</td>
+            <td>4</td>
+            <td>4</td>
+    </tr>
+    <tr>
+    	<td>Cores per server machine</td>
+    	<td>8</td>
+        <td>8</td>
+        <td>8</td>
+        <td>8</td>
+    </tr>
+
+    <tr>
+      <td>Call rate</td>
+      <td>9 mil/sec</td>
+        <td>19 mil/sec</td>
+        <td>33 mil/sec</td>
+        <td>68 mil/sec</td>
+    </tr>
+   <tr>
+       <td>Call latency</td>
+       <td>55 micros</td>
+       <td>54 micros</td>
+       <td>64 micros</td>
+       <td>59 micros</td>
+   </tr>
+     <tr>
+      <td>Threads per client</td>
+      <td>16</td>
+         <td>16</td>
+         <td>16</td>
+         <td>16</td>
+    </tr>
+    <tr>
+    	<td>Shard Count</td>
+    	<td>4</td>
+        <td>8</td>
+        <td>15</td>
+        <td>32</td>
+    </tr>
+    <tr>
+    	<td>Replica Count</td>
+    	<td>1</td>
+        <td>1</td>
+        <td>1</td>
+        <td>1</td>
+    </tr>
+  </tbody>
+</table>
+</div>
+</div>
+</body>
+</html>

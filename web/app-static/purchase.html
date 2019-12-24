@@ -1,0 +1,291 @@
+<!doctype html>
+<html>
+<head>
+    <meta http-equiv="X-UA-Compatible" content="IE=edge">
+    <meta name="viewport" content="width=device-width, initial-scale=1">
+
+    <meta name="description" content="Purchase SonicBase licenses.">
+
+    <!-- Global site tag (gtag.js) - Google Analytics -->
+    <script async src="https://www.googletagmanager.com/gtag/js?id=UA-109032274-1"></script>
+    <script>
+        window.dataLayer = window.dataLayer || [];
+        function gtag(){dataLayer.push(arguments);}
+        gtag('js', new Date());
+
+        gtag('config', 'UA-109032274-1');
+        ga('require', 'displayfeatures');
+    </script>
+
+    <link href="../css/singlePageTemplate.css" rel="stylesheet" type="text/css">
+    <script src="https://www.paypalobjects.com/api/checkout.js"></script>
+
+    <meta charset="UTF-8">
+    <title>SonicBase - Purchase Licenses</title>
+    <script type="text/javascript" src="../javascript/jquery-3.2.1.min.js"></script>
+    <script type="text/javascript" src="../javascript/main.js"></script>
+    <script>
+        function calculatePrice() {
+            var coreCount = document.getElementById("coreCount").value;
+            var promoCode = document.getElementById("promoCode").value;
+
+            $.ajaxSetup({
+                error: function(xhr){
+                    alert('Request Status: ' + xhr.status + ' Status Text: ' + xhr.statusText + ' ' + xhr.responseText);
+                }
+            });
+
+            var sessionId = readCookie("SBSessionId");
+
+            var price = "0.00";
+            $.ajax({
+                headers:{
+                    "Accept":"application/text",
+                    "Content-type":"application/json"
+                },
+                url:"/app/license/calculatePrice?cores=" + coreCount + "&promoCode=" + promoCode + "&sessionId=" + sessionId,
+                success:function(response){
+                    touchCookie("SBSessionId");
+                    price = response;
+                    document.getElementById("price").innerHTML = price;
+                },
+                statusCode: {
+                    401: function() {
+                        alert("Session has timed out. Please login again.");
+                        window.location.href = "/app-static/login.html";
+                    }
+                },
+                async: false
+            });
+            return price;
+        }
+
+        function purchase(form) {
+            var coreCount = document.getElementById("coreCount").value;
+            var promoCode = document.getElementById("promoCode").value;
+
+            $.ajaxSetup({
+                error: function(xhr){
+                    alert('Request Status: ' + xhr.status + ' Status Text: ' + xhr.statusText + ' ' + xhr.responseText);
+                }
+            });
+
+            var sessionId = readCookie("SBSessionId");
+
+            $.ajax({
+                headers:{
+                    "Accept":"application/json",
+                    "Content-type":"application/json"
+                },   url:"/app/license/purchase?cores=" + coreCount + "&promoCode=" + promoCode + "&sessionId=" + sessionId,
+                success:function(response){
+                    touchCookie("SBSessionId");
+                    window.location.href = "/app-static/licenses.html";
+                },
+                error: function(xhr) {
+                    if (xhr.status == 401) {
+                        alert("Session has timed out. Please login again.");
+                    }
+                    else {
+                        // revert to default
+                        ajaxError.apply(this, arguments);
+                    }
+                }
+            });
+        }
+    </script>
+
+</head>
+
+<body>
+<div class="container">
+    <header>
+        <div class="mobile">
+            <a href="../index.html">
+                <h4 class="logo">SonicBase™</h4>
+            </a>
+        </div>
+
+        <div class="desktop">
+            <a href="../index.html">
+                <img style="margin-top:3px" src="../images/logo-white.gif" width="50px"/><h4 class="logo">SonicBase™</h4>
+            </a>
+        <nav>
+            <ul>
+                <li><a href="../index.html">HOME</a></li>
+                <li> <a href="../documentation.html">DOCUMENTATION</a></li>
+                <li><a href="../downloads.html">DOWNLOADS</a></li>
+                <li><a href="../contact.html">CONTACT</a></li>
+            </ul>
+        </nav>
+        </div>
+    </header>
+
+    <div class="main-page-text">
+
+        <br/>
+        <br/>
+        <br/>
+        <br/>
+        Licenses cost $31.25 per core per year. Or $250 for 8 cores per year.<br/>
+    <br/>
+    <form id="purchase-form" name="purchase-form" action="javascript:;">
+    <table>
+        <tr>
+            <td align="right"># of Cores</td>
+            <td><input type="text" id="coreCount"></td>
+        </tr>
+        <tr>
+            <td align="right">Promo Code</td>
+            <td><input type="text" id="promoCode"></td>
+        </tr>
+        <tr>
+            <td align="right">Price</td>
+            <td id="price">$0.00</td>
+        </tr>
+        <tr>
+            <td></td><td><button type="button" onclick="calculatePrice()">Calculate Price</button></td>
+        </tr>
+        <tr>
+            <td></td><td>
+                <div id="paypal-button"></div>
+
+                <script>
+                    paypal.Button.render({
+
+                        // Set your environment
+
+                        env: 'production', // sandbox | production
+
+                        locale: 'en_US',
+
+                        // Specify the style of the button
+
+                        style: {
+                            label: 'paypal',
+                            size:  'small', // small | medium | large | responsive
+                            shape: 'pill',   // pill | rect
+                            color: 'gold'   // gold | blue | silver | black
+                        },
+
+                        // PayPal Client IDs - replace with your own
+                        // Create a PayPal app: https://developer.paypal.com/developer/applications/create
+
+                        client: {
+                            sandbox:    '',
+                            production: 'AeRg5Va0HldG2957ue5KD8hayAn7RoENW4jhrwPrqTj25R1nQlscMQ9QJ3gvwgl76b4n2y6kISfHoGUG'
+                        },
+
+                        commit: true,
+                        // Wait for the PayPal button to be clicked
+
+//                        return actions.payment.create({
+//                            payment: {
+//                                transactions: [
+//                                    {
+//                                        amount: { total: '0.01', currency: 'USD' }
+//                                    }
+//                                ]
+//                            }
+//                        });
+
+                        payment: function(data, actions) {
+                            touchCookie("SBSessionId");
+                            var price = calculatePrice();
+                            var j =
+                                '{"payment": {' +
+                                '"transactions": [' +
+                                '    {' +
+                                '        "amount": { "total": "' + price + '", "currency": "USD" }' +
+                                '    }' +
+                                ']' +
+                                '}}';
+
+                            //alert(JSON.parse(j).toString());
+                            touchCookie("SBSessionId");
+                            return actions.payment.create(JSON.parse(j));
+                        },
+
+                        // Wait for the payment to be authorized by the customer
+
+                        onAuthorize: function(data, actions) {
+                            return actions.payment.execute().then(function() {
+                                var coreCount = document.getElementById("coreCount").value;
+                                var promoCode = document.getElementById("promoCode").value;
+//                                alert("coreCount=" + coreCount + ", promoCode=" + promoCode + ", paymentID=" + data.paymentID +
+//                                    ", payerID=" + data.payerID)
+                                $.ajax({
+                                    type: 'POST',
+                                    headers:{
+                                        "Accept":"application/text",
+                                        "Content-type":"application/json"
+                                    },
+                                    url:"/app/license/paypal/execute-payment?" +
+                                        "cores=" + coreCount +
+                                        "&promoCode=" + promoCode +
+                                        "&sessionId=" + readCookie("SBSessionId") + "&paymentID=" + data.paymentID +
+                                                "&payerID=" + data.payerID,
+                                    success:function(response){
+                                        touchCookie("SBSessionId");
+                                        alert("Successfully completed transaction");
+                                        window.location.href = "/app-static/licenses.html";
+                                    },
+                                    statusCode: {
+                                        401: function() {
+                                            alert("Session has timed out. Please login again.");
+                                            window.location.href = "/app-static/login.html";
+                                        }
+                                    },
+                                    async: false
+                                });
+
+                            });
+                        }
+
+                    }, '#paypal-button');
+
+
+                    //                    paypal.Button.render({
+//
+//                        env: 'production',
+//
+//                        commit: true, // Show a 'Pay Now' button
+//
+//
+//                    payment: function() {
+//                            return paypal.request.post("https://sonicbase.com:8443/app/license/paypal/create-payment?" +
+//                        "cores=" + document.getElementById("coreCount").value +
+//                        "&promoCode=" + document.getElementById("promoCode").value +
+//                        "&sessionId=" + readCookie("SBSessionId")
+//                            ).then(function(data) {
+//                                return data.id;
+//                            });
+//                        },
+//
+//
+//                        onAuthorize: function(data) {
+//                            return paypal.request.post("https://sonicbase.com:8443/app/license/paypal/execute-payment?" +
+//                                "cores=" + document.getElementById("coreCount").value +
+//                                "&promoCode=" + document.getElementById("promoCode").value +
+//                                "&sessionId=" + readCookie("SBSessionId"), {
+//                                paymentID: data.paymentID,
+//                                payerID:   data.payerID
+//                            }).then(function() {
+//                                window.location.href = "/app-static/licenses.html";
+//                            });
+//                        }
+//
+//                    }, '#paypal-button');
+//
+                </script>
+        
+        </td>
+        </tr>
+    </table>
+    </form>
+    </div>
+</div>
+<footer>
+    <script type="text/javascript" src="https://cdn.ywxi.net/js/1.js" async></script>
+</footer>
+</body>
+</html>

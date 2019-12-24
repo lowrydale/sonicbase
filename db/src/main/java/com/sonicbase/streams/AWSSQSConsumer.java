@@ -39,11 +39,6 @@ public class AWSSQSConsumer implements StreamsConsumer {
     }
   }
 
-  public File getInstallDir(Config config) {
-    String dir = config.getString("installDirectory");
-    return new File(dir.replace("$HOME", System.getProperty("user.home")));
-  }
-
   public void shutdown() {
     this.shutdown = true;
     sqsClient.shutdown();

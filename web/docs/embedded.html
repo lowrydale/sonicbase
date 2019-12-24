@@ -1,0 +1,145 @@
+<!doctype html>
+<html>
+<head>
+	<link rel="canonical" href="http://sonicbase.com/docs/embedded.html"/>
+
+	<meta charset="UTF-8">
+<title>SonicBase - In-Memory Database. Embedded database server.</title>
+	<meta http-equiv="X-UA-Compatible" content="IE=edge">
+	<meta name="viewport" content="width=device-width, initial-scale=1">
+	<meta name="description" content="Directions on how to embed SonicBase in your application">
+	<link href="../css/singlePageTemplate.css" rel="stylesheet" type="text/css">
+	<script type="text/javascript" src="../javascript/main.js"></script>
+
+	<link rel="stylesheet" href="../css/tomorrow-night-bright.css">
+	<script src="../javascript/highlight.min.js"></script>
+	<script>hljs.initHighlightingOnLoad();</script>
+	<!-- Global site tag (gtag.js) - Google Analytics -->
+	<script async src="https://www.googletagmanager.com/gtag/js?id=UA-109032274-1"></script>
+	<script>
+        window.dataLayer = window.dataLayer || [];
+        function gtag(){dataLayer.push(arguments);}
+        gtag('js', new Date());
+
+        gtag('config', 'UA-109032274-1');
+        ga('require', 'displayfeatures');
+	</script>
+</head>
+
+<body>
+<div class="container">
+	<header id="myHeader">
+		<div class="mobile">
+			<a href="../index.html">
+				<h4 class="logo">SonicBase™</h4>
+			</a>
+		</div>
+
+		<div class="desktop">
+			<a href="../index.html">
+				<img style="margin-top:3px" src="../images/logo-white.gif" width="50px"/><h4 class="logo">SonicBase™</h4>
+			</a>
+		<nav>
+			<ul>
+				<li><a href="../index.html">HOME</a></li>
+				<li> <a href="../documentation.html">DOCUMENTATION</a></li>
+				<li><a href="../contact.html">CONTACT</a></li>
+			</ul>
+		</nav>
+		</div>
+	</header>
+
+	<script>
+        if (isFramed()) {
+            document.getElementById("myHeader").style.display = "none";
+        }
+	</script>
+
+	<div class="main-page-text">
+		<div class="intro">SonicBase. In-memory embedded or distributed streaming sql database</div>
+
+<h1>Embedded Database Server</h1>
+SonicBase can be embedded in your server. EmbeddedDatabase is a simple class that provides this functionality. There are
+		a few methods on this class that you will need to use:<br/>
+		<br/>
+		<lu><li>
+			setUseUnsafe - set to true if you want SonicBase to use unsafe memory. Unsafe memory allows for less memory
+			consumption, but it is more complicated to manage (you have to set the Xmx setting just right). The default
+			if you don't set this option is to not use unsafe.
+		</li><li>
+			setDurability - pass in the path to the location you want data stored on disk. If this method is not called then
+			SonicBase will operate in an in-memory only mode.
+		</li><li>
+			purge - deletes all persisted data.
+		</li><li>
+			start - starts the embedded database. You must call setUsafeUnsafe, setDurability and optionally purge before calling start.
+		</li><li>
+			createDatabaseIfNeeded - creates the specified database if it doesn't already exist. This call must be made after
+			calling start.
+		</li><li>
+			getConnection - returns a standard jdbc connection for the specified database. This call must be made after calling start.
+		</li><li>
+			shutdown - call this when you are done using the database.
+		</li></lu>
+			<br/>
+			To use the embedded database you need to include the SonicBase JDBC jar and the SonicBase Server jar in your project.
+			To do this, include the following in your maven project:<br/>
+			        <pre class="xml"><code>
+&lt;dependency&gt;
+    &lt;groupId&gt;com.sonicbase&lt;/groupId&gt;
+    &lt;artifactId&gt;sonicbase-jdbc&lt;/artifactId&gt;
+    &lt;version&gt;[version]&lt;/version&gt;
+&lt;/dependency&gt;
+
+&lt;dependency&gt;
+    &lt;groupId&gt;com.sonicbase&lt;/groupId&gt;
+    &lt;artifactId&gt;sonicbase-server&lt;/artifactId&gt;
+    &lt;version&gt;[version]&lt;/version&gt;
+&lt;/dependency&gt;
+        </code></pre>
+		<h2>Example</h2>
+
+		<pre class="java"><code>
+EmbeddedDatabase db = new EmbeddedDatabase();
+try {
+  db.setUseUnsafe(false);
+  db.setDurability(System.getProperty("user.home") + "/db-data.embedded");
+  db.purge();
+  db.start();
+
+  db.createDatabaseIfNeeded("db");
+
+  try (Connection conn = db.getConnection("db")) {
+    try (PreparedStatement stmt = conn.prepareStatement("create table Persons (id BIGINT, socialSecurityNumber VARCHAR(20), gender VARCHAR(8), PRIMARY KEY (id))")) {
+      stmt.executeUpdate();
+    }
+
+    for (int i = 0; i < 10; i++) {
+      try (PreparedStatement stmt = conn.prepareStatement("insert into persons (id, socialSecurityNumber, gender) VALUES (?, ?, ?)")) {
+        stmt.setLong(1, i);
+        stmt.setString(2, "933-28-" + i);
+        stmt.setString(3, "m");
+        stmt.executeUpdate();
+      }
+    }
+
+    try (PreparedStatement stmt = conn.prepareStatement("select * from persons where id < 2")) {
+      try (ResultSet rs = stmt.executeQuery()) {
+        rs.next();
+        System.out.println("personId=" + rs.getLong("id"));
+        rs.next();
+        System.out.println("personId=" + rs.getLong("id"));
+      }
+    }
+  }
+}
+finally {
+  db.shutdown();
+}
+<br/>
+</code></pre>
+<br/>
+</div>
+</div>
+</body>
+</html>

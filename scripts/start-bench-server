@@ -1,6 +1,4 @@
 export _XMX_=2048m
-#export SONIC_BASE_HOME=$4
-#export MODE=yprof
 
 export SONIC_BASE_HOME="$(dirname $( cd "$( dirname "${BASH_SOURCE[0]}" )" && pwd ))"
 mkdir $SONIC_BASE_HOME/logs
@@ -8,8 +6,8 @@ mkdir $SONIC_BASE_HOME/logs
 cd $SONIC_BASE_HOME
 echo "start-SONIC_BASE_HOME=$SONIC_BASE_HOME"
 
-export _LOG4J_FILENAME_=$SONIC_BASE_HOME/logs/bench-$2.log
-export _GC_LOG_FILENAME_=$SONIC_BASE_HOME/logs/gc-bench-$2.log
+export _LOG4J_FILENAME_=$SONIC_BASE_HOME/logs/bench-$1.log
+export _GC_LOG_FILENAME_=$SONIC_BASE_HOME/logs/gc-bench-$1.log
 export LOG4J_FILE="log4j.xml"
 echo "starting BenchmarkServer: SONIC_BASE_HOME=" + $SONIC_BASE_HOME
-nohup $SONIC_BASE_HOME/bin/runclass com.sonicbase.bench.BenchServer -port $2 > $SONIC_BASE_HOME/logs/bench-$2.sysout.log 2>&1 &
+nohup $SONIC_BASE_HOME/bin/runclass com.sonicbase.bench.BenchServer -port $1 > $SONIC_BASE_HOME/logs/bench-$1.sysout.log 2>&1 &

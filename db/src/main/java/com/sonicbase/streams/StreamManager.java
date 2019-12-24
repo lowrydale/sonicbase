@@ -436,6 +436,9 @@ public class StreamManager {
       for (int i = 0; i < streams.size(); i++) {
         try {
           final Map<String, Object> stream = (Map<String, Object>) streams.get(i).get("consumer");
+          if (stream == null) {
+            continue;
+          }
           final String className = (String) stream.get("className");
           logger.info("starting queue consumer: config=" + stream.toString());
 
@@ -613,10 +616,9 @@ public class StreamManager {
 
           String dbName = entry.get("_sonicbase_dbname").asText();
           initConnection(dbName);
-          String clusterName = entry.get("_sonicbase_clustername").asText();
           String tableName = entry.get("_sonicbase_tablename").asText();
           String action = entry.get("_sonicbase_action").asText();
-          String key = clusterName + ":" + dbName + ":" + tableName + ":" + action;
+          String key = dbName + ":" + tableName + ":" + action;
           List<JsonNode> currMsgs = groupedMessages.get(key);
           if (currMsgs == null) {
             currMsgs = new ArrayList<>();
@@ -632,10 +634,9 @@ public class StreamManager {
     for (Map.Entry<String, List<JsonNode>> entry : groupedMessages.entrySet()) {
       try {
         String[] parts = entry.getKey().split(":");
-        String cluster = parts[0];
-        String dbName = parts[1];
-        String tableName = parts[2];
-        String action = parts[3];
+        String dbName = parts[0];
+        String tableName = parts[1];
+        String action = parts[2];
         final TableSchema tableSchema = server.getCommon().getTables(dbName).get(tableName);
         final List<FieldSchema> fields = tableSchema.getFields();
         if (action.equals(UpdateManager.UpdateType.INSERT.name())) {

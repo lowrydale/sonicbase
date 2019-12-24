@@ -1,0 +1,366 @@
+<?xml version="1.0" encoding="UTF-8"?>
+<urlset
+      xmlns="http://www.sitemaps.org/schemas/sitemap/0.9"
+      xmlns:xsi="http://www.w3.org/2001/XMLSchema-instance"
+      xsi:schemaLocation="http://www.sitemaps.org/schemas/sitemap/0.9
+            http://www.sitemaps.org/schemas/sitemap/0.9/sitemap.xsd">
+<!-- created with Free Online Sitemap Generator www.xml-sitemaps.com -->
+
+
+<url>
+  <loc>http://sonicbase.com/index.html</loc>
+  <lastmod>2018-12-08T06:41:36+00:00</lastmod>
+  <priority>0.80</priority>
+</url>
+<url>
+  <loc>http://sonicbase.com/documentation.html</loc>
+  <lastmod>2018-12-08T06:28:09+00:00</lastmod>
+  <priority>0.80</priority>
+</url>
+<url>
+  <loc>http://sonicbase.com/contact.html</loc>
+  <lastmod>2018-12-08T05:24:23+00:00</lastmod>
+  <priority>0.80</priority>
+</url>
+<url>
+  <loc>http://sonicbase.com/docs/automated-bulk-import.html</loc>
+  <lastmod>2018-12-08T06:36:03+00:00</lastmod>
+  <priority>0.80</priority>
+</url>
+<url>
+  <loc>http://sonicbase.com/docs/streaming-consumer.html</loc>
+  <lastmod>2018-12-08T06:36:03+00:00</lastmod>
+  <priority>0.80</priority>
+</url>
+<url>
+  <loc>http://sonicbase.com/docs/streaming-producer.html</loc>
+  <lastmod>2018-12-08T06:36:03+00:00</lastmod>
+  <priority>0.80</priority>
+</url>
+<url>
+  <loc>http://sonicbase.com/docs/stored-procedures.html</loc>
+  <lastmod>2018-12-08T06:36:03+00:00</lastmod>
+  <priority>0.80</priority>
+</url>
+<url>
+  <loc>http://sonicbase.com/docs/tutorial-local-deploy.html</loc>
+  <lastmod>2018-12-08T06:36:03+00:00</lastmod>
+  <priority>0.64</priority>
+</url>
+<url>
+  <loc>http://sonicbase.com/docs/tutorial-distributed-deploy.html</loc>
+  <lastmod>2018-12-08T06:36:03+00:00</lastmod>
+  <priority>0.64</priority>
+</url>
+<url>
+  <loc>http://sonicbase.com/docs/embedded.html</loc>
+  <lastmod>2018-12-08T06:36:03+00:00</lastmod>
+  <priority>0.64</priority>
+</url>
+<url>
+  <loc>http://sonicbase.com/docs/features.html</loc>
+  <lastmod>2018-12-08T06:36:03+00:00</lastmod>
+  <priority>0.64</priority>
+</url>
+<url>
+  <loc>http://sonicbase.com/docs/benchmarks-batch-insert.html</loc>
+  <lastmod>2018-12-08T06:36:03+00:00</lastmod>
+  <priority>0.64</priority>
+</url>
+<url>
+  <loc>http://sonicbase.com/docs/benchmarks-identity-query.html</loc>
+  <lastmod>2018-12-08T06:36:03+00:00</lastmod>
+  <priority>0.64</priority>
+</url>
+<url>
+  <loc>http://sonicbase.com/docs/benchmarks-range-query.html</loc>
+  <lastmod>2018-12-08T06:36:03+00:00</lastmod>
+  <priority>0.64</priority>
+</url>
+<url>
+  <loc>http://sonicbase.com/docs/benchmark-framework.html</loc>
+  <lastmod>2018-12-08T06:36:03+00:00</lastmod>
+  <priority>0.64</priority>
+</url>
+<url>
+  <loc>http://sonicbase.com/docs/select-basics.html</loc>
+  <lastmod>2018-12-08T06:36:03+00:00</lastmod>
+  <priority>0.64</priority>
+</url>
+<url>
+  <loc>http://sonicbase.com/docs/select-order-by.html</loc>
+  <lastmod>2018-12-08T06:36:03+00:00</lastmod>
+  <priority>0.64</priority>
+</url>
+<url>
+  <loc>http://sonicbase.com/docs/select-functions.html</loc>
+  <lastmod>2018-12-08T06:36:03+00:00</lastmod>
+  <priority>0.64</priority>
+</url>
+<url>
+  <loc>http://sonicbase.com/docs/select-group-by.html</loc>
+  <lastmod>2018-12-08T06:36:03+00:00</lastmod>
+  <priority>0.64</priority>
+</url>
+<url>
+  <loc>http://sonicbase.com/docs/select-limit.html</loc>
+  <lastmod>2018-12-08T06:36:03+00:00</lastmod>
+  <priority>0.64</priority>
+</url>
+<url>
+  <loc>http://sonicbase.com/docs/select-math.html</loc>
+  <lastmod>2018-12-08T06:36:03+00:00</lastmod>
+  <priority>0.64</priority>
+</url>
+<url>
+  <loc>http://sonicbase.com/docs/functions.html</loc>
+  <lastmod>2018-12-08T06:36:03+00:00</lastmod>
+  <priority>0.64</priority>
+</url>
+<url>
+  <loc>http://sonicbase.com/docs/select-set-operators.html</loc>
+  <lastmod>2018-12-08T06:36:03+00:00</lastmod>
+  <priority>0.64</priority>
+</url>
+<url>
+  <loc>http://sonicbase.com/docs/batch_read.html</loc>
+  <lastmod>2018-12-08T06:36:03+00:00</lastmod>
+  <priority>0.64</priority>
+</url>
+<url>
+  <loc>http://sonicbase.com/docs/insert.html</loc>
+  <lastmod>2018-12-08T06:36:03+00:00</lastmod>
+  <priority>0.64</priority>
+</url>
+<url>
+  <loc>http://sonicbase.com/docs/batch_insert.html</loc>
+  <lastmod>2018-12-08T06:36:03+00:00</lastmod>
+  <priority>0.64</priority>
+</url>
+<url>
+  <loc>http://sonicbase.com/docs/delete.html</loc>
+  <lastmod>2018-12-08T06:36:03+00:00</lastmod>
+  <priority>0.64</priority>
+</url>
+<url>
+  <loc>http://sonicbase.com/docs/update.html</loc>
+  <lastmod>2018-12-08T06:36:03+00:00</lastmod>
+  <priority>0.64</priority>
+</url>
+<url>
+  <loc>http://sonicbase.com/docs/create-table.html</loc>
+  <lastmod>2018-12-08T06:36:03+00:00</lastmod>
+  <priority>0.64</priority>
+</url>
+<url>
+  <loc>http://sonicbase.com/docs/drop-table.html</loc>
+  <lastmod>2018-12-08T06:36:03+00:00</lastmod>
+  <priority>0.64</priority>
+</url>
+<url>
+  <loc>http://sonicbase.com/docs/truncate-table.html</loc>
+  <lastmod>2018-12-08T06:36:03+00:00</lastmod>
+  <priority>0.64</priority>
+</url>
+<url>
+  <loc>http://sonicbase.com/docs/create-index.html</loc>
+  <lastmod>2018-12-08T06:36:03+00:00</lastmod>
+  <priority>0.64</priority>
+</url>
+<url>
+  <loc>http://sonicbase.com/docs/drop-index.html</loc>
+  <lastmod>2018-12-08T06:36:03+00:00</lastmod>
+  <priority>0.64</priority>
+</url>
+<url>
+  <loc>http://sonicbase.com/docs/describe.html</loc>
+  <lastmod>2018-12-08T06:36:03+00:00</lastmod>
+  <priority>0.64</priority>
+</url>
+<url>
+  <loc>http://sonicbase.com/docs/describe-tables.html</loc>
+  <lastmod>2018-12-08T06:36:03+00:00</lastmod>
+  <priority>0.64</priority>
+</url>
+<url>
+  <loc>http://sonicbase.com/docs/describe-shards.html</loc>
+  <lastmod>2018-12-08T06:36:03+00:00</lastmod>
+  <priority>0.64</priority>
+</url>
+<url>
+  <loc>http://sonicbase.com/docs/describe-server-stats.html</loc>
+  <lastmod>2018-12-08T06:36:03+00:00</lastmod>
+  <priority>0.64</priority>
+</url>
+<url>
+  <loc>http://sonicbase.com/docs/describe-server-health.html</loc>
+  <lastmod>2018-12-08T06:36:03+00:00</lastmod>
+  <priority>0.64</priority>
+</url>
+<url>
+  <loc>http://sonicbase.com/docs/joins-inner.html</loc>
+  <lastmod>2018-12-08T06:36:03+00:00</lastmod>
+  <priority>0.64</priority>
+</url>
+<url>
+  <loc>http://sonicbase.com/docs/joins-left-outer.html</loc>
+  <lastmod>2018-12-08T06:36:03+00:00</lastmod>
+  <priority>0.64</priority>
+</url>
+<url>
+  <loc>http://sonicbase.com/docs/joins-right-outer.html</loc>
+  <lastmod>2018-12-08T06:36:03+00:00</lastmod>
+  <priority>0.64</priority>
+</url>
+<url>
+  <loc>http://sonicbase.com/docs/joins-full.html</loc>
+  <lastmod>2018-12-08T06:36:03+00:00</lastmod>
+  <priority>0.64</priority>
+</url>
+<url>
+  <loc>http://sonicbase.com/docs/joins-three-way.html</loc>
+  <lastmod>2018-12-08T06:36:03+00:00</lastmod>
+  <priority>0.64</priority>
+</url>
+<url>
+  <loc>http://sonicbase.com/docs/backup-restore.html</loc>
+  <lastmod>2018-12-08T06:36:03+00:00</lastmod>
+  <priority>0.64</priority>
+</url>
+<url>
+  <loc>http://sonicbase.com/docs/elasticsearch.html</loc>
+  <lastmod>2018-12-08T06:36:03+00:00</lastmod>
+  <priority>0.64</priority>
+</url>
+<url>
+  <loc>http://sonicbase.com/docs/logstash.html</loc>
+  <lastmod>2018-12-08T06:36:03+00:00</lastmod>
+  <priority>0.64</priority>
+</url>
+<url>
+  <loc>http://sonicbase.com/docs/monitoring.html</loc>
+  <lastmod>2018-12-08T06:36:03+00:00</lastmod>
+  <priority>0.64</priority>
+</url>
+<url>
+  <loc>http://sonicbase.com/docs/monitor-health.html</loc>
+  <lastmod>2018-12-08T06:36:03+00:00</lastmod>
+  <priority>0.64</priority>
+</url>
+<url>
+  <loc>http://sonicbase.com/docs/monitor-os-stats.html</loc>
+  <lastmod>2018-12-08T06:36:03+00:00</lastmod>
+  <priority>0.64</priority>
+</url>
+<url>
+  <loc>http://sonicbase.com/docs/monitor-query-stats.html</loc>
+  <lastmod>2018-12-08T06:36:03+00:00</lastmod>
+  <priority>0.64</priority>
+</url>
+<url>
+  <loc>http://sonicbase.com/docs/setup.html</loc>
+  <lastmod>2018-12-08T06:36:03+00:00</lastmod>
+  <priority>0.64</priority>
+</url>
+<url>
+  <loc>http://sonicbase.com/docs/setup-linux-mac.html</loc>
+  <lastmod>2018-12-08T06:36:03+00:00</lastmod>
+  <priority>0.64</priority>
+</url>
+<url>
+  <loc>http://sonicbase.com/docs/setup-windows.html</loc>
+  <lastmod>2018-12-08T06:36:03+00:00</lastmod>
+  <priority>0.64</priority>
+</url>
+<url>
+  <loc>http://sonicbase.com/docs/setup-cygwin.html</loc>
+  <lastmod>2018-12-08T06:36:03+00:00</lastmod>
+  <priority>0.64</priority>
+</url>
+<url>
+  <loc>http://sonicbase.com/docs/diagnostics.html</loc>
+  <lastmod>2018-12-08T06:36:03+00:00</lastmod>
+  <priority>0.64</priority>
+</url>
+<url>
+  <loc>http://sonicbase.com/docs/config.html</loc>
+  <lastmod>2018-12-08T06:36:03+00:00</lastmod>
+  <priority>0.64</priority>
+</url>
+<url>
+  <loc>http://sonicbase.com/docs/client.html</loc>
+  <lastmod>2018-12-08T06:36:03+00:00</lastmod>
+  <priority>0.64</priority>
+</url>
+<url>
+  <loc>http://sonicbase.com/docs/server-reload.html</loc>
+  <lastmod>2018-12-08T06:36:03+00:00</lastmod>
+  <priority>0.64</priority>
+</url>
+<url>
+  <loc>http://sonicbase.com/docs/aws-integration.html</loc>
+  <lastmod>2018-12-08T06:36:03+00:00</lastmod>
+  <priority>0.64</priority>
+</url>
+<url>
+  <loc>http://sonicbase.com/docs/jdbc-driver.html</loc>
+  <lastmod>2018-12-08T06:36:03+00:00</lastmod>
+  <priority>0.64</priority>
+</url>
+<url>
+  <loc>http://sonicbase.com/docs/datatypes.html</loc>
+  <lastmod>2018-12-08T06:36:03+00:00</lastmod>
+  <priority>0.64</priority>
+</url>
+<url>
+  <loc>http://sonicbase.com/docs/shards-and-replicas.html</loc>
+  <lastmod>2018-12-08T06:36:03+00:00</lastmod>
+  <priority>0.64</priority>
+</url>
+<url>
+  <loc>http://sonicbase.com/docs/stored-procedures-example1.html</loc>
+  <lastmod>2018-12-08T06:36:03+00:00</lastmod>
+  <priority>0.64</priority>
+</url>
+<url>
+  <loc>http://sonicbase.com/docs/stored-procedures-example2.html</loc>
+  <lastmod>2018-12-08T06:36:03+00:00</lastmod>
+  <priority>0.64</priority>
+</url>
+<url>
+  <loc>http://sonicbase.com/docs/stored-procedures-example3.html</loc>
+  <lastmod>2018-12-08T06:36:03+00:00</lastmod>
+  <priority>0.64</priority>
+</url>
+<url>
+  <loc>http://sonicbase.com/docs/transactions.html</loc>
+  <lastmod>2018-12-08T06:36:03+00:00</lastmod>
+  <priority>0.64</priority>
+</url>
+<url>
+  <loc>http://sonicbase.com/docs/performance-considerations.html</loc>
+  <lastmod>2018-12-08T06:36:03+00:00</lastmod>
+  <priority>0.64</priority>
+</url>
+<url>
+  <loc>http://sonicbase.com/docs/troubleshooting.html</loc>
+  <lastmod>2018-12-08T06:36:03+00:00</lastmod>
+  <priority>0.64</priority>
+</url>
+<url>
+  <loc>http://sonicbase.com/docs/rolling-restart.html</loc>
+  <lastmod>2018-12-08T06:36:03+00:00</lastmod>
+  <priority>0.64</priority>
+</url>
+<url>
+  <loc>http://sonicbase.com/doc-detail.html</loc>
+  <lastmod>2018-12-08T03:25:31+00:00</lastmod>
+  <priority>0.64</priority>
+</url>
+<url>
+  <loc>http://sonicbase.com/docs/benchmarks-schema.html</loc>
+  <lastmod>2018-12-08T06:36:03+00:00</lastmod>
+  <priority>0.51</priority>
+</url>
+
+</urlset>

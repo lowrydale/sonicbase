@@ -1,0 +1,78 @@
+<!doctype html>
+<html>
+<head>
+  <link rel="canonical" href="http://sonicbase.com/docs/shards-and-replicas.html"/>
+
+  <meta charset="UTF-8">
+
+<title>SonicBase - In-Memory Database. Shards and Replicas</title>
+    <meta http-equiv="X-UA-Compatible" content="IE=edge">
+    <meta name="viewport" content="width=device-width, initial-scale=1">
+    <meta name="description" content="Overview of how SonicBase uses shards and replicas.">
+    <link href="../css/singlePageTemplate.css" rel="stylesheet" type="text/css">
+    <script type="text/javascript" src="../javascript/main.js"></script>
+
+    <link rel="stylesheet" href="../css/tomorrow-night-bright.css">
+    <script src="../javascript/highlight.min.js"></script>
+    <script>hljs.initHighlightingOnLoad();</script>
+
+    <!-- Global site tag (gtag.js) - Google Analytics -->
+    <script async src="https://www.googletagmanager.com/gtag/js?id=UA-109032274-1"></script>
+    <script>
+        window.dataLayer = window.dataLayer || [];
+        function gtag(){dataLayer.push(arguments);}
+        gtag('js', new Date());
+
+        gtag('config', 'UA-109032274-1');
+        ga('require', 'displayfeatures');
+    </script>
+</head>
+
+
+<body>
+<div class="container">
+    <header id="myHeader">
+        <div class="mobile">
+            <a href="../index.html">
+                <h4 class="logo">SonicBase™</h4>
+            </a>
+        </div>
+
+        <div class="desktop">
+            <a href="../index.html">
+                <img style="margin-top:3px" src="../images/logo-white.gif" width="50px"/><h4 class="logo">SonicBase™</h4>
+            </a>
+        <nav>
+            <ul>
+                <li><a href="../index.html">HOME</a></li>
+                <li> <a href="../documentation.html">DOCUMENTATION</a></li>
+                <li><a href="../contact.html">CONTACT</a></li>
+            </ul>
+        </nav>
+        </div>
+    </header>
+
+    <script>
+        if (isFramed()) {
+            document.getElementById("myHeader").style.display = "none";
+        }
+    </script>
+
+    <div class="main-page-text">
+      <div class="intro">SonicBase. In-memory embedded or distributed streaming sql database</div>
+
+<h1>Shards and Replicas</h1>
+
+      Shards and replicas are fundamental building blocks of the SonicBase cluster.<br/>
+      <br/>
+      The data stored in the cluster is split evenly into shards. For example, if you have records 1, 2, 3 and 4, shard 0
+      would contain records 1 and 2 while shard 1 would contain records 3 and 4. As data is inserted into the cluster
+      it automatically distributed across the shards.<br/>
+      <br/>
+      A replica is a full copy of the data stored in a shard. You may have one or more replicas for each shard. You can
+      achieve redundancy and fail-safety if you have 2 or more replicas for a shard. If one replica fails, requests will
+      automatically failover to another replica. Inserts are applied equally to all replicas of a shard. All shards must
+      have the same number of replicas. Adding replicas can increase overall throughput of reads.
+    </div>
+</body>
+</html>

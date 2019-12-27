@@ -22,12 +22,14 @@ import net.sf.jsqlparser.statement.select.*;
 import org.apache.commons.cli.*;
 import org.apache.commons.io.FileUtils;
 import org.apache.commons.io.IOUtils;
+import org.apache.commons.lang.StringUtils;
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
 import org.yaml.snakeyaml.Yaml;
 
 import javax.net.ssl.*;
 import java.io.*;
+import java.nio.file.Files;
 import java.security.cert.X509Certificate;
 import java.sql.DriverManager;
 import java.sql.PreparedStatement;
@@ -38,6 +40,7 @@ import java.util.concurrent.*;
 import java.util.concurrent.atomic.AtomicBoolean;
 
 import static com.sonicbase.common.MemUtil.getMemValue;
+import static java.sql.Types.BIGINT;
 import static java.sql.Types.VARCHAR;
 
 public class Cli {
@@ -101,6 +104,24 @@ public class Cli {
     miscHandler = new MiscHandler(this);
 
     try {
+      File file = new File(System.getProperty("user.dir"), "config/cli.yaml");
+      String json = "";
+      if (file.exists()) {
+        InputStream in = new FileInputStream(file);
+        json = IOUtils.toString(in, "utf-8");
+        Config config = new Config(json);
+        String db = config.getString("currentDatabase");
+        if (!StringUtils.isEmpty(db)) {
+          currDbName = db;
+        }
+      }
+    }
+    catch (Exception e) {
+      //noop
+    }
+
+    try {
+
       ProcessBuilder builder = new ProcessBuilder().command("uname", "-o");
       Process p = builder.start();
       InputStream stream = p.getInputStream();
@@ -977,7 +998,7 @@ public class Cli {
       return;
     }
 
-   BuildConfig build = new BuildConfig();
+    BuildConfig build = new BuildConfig();
     build.buildConfig(filename);
   }
 
@@ -1044,6 +1065,34 @@ public class Cli {
 
   void useDatabase(String dbName) throws SQLException {
     closeConnection();
+
+    try {
+      File file = new File(System.getProperty("user.dir"), "config/cli.yaml");
+      String json = "";
+      Config config;
+      if (file.exists()) {
+        InputStream in = new FileInputStream(file);
+        json = IOUtils.toString(in, "utf-8");
+        config = new Config(json);
+      }
+      else {
+        config = new Config(new HashMap<>());
+      }
+      Map<String, Object> configMap = config.getMap();
+
+      configMap.put("currentDatabase", dbName);;
+
+      String newYaml = new Yaml().dumpAsMap(configMap);
+
+      Files.deleteIfExists(file.toPath());
+      try (BufferedWriter writer = new BufferedWriter(new OutputStreamWriter(new FileOutputStream(file)))) {
+        writer.write(newYaml);
+      }
+    }
+    catch (Exception e) {
+      logger.error("Error setting database", e);
+    }
+
     currDbName = dbName.trim().toLowerCase();
   }
 
@@ -1234,79 +1283,106 @@ public class Cli {
       }
     }
 
-      TableSchema tableSchema = conn.getTables(currDbName).get(fromTable);
+    TableSchema tableSchema = conn.getTables(currDbName).get(fromTable);
+    if (columns.size() == 1 && columns.get(0).name.equals("count")) {
+      columnTypes.add(BIGINT);
+    }
+    else {
       for (SelectColumn column : columns) {
         FieldSchema fieldSchema = tableSchema.getFields().get(tableSchema.getFieldOffset(column.name));
         columnTypes.add(fieldSchema.getType().getValue());
       }
-
-      String str = getTerminalSize();
-      String[] parts = str.split(",");
-      String width = parts[0].trim();
-      String height = parts[1].trim();
-
-      List<List<String>> data = new ArrayList<>();
-
-      for (int i = 0; i < Integer.valueOf(height) - 7; i++) {
-        List<String> line = new ArrayList<>();
-
-        if (!ret.next()) {
-          break;
-        }
-        for (SelectColumn column : columns) {
-          if (column.columnOffset != null) {
-            str = ret.getString(column.columnOffset);
-          }
-          else {
-            str = ret.getString(column.name);
-          }
-          int type = 0;
-          for (int j = 0; j < columns.size(); j++) {
-            if (column.name.equalsIgnoreCase(columns.get(j).name)) {
-              type = columnTypes.get(j);
-              break;
-            }
-          }
-          if (type == VARCHAR) {
-            str = "'" + str + "'";
-          }
-          line.add(str == null ? "<null>" : str);
-        }
-        data.add(line);
-      }
-
-      displayPageOfData(columns, width, data, !ret.isLast());
     }
 
-    void displayPageOfData (List < SelectColumn > columns, String width, List < List < String >> data,boolean isLast){
-      StringBuilder builder = new StringBuilder();
+    String str = getTerminalSize();
+    String[] parts = str.split(",");
+    String width = parts[0].trim();
+    String height = parts[1].trim();
 
-      int totalWidth = 0;
-      List<Integer> columnWidths = new ArrayList<>();
-      for (int i = 0; i < columns.size(); i++) {
-        int currWidth = 0;
-        for (int j = 0; j < data.size(); j++) {
-          currWidth = Math.min(33, Math.max(columns.get(i).name.length(), Math.max(currWidth, data.get(j).get(i).length())));
-        }
-        if (totalWidth + currWidth + 3 > Integer.valueOf(width)) {
-          columnWidths.add(-1);
-        }
-        else {
-          totalWidth += currWidth + 3;
-          columnWidths.add(currWidth);
-        }
+    List<List<String>> data = new ArrayList<>();
+
+    for (int i = 0; i < Integer.valueOf(height) - 7; i++) {
+      List<String> line = new ArrayList<>();
+
+      if (!ret.next()) {
+        break;
+      }
+      if (columns.size() == 1 && columns.get(0).name.equals("count")) {
+        line.add(String.valueOf(ret.getLong(1)));
+        data.add(line);
+        break;
       }
 
-      totalWidth += 1;
-      appendChar(builder, "-", totalWidth);
-      builder.append("\n");
+      for (SelectColumn column : columns) {
+        if (column.columnOffset != null) {
+          str = ret.getString(column.columnOffset);
+        }
+        else {
+          str = ret.getString(column.name);
+        }
+        int type = 0;
+        for (int j = 0; j < columns.size(); j++) {
+          if (column.name.equalsIgnoreCase(columns.get(j).name)) {
+            type = columnTypes.get(j);
+            break;
+          }
+        }
+        if (type == VARCHAR) {
+          str = "'" + str + "'";
+        }
+        line.add(str == null ? "<null>" : str);
+      }
+      data.add(line);
+    }
+
+    displayPageOfData(columns, width, data, !ret.isLast());
+  }
+
+  void displayPageOfData(List<SelectColumn> columns, String width, List<List<String>> data, boolean isLast) {
+    StringBuilder builder = new StringBuilder();
+
+    int totalWidth = 0;
+    List<Integer> columnWidths = new ArrayList<>();
+    for (int i = 0; i < columns.size(); i++) {
+      int currWidth = 0;
+      for (int j = 0; j < data.size(); j++) {
+        currWidth = Math.min(33, Math.max(columns.get(i).name.length(), Math.max(currWidth, data.get(j).get(i).length())));
+      }
+      if (totalWidth + currWidth + 3 > Integer.valueOf(width)) {
+        columnWidths.add(-1);
+      }
+      else {
+        totalWidth += currWidth + 3;
+        columnWidths.add(currWidth);
+      }
+    }
+
+    totalWidth += 1;
+    appendChar(builder, "-", totalWidth);
+    builder.append("\n");
+    for (int i = 0; i < columns.size(); i++) {
+      SelectColumn column = columns.get(i);
+      if (columnWidths.get(i) == -1) {
+        continue;
+      }
+      builder.append("| ");
+      String value = column.name;
+      if (value.length() > 30) {
+        value = value.substring(0, 30);
+        value += "...";
+      }
+      builder.append(value);
+      appendChar(builder, " ", columnWidths.get(i) - value.length() + 1);
+    }
+    builder.append("|\n");
+    if (columns.get(0).metric != null) {
       for (int i = 0; i < columns.size(); i++) {
         SelectColumn column = columns.get(i);
         if (columnWidths.get(i) == -1) {
           continue;
         }
         builder.append("| ");
-        String value = column.name;
+        String value = column.metric;
         if (value.length() > 30) {
           value = value.substring(0, 30);
           value += "...";
@@ -1315,57 +1391,41 @@ public class Cli {
         appendChar(builder, " ", columnWidths.get(i) - value.length() + 1);
       }
       builder.append("|\n");
-      if (columns.get(0).metric != null) {
-        for (int i = 0; i < columns.size(); i++) {
-          SelectColumn column = columns.get(i);
-          if (columnWidths.get(i) == -1) {
-            continue;
-          }
-          builder.append("| ");
-          String value = column.metric;
-          if (value.length() > 30) {
-            value = value.substring(0, 30);
-            value += "...";
-          }
-          builder.append(value);
-          appendChar(builder, " ", columnWidths.get(i) - value.length() + 1);
-        }
-        builder.append("|\n");
-      }
-      appendChar(builder, "-", totalWidth);
-      builder.append("\n");
-
-      for (int i = 0; i < data.size(); i++) {
-        List<String> line = data.get(i);
-        for (int j = 0; j < line.size(); j++) {
-          if (columnWidths.get(j) == -1) {
-            continue;
-          }
-          String value = line.get(j);
-          if (line.get(j).length() > 30) {
-            value = line.get(j).substring(0, 30);
-            value += "...";
-          }
-          builder.append("| ");
-          builder.append(value);
-          appendChar(builder, " ", columnWidths.get(j) - value.length() + 1);
-        }
-        builder.append("|\n");
-      }
-      appendChar(builder, "-", totalWidth);
-      if (!isLast) {
-        builder.append("\nnext");
-      }
-      println(builder.toString());
     }
+    appendChar(builder, "-", totalWidth);
+    builder.append("\n");
 
-    private void appendChar (StringBuilder builder, String c,int count){
-      for (int i = 0; i < count; i++) {
-        builder.append(c);
+    for (int i = 0; i < data.size(); i++) {
+      List<String> line = data.get(i);
+      for (int j = 0; j < line.size(); j++) {
+        if (columnWidths.get(j) == -1) {
+          continue;
+        }
+        String value = line.get(j);
+        if (line.get(j).length() > 30) {
+          value = line.get(j).substring(0, 30);
+          value += "...";
+        }
+        builder.append("| ");
+        builder.append(value);
+        appendChar(builder, " ", columnWidths.get(j) - value.length() + 1);
       }
+      builder.append("|\n");
     }
+    appendChar(builder, "-", totalWidth);
+    if (!isLast) {
+      builder.append("\nnext");
+    }
+    println(builder.toString());
+  }
 
-  void getCredentials (String cluster) throws IOException, InterruptedException {
+  private void appendChar(StringBuilder builder, String c, int count) {
+    for (int i = 0; i < count; i++) {
+      builder.append(c);
+    }
+  }
+
+  void getCredentials(String cluster) throws IOException, InterruptedException {
     File dir = new File(System.getProperty(USER_DIR_STR), "credentials");
     File[] files = dir.listFiles();
     username = null;
@@ -1407,51 +1467,51 @@ public class Cli {
     }
   }
 
-  String getMaxHeap (Config config) throws IOException, InterruptedException {
-      String maxStr = config.getString("maxJavaHeap");
-      String maxHeap = maxStr;
-      if (maxStr != null && maxStr.contains("%")) {
-        String command = "bin/get-mem-total";
-        if (isCygwin() || isWindows()) {
-          command = "bin/get-mem-total.bat";
-        }
-        ProcessBuilder builder = new ProcessBuilder().command(command);
-        Process p = builder.start();
-        BufferedReader reader = new BufferedReader(new InputStreamReader(p.getInputStream()));
-        String line = reader.readLine();
-        double totalGig = 0;
-        if (isCygwin() || isWindows()) {
-          totalGig = Long.valueOf(line.trim()) / 1024d / 1024d / 1024d;
+  String getMaxHeap(Config config) throws IOException, InterruptedException {
+    String maxStr = config.getString("maxJavaHeap");
+    String maxHeap = maxStr;
+    if (maxStr != null && maxStr.contains("%")) {
+      String command = "bin/get-mem-total";
+      if (isCygwin() || isWindows()) {
+        command = "bin/get-mem-total.bat";
+      }
+      ProcessBuilder builder = new ProcessBuilder().command(command);
+      Process p = builder.start();
+      BufferedReader reader = new BufferedReader(new InputStreamReader(p.getInputStream()));
+      String line = reader.readLine();
+      double totalGig = 0;
+      if (isCygwin() || isWindows()) {
+        totalGig = Long.valueOf(line.trim()) / 1024d / 1024d / 1024d;
+      }
+      else {
+        if (line.toLowerCase().startsWith("memtotal")) {
+          line = line.substring("MemTotal:".length()).trim();
+          totalGig = getMemValue(line);
         }
         else {
-          if (line.toLowerCase().startsWith("memtotal")) {
-            line = line.substring("MemTotal:".length()).trim();
-            totalGig = getMemValue(line);
-          }
-          else {
-            String[] parts = line.split(" ");
-            String memStr = parts[1];
-            totalGig = getMemValue(memStr);
-          }
+          String[] parts = line.split(" ");
+          String memStr = parts[1];
+          totalGig = getMemValue(memStr);
         }
-        p.waitFor();
-        maxStr = maxStr.substring(0, maxStr.indexOf('%'));
-        double maxPercent = Double.parseDouble(maxStr);
-        double maxGig = totalGig * (maxPercent / 100);
-        maxHeap = (int) Math.floor(maxGig * 1024d) + "m";
       }
-      return maxHeap;
+      p.waitFor();
+      maxStr = maxStr.substring(0, maxStr.indexOf('%'));
+      double maxPercent = Double.parseDouble(maxStr);
+      double maxGig = totalGig * (maxPercent / 100);
+      maxHeap = (int) Math.floor(maxGig * 1024d) + "m";
     }
-
-    public static String resolvePath(String installDir){
-      if (installDir.startsWith("$HOME")) {
-        installDir = installDir.replace("$HOME", System.getProperty("user.home"));
-      }
-      else if (installDir.startsWith("$WORKING_DIR")) {
-        installDir = installDir.replace("$WORKING_DIR", System.getProperty(USER_DIR_STR));
-      }
-      return installDir;
-    }
-
-
+    return maxHeap;
   }
+
+  public static String resolvePath(String installDir) {
+    if (installDir.startsWith("$HOME")) {
+      installDir = installDir.replace("$HOME", System.getProperty("user.home"));
+    }
+    else if (installDir.startsWith("$WORKING_DIR")) {
+      installDir = installDir.replace("$WORKING_DIR", System.getProperty(USER_DIR_STR));
+    }
+    return installDir;
+  }
+
+
+}

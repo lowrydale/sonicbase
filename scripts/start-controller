@@ -1,0 +1,27 @@
+#!/bin/bash
+
+export SONIC_BASE_HOME="$(dirname $( cd "$( dirname "${BASH_SOURCE[0]}" )" && pwd ))"
+
+#export SONIC_BASE_HOME=$(dirname $(pwd)/$(dirname "$0"))
+#xport dir1=$(dirname "$0")
+#if [ "$dir1" == "." ]
+#then
+#  export SONIC_BASE_HOME=$(dirname $(pwd))
+#fi
+
+export _XMX_=512m
+
+#if [ ${4:0:1} != "/" ]
+#then
+#  export SONIC_BASE_HOME=$HOME/$SONIC_BASE_HOME
+#fi
+
+mkdir -p $SONIC_BASE_HOME/logs
+
+cd $SONIC_BASE_HOME
+
+export _LOG4J_FILENAME_=$SONIC_BASE_HOME/logs/controller.log
+export _GC_LOG_FILENAME_=$SONIC_BASE_HOME/logs/gc-controller.log
+export LOG4J_FILE="log4j.xml"
+
+nohup $SONIC_BASE_HOME/bin/runclass com.sonicbase.controller.HttpServer $SONIC_BASE_HOME > $SONIC_BASE_HOME/logs/controller-sysout.log 2>&1 &

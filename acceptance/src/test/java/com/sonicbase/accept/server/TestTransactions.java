@@ -43,7 +43,7 @@ public class TestTransactions {
       server.shutdown();
     }
 
-    System.out.println("client refCount=" + DatabaseClient.clientRefCount.get() + ", sharedClients=" + DatabaseClient.sharedClients.size());
+    System.out.println("client refCount=" + DatabaseClient.clientRefCount.get());
     for (DatabaseClient client : DatabaseClient.allClients) {
       System.out.println("Stack:\n" + client.getAllocatedStack());
     }
@@ -69,7 +69,8 @@ public class TestTransactions {
     List<Future> futures = new ArrayList<>();
     for (int i = 0; i < dbServers.length; i++) {
       dbServers[i] = new com.sonicbase.server.DatabaseServer();
-      dbServers[i].setConfig(config, "test", "localhost", 9010 + (50 * i), true, new AtomicBoolean(true), new AtomicBoolean(true),null, false);
+      Config.copyConfig("test");
+      dbServers[i].setConfig(config, "localhost", 9010 + (50 * i), true, new AtomicBoolean(true), new AtomicBoolean(true),null, false);
       dbServers[i].setRole(role);
     }
     for (Future future : futures) {

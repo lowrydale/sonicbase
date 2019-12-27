@@ -43,23 +43,26 @@ rsync -vlLt --exclude original*sonicbase-*.jar --exclude sonicbase-*tests.jar db
 rsync -vlLt --exclude original*sonicbase-*.jar --exclude sonicbase-*tests.jar jdbc/target/sonicbase-*.jar $HOME/sonicbase/lib
 rsync -vlLt --exclude original*sonicbase-*.jar --exclude sonicbase-*tests.jar cli/target/sonicbase-*.jar $HOME/sonicbase/lib
 rsync -vlLt --exclude original*sonicbase-*.jar --exclude sonicbase-*tests.jar controller/target/sonicbase-*.jar $HOME/sonicbase/lib
+rsync -vlLt --exclude original*sonicbase-*.jar --exclude sonicbase-*tests.jar acceptance/target/sonicbase-*.jar $HOME/sonicbase/lib
 #rsync -vlLt repo/* $HOMdE/sonicbase/lib
 #mvn dependency:copy-dependencies -DoutputDirectory=$HOME/sonicbase/lib
 #rsync -rvlLt repo/linux64/* $HOME/sonicbase/lib/linux64
 
 rsync -rvlLt dependencies/kafka-clients-0.11.0.1.jar $HOME/sonicbase/lib
-rsync -rvlLt db/target/classes/config/config-1-local.yaml $HOME/sonicbase/config
-rsync -rvlLt db/target/classes/config/es-mapping.yaml $HOME/sonicbase/config
-rsync -rvlLt db/target/classes/config/default-cluster $HOME/sonicbase/config
+rsync -rvlLt db/src/main/resources/config/config-1-local.yaml $HOME/sonicbase/config
+rsync -rvlLt db/src/main/resources/es-mapping.yaml $HOME/sonicbase/config
+#rsync -rvlLt db/src/main/resources/default-cluster $HOME/sonicbase/config
 rsync -rvlLt cli/src/main/resources/init-tables.command $HOME/sonicbase/scripts
-rsync -rvlLt $HOME/Dropbox/sonicbase-config/* $HOME/sonicbase/config
+rsync -rvlLt $HOME/Dropbox/sonicbase-config/config-4-dale.yaml $HOME/sonicbase/config/config.yaml
 rsync -rvlLt db/src/main/resources/log4j.xml $HOME/sonicbase/config
 rsync -rvlLt db/src/main/resources/cli-log4j.xml $HOME/sonicbase/config
 #rsync -rvlLt win $HOME/sonicbase/lib
-mkdir $HOME/sonicbase/lib/linux
-rsync -rvlLt native/PartitionedAvlTree/linux/*.so $HOME/sonicbase/lib/linux
-mkdir $HOME/sonicbase/lib/mac
-rsync -rvlLt native/PartitionedAvlTree/mac/*.so $HOME/sonicbase/lib/mac
+#mkdir $HOME/sonicbase/lib/linux
+#rsync -rvlLt native/PartitionedAvlTree/linux/*.so $HOME/sonicbase/lib/linux
+#mkdir $HOME/sonicbase/lib/mac
+#rsync -rvlLt native/PartitionedAvlTree/mac/*.so $HOME/sonicbase/lib/mac
+#mkdir $HOME/sonicbase/lib/win
+#rsync -rvlLt native/PartitionedAvlTree/win/*.dll $HOME/sonicbase/lib/win
 cd scripts
 rsync -rvlLt get-distribution $HOME/sonicbase/bin
 rsync -rvlLt get-df $HOME/sonicbase/bin
@@ -71,6 +74,7 @@ rsync -rvlLt get-dir $HOME/sonicbase/bin
 rsync -rvlLt runclass $HOME/sonicbase/bin
 rsync -rvlLt runclass.bat $HOME/sonicbase/bin
 rsync -rvlLt purge-data.bat $HOME/sonicbase/bin
+rsync -rvlLt purge-data $HOME/sonicbase/bin
 rsync -rvlLt get-credentials.ps1 $HOME/sonicbase/bin
 rsync -rvlLt remote-start-bench-server.ps1 $HOME/sonicbase/bin
 rsync -rvlLt remote-start-license-server.ps1 $HOME/sonicbase/bin
@@ -102,6 +106,10 @@ rsync -rvlLt start-license-server-task.bat $HOME/sonicbase/bin
 rsync -rvlLt start-bench-server.vbs $HOME/sonicbase/bin
 rsync -rvlLt start-license-server.vbs $HOME/sonicbase/bin
 rsync -rvlLt start-controller.bat $HOME/sonicbase/bin
+rsync -rvlLt start-controller.bat $HOME/sonicbase/bin
+rsync -rvlLt do-start-controller.bat $HOME/sonicbase/bin
+rsync -rvlLt do-start-controller.vbs $HOME/sonicbase/bin
+rsync -rvlLt do-start-controller $HOME/sonicbase/bin
 rsync -rvlLt remote-start-db-server $HOME/sonicbase/bin
 rsync -rvlLt remote-start-rest-server $HOME/sonicbase/bin
 rsync -rvlLt dump-threads $HOME/sonicbase/bin
@@ -137,8 +145,11 @@ chmod +x $sHOME/sonicbase/bin/is-server-running
 chmod +x $HOME/sonicbase/bin/start-local-rest
 chmod +x $HOME/sonicbase/bin/start
 chmod +x $HOME/sonicbase/bin/start-id-servers
+chmod +x $HOME/sonicbase/bin/purge-data
 chmod +x $HOME/sonicbase/bin/start-db-server
 chmod +x $HOME/sonicbase/bin/start-bench-server
+chmod +x $HOME/sonicbase/bin/start-controller
+chmod +x $HOME/sonicbase/bin/do-start-controller
 chmod +x $HOME/sonicbase/bin/start-license-server
 chmod +x $HOME/sonicbase/bin/remote-start-db-server
 chmod +x $HOME/sonicbase/bin/remote-start-rest-server

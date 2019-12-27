@@ -8,7 +8,7 @@ import java.util.Map;
 
 public interface StreamsProducer {
 
-  void init(String cluster, Config config, Map<String, Object> streamCOnfig);
+  void init(Config config, String installDir, Map<String, Object> streamCOnfig);
 
   void publish(List<String> messages);
 

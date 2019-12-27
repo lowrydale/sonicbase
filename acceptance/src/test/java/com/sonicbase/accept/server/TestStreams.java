@@ -6,6 +6,7 @@ import com.fasterxml.jackson.databind.node.ObjectNode;
 import com.sonicbase.client.DatabaseClient;
 import com.sonicbase.common.ComArray;
 import com.sonicbase.common.ComObject;
+import com.sonicbase.common.Config;
 import com.sonicbase.common.Record;
 import com.sonicbase.index.Index;
 import com.sonicbase.jdbcdriver.ConnectionProxy;
@@ -57,7 +58,7 @@ public class TestStreams {
     serverB1.shutdown();
     serverB2.shutdown();
 
-    System.out.println("client refCount=" + DatabaseClient.clientRefCount.get() + ", sharedClients=" + DatabaseClient.sharedClients.size());
+    System.out.println("client refCount=" + DatabaseClient.clientRefCount.get());
     for (DatabaseClient client : DatabaseClient.allClients) {
       System.out.println("Stack:\n" + client.getAllocatedStack());
     }
@@ -78,16 +79,15 @@ public class TestStreams {
       String role = "primaryMaster";
 
 
+      Config.copyConfig("2-servers-a-producer");
+
       final CountDownLatch latch = new CountDownLatch(4);
       serverA1 = new NettyServer(128);
-      Thread thread = new Thread(new Runnable(){
-        @Override
-        public void run() {
-          serverA1.startServer(new String[]{"-port", String.valueOf(9010), "-host", "localhost",
-              "-mport", String.valueOf(9010), "-mhost", "localhost", "-cluster", "2-servers-a-producer", "-shard",
-              String.valueOf(0)});
-          latch.countDown();
-        }
+      Thread thread = new Thread(() -> {
+        serverA1.startServer(new String[]{"-port", String.valueOf(9010), "-host", "localhost",
+            "-mport", String.valueOf(9010), "-mhost", "localhost", "-shard",
+            String.valueOf(0)});
+        latch.countDown();
       });
       thread.start();
       while (true) {
@@ -98,13 +98,10 @@ public class TestStreams {
       }
 
       serverA2 = new NettyServer(128);
-      thread = new Thread(new Runnable(){
-        @Override
-        public void run() {
-          serverA2.startServer(new String[]{"-port", String.valueOf(9060), "-host", "localhost",
-              "-mport", String.valueOf(9060), "-mhost", "localhost", "-cluster", "2-servers-a-producer", "-shard", String.valueOf(1)});
-          latch.countDown();
-        }
+      thread = new Thread(() -> {
+        serverA2.startServer(new String[]{"-port", String.valueOf(9060), "-host", "localhost",
+            "-mport", String.valueOf(9060), "-mhost", "localhost", "-shard", String.valueOf(1)});
+        latch.countDown();
       });
       thread.start();
 
@@ -115,14 +112,13 @@ public class TestStreams {
         Thread.sleep(100);
       }
 
+      Config.copyConfig("2-servers-b-consumer");
+
       serverB1 = new NettyServer(128);
-      thread = new Thread(new Runnable(){
-        @Override
-        public void run() {
-          serverB1.startServer(new String[]{"-port", String.valueOf(9110), "-host", "localhost",
-              "-mport", String.valueOf(9110), "-mhost", "localhost", "-cluster", "2-servers-b-consumer", "-shard", String.valueOf(0)});
-          latch.countDown();
-        }
+      thread = new Thread(() -> {
+        serverB1.startServer(new String[]{"-port", String.valueOf(9110), "-host", "localhost",
+            "-mport", String.valueOf(9110), "-mhost", "localhost", "-shard", String.valueOf(0)});
+        latch.countDown();
       });
       thread.start();
       while (true) {
@@ -133,13 +129,10 @@ public class TestStreams {
       }
 
       serverB2 = new NettyServer(128);
-      thread = new Thread(new Runnable(){
-        @Override
-        public void run() {
-          serverB2.startServer(new String[]{"-port", String.valueOf(9160), "-host", "localhost",
-              "-mport", String.valueOf(9160), "-mhost", "localhost", "-cluster", "2-servers-b-consumer", "-shard", String.valueOf(1)});
-          latch.countDown();
-        }
+      thread = new Thread(() -> {
+        serverB2.startServer(new String[]{"-port", String.valueOf(9160), "-host", "localhost",
+            "-mport", String.valueOf(9160), "-mhost", "localhost", "-shard", String.valueOf(1)});
+        latch.countDown();
       });
       thread.start();
       while (true) {

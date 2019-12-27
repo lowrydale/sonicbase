@@ -1,0 +1,144 @@
+<!doctype html>
+<html>
+<head>
+  <link rel="canonical" href="http://sonicbase.com/docs/tutorial-local-deploy.html"/>
+
+  <meta charset="UTF-8">
+
+  <title>SonicBase - In-Memory Database. Tutorial - Local Deploy</title>
+  <meta http-equiv="X-UA-Compatible" content="IE=edge">
+  <meta name="viewport" content="width=device-width, initial-scale=1">
+  <meta name="description" content="Tutorial on how to get started with SonicBase with a local deploy. The tutorial primarily shows you how to use SonicBase via the administration client.">
+  <link href="../css/singlePageTemplate.css" rel="stylesheet" type="text/css">
+  <script type="text/javascript" src="../javascript/main.js"></script>
+
+  <link rel="stylesheet" href="../css/tomorrow-night-bright.css">
+  <script src="../javascript/highlight.min.js"></script>
+  <script>hljs.initHighlightingOnLoad();</script>
+
+  <!-- Global site tag (gtag.js) - Google Analytics -->
+  <script async src="https://www.googletagmanager.com/gtag/js?id=UA-109032274-1"></script>
+  <script>
+      window.dataLayer = window.dataLayer || [];
+      function gtag(){dataLayer.push(arguments);}
+      gtag('js', new Date());
+
+      gtag('config', 'UA-109032274-1');
+      ga('require', 'displayfeatures');
+  </script>
+</head>
+
+
+<body>
+<div class="container">
+  <header id="myHeader">
+    <div class="mobile">
+      <a href="../index.html">
+        <h4 class="logo">SonicBase™</h4>
+      </a>
+    </div>
+
+    <div class="desktop">
+      <a href="../index.html">
+        <img style="margin-top:3px" src="../images/logo-white.gif" width="50px"/><h4 class="logo">SonicBase™</h4>
+      </a>
+      <nav>
+        <ul>
+          <li><a href="../index.html">HOME</a></li>
+          <li> <a href="../documentation.html">DOCUMENTATION</a></li>
+          <li><a href="../contact.html">CONTACT</a></li>
+        </ul>
+      </nav>
+    </div>
+  </header>
+
+  <script>
+      if (isFramed()) {
+          document.getElementById("myHeader").style.display = "none";
+      }
+  </script>
+
+  <div class="main-page-text">
+    <div class="intro">SonicBase. In-memory embedded or distributed streaming sql database</div>
+
+    <h1>Tutorial - Standalone Deploy</h1>
+    <br/>
+    In this tutorial we will walk you through the process of starting a standalone server and inserting into and reading from it.<br/>
+    <br/>
+    <h2>Install Java</h2>
+    <div class="mylink">
+      Install <a href="https://www.oracle.com/technetwork/java/javase/downloads/index.html" target="_blank">jdk8 or jre8 or newer.</a>
+    </div>
+    <h2>Download The Software</h2>
+    <div class="mylink">
+      Go to the <a href="javascript:parent.window.location.href='../downloads.html'">downloads</a> section of the SonicBase website and download the latest version.
+    </div>
+    <h2>Unpack Package</h2>
+    <div style="margin-left: 2em;">
+
+      <lu>
+        <li>
+          Linux/Mac: Type "tar -xzf sonicbase-&lt;version&gt;.tgz" in the parent directory where you want the software to go. A directory
+          named "sonicbase" will be created.<br/>
+        </li>
+        <li>
+          Windows: Unzip the file sonicbase-&lt;version&gt;.zip in the parent directory where you want the software to go. A directory
+          named "sonicbase" will be created.
+        </li>
+      </lu>
+    </div>
+    <h2>Start Admin Client</h2>
+    Change to the sonicbase/bin directory and type "./cli" for MacOS and Linux and "./cli.bat" for cygwin and "cli.bat" for Windows.
+    This will start the SonicBase admin client.
+    <h2>Run Init Script</h2>
+    In the client, type:<br/>
+    &nbsp;&nbsp;run script init-tables.command<br/>
+    <br/>
+    This will start the cluster, create the database and create some tables. This script contains the following commands:<br/>
+    <pre class="java"><code>
+start cluster
+create database db
+create table Employers (id VARCHAR(64), name VARCHAR(256))
+create index employerId on Employers(id)
+create table Persons (id1 BIGINT, id2 BIGINT, name VARCHAR(256), socialSecurityNumber VARCHAR(20), relatives VARCHAR(64000), restricted BOOLEAN, gender VARCHAR(8), PRIMARY KEY (id1))
+create table Memberships (personId BIGINT, personId2 BIGINT, membershipName VARCHAR(20), resortId BIGINT, PRIMARY KEY (personId, personId2))
+create table Resorts (resortId BIGINT, resortName VARCHAR(20), PRIMARY KEY (resortId))
+    </code></pre>
+    <h2>Insert Record</h2>
+    In the client, type:<br/>
+    &nbsp;&nbsp;insert into persons (id1, name, socialsecuritynumber) VALUES (100, 'bob', '555-66-7777')<br/>
+    <h2>Read Record</h2>
+    In the client, type:<br/>
+    &nbsp;&nbsp;select * from persons<br/>
+    <br/>
+    You should see the inserted record displayed in the client.
+    <h2>Access From JDBC Driver</h2>
+    <div class="mylink">
+      Include the SonicBase jdbc driver in your application. The jar is located in the "lib" directory of the install directory.
+      It is named "sonicbase-jdbc-&lt;version&gt;.jar". Or you can include it from the Maven Centraol Repository.
+      For more details, see <a href="jdbc-driver.html?framed=true">JDBC Driver</a>.<br/>
+    </div>
+    <br/>
+    Create and run the following class:<br/>
+    <br/>
+    <pre class="java"><code>
+package foo;
+
+public class Tutorial {
+  public static void main(String[] args) throws ClassNotFoundException, SQLException {
+    Class.forName("com.sonicbase.jdbcdriver.Driver");
+    try (Connection conn = DriverManager.getConnection("jdbc:sonicbase:127.0.0.1:9010/db");
+         PreparedStatement stmt = conn.prepareStatement("select * from persons");
+         ResultSet rs = stmt.executeQuery()) {
+      rs.next();
+      System.out.println(rs.getString("name") + " " + rs.getString("socialsecuritynumber"));
+    }
+  }
+}</code></pre>
+    <h2>Stop Cluster</h2>
+    In the client, type:<br/>
+    &nbsp;&nbsp;stop cluster
+  </div>
+</div>
+</body>
+</html>

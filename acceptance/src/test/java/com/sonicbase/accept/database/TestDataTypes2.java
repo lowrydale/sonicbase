@@ -61,7 +61,8 @@ public class TestDataTypes2 {
     List<Future> futures = new ArrayList<>();
     for (int i = 0; i < dbServers.length; i++) {
       dbServers[i] = new DatabaseServer();
-      dbServers[i].setConfig(config, "4-servers", "localhost", 9010 + (50 * i), true, new AtomicBoolean(true), new AtomicBoolean(true),null, false);
+      Config.copyConfig("4-servers");
+      dbServers[i].setConfig(config, "localhost", 9010 + (50 * i), true, new AtomicBoolean(true), new AtomicBoolean(true),null, false);
       dbServers[i].setRole(role);
     }
     for (Future future : futures) {
@@ -120,7 +121,7 @@ public class TestDataTypes2 {
 
   }
 
-  @Test
+  @Test(enabled=false)
   public void test() throws SQLException {
     PreparedStatement stmt = conn.prepareStatement("select * from query_stats");
     ResultSet rs = stmt.executeQuery();
@@ -138,7 +139,7 @@ public class TestDataTypes2 {
     assertFalse(rs.next());
   }
 
-  @Test
+  @Test(enabled=false)
   public void testComObject() {
     ComObject cobj = new ComObject(3);
     long duration = 40404022;

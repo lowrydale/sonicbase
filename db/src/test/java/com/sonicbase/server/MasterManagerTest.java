@@ -34,7 +34,8 @@ public class MasterManagerTest {
         return mockLogger;
       }
     };
-    server.setConfig(config, "test", "localhost", 9010, true, new AtomicBoolean(), new AtomicBoolean(), "gc.log", false);
+    Config.copyConfig("test");
+    server.setConfig(config, "localhost", 9010, true, new AtomicBoolean(), new AtomicBoolean(), "gc.log", false);
     DatabaseClient client = mock(DatabaseClient.class);
     server.setDatabaseClient(client);
     server.setReplicationFactor(2);

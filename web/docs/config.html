@@ -1,0 +1,151 @@
+<!doctype html>
+<html>
+<head>
+  <link rel="canonical" href="http://sonicbase.com/docs/config.html"/>
+
+  <meta charset="UTF-8">
+ <meta name="description" content="Configuration files describe what the SonicBase cluster looks like. Configuration files are used when deploying and starting clusters.">
+
+ <title>SonicBase - In-Memory Database. Configuration Files</title>
+ <meta http-equiv="X-UA-Compatible" content="IE=edge">
+ <meta name="viewport" content="width=device-width, initial-scale=1">
+\ <link href="../css/singlePageTemplate.css" rel="stylesheet" type="text/css">
+ <script type="text/javascript" src="../javascript/main.js"></script>
+
+
+    <link rel="stylesheet" href="../css/tomorrow-night-bright.css">
+    <script src="../javascript/highlight.min.js"></script>
+    <script>hljs.initHighlightingOnLoad();</script>
+    <!-- Global site tag (gtag.js) - Google Analytics -->
+    <script async src="https://www.googletagmanager.com/gtag/js?id=UA-109032274-1"></script>
+    <script>
+        window.dataLayer = window.dataLayer || [];
+        function gtag(){dataLayer.push(arguments);}
+        gtag('js', new Date());
+
+        gtag('config', 'UA-109032274-1');
+        ga('require', 'displayfeatures');
+    </script>
+
+</head>
+<body>
+<div class="container">
+ <header id="myHeader">
+     <div class="mobile">
+         <a href="../index.html">
+             <h4 class="logo">SonicBase™</h4>
+         </a>
+     </div>
+
+     <div class="desktop">
+         <a href="../index.html">
+             <img style="margin-top:3px" src="../images/logo-white.gif" width="50px"/><h4 class="logo">SonicBase™</h4>
+         </a>
+  <nav>
+   <ul>
+    <li><a href="../index.html">HOME</a></li>
+    <li> <a href="../documentation.html">DOCUMENTATION</a></li>
+    <li><a href="../contact.html">CONTACT</a></li>
+   </ul>
+  </nav>
+     </div>
+ </header>
+
+ <script>
+     if (isFramed()) {
+         document.getElementById("myHeader").style.display = "none";
+     }
+ </script>
+
+    <div class="main-page-text">
+      <div class="intro">SonicBase. In-memory embedded or distributed streaming sql database</div>
+
+
+     <h1>Configuration</h1>
+<h2>Location</h2>
+Config files are located in the "&lt;installDir&gt;/config" directory.
+<br/>
+
+<h2>Naming</h2>
+The config file must be named "config-&lt;cluster name&gt;.yaml".
+<br/>
+
+<h2>Example</h2>
+     <pre class="YAML"><code>
+replicationFactor: 1
+dataDirectory: $HOME/db-data
+maxJavaHeap: 8g
+defaultPort: 9010
+defaultHttpPort: 8080
+defaultControllerPort: 8081
+servers:
+- server:
+    address: localhost
+clients:
+- client:
+    address: 10.0.0.240
+</code></pre>
+<h2>Elements</h2>
+  <b>dataDirectory</b> - path to the location of the database files. Note on Windows you will need to escape the
+  backslashes so the value can be stored in the json file.<br/>
+  <br/>
+  On Windows the directory may look like "c:\\\\sonicbase". On linux it may look like "/mnt/sonicbase". On linux and mac
+  you also have the option of prefixing your path with "$HOME" to specify the home directory. This option is not available on Windows.<br/>
+<br/>
+  <b>maxJavaHeap</b> - maximum java heap size. Can be absolute (e.g., 50g, 1024m). It can also be a percentage
+of the machine total memory (e.g., 60%).<br/>
+<br/>
+      <b>replicationFactor</b> -  the number of replicas you want.<br/>
+      <br/>
+      <b>defaultPort</b> -  the port that should be used for all servers. If no port is specified then the value 9010 will be used<br/>
+      <br/>
+      <b>defaultHttpPort</b> -  the port that should be used for the http transport for all servers. If no
+      port is specified then the value 8080 will be used.
+      <b>defaultControllerPort</b> - the port that should be used for communicatting with the controller. If no
+      port is specified then the value of 8081 will be used.
+      <h2>Servers</h2>
+      List of servers that you want to use in your cluster. Each server can be configured with the following properties.<br/><br/>
+
+      If you have more than one replica, you must have at least three servers. This doesn't mean you have to have three
+      replicas. You must either have at least three replicas or have at least two shards with two replicas. If you truly
+      only want one shard with two replicas, you will need to run two servers on each box.</br>
+      <br/>
+      <b>address</b> - address of the server. If you specify this address you don't need to specify
+      privateAddress or publicAddress<br/>
+      <br/>
+      <b>address</b> - address you can use to connect to the server<br/>
+      <br/>
+
+      <b>port</b> - port for the server to listen on. If you specify defaultPort, you don't need to
+      set this port<br/>
+      <br/>
+
+      <b>httpPort</b> - http port for the server to listen on. If you specify defaultHttpPort, you don't need to
+      set this port<br/>
+      <br/>
+<br/>
+      <h2>clients</h2>
+    List of clients. These are servers where the benchmark client will run. This is only needed if you
+      are doing benchmarking.<br/>
+
+      <h2>Example - Detailed Config</h2>
+      <pre class="YAML"><code>
+replicationFactor: 1
+dataDirectory: $WORKING_DIR/db-data
+maxJavaHeap: 20%
+servers:
+- server:
+    address: localhost
+    port: 9010
+    httpPort: 8080
+clients:
+- client:
+    address: 10.0.0.240
+    port: 8080
+    publicAddress: 10.0.0.240
+</code></pre>
+
+</div>
+</div>
+</body>
+</html>

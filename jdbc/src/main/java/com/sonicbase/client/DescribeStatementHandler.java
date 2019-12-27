@@ -266,7 +266,7 @@ public class DescribeStatementHandler {
         for (int i = 0; i < replicas.length; i++) {
           ServersConfig.Host replica = replicas[i];
           Map<String, String> line = new HashMap<>();
-          line.put("host", replica.getPrivateAddress() + ":" + replica.getPort());
+          line.put("host", replica.getaddress() + ":" + replica.getPort());
           line.put("shard", String.valueOf(j));
           line.put("replica", String.valueOf(i));
           line.put("dead", String.valueOf(replica.isDead()));
@@ -296,7 +296,7 @@ public class DescribeStatementHandler {
         for (int i = 0; i < replicas.length; i++) {
           ServersConfig.Host replica = replicas[i];
           Map<String, String> line = new HashMap<>();
-          line.put("host", replica.getPrivateAddress() + ":" + replica.getPort());
+          line.put("host", replica.getaddress() + ":" + replica.getPort());
           line.put("shard", String.valueOf(j));
           line.put("replica", String.valueOf(i));
 

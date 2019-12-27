@@ -1899,7 +1899,7 @@ public class ResultSetImpl implements ResultSet {
   public void getMoreResults(final int schemaRetryCount) {
     ClientStatsHandler.HistogramEntry histogramEntry = null;
     if (sqlToUse != null) {
-      histogramEntry = databaseClient.getClientStatsHandler().registerQueryForStats(databaseClient.getCluster(), dbName, "(next page) " + sqlToUse);
+      histogramEntry = databaseClient.getClientStatsHandler().registerQueryForStats(dbName, "(next page) " + sqlToUse);
     }
     long beginNanos = System.nanoTime();
     try {

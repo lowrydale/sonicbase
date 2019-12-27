@@ -1,11 +1,15 @@
 /* © 2019 by Intellectual Reserve, Inc. All rights reserved. */
 package com.sonicbase.controller;
 
+import com.sonicbase.common.Config;
 import com.sonicbase.common.ThreadUtil;
 import com.sonicbase.query.DatabaseException;
+import org.apache.commons.io.IOUtils;
 import org.eclipse.jetty.server.Server;
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
+
+import java.io.InputStream;
 
 public class HttpServer {
   private static Logger logger = LoggerFactory.getLogger(HttpServer.class);
@@ -24,7 +28,27 @@ public class HttpServer {
 
   public static void main(String[] args) {
     HttpServer server = new HttpServer();
-    server.startControllerServer(8081);
+    String installDir = args[0];
+
+    Config config = getConfig();
+    Integer port = config.getInt("defaultControllerPort");
+    if (port == null) {
+      port = 8081;
+    }
+
+    server.startControllerServer(port, installDir);
+  }
+
+  public static Config getConfig() {
+    try {
+      InputStream in = Config.getConfigStream();
+
+      String json = IOUtils.toString(in, "utf-8");
+      return new Config(json);
+    }
+    catch (Exception e) {
+      throw new DatabaseException(e);
+    }
   }
 
   public void shutdown() {
@@ -44,10 +68,11 @@ public class HttpServer {
     }
   }
 
-  public void startControllerServer(final int port) {
+  public void startControllerServer(final int port, String installDir) {
     mainThread = ThreadUtil.createThread(() -> {
       try {
         Server server = new Server(port);
+        handler.setInstallDir(installDir);
         server.setHandler(handler);
 
         server.start();

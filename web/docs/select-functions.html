@@ -1,0 +1,132 @@
+<!doctype html>
+<html>
+<head>
+  <link rel="canonical" href="http://sonicbase.com/docs/select-functions.html"/>
+
+  <meta charset="UTF-8">
+<title>SonicBase - In-Memory Database. Select SQL Syntax Functions</title>
+    <meta http-equiv="X-UA-Compatible" content="IE=edge">
+    <meta name="viewport" content="width=device-width, initial-scale=1">
+    <meta name="description" content="Shown is the SQL syntax for a variety of functions that are available to use in the select clause for SonicBase.">
+    <link href="../css/singlePageTemplate.css" rel="stylesheet" type="text/css">
+    <script type="text/javascript" src="../javascript/main.js"></script>
+    <!-- Global site tag (gtag.js) - Google Analytics -->
+    <script async src="https://www.googletagmanager.com/gtag/js?id=UA-109032274-1"></script>
+    <script>
+        window.dataLayer = window.dataLayer || [];
+        function gtag(){dataLayer.push(arguments);}
+        gtag('js', new Date());
+
+        gtag('config', 'UA-109032274-1');
+        ga('require', 'displayfeatures');
+    </script>
+</head>
+
+<body>
+<div class="container">
+    <header id="myHeader">
+        <div class="mobile">
+            <a href="../index.html">
+                <h4 class="logo">SonicBase™</h4>
+            </a>
+        </div>
+
+        <div class="desktop">
+            <a href="../index.html">
+                <img style="margin-top:3px" src="../images/logo-white.gif" width="50px"/><h4 class="logo">SonicBase™</h4>
+            </a>
+        <nav>
+            <ul>
+                <li><a href="../index.html">HOME</a></li>
+                <li> <a href="../documentation.html">DOCUMENTATION</a></li>
+                <li><a href="../contact.html">CONTACT</a></li>
+            </ul>
+        </nav>
+        </div>
+    </header>
+
+    <script>
+        if (isFramed()) {
+            document.getElementById("myHeader").style.display = "none";
+        }
+    </script>
+
+    <div class="main-page-text">
+      <div class="intro">SonicBase. In-memory embedded or distributed streaming sql database</div>
+
+<h1>SQL Select With Functions Statement</h1>
+<br/>
+<h3>Syntax</h3><table class="border-table" border="1"><tr><td> <table class="syntax-table" cellpadding="4">
+    <tbody>
+  
+    <tr class="syntax-main">
+           <td width="512" colspan=2 >
+            SELECT [function(column_name)] [,select_columns] FROM table_name
+		</td>
+	  </tr>
+	  <tr><td><table cellpadding=4 cellspacing=0>
+	  <tr><td align="right">function:&nbsp;&nbsp;</td><td width="430"> function to perform on select</td></tr>
+          <tr><td align="right">column_name:&nbsp;&nbsp;</td><td width="430"> column to select</td></tr>
+	  </table></td></tr>
+	  
+  </tbody>
+</table>
+</td>
+</tr>
+</table>
+
+<h3>Supported functions</h3>
+<table width="512" border="1" cellpadding=2 cellspacing="0">
+  <tbody>
+    <tr>
+      <td>min</td>
+        <td>Selects the minimum value<br/>
+            example: select min(age) as maxValue from persons</td>
+    </tr>
+    <tr>
+        <td>max</td>
+        <td>Selects the maximum value<br/>
+            example: select max(age) as maxValue from persons</td>
+    </tr>
+    <tr>
+        <td>count</td>
+        <td>Counts the records that match the criteria<br/>
+        example: select count(*) from persons where name='bob'</td>
+    </tr>
+    <tr>
+        <td>sum</td>
+        <td>Calculates the sum of the column<br/>
+            example: select sum(id) as sumValue from persons</td>
+    </tr>
+    <tr>
+        <td>avg</td>
+        <td>Selects the average value<br/>
+            example: select avg(distance) as avg from routes
+        </td>
+    </tr>
+    <tr>
+        <td>upper</td>
+        <td>Returns the value in upper case<br/>
+        example: select upper(name) as u from persons</td>
+    </tr>
+    <tr>
+        <td>lower</td>
+        <td>Returns the value in lower case<br/>
+        example: select lower(name) as l from persons</td>
+    </tr>
+    <tr>
+        <td>substring</td>
+        <td>Returns the substring of the selected value<br/>
+        example: select substring(birthPlace, 1, 12) as str from persons</td>
+    </tr>
+    <tr>
+        <td>length</td>
+        <td>Returns the length of the selected value<br/>
+        example: select length(name) as n from persons</td>
+    </tr>
+  </tbody>
+</table>
+</div>
+</div>
+</body>
+</html>

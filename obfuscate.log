@@ -2475,7 +2475,7 @@ to act on classes which have been obfuscated.
   <class name="com.sonicbase.server.DatabaseServer$Host" map="_L"/>
   <field class="com.sonicbase.server.DatabaseServer$Host" name="publicAddress" map="A"/>
   <field class="com.sonicbase.server.DatabaseServer$Host" name="port" map="B"/>
-  <field class="com.sonicbase.server.DatabaseServer$Host" name="privateAddress" map="C"/>
+  <field class="com.sonicbase.server.DatabaseServer$Host" name="address" map="C"/>
   <field class="com.sonicbase.server.DatabaseServer$Host" name="dead" map="D"/>
   <method class="com.sonicbase.server.DatabaseServer$Host" name="java.lang.String getPublicAddress()" map="A"/>
   <method class="com.sonicbase.server.DatabaseServer$Host" name="boolean access$1002(com.sonicbase.server.DatabaseServer$Host, boolean)" map="A"/>
@@ -2483,7 +2483,7 @@ to act on classes which have been obfuscated.
   <method class="com.sonicbase.server.DatabaseServer$Host" name="void setDead(boolean)" map="A"/>
   <method class="com.sonicbase.server.DatabaseServer$Host" name="void serialize(java.io.DataOutputStream, long)" map="A"/>
   <method class="com.sonicbase.server.DatabaseServer$Host" name="java.lang.String access$3700(com.sonicbase.server.DatabaseServer$Host)" map="B"/>
-  <method class="com.sonicbase.server.DatabaseServer$Host" name="java.lang.String getPrivateAddress()" map="B"/>
+  <method class="com.sonicbase.server.DatabaseServer$Host" name="java.lang.String getaddress()" map="B"/>
   <method class="com.sonicbase.server.DatabaseServer$Host" name="boolean isDead()" map="C"/>
   <method class="com.sonicbase.server.DatabaseServer$Host" name="int getPort()" map="D"/>
   <method class="com.sonicbase.server.DatabaseServer$Host" name="int access$3800(com.sonicbase.server.DatabaseServer$Host)" map="C"/>

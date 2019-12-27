@@ -4,14 +4,14 @@
     <groupId>com.sonicbase</groupId>
     <artifactId>sonicbase-cli</artifactId>
     <packaging>jar</packaging>
-    <version>1.3.0</version>
+    <version>1.3.1</version>
     <name>sonicbase-cli</name>
     <url>http://maven.apache.org</url>
 
     <parent>
         <groupId>com.sonicbase</groupId>
         <artifactId>sonicbase-root</artifactId>
-        <version>1.3.0</version>
+        <version>1.3.1</version>
     </parent>
 
     <build>
@@ -203,7 +203,7 @@
         <dependency>
             <groupId>commons-io</groupId>
             <artifactId>commons-io</artifactId>
-            <scope>provided</scope> <!-- by jdbc jar -->
+            <version>${commons-io.version}</version>
         </dependency>
 
         <!--Apache 2.0 - license confirmed-->

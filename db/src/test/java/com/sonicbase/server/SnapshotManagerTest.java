@@ -58,7 +58,7 @@ public class SnapshotManagerTest {
     DatabaseCommon common = TestUtils.createCommon(tableSchema);
     String configStr = IOUtils.toString(BulkImportManager.class.getResourceAsStream("/config/config-1-local.yaml"), "utf-8");
     Config config = new Config(configStr);
-    ServersConfig serversConfig = new ServersConfig("test", config.getShards(), true, true);
+    ServersConfig serversConfig = new ServersConfig(config.getShards(), true, true);
     common.setServersConfig(serversConfig);
     when(server.getCommon()).thenReturn(common);
     when(server.getConfig()).thenReturn(config);

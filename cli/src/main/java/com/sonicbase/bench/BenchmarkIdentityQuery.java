@@ -46,7 +46,7 @@ public class BenchmarkIdentityQuery {
   private int countDead = 0;
   private final AtomicInteger activeThreads = new AtomicInteger();
 
-  public void start(String address, final String cluster, final int shardCount, final Integer shard, final long count, final String queryType) {
+  public void start(String address, final int shardCount, final Integer shard, final long count, final String queryType) {
     shutdown = false;
     selectBegin.set(System.currentTimeMillis());
     doResetStats();
@@ -56,15 +56,6 @@ public class BenchmarkIdentityQuery {
         final long startId = shard * count;
 
         logger.info("Starting client");
-
-        File file = new File(System.getProperty("user.dir"), "config/config-" + cluster + ".yaml");
-        if (!file.exists()) {
-          file = new File(System.getProperty("user.dir"), "db/src/main/resources/config/config-" + cluster + ".yaml");
-          logger.info("Loaded config resource dir");
-        }
-        else {
-          logger.info("Loaded config default dir");
-        }
 
         logger.info("Using address: address={}", address);
 
@@ -79,7 +70,7 @@ public class BenchmarkIdentityQuery {
         final AtomicInteger logMod = new AtomicInteger(10000);
         int threadCount = 32;
         if (queryType.equals("batch") || queryType.equals("cbatch")) {
-          threadCount = 8;
+          threadCount = 6;
         }
         if (queryType.equals("limitOffset") || queryType.equals("sort")) {
           threadCount = 4;

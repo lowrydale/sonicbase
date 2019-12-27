@@ -30,25 +30,29 @@
 ARCH      := INTEL
 DEBUGGING := -DNDEBUG
 
+#-Ilzo-2.10/include -Ilzo_mac/include -Ilzo_mac
 ifeq ($(ARCH),INTEL)
 #CC          := gcc
 CC          := g++
-CFLAGS      := -fPIC -pthread -std=c++0x -I/opt/jdk1.8.0_192/include/linux/ -I/opt/jdk1.8.0_192/include/  -I/Library/Java/JavaVirtualMachines/jdk1.8.0_181.jdk/Contents/Home/include -I/Library/Java/JavaVirtualMachines/jdk1.8.0_181.jdk/Contents/Home/include/darwin
-#CFLAGS	    := -Wall -g  -I/Library/Java/JavaVirtualMachines/jdk1.8.0_181.jdk/Contents/Home/include -I/Library/Java/JavaVirtualMachines/jdk1.8.0_181.jdk/Contents/Home/include/darwin
-LDFLAGS     := -Wl#-L
+CFLAGS      := -fPIC -O -O2 -O3 -pthread -std=c++0x  -I/usr/lib/jvm/java-8-openjdk-amd64/include/linux/ -I/usr/lib/jvm/java-8-openjdk-amd64/include/  -I/Library/Java/JavaVirtualMachines/jdk1.8.0_181.jdk/Contents/Home/include -I/Library/Java/JavaVirtualMachines/jdk1.8.0_181.jdk/Contents/Home/include/darwin
+#CFLAGS	    := -Wall -g  -Izlib -I/Library/Java/JavaVirtualMachines/jdk1.8.0_181.jdk/Contents/Home/include -I/Library/Java/JavaVirtualMachines/jdk1.8.0_181.jdk/Contents/Home/include/darwin
+LDFLAGS     := #-L
 endif
+
+#/usr/lib/x86_64-linux-gnu/libc.a
 
 UNAME := $(shell uname)
 
 TARGETS    := $(GC_HARNESS_TARGETS)
 
 ifeq ($(UNAME), Linux)
-TARGETS    += linux/SonicBase.so
+TARGETS    += linux/SonicBase.so #linux/SonicBase
 OUT_DIR	:= linux
+LDFLAGS := $(LDFLAGS) -z muldefs
 endif
 
 ifeq ($(UNAME), Darwin)
-TARGETS    += mac/SonicBase.so
+TARGETS    += mac/SonicBase.so #mac/SonicBase
 OUT_DIR	:= mac
 endif
 
@@ -61,7 +65,18 @@ all: $(TARGETS)
 clean:
 	rm -f $(TARGETS) replay *~ core *.o *.a
 
-$(OUT_DIR)/SonicBase.so: PartitionedAvlTree.cpp BigDecimal.cpp
+
+csrc = $(wildcard lzo-2.10/src/*.c) \
+ 		$(wildcard ./*.c) \
+       $(wildcard ./*.cpp)
+obj = $(csrc:.c=.o)
+
+$(OUT_DIR)/SonicBase.so: $(obj)
 	echo $(OUT_DIR)
 	@mkdir -p $(@D)
-	$(CC) -shared $(CFLAGS) PartitionedAvlTree.cpp BigDecimal.cpp -o $(OUT_DIR)/SonicBase.so
+	$(CC) -shared $(CFLAGS) -o $@ $^ $(LDFLAGS)
+
+#$(OUT_DIR)/SonicBase: $(obj)
+#	echo $(OUT_DIR)
+#	@mkdir -p $(@D)
+#	$(CC) $(CFLAGS) -o $@ $^ $(LDFLAGS) -v

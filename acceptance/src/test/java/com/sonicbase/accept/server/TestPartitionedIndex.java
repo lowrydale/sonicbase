@@ -66,7 +66,7 @@ public class TestPartitionedIndex {
     serverB1.shutdown();
     serverB2.shutdown();
 
-    System.out.println("client refCount=" + DatabaseClient.clientRefCount.get() + ", sharedClients=" + DatabaseClient.sharedClients.size());
+    System.out.println("client refCount=" + DatabaseClient.clientRefCount.get());
     for (DatabaseClient client : DatabaseClient.allClients) {
       System.out.println("Stack:\n" + client.getAllocatedStack());
     }
@@ -85,6 +85,7 @@ public class TestPartitionedIndex {
 
     String role = "primaryMaster";
 
+    Config.copyConfig("4-shards");
 
     final CountDownLatch latch = new CountDownLatch(4);
     serverA1 = new NettyServer(128);
@@ -92,7 +93,7 @@ public class TestPartitionedIndex {
       @Override
       public void run() {
         serverA1.startServer(new String[]{"-port", String.valueOf(9010), "-host", "localhost",
-            "-mport", String.valueOf(9010), "-mhost", "localhost", "-cluster", "4-shards", "-shard",
+            "-mport", String.valueOf(9010), "-mhost", "localhost", "-shard",
             String.valueOf(0)});
         latch.countDown();
       }
@@ -110,7 +111,7 @@ public class TestPartitionedIndex {
       @Override
       public void run() {
         serverA2.startServer(new String[]{"-port", String.valueOf(9060), "-host", "localhost",
-            "-mport", String.valueOf(9060), "-mhost", "localhost", "-cluster", "4-shards", "-shard", String.valueOf(1)});
+            "-mport", String.valueOf(9060), "-mhost", "localhost", "-shard", String.valueOf(1)});
         latch.countDown();
       }
     });
@@ -128,7 +129,7 @@ public class TestPartitionedIndex {
       @Override
       public void run() {
         serverB1.startServer(new String[]{"-port", String.valueOf(9110), "-host", "localhost",
-            "-mport", String.valueOf(9110), "-mhost", "localhost", "-cluster", "4-shards", "-shard", String.valueOf(0)});
+            "-mport", String.valueOf(9110), "-mhost", "localhost", "-shard", String.valueOf(0)});
         latch.countDown();
       }
     });
@@ -145,7 +146,7 @@ public class TestPartitionedIndex {
       @Override
       public void run() {
         serverB2.startServer(new String[]{"-port", String.valueOf(9160), "-host", "localhost",
-            "-mport", String.valueOf(9160), "-mhost", "localhost", "-cluster", "4-shards", "-shard", String.valueOf(1)});
+            "-mport", String.valueOf(9160), "-mhost", "localhost", "-shard", String.valueOf(1)});
         latch.countDown();
       }
     });

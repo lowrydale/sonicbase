@@ -87,7 +87,8 @@ public class TestLongManagerLostEntries {
 
     for (int i = 0; i < dbServers.length; i++) {
       dbServers[i] = new MonitorServer();
-      dbServers[i].setConfig(config, "4-servers", "localhost", 9010 + (50 * i), true, new AtomicBoolean(true), new AtomicBoolean(true),null, false);
+      Config.copyConfig("4-servers");
+      dbServers[i].setConfig(config, "localhost", 9010 + (50 * i), true, new AtomicBoolean(true), new AtomicBoolean(true),null, false);
       dbServers[i].setRole(role);
     }
 
@@ -187,7 +188,7 @@ public class TestLongManagerLostEntries {
       dbServers[3].shutdown();
     }
 
-    System.out.println("client refCount=" + DatabaseClient.clientRefCount.get() + ", sharedClients=" + DatabaseClient.sharedClients.size());
+    System.out.println("client refCount=" + DatabaseClient.clientRefCount.get());
 
   }
 }

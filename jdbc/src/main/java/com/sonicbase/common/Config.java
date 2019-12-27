@@ -2,12 +2,17 @@
 package com.sonicbase.common;
 
 import com.sonicbase.query.DatabaseException;
+import net.sf.jsqlparser.schema.Database;
+import org.apache.commons.io.IOUtils;
 
+import java.io.*;
+import java.nio.file.Files;
 import java.util.ArrayList;
 import java.util.List;
 import java.util.Map;
 
 public class Config extends Properties {
+  private static final String USER_DIR_STR = "user.dir";
 
   public Config(Map<String, Object> map) {
     super(map);
@@ -15,6 +20,44 @@ public class Config extends Properties {
 
   public Config(String rawConfig) {
     super(rawConfig);
+  }
+
+
+  public static InputStream getConfigStream() {
+    File file = new File(System.getProperty(USER_DIR_STR), "config/config.yaml");
+    if (!file.exists()) {
+      throw new DatabaseException("config.yaml not found");
+    }
+
+    try {
+      return new FileInputStream(file);
+    }
+    catch (FileNotFoundException e) {
+      throw new DatabaseException("config.yaml not found", e);
+    }
+  }
+
+  public static void copyConfig(String cluster) {
+    try {
+      String configStr = IOUtils.toString(new BufferedInputStream(Config.class.getResourceAsStream("/config/config-" + cluster + ".yaml")), "utf-8");
+
+      File dir = new File(System.getProperty(USER_DIR_STR), "config");
+      dir.mkdirs();
+      File file = new File(dir, "config.yaml");
+      file.getParentFile().mkdirs();
+      Files.write(file.toPath(), configStr.getBytes("utf-8"));
+    }
+    catch (IOException e) {
+      throw new DatabaseException(e);
+    }
+  }
+
+  public String toString() {
+    StringBuilder builder = new StringBuilder();
+    for (Shard shard : getShards()) {
+      builder.append("[shard: " + shard.toString()).append("]");
+    }
+    return builder.toString();
   }
 
   public List<Client> getClients() {
@@ -29,11 +72,6 @@ public class Config extends Properties {
         Map<String, Object> cli = (Map<String, Object>) clientObj.get("client");
         if (cli.get("port") == null) {
           cli.put("port", defaultHttpPort);
-        }
-        String address = (String) cli.get("address");
-        if (address != null) {
-          cli.put("privateAddress", address);
-          cli.put("publicAddress", address);
         }
 
         Client client = new Client(cli);
@@ -96,11 +134,6 @@ public class Config extends Properties {
           if (server.get("httpPort") == null) {
             server.put("httpPort", defaultHttpPort);
           }
-          String address = (String) server.get("address");
-          if (address != null) {
-            server.put("privateAddress", address);
-            server.put("publicAddress", address);
-          }
           Replica replica = new Replica(server);
           shard.replicas.add(replica);
           offset++;
@@ -124,11 +157,27 @@ public class Config extends Properties {
     public List<Replica> getReplicas() {
       return replicas;
     }
+
+    public String toString() {
+      StringBuilder builder = new StringBuilder();
+      for (Replica replica : getReplicas()) {
+        builder.append("[replica: ").append(replica.toString()).append("]");
+      }
+      return builder.toString();
+    }
   }
 
   public static class Replica extends Properties {
     public Replica(Map<String, Object> yaml) {
       super(yaml);
+    }
+
+    public String toString() {
+      StringBuilder builder = new StringBuilder();
+      for (Map.Entry<String, Object> entry : getMap().entrySet()) {
+        builder.append("[").append(entry.getKey()).append("=").append(entry.getValue()).append("]");
+      }
+      return builder.toString();
     }
   }
 

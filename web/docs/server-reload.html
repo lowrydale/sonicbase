@@ -1,0 +1,80 @@
+<!doctype html>
+<html>
+<head>
+  <link rel="canonical" href="http://sonicbase.com/docs/server-reload.html"/>
+
+  <meta charset="UTF-8">
+    <meta name="description" content="SonicBase server reload commands. Use the client to reload servers or entire replicas">
+
+    <title>SonicBase - In-Memory Database. Server Reload</title>
+    <meta http-equiv="X-UA-Compatible" content="IE=edge">
+    <meta name="viewport" content="width=device-width, initial-scale=1">
+    <meta name="description" content="Instructions on how to the reload servers in SonicBase.">
+    <link href="../css/singlePageTemplate.css" rel="stylesheet" type="text/css">
+    <script type="text/javascript" src="../javascript/main.js"></script>
+    <!-- Global site tag (gtag.js) - Google Analytics -->
+    <script async src="https://www.googletagmanager.com/gtag/js?id=UA-109032274-1"></script>
+    <script>
+        window.dataLayer = window.dataLayer || [];
+        function gtag(){dataLayer.push(arguments);}
+        gtag('js', new Date());
+
+        gtag('config', 'UA-109032274-1');
+        ga('require', 'displayfeatures');
+    </script>
+</head>
+<body>
+<div class="container">
+    <header id="myHeader">
+        <div class="mobile">
+            <a href="../index.html">
+                <h4 class="logo">SonicBase™</h4>
+            </a>
+        </div>
+
+        <div class="desktop">
+            <a href="../index.html">
+                <img style="margin-top:3px" src="../images/logo-white.gif" width="50px"/><h4 class="logo">SonicBase™</h4>
+            </a>
+        <nav>
+            <ul>
+                <li><a href="../index.html">HOME</a></li>
+                <li> <a href="../documentation.html">DOCUMENTATION</a></li>
+                <li><a href="../contact.html">CONTACT</a></li>
+            </ul>
+        </nav>
+        </div>
+    </header>
+
+    <script>
+        if (isFramed()) {
+            document.getElementById("myHeader").style.display = "none";
+        }
+    </script>
+
+    <div class="main-page-text">
+
+      <div class="intro">SonicBase. In-memory embedded or distributed streaming sql database</div>
+
+        <div class="mylink">
+
+            <h1>Reload Commands</h1>
+          Issue the following reload commands from the administrative client.
+               <h2>Reload Server</h2>
+            To reload a server from a peer, type "reload server &lt;shard&gt; &lt;replica&gt;, where shard
+            and replica specify the server you wish to reload. You would need to take this action in the
+            case you are replacing a bad server or disk where the database resides.
+            <h2>Reload Server Status</h2>
+            To get the status of a server reload, type "reload server status &lt;shard&gt; &lt;replica&gt;, where shard
+            and replica specify the server you are reloading. Returns "complete" or "running" depending on the state of the reload.
+            <h2>Reload Replica</h2>
+            To reload a replica from its peers, type "reload replica &lt;replica&gt;, where
+            replica specifies the replica you wish to reload. You would need to take this action in the
+            case you are adding a new replica.
+            <h2>Reload Replica Status</h2>
+            To get the status of a replica reload, type "reload replica status &lt;replica&gt;, where
+            replica specifies the replica you are reloading. Returns "complete" or "running" depending on the state of the reload.
+</div>
+</div>
+</body>
+</html>

@@ -3520,10 +3520,10 @@
 	<method signature="int access$3800(com.sonicbase.server.DatabaseServer$Host)" class="com.sonicbase.server.DatabaseServer$Host" />
 	<method signature="java.lang.String getPublicAddress()" class="com.sonicbase.server.DatabaseServer$Host" />
 	<method signature="boolean access$1000(com.sonicbase.server.DatabaseServer$Host)" class="com.sonicbase.server.DatabaseServer$Host" />
-	<method signature="java.lang.String getPrivateAddress()" class="com.sonicbase.server.DatabaseServer$Host" />
+	<method signature="java.lang.String getaddress()" class="com.sonicbase.server.DatabaseServer$Host" />
 	<method signature="void setDead(boolean)" class="com.sonicbase.server.DatabaseServer$Host" />
 	<method signature="java.lang.String access$3700(com.sonicbase.server.DatabaseServer$Host)" class="com.sonicbase.server.DatabaseServer$Host" />
-	<field name="privateAddress" class="com.sonicbase.server.DatabaseServer$Host" />
+	<field name="address" class="com.sonicbase.server.DatabaseServer$Host" />
 	<field name="port" class="com.sonicbase.server.DatabaseServer$Host" />
 	<field name="publicAddress" class="com.sonicbase.server.DatabaseServer$Host" />
 	<field name="dead" class="com.sonicbase.server.DatabaseServer$Host" />

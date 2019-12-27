@@ -1,0 +1,206 @@
+<!doctype html>
+<html>
+<head>
+  <link rel="canonical" href="http://sonicbase.com/docs/stored-procedures-example2.html"/>
+
+  <meta charset="UTF-8">
+<title>SonicBase - In-Memory Database. Stored Procedures - Example 2</title>
+    <meta http-equiv="X-UA-Compatible" content="IE=edge">
+    <meta name="viewport" content="width=device-width, initial-scale=1">
+    <meta name="description" content="Second example of how stored procedures are supported by SonicBase.">
+    <link href="../css/singlePageTemplate.css" rel="stylesheet" type="text/css">
+    <script type="text/javascript" src="../javascript/main.js"></script>
+    <link rel="stylesheet" href="../css/tomorrow-night-bright.css">
+    <script src="../javascript/highlight.min.js"></script>
+    <script>hljs.initHighlightingOnLoad();</script>
+
+    <!-- Global site tag (gtag.js) - Google Analytics -->
+    <script async src="https://www.googletagmanager.com/gtag/js?id=UA-109032274-1"></script>
+    <script>
+        window.dataLayer = window.dataLayer || [];
+        function gtag(){dataLayer.push(arguments);}
+        gtag('js', new Date());
+
+        gtag('config', 'UA-109032274-1');
+        ga('require', 'displayfeatures');
+    </script>
+</head>
+
+<body>
+<div class="container">
+    <header id="myHeader">
+        <div class="mobile">
+            <a href="../index.html">
+                <h4 class="logo">SonicBase™</h4>
+            </a>
+        </div>
+
+        <div class="desktop">
+            <a href="../index.html">
+                <img style="margin-top:3px" src="../images/logo-white.gif" width="50px"/><h4 class="logo">SonicBase™</h4>
+            </a>
+        <nav>
+            <ul>
+                <li><a href="../index.html">HOME</a></li>
+                <li> <a href="../documentation.html">DOCUMENTATION</a></li>
+                <li><a href="../contact.html">CONTACT</a></li>
+            </ul>
+        </nav>
+        </div>
+    </header>
+
+    <script>
+        if (isFramed()) {
+            document.getElementById("myHeader").style.display = "none";
+        }
+    </script>
+
+    <div class="main-page-text">
+      <div class="intro">SonicBase. In-memory embedded or distributed streaming sql database</div>
+
+
+<h1>Stored Procedures - Example 2</h1>
+<h2>Overview</h2>
+        This example illustrates how you can store results in a temporary table and allow the client to traverse this table
+        for the results. Here we capture the result records in the "RecordEvaluator" callback. Additionally we return "false"
+        from the RecordEvaluator to prevent the results from being returned to the stored procedure via the result set of
+        the query. Note that we return the table name to the client in the "finalize" method.
+        <br/><br/>
+        It is important to call SonicBasePreparedStatement.restrictToThisServer(true) before executing the query. This
+        keeps traversal on this server.
+
+
+        <h2>Client Code</h2>
+        <pre class="java"><code>
+  @Test
+  public void test2() throws SQLException {
+      String tableName = null;
+      try {
+        String query = "call procedure 'com.sonicbase.procedure.MyStoredProcedure2', 1000";
+        try (PreparedStatement procedureStmt = conn.prepareStatement(query);
+             ResultSet procedureRs = procedureStmt.executeQuery()) {
+          if (procedureRs.next()) {
+            tableName = procedureRs.getString("tableName");
+          }
+          System.out.println("tableName=" + tableName);
+        }
+
+        try (PreparedStatement resultsStmt = conn.prepareStatement("select * from " + tableName);
+            ResultSet rs = resultsStmt.executeQuery()) {
+          int offset = 3;
+          while (rs.next()) {
+            System.out.println("id=" + rs.getLong("id1") + ", socialsecuritynumber=" +
+                rs.getString("socialsecuritynumber") + ", gender=" + rs.getString("gender"));
+          }
+        }
+        System.out.println("finished");
+      }
+      finally {
+        try {
+          if (tableName != null) {
+            try (PreparedStatement stmt = conn.prepareStatement("drop table " + tableName)) {
+              stmt.executeUpdate();
+            }
+          }
+        }
+        catch (Exception e) {
+          e.printStackTrace();
+        }
+      }
+    }</code></pre>
+
+        <h2>Stored Procedure Code</h2>
+        <pre class="java"><code>
+public class MyStoredProcedure2 implements StoredProcedure {
+
+  public void init(StoredProcedureContext context) {
+    try {
+      try (SonicBasePreparedStatement stmt = context.getConnection().prepareSonicBaseStatement(
+          context, "create table " + "results_" + context.getStoredProdecureId() + " (id1 BIGINT, num DOUBLE, socialSecurityNumber " +
+              "VARCHAR(20), gender VARCHAR(8), PRIMARY KEY (id1))")) {
+        stmt.executeUpdate();
+      }
+    }
+    catch (Exception e) {
+      throw new DatabaseException(e);
+    }
+  }
+
+  @Override
+  public StoredProcedureResponse execute(final StoredProcedureContext context) {
+    try {
+      String query = "select * from persons where id1>1 and id1<500 and gender='m'";
+
+      try (SonicBasePreparedStatement stmt = context.getConnection().prepareSonicBaseStatement(context, query)) {
+        stmt.restrictToThisServer(true);
+
+        final List&lt;Record&gt; batch = new ArrayList<>();
+        stmt.executeQueryWithEvaluator(new RecordEvaluator() {
+          @Override
+          public boolean evaluate(final StoredProcedureContext context, Record record) {
+            if (record.getDatabase().equalsIgnoreCase("db") &&
+                record.getTableName().equalsIgnoreCase("persons")) {
+              Long id = record.getLong("id1");
+              if (id != null && id > 2 && id < context.getParameters().getInt(2) && passesComplicatedLogic(record)) {
+                if (!record.isDeleting()) {
+                  batch.add(record);
+                  if (batch.size() >= 200) {
+                    insertBatch(context, batch);
+                    batch.clear();
+                  }
+                }
+              }
+            }
+            return false;
+          }
+        });
+
+        if (batch.size() != 0) {
+          insertBatch(context, batch);
+        }
+      }
+    }
+    catch (Exception e) {
+      throw new DatabaseException(e);
+    }
+    return null;
+  }
+
+  private boolean passesComplicatedLogic(Record record) {
+    //put complicated logic here
+    return true;
+  }
+
+  public void insertBatch(StoredProcedureContext context, List&lt;Record&gt; batch) {
+    try {
+      PreparedStatement insertStmt = context.getConnection().prepareStatement("insert into " +
+           "results_" + context.getStoredProdecureId() + " (id1, socialsecuritynumber, gender) VALUES (?, ?, ?)");
+      for (Record record : batch) {
+        insertStmt.setLong(1, record.getLong("id1"));
+        insertStmt.setString(2, record.getString("socialsecuritynumber"));
+        insertStmt.setString(3, record.getString("gender"));
+        insertStmt.addBatch();
+      }
+      insertStmt.executeBatch();
+      insertStmt.close();
+    }
+    catch (Exception e) {
+      throw new DatabaseException(e);
+    }
+  }
+
+  public StoredProcedureResponse finalize(StoredProcedureContext context,
+                                          List&lt;StoredProcedureResponse&gt; responses) {
+    Record record = context.createRecord();
+    record.setString("tableName", "results_" + context.getStoredProdecureId());
+
+    StoredProcedureResponse response = context.createResponse();
+    response.addRecord(record);
+
+    return response;
+  }
+}</code></pre>
+</div>
+</div>
+</body>
+</html>

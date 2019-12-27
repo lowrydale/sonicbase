@@ -13,7 +13,6 @@
 
       $.ajaxSetup({cache: false});
 
-    var currCluster = "";
     var currOrderBy = "count";
     var currAsc = "desc";
     var offset = 0;
@@ -85,7 +84,6 @@
             currOrderBy = parts[0];
             currAsc = parts[1];
             page_size = parts[2];
-            currCluster = parts[3];
             document.getElementById("page_size").value = page_size;
         }
         setDateRangeOnDatePicker();
@@ -212,8 +210,6 @@
     }
 
     function refreshCluster(value) {
-        currCluster = value;
-        $('#clusters').val(value);
         loadQueries(currOrderBy);
     }
 
@@ -255,16 +251,6 @@
               }
           });
 
-          var selectNode = document.getElementById("clusters");
-          if (selectNode != null && selectNode.options != null) {
-              if (selectNode.selectedIndex != -1) {
-                  currCluster = selectNode.options[selectNode.selectedIndex].value;
-              }
-          }
-          if (currCluster == null || currCluster == "") {
-              currCluster = "_unknown_";
-          }
-
           if (document.getElementById("page_size") != null) {
               page_size = document.getElementById("page_size").value;
           }
@@ -285,7 +271,7 @@
               headers:{
                   "Accept":"application/json",
                   "Content-type":"application/json"
-              },   url:"/query-stats?tz=" + timezone + "&search=" + encodedQuery + "&currDate=" + currDateStr + "&date=" + date + "&cluster=" + currCluster + "&offset=" + offset + "&page_size=" + page_size + "&order_by=" + currOrderBy + "&asc=" + currAsc,
+              },   url:"/query-stats?tz=" + timezone + "&search=" + encodedQuery + "&currDate=" + currDateStr + "&date=" + date + "&offset=" + offset + "&page_size=" + page_size + "&order_by=" + currOrderBy + "&asc=" + currAsc,
               success:function(response) {
 
                   if (response.error != null) {
@@ -360,7 +346,7 @@
                       c8.innerHTML=lat_max
                   }
 
-                  var cookieValue = currOrderBy + ":" + currAsc + ":" + page_size + ":" + currCluster;
+                  var cookieValue = currOrderBy + ":" + currAsc + ":" + page_size;
                   createCookie(cookieName, cookieValue, 600000);
               },
               error: function(xhr) {

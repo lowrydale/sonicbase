@@ -40,8 +40,8 @@ public class MonitorHandler extends AbstractHandler {
   private static Logger logger = LoggerFactory.getLogger(MonitorHandler.class);
 
   private final DatabaseServer server;
-  private static ConcurrentHashMap<String, Connection> connections = new ConcurrentHashMap<>();
   private final ProServer proServer;
+  private static Connection connection;
 
 
   public MonitorHandler(ProServer proServer, DatabaseServer server) {
@@ -93,7 +93,6 @@ public class MonitorHandler extends AbstractHandler {
       }
 
       if (uri.startsWith("/query-stats")) {
-        String cluster = request.getParameter("cluster");
         String orderBy = request.getParameter("order_by");
         String pageSize = request.getParameter("page_size");
         String offset = request.getParameter("offset");
@@ -102,25 +101,23 @@ public class MonitorHandler extends AbstractHandler {
         String currentDate = request.getParameter("currDate");
         String timezone = request.getParameter("tz");
         String searchStr = request.getParameter("search");
-        String data = getQueryStats(cluster, offset, pageSize, orderBy, asc, date, currentDate, timezone, searchStr);
+        String data = getQueryStats(offset, pageSize, orderBy, asc, date, currentDate, timezone, searchStr);
         response.setContentType("application/json; charset=utf-8");
         response.setStatus(HttpServletResponse.SC_OK);
         IOUtils.write(data, response.getOutputStream(), "utf-8");
         response.getOutputStream().flush();
       }
       else if (uri.startsWith("/os-stats")) {
-        String cluster = request.getParameter("cluster");
         String time = request.getParameter("time");
         String timezone = request.getParameter("tz");
-        String data = getOSStats(cluster, time, timezone);
+        String data = getOSStats(time, timezone);
         response.setContentType("application/json; charset=utf-8");
         response.setStatus(HttpServletResponse.SC_OK);
         IOUtils.write(data, response.getOutputStream(), "utf-8");
         response.getOutputStream().flush();
       }
       else if (uri.startsWith("/health")) {
-        String cluster = request.getParameter("cluster");
-        String data = getServerHealth(cluster);
+        String data = getServerHealth();
         response.setContentType("application/json; charset=utf-8");
         response.setStatus(HttpServletResponse.SC_OK);
         IOUtils.write(data, response.getOutputStream(), "utf-8");
@@ -151,46 +148,11 @@ public class MonitorHandler extends AbstractHandler {
     }
   }
 
-  private static ArrayNode getClusters(ObjectNode node) {
-    ArrayNode clusters = node.putArray("clusters");
-
-    File binDir = new File(System.getProperty("user.dir"));
-
-    File dir = new File(binDir, "config");
-    if (!dir.exists()) {
-      dir = new File(binDir.getParentFile(), "config");
-    }
-    //System.out.println("Checking dir for clusters: dir=" + dir.getAbsolutePath());
-    File[] files = dir.listFiles();
-    if (files != null) {
-      for (File file : files) {
-        String name = file.getName();
-        if (name.contains("config-license-server")) {
-          continue;
-        }
-        if (name.contains("config-mgmt-server")) {
-          continue;
-        }
-        if (name.startsWith("config-")) {
-          String clusterName = name.substring("config-".length(), name.lastIndexOf('.'));
-          clusters.add(clusterName);
-        }
-      }
-    }
-    return clusters;
-  }
-
-  public String getOSStats(String cluster, String time, String timezone) {
+  public String getOSStats(String time, String timezone) {
     ObjectMapper mapper = new ObjectMapper();
     ObjectNode node = mapper.createObjectNode();
     try {
-      getClusters(node);
-
-      //if (cluster == null || cluster.length() == 0 || cluster.equals("_unknown_")) {
-      cluster = server.getCluster();
-      //}
-
-      Connection conn = getDbConnection(cluster);
+      Connection conn = getDbConnection();
 
       double maxMem = 0;
       double maxDisk = 0;
@@ -205,6 +167,20 @@ public class MonitorHandler extends AbstractHandler {
         }
       }
       logger.info("os_totals count: " + totalsCount);
+
+      double xmxValue = 0;
+      String xmxSetting = server.getXmx();
+      if (xmxSetting.contains("g")) {
+        xmxValue = Double.valueOf(xmxSetting.substring(0, xmxSetting.length() - 1));
+      }
+      else if (xmxSetting.contains("m")) {
+        xmxValue = Double.valueOf(xmxSetting.substring(0, xmxSetting.length() - 1)) / 1024d;
+      }
+      else if (xmxSetting.contains("t")) {
+        xmxValue = Double.valueOf(xmxSetting.substring(0, xmxSetting.length() - 1)) * 1024d;
+      }
+
+      node.put("maxJavaMem", xmxValue);
       node.put("maxMem", maxMem);
       node.put("maxDisk", maxDisk / 1024 / 1024 / 1024);
 
@@ -226,9 +202,12 @@ public class MonitorHandler extends AbstractHandler {
       String query = null;
       if (timeStr2 == null) {
         query = "select * from os_stats where time_val > ? order by time_val asc";
+        logger.info("getting os_stats: stmt=\"select * from os_stats where time_val > '" + timeStr + "' order by time_val asc\"");
       }
       else {
         query = "select * from os_stats where time_val > ? and time_val < ? order by time_val asc";
+        logger.info("getting os_stats: stmt=\"select * from os_stats where time_val > '" + timeStr +
+            "' and time_val < '" + timeStr2 + "' order by time_val asc\"");
       }
       try (PreparedStatement stmt = conn.prepareStatement(query)) {
         stmt.setString(1, timeStr);
@@ -362,8 +341,8 @@ public class MonitorHandler extends AbstractHandler {
           for (OSStats currStats : entry.getValue()) {
             historgrams.cpuHistogram.update((long)currStats.cpu);
             historgrams.resGigHistogram.update((long)currStats.resGig);
-            historgrams.javaMemMinHistogram.update((long)currStats.javaMemMin);
-            historgrams.javaMemMaxHistogram.update((long)currStats.javaMemMax);
+            historgrams.javaMemMinHistogram.update((long) (currStats.javaMemMin * 1024d));
+            historgrams.javaMemMaxHistogram.update((long) (currStats.javaMemMax * 1024d));
             historgrams.netInHistogram.update((long)currStats.netIn);
             historgrams.netOutHistogram.update((long)currStats.netOut);
             historgrams.diskAvailHistogram.update((long)currStats.diskAvail);
@@ -389,8 +368,8 @@ public class MonitorHandler extends AbstractHandler {
       obj.put("net_in", h.netInSnapshot.getMax());
       obj.put("net_out", h.netOutSnapshot.getMax());
       obj.put("r_mem", h.resGigSnapshot.getMax());
-      obj.put("j_min", h.javaMemMinSnapshot.getMax());
-      obj.put("j_max", h.javaMemMaxSnapshot.getMax());
+      obj.put("j_min", h.javaMemMinSnapshot.getMax() / 1024d);
+      obj.put("j_max", h.javaMemMaxSnapshot.getMax() / 1024d);
       obj.put("d_avail", h.diskAvailSnapshot.getMax() / 1024 / 1024 / 1024);
     }
     ArrayNode p75 = node.putArray("p75");
@@ -403,8 +382,8 @@ public class MonitorHandler extends AbstractHandler {
       obj.put("net_in", h.netInSnapshot.get75thPercentile());
       obj.put("net_out", h.netOutSnapshot.get75thPercentile());
       obj.put("r_mem", h.resGigSnapshot.get75thPercentile());
-      obj.put("j_min", h.javaMemMinSnapshot.get75thPercentile());
-      obj.put("j_max", h.javaMemMaxSnapshot.get75thPercentile());
+      obj.put("j_min", h.javaMemMinSnapshot.get75thPercentile() / 1024d);
+      obj.put("j_max", h.javaMemMaxSnapshot.get75thPercentile() / 1024d);
       obj.put("d_avail", h.diskAvailSnapshot.get75thPercentile() / 1024 / 1024 / 1024);
     }
     ArrayNode p95 = node.putArray("p95");
@@ -417,8 +396,8 @@ public class MonitorHandler extends AbstractHandler {
       obj.put("net_in", h.netInSnapshot.get95thPercentile());
       obj.put("net_out", h.netOutSnapshot.get95thPercentile());
       obj.put("r_mem", h.resGigSnapshot.get95thPercentile());
-      obj.put("j_min", h.javaMemMinSnapshot.get95thPercentile());
-      obj.put("j_max", h.javaMemMaxSnapshot.get95thPercentile());
+      obj.put("j_min", h.javaMemMinSnapshot.get95thPercentile() / 1024d);
+      obj.put("j_max", h.javaMemMaxSnapshot.get95thPercentile() / 1024d);
       obj.put("d_avail", h.diskAvailSnapshot.get95thPercentile() / 1024 / 1024 / 1024);
     }
     ArrayNode p99 = node.putArray("p99");
@@ -431,8 +410,8 @@ public class MonitorHandler extends AbstractHandler {
       obj.put("net_in", h.netInSnapshot.get99thPercentile());
       obj.put("net_out", h.netOutSnapshot.get99thPercentile());
       obj.put("r_mem", h.resGigSnapshot.get99thPercentile());
-      obj.put("j_min", h.javaMemMinSnapshot.get99thPercentile());
-      obj.put("j_max", h.javaMemMaxSnapshot.get99thPercentile());
+      obj.put("j_min", h.javaMemMinSnapshot.get99thPercentile() / 1024d);
+      obj.put("j_max", h.javaMemMaxSnapshot.get99thPercentile() / 1024d);
       obj.put("d_avail", h.diskAvailSnapshot.get99thPercentile() / 1024 / 1024 / 1024);
     }
     ArrayNode p999 = node.putArray("p999");
@@ -445,8 +424,8 @@ public class MonitorHandler extends AbstractHandler {
       obj.put("net_in", h.netInSnapshot.get999thPercentile());
       obj.put("net_out", h.netOutSnapshot.get999thPercentile());
       obj.put("r_mem", h.resGigSnapshot.get999thPercentile());
-      obj.put("j_min", h.javaMemMinSnapshot.get999thPercentile());
-      obj.put("j_max", h.javaMemMaxSnapshot.get999thPercentile());
+      obj.put("j_min", h.javaMemMinSnapshot.get999thPercentile() / 1024d);
+      obj.put("j_max", h.javaMemMaxSnapshot.get999thPercentile() / 1024d);
       obj.put("d_avail", h.diskAvailSnapshot.get999thPercentile() / 1024 / 1024 / 1024);
     }
     ArrayNode avg = node.putArray("avg");
@@ -459,20 +438,19 @@ public class MonitorHandler extends AbstractHandler {
       obj.put("net_in", h.netInSnapshot.getMean());
       obj.put("net_out", h.netOutSnapshot.getMean());
       obj.put("r_mem", h.resGigSnapshot.getMean());
-      obj.put("j_min", h.javaMemMinSnapshot.getMean());
-      obj.put("j_max", h.javaMemMaxSnapshot.getMean());
+      obj.put("j_min", h.javaMemMinSnapshot.getMean() / 1024d);
+      obj.put("j_max", h.javaMemMaxSnapshot.getMean() / 1024d);
       obj.put("d_avail", h.diskAvailSnapshot.getMean() / 1024 / 1024 / 1024);
     }
   }
 
   public void shutdown() {
-    for (Connection conn : connections.values()) {
-      try {
-        conn.close();
-      }
-      catch (SQLException e) {
-        logger.error("Error shutting down monitor handler", e);
-      }
+
+    try {
+      connection.close();
+    }
+    catch (SQLException e) {
+      logger.error("Error shutting down monitor handler", e);
     }
   }
 
@@ -508,16 +486,12 @@ public class MonitorHandler extends AbstractHandler {
   }
 
 
-  public String getQueryStats(String cluster, String offset, String page_size, String orderBy,
+  public String getQueryStats(String offset, String page_size, String orderBy,
                               String asc, String date, String currentDate, String timezone, String searchStr) throws IOException {
     ObjectMapper mapper = new ObjectMapper();
     ObjectNode node = mapper.createObjectNode();
     try {
-      getClusters(node);
-
-      cluster = server.getCluster();
-
-      Connection conn = getDbConnection(cluster);
+      Connection conn = getDbConnection();
 
       SimpleDateFormat df = new SimpleDateFormat(DAY_FORMAT_STR);
 
@@ -611,30 +585,23 @@ public class MonitorHandler extends AbstractHandler {
     return node.toString();
   }
 
-  private Connection getDbConnection(String cluster) {
+  private Connection getDbConnection() {
     try {
-      Connection conn = null;
       synchronized (this) {
-        conn = connections.get(cluster);
-        if (conn != null) {
-          return conn;
+        if (connection != null) {
+          return connection;
         }
         Config config = proServer.getConfig();
 
         List<Config.Shard> array = config.getShards();
         Config.Shard shard = array.get(0);
         List<Config.Replica> replicasArray = shard.getReplicas();
-        Boolean node = config.getBoolean("clientIsPrivate");
-        final String address = node != null && node ?
-            replicasArray.get(0).getString("privateAddress") :
-            replicasArray.get(0).getString("publicAddress");
+        final String address = replicasArray.get(0).getString("address");
         final int port = replicasArray.get(0).getInt("port");
 
         Class.forName("com.sonicbase.jdbcdriver.Driver");
-        conn = DriverManager.getConnection("jdbc:sonicbase:" + address + ":" + port + "/_sonicbase_sys");
-
-        connections.put(cluster, conn);
-        return conn;
+        connection = DriverManager.getConnection("jdbc:sonicbase:" + address + ":" + port + "/_sonicbase_sys");
+        return connection;
       }
     }
     catch (Exception e) {
@@ -645,15 +612,11 @@ public class MonitorHandler extends AbstractHandler {
   }
 
 
-  private String getServerHealth(String cluster) {
+  private String getServerHealth() {
     ObjectMapper mapper = new ObjectMapper();
     ObjectNode node = mapper.createObjectNode();
     try {
-      getClusters(node);
-
-      cluster = server.getCluster();
-
-      Connection conn = getDbConnection(cluster);
+      Connection conn = getDbConnection();
 
       DatabaseClient client = ((ConnectionProxy)conn).getDatabaseClient();
       client.syncSchema();
@@ -667,7 +630,7 @@ public class MonitorHandler extends AbstractHandler {
         for (int i = 0; i < replicas.length; i++) {
           ObjectNode replicaNode = replicasArray.addObject();
           ServersConfig.Host replica = replicas[i];
-          replicaNode.put("host", replica.getPrivateAddress() + ":" + replica.getPort());
+          replicaNode.put("host", replica.getaddress() + ":" + replica.getPort());
           replicaNode.put("shard", String.valueOf(j));
           replicaNode.put("replica", String.valueOf(i));
           replicaNode.put("dead", String.valueOf(replica.isDead()));

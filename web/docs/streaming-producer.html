@@ -1,0 +1,254 @@
+<!doctype html>
+<html>
+<head>
+  <link rel="canonical" href="http://sonicbase.com/docs/streaming-producer.html"/>
+
+  <meta charset="UTF-8">
+<title>SonicBase - In-Memory Database. Streaming Producers</title>
+    <meta http-equiv="X-UA-Compatible" content="IE=edge">
+    <meta name="viewport" content="width=device-width, initial-scale=1">
+    <meta name="description" content="Streaming producer documentation for SonicBase.">
+    <link href="../css/singlePageTemplate.css" rel="stylesheet" type="text/css">
+
+
+    <script type="text/javascript" src="../javascript/main.js"></script>
+
+    <link rel="stylesheet" href="../css/tomorrow-night-bright.css">
+    <script src="../javascript/highlight.min.js"></script>
+    <script>hljs.initHighlightingOnLoad();</script>
+    <!-- Global site tag (gtag.js) - Google Analytics -->
+    <script async src="https://www.googletagmanager.com/gtag/js?id=UA-109032274-1"></script>
+    <script>
+        window.dataLayer = window.dataLayer || [];
+        function gtag(){dataLayer.push(arguments);}
+        gtag('js', new Date());
+
+        gtag('config', 'UA-109032274-1');
+        ga('require', 'displayfeatures');
+    </script>
+
+</head>
+
+<body>
+<div class="container">
+    <header id="myHeader">
+        <div class="mobile">
+            <a href="../index.html">
+                <h4 class="logo">SonicBase™</h4>
+            </a>
+        </div>
+
+        <div class="desktop">
+            <a href="../index.html">
+                <img style="margin-top:3px" src="../images/logo-white.gif" width="50px"/><h4 class="logo">SonicBase™</h4>
+            </a>
+        <nav>
+            <ul>
+                <li><a href="../index.html">HOME</a></li>
+                <li> <a href="../documentation.html">DOCUMENTATION</a></li>
+                <li><a href="../contact.html">CONTACT</a></li>
+            </ul>
+        </nav>
+        </div>
+    </header>
+
+    <script>
+        if (isFramed()) {
+            document.getElementById("myHeader").style.display = "none";
+        }
+    </script>
+
+    <div class="main-page-text">
+      <div class="intro">SonicBase. In-memory embedded or distributed streaming sql database</div>
+
+<h1>Streaming Producer</h1>
+
+        <h2>Overview</h2>
+        With SonicBase you can publish messages from from inserts, updates and deletes that occur to the database.
+        The current streams platforms that are supported include Kafka, Amazon Web Services Kinesis, and Amazon Web Services Simple Message
+        Queue Service. Additionally, we support custom streams providers. Your streams will receive messages from SonicBase
+        in the format described below.
+        <h2>Performance Considerations</h2>
+        You must have an extremely fast streams provider when hooking a producer or consumer into Sonicbase. Otherwise performance
+        will greatly suffer.
+        <h2>Configuration</h2>
+        You configure streams integration in the cluster config file. In the configuration you create a "streams" section where you specify
+        an array of "producer"s. Each producer has a "className", "maxBatchSize" and provider specific config.
+
+        <h3>Example</h3>
+        <pre class="JSON"><code>
+dataDirectory: $HOME/db-data
+      ...
+streams:
+  processorThreadCount: 8
+  producers:
+  - producer:
+      className: com.sonicbase.streams.AWSKinesisProducer
+      region: us-east-1
+      streamName: sonicbase-test-stream23
+      maxBatchSize: 200
+  - producer:
+      servers: 10.0.0.167:9092
+      maxBatchSize: 200
+      topic: test
+      kafka.batch.size: 16384
+      kafka.linger.ms: 2
+      kafka.acks: 1
+      className: com.sonicbase.streams.KafkaProducer
+  - producer:
+      className: com.sonicbase.streams.AWSSQSProducer
+      maxBatchSize: 100
+      url: https://sqs.us-east-1.amazonaws.com/6/benchmark-queue
+</code></pre>
+        <h2>Message Format</h2>
+        <div class="mylink">
+        See <a href="streaming-consumer.html">Streams Consumers</a> for details about the message format.
+        </div>
+
+        <h2>Administration</h2>
+        In order for AWS integration to work you must have a file named "&lt;cluster&gt;-awskeys" located in the
+        "keys" subdirectory of the install directory. This file contains the accesskey on the first line and the
+        secret key on the second line.
+
+        <h2>Custom Message Providers</h2>
+        You can hook into any messaging system by providing a custom provider. Your class must implement the following
+        interface located in sonicbase-&lt;version&gt;.jar.<br/><br/>
+
+        <pre class="java"><code>
+package com.sonicbase.streams;<br/>
+
+public interface StreamProducer {<br/>
+
+    void init(String cluster, String jsonConfig, String jsonStreamConfig);<br/>
+
+    void publish(List&lt;String&gt; messages);<br/>
+
+    void shutdown();<br/>
+}<br/>
+            </code></pre>
+        "init" is called once to initialize your producer.<br/>
+        <br/>
+        "publish" is called for you send messages to your streams.<br/>
+        <br/>
+        "shutdown" is called for you to disconnect from your provider.<br/>
+        <br/>
+
+        <h2>Example Custom Provider</h2>
+        Below is an example provider that is based on the AWS Simple Queue Service provider built into
+        SonicBase. For your provider to work, you must place the jar containing your code and any dependencies in the "lib"
+        directory under the install directory and deploy it across the cluster.<br/>
+        <pre class="java"><code>
+package com.sonicbase.streams;
+
+public class AWSSQSProducer implements StreamsProducer {
+
+  private static org.apache.log4j.Logger logger = org.apache.log4j.Logger.getLogger(AWSSQSProducer.class);
+
+  private String url;
+  private AmazonSQS sqsClient;
+
+  @Override
+  public void init(String cluster, String installDir, String jsonConfig, String jsonStreamConfig) {
+    try {
+      logger.info("aws sqs producer init - begin");
+      final ClientConfiguration clientConfig = new ClientConfiguration();
+      clientConfig.setMaxConnections(100);
+      clientConfig.setRequestTimeout(20_000);
+      clientConfig.setConnectionTimeout(60_000);
+
+      AmazonSQSClientBuilder builder = AmazonSQSClient.builder();
+
+      ObjectMapper mapper = new ObjectMapper();
+      ObjectNode config = (ObjectNode) mapper.readTree(jsonConfig);
+
+      File keysFile = new File(installDir, "/keys/" + cluster + "-awskeys");
+      if (!keysFile.exists()) {
+        builder.setCredentials(new InstanceProfileCredentialsProvider(true));
+      }
+      else {
+        try (BufferedReader reader = new BufferedReader(new InputStreamReader(new FileInputStream(keysFile)))) {
+          String accessKey = reader.readLine();
+          String secretKey = reader.readLine();
+
+          BasicAWSCredentials awsCredentials = new BasicAWSCredentials(accessKey, secretKey);
+          builder.setCredentials(new AWSStaticCredentialsProvider(awsCredentials));
+        }
+        catch (IOException e) {
+          throw new DatabaseException(e);
+        }
+      }
+      builder.setClientConfiguration(clientConfig);
+      sqsClient = builder.build();
+
+      ObjectNode streamConfig = (ObjectNode) mapper.readTree(jsonStreamConfig);
+      url = streamConfig.get("url").asText();
+
+      logger.info("aws sqs producer init - end");
+    }
+    catch (Exception e) {
+      throw new DatabaseException(e);
+    }
+  }
+
+  @Override
+  public void publish(List&lt;String&gt; messages) {
+    try {
+      Map&lt;String, MessageAttributeValue&gt; attributes = new HashMap&lt;&gt;();
+      List&lt;SendMessageBatchRequestEntry&gt; entries = new ArrayList&lt;&gt;();
+      int offset = 0;
+      for (String message : messages) {
+        SendMessageBatchRequestEntry entry = new SendMessageBatchRequestEntry();
+
+        ByteArrayOutputStream bytesOut = new ByteArrayOutputStream();
+        GZIPOutputStream out = new GZIPOutputStream(bytesOut);
+        out.write(message.getBytes("utf-8"));
+        out.close();
+
+        entry.setId(String.valueOf(offset));
+        entry.setMessageBody("SonicBase Publish");
+        MessageAttributeValue attrib = new MessageAttributeValue().withDataType("Binary").withBinaryValue(ByteBuffer.wrap(bytesOut.toByteArray()));
+        attributes.put(String.valueOf(offset), attrib);
+        entry.addMessageAttributesEntry("message", attrib);
+        entries.add(entry);
+        offset++;
+      }
+      SendMessageBatchResult result = sqsClient.sendMessageBatch(url, entries);
+
+      List&lt;BatchResultErrorEntry&gt; failed = result.getFailed();
+      for (int i = 0; i < 10 && !failed.isEmpty(); i++) {
+        entries.clear();
+
+        logger.error("Error publishing message: count=" + failed.size());
+
+        for (BatchResultErrorEntry curr : failed) {
+          SendMessageBatchRequestEntry entry = new SendMessageBatchRequestEntry();
+          entry.setMessageBody(curr.getMessage());
+          String id = curr.getId();
+          entry.addMessageAttributesEntry("message", attributes.get(id));
+          entries.add(entry);
+        }
+
+        result = sqsClient.sendMessageBatch(url, entries);
+        failed = result.getFailed();
+
+        if (i == 9 && !failed.isEmpty()) {
+          throw new DatabaseException("Error publishing message: count=" + failed.size());
+        }
+      }
+    }
+    catch (Exception e) {
+      throw new DatabaseException(e);
+    }
+  }
+
+  @Override
+  public void shutdown() {
+    sqsClient.shutdown();
+  }
+}
+        </code></pre>
+
+    </div>
+</div>
+</body>
+</html>

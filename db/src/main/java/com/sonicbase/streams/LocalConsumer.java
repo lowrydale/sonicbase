@@ -21,7 +21,7 @@ public class LocalConsumer implements StreamsConsumer {
   }
 
   @Override
-  public int init(String cluster, Config config, Map<String, Object> streamConfig) {
+  public int init(Config config, String installDir, Map<String, Object> streamConfig) {
     return 1;
   }
 

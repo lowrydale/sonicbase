@@ -56,7 +56,8 @@ public class TestNoKey {
         //          String role = "primaryMaster";
 
         dbServers[i] = new DatabaseServer();
-        dbServers[i].setConfig(config, "4-servers", "localhost", 9010 + (50 * i), true, new AtomicBoolean(true), new AtomicBoolean(true),null, false);
+        Config.copyConfig("4-servers");
+        dbServers[i].setConfig(config, "localhost", 9010 + (50 * i), true, new AtomicBoolean(true), new AtomicBoolean(true),null, false);
         dbServers[i].setRole(role);
 
         //          return null;
@@ -185,7 +186,7 @@ public class TestNoKey {
     }
   }
 
-  @Test
+  @Test(enabled=false)
   public void test() throws SQLException {
     PreparedStatement stmt = conn.prepareStatement("select * from nokeysecondaryindex");
     ResultSet rs = stmt.executeQuery();

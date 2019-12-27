@@ -20,10 +20,18 @@
 #include <locale>
 #include <future>
 #include <math.h>
-#include "utf8.h"
+//#include "utf8.h"
 #include "BigDecimal.h"
+//#include <lzo/lzoconf.h>
+//#include <lzo/lzo1x.h>
+#include <atomic>
+#include <condition_variable>
+#include <stdexcept>
+#include <iostream>
+#include <list>
+#include "ctpl_stl.h" 
 
-#include <jni.h>        // JNI header provided by JDK#include <stdio.h>      // C Standard IO Header
+#include <jni.h>     
 #include "com_sonicbase_index_NativePartitionedTree.h"
 
 
@@ -41,7 +49,10 @@
 
 #define SB_DEBUG 0
 
-const int PARTITION_COUNT = 16; // 64 for 17mil tailBlock reads/sec
+
+//extern "C" {void *__dso_handle = NULL; } extern "C" {void *__cxa_atexit = NULL; }
+
+const int PARTITION_COUNT = 64; // 64 for 17mil tailBlock reads/sec
 //const int NUM_RECORDS_PER_PARTITION =  32 + 2;
 //const int BLOCK_SIZE = (PARTITION_COUNT * NUM_RECORDS_PER_PARTITION);
 
@@ -139,6 +150,10 @@ static jclass gBigDecimal_class;
 static jmethodID gBigDecimal_ctor;
 static jmethodID gBigDecimal_toPlainString_mid;
 
+bool shutdownFlag = false;
+
+//unsigned concurentThreadsSupported = std::thread::hardware_concurrency();
+//ctpl::thread_pool threadPool(concurentThreadsSupported);
 
 #ifdef _WIN32
 #define smin(x, y) min(x, y)
@@ -165,6 +180,213 @@ void logError(JNIEnv *env, char msg[]) {
 
 
 
+long readLong(std::vector<jbyte> &vector, int offset) {
+	long result = 0;
+	for (int i = 0; i < 8; i++) {
+		result <<= 8;
+		result |= (vector[i + offset] & 0xFF);
+	}
+	return result;
+}
+
+jboolean writeLong(long long int value, jbyte *bytes, int *offset, int len) {
+	if (offset[0] + 8 > len) {
+		return false;
+	}
+	bytes[offset[0]++] = (jbyte)(0xff & (value >> 56));
+	bytes[offset[0]++] = (jbyte)(0xff & (value >> 48));
+	bytes[offset[0]++] = (jbyte)(0xff & (value >> 40));
+	bytes[offset[0]++] = (jbyte)(0xff & (value >> 32));
+	bytes[offset[0]++] = (jbyte)(0xff & (value >> 24));
+	bytes[offset[0]++] = (jbyte)(0xff & (value >> 16));
+	bytes[offset[0]++] = (jbyte)(0xff & (value >> 8));
+	bytes[offset[0]++] = (jbyte)(0xff & value);
+	return true;
+}
+
+jboolean writeInt(int value, jbyte *p, int *offset, int len) {
+	if (offset[0] + 4 > len) {
+		return false;
+	}
+	p[offset[0]++] = (0xff & (value >> 24));
+	p[offset[0]++] = (0xff & (value >> 16));
+	p[offset[0]++] = (0xff & (value >> 8));
+	p[offset[0]++] = (0xff & value);
+	return true;
+}
+
+jboolean writeShort(int value, jbyte *p, int *offset, int len) {
+	if (offset[0] + 2 > len) {
+		return false;
+	}
+	p[offset[0]++] = (0xff & (value >> 8));
+	p[offset[0]++] = (0xff & value);
+	return true;
+}
+
+long long int readUnsignedVarLong(std::vector<jbyte> &vector, int *offset) {
+	long long int tmp;
+	// CHECKSTYLE: stop InnerAssignment
+	if ((tmp = vector[offset[0]++]) >= 0) {
+		return tmp;
+	}
+	long long int result = tmp & 0x7f;
+	if ((tmp = vector[offset[0]++]) >= 0) {
+		result |= tmp << 7;
+	}
+	else {
+		result |= (tmp & 0x7f) << 7;
+		if ((tmp = vector[offset[0]++]) >= 0) {
+			result |= tmp << 14;
+		}
+		else {
+			result |= (tmp & 0x7f) << 14;
+			if ((tmp = vector[offset[0]++]) >= 0) {
+				result |= tmp << 21;
+			}
+			else {
+				result |= (tmp & 0x7f) << 21;
+				if ((tmp = vector[offset[0]++]) >= 0) {
+					result |= tmp << 28;
+				}
+				else {
+					result |= (tmp & 0x7f) << 28;
+					if ((tmp = vector[offset[0]++]) >= 0) {
+						result |= tmp << 35;
+					}
+					else {
+						result |= (tmp & 0x7f) << 35;
+						if ((tmp = vector[offset[0]++]) >= 0) {
+							result |= tmp << 42;
+						}
+						else {
+							result |= (tmp & 0x7f) << 42;
+							if ((tmp = vector[offset[0]++]) >= 0) {
+								result |= tmp << 49;
+							}
+							else {
+								result |= (tmp & 0x7f) << 49;
+								if ((tmp = vector[offset[0]++]) >= 0) {
+									result |= tmp << 56;
+								}
+								else {
+									result |= (tmp & 0x7f) << 56;
+									result |= ((long long int)vector[offset[0]++]) << 63;
+								}
+							}
+						}
+					}
+				}
+			}
+		}
+	}
+	return result;
+}
+
+long long int readVarLong(std::vector<jbyte> &vector, int *offset) {
+	long long int raw = readUnsignedVarLong(vector, offset);
+	long long int temp = (((raw << 63) >> 63) ^ raw) >> 1;
+	return temp ^ (raw & (1L << 63));
+}
+
+
+void writeVarLong(
+	long long int value,
+	jbyte *bytes,
+	int *offset
+)
+{
+	value = (value << 1);
+	long long int tmp = (value >> 63);
+	value = value ^ tmp;
+	while (true) {
+		int bits = ((int)value) & 0x7f;
+		value = static_cast<unsigned long long int>(value) >> 7;
+		if (value == 0) {
+			bytes[offset[0]++] = (jbyte)bits;
+			return;
+		}
+		bytes[offset[0]++] = (jbyte)(bits | 0x80);
+	}
+}
+
+
+/* These are parameters to deflateInit2. See
+http://zlib.net/manual.html for the exact meanings. */
+
+/* portability layer */
+static const char *progname = NULL;
+#define WANT_LZO_MALLOC 1
+#define WANT_XMALLOC 1
+//#include "examples/portab.h"
+
+
+/* We want to compress the data block at 'in' with length 'IN_LEN' to
+* the block at 'out'. Because the input block may be incompressible,
+* we must provide a little more output space in case that compression
+* is not possible.
+*/
+
+#ifndef IN_LEN
+#define IN_LEN      (128*1024L)
+#endif
+#define OUT_LEN     (IN_LEN + IN_LEN / 16 + 64 + 3)
+
+//#include <lzo/lzoconf.h>
+//#include <lzo/lzo1x.h>
+//#define LZO_OS_WIN64 true
+//#define __WIN64__
+//#define LZO_DEBUG
+
+/*
+#include "minilzo.h"
+*/
+
+/*
+lzo_bytep allocOut(lzo_uint inLen, lzo_uint outLen) {
+	outLen = inLen + inLen / 16 + 64 + 3;
+	return new lzo_byte[outLen];
+}
+
+lzo_bytep lzoDecompress(lzo_bytep in, lzo_uint in_len, lzo_bytep out, lzo_uint &new_len) {
+	
+	new_len = in_len;
+	int r = lzo1x_decompress(in, in_len, out, &new_len, NULL);
+	if (r != LZO_E_OK)
+	{ 
+		printf("internal error - decompression failed: %d\n", r);
+		return 0;
+	}
+
+	return out;
+}
+
+lzo_bytep lzoCompress(lzo_bytep in, lzo_uint in_len, lzo_bytep out, lzo_uint out_len, lzo_uint &new_len) {
+
+	int r;
+	lzo_voidp wrkmem;
+
+	wrkmem = (lzo_voidp)malloc(LZO1X_999_MEM_COMPRESS);
+	if (in == NULL || out == NULL || wrkmem == NULL)
+	{
+		printf("out of memory\n");
+		return 0;
+	}
+
+	r = lzo1x_999_compress(in, in_len, out, &new_len, wrkmem);
+	if (r != LZO_E_OK)
+	{
+		printf("internal error - compression failed: %d\n", r);
+		return 0;
+	}
+
+	//writeInt(in_len, out, 0);
+
+	free(wrkmem);
+	
+	return out;
+}
+*/
 
 struct ByteArray {
 	uint8_t* bytes;
@@ -530,7 +752,221 @@ public:
 
 		env->ReleaseIntArrayElements(dataTypes, types, 0);
     }
+
+	PartitionedMap(int* dataTypes, int fieldCount) {
+		for (int i = 0; i < PARTITION_COUNT; i++) {
+			maps[i] = 0;
+		}
+
+		this->dataTypes = new int[fieldCount];
+		memcpy((void*)this->dataTypes, (void*)dataTypes, fieldCount * sizeof(int));
+		comparator = new KeyComparator(NULL, fieldCount, this->dataTypes);
+	}
 };
+
+
+
+
+void deleteKey(JNIEnv *env, PartitionedMap *map, Key *key) {
+	for (int i = 0; i < key->len; i++) {
+		if (key->key[i] == 0) {
+			continue;
+		}
+		int type = map->dataTypes[i];
+
+		switch (type) {
+		case ROWID:
+		case BIGINT:
+		case DATE:
+		case TIME:
+			delete (uint64_t*)key->key[i];
+			break;
+		case SMALLINT:
+			delete (short*)key->key[i];
+			break;
+		case INTEGER:
+			delete (int*)key->key[i];
+			break;
+		case TINYINT:
+			delete (uint8_t*)key->key[i];
+			break;
+		case NUMERIC:
+		case DECIMAL:
+			delete (std::string *)key->key[i];
+			break;
+		case VARCHAR:
+		case CHAR:
+		case LONGVARCHAR:
+		case NCHAR:
+		case NVARCHAR:
+		case LONGNVARCHAR:
+		case NCLOB:
+		{
+			sb_utf8str *str = (sb_utf8str*)key->key[i];
+			delete[] str->bytes;
+			delete str;
+		}
+		break;
+		case TIMESTAMP:
+		{
+			//printf("deleting");
+			//fflush(stdout);
+			uint64_t *entry = (uint64_t*)key->key[i];
+			delete[] entry;
+		}
+		break;
+		case DOUBLE:
+		case FLOAT:
+		{
+			delete (double*)key->key[i];
+		}
+		break;
+		case REAL:
+		{
+			delete (float*)key->key[i];
+		}
+		break;
+		default:
+		{
+			if (env != 0) {
+				//char *buffer = new char[75];
+				printf("Unsupported datatype in deleteKey: type=%d", type);
+				//logError(env, buffer);
+				//delete[] buffer;
+			}
+		}
+
+		}
+
+	}
+	delete[] key->key;
+	delete key;
+}
+
+
+class DeleteQueueEntry {
+public:
+	PartitionedMap * map = 0;
+	Key *key = 0;
+	uint64_t time = 0;
+	DeleteQueueEntry *next = 0;
+	DeleteQueueEntry *prev = 0;
+};
+
+uint64_t getCurrMillis() {
+#ifdef _WIN32
+	SYSTEMTIME time;
+	GetSystemTime(&time);
+	return (time.wSecond * 1000) + time.wMilliseconds;
+#else
+	struct timeval tp;
+	gettimeofday(&tp, NULL);
+	return (uint64_t)tp.tv_sec * 1000L + tp.tv_usec / 1000;
+#endif
+}
+class DeleteQueue {
+	std::mutex queueLock;
+	DeleteQueueEntry *head = 0;
+	DeleteQueueEntry *tail = 0;
+
+public:
+	void push(DeleteQueueEntry *entry) {
+		{
+
+			entry->time = getCurrMillis();
+			std::lock_guard<std::mutex> lock(queueLock);
+			if (tail == 0) {
+				head = tail = entry;
+			}
+			else {
+				tail->next = entry;
+				entry->prev = tail;
+				tail = entry;
+			}
+		}
+	}
+
+	DeleteQueueEntry *pop() {
+		{
+			std::lock_guard<std::mutex> lock(queueLock);
+			if (head == 0) {
+				return 0;
+			}
+
+			if (getCurrMillis() - head->time > 10000) {
+				return 0;
+			}
+
+			DeleteQueueEntry *ret = 0;
+			ret = head;
+			head = ret->next;
+			if (head == 0) {
+				tail = 0;
+			}
+			return ret;
+		}
+	}
+};
+
+DeleteQueue *deleteQueue = new DeleteQueue();
+
+std::thread *deleteThread;
+
+
+void deleteRunner() {
+	printf("started runner");
+	fflush(stdout);
+	while (!shutdownFlag) {
+		DeleteQueueEntry *entry = deleteQueue->pop();
+		if (entry == 0) {
+			//			printf("popped nothing");
+			//			fflush(stdout);
+			std::this_thread::sleep_for(std::chrono::milliseconds(10000));
+			continue;
+		}
+		//		printf("############# deleting");
+		//		fflush(stdout);
+		deleteKey(0, entry->map, entry->key);
+		delete entry;
+	}
+}
+
+void pushDelete(PartitionedMap *map, Key *key) {
+	if (deleteThread == 0) {
+		printf("creating thread");
+		fflush(stdout);
+		deleteThread = new std::thread(deleteRunner);
+		deleteThread->detach();
+		printf("created thread");
+		fflush(stdout);
+	}
+	DeleteQueueEntry *entry = new DeleteQueueEntry();
+	entry->map = map;
+	entry->key = key;
+	deleteQueue->push(entry);
+}
+
+
+class MyFreeNode : public FreeNode {
+public:
+	void free(void *map, my_node *p) {
+		pushDelete((PartitionedMap *)map, p->key);
+		delete p;
+	}
+};
+
+FreeNode *freeNode = new MyFreeNode();
+
+class SortedListNode {
+public:
+	SortedListNode * next = 0;
+	SortedListNode *prev = 0;
+	head_t *head = 0;
+	Key *key = 0;
+	uint64_t value = 0;
+	int partition;
+};
+
 
 class PartitionResults {
   public:
@@ -541,8 +977,17 @@ class PartitionResults {
     Key *key = 0;
     uint64_t value = 0;
     int partition = 0;
+	SortedListNode sortedListNode;
 
-    PartitionResults(int numRecordsPerPartition) {
+	PartitionResults() {
+	}
+	
+	~PartitionResults() {
+		delete[] values;
+		delete[] keys;
+	}
+
+    void init(int numRecordsPerPartition) {
     	values = new uint64_t[numRecordsPerPartition];
     	keys = new Key*[numRecordsPerPartition];
 
@@ -569,8 +1014,6 @@ float timedifference_msec(struct timeval t0, struct timeval t1)
 {
     return (t1.tv_sec - t0.tv_sec) * 1000.0f + (t1.tv_usec - t0.tv_usec) / 1000.0f;
 }
-
-bool shutdownFlag = false;
 
 
 static uint64_t EXP_BIT_MASK = 9218868437227405312L;
@@ -705,6 +1148,7 @@ uint32_t hashKey(JNIEnv* env, PartitionedMap *map, Key *key) {
 	return abs((int)hashCode);
 }
 
+/*
 std::string byte_seq_to_string( uint8_t bytes[], int n)
 {
     std::ostringstream stm ;
@@ -714,7 +1158,7 @@ std::string byte_seq_to_string( uint8_t bytes[], int n)
 
     return stm.str() ;
 }
-
+*/
 /*
 std::string byte_seq_to_string_orig( const unsigned char bytes[], std::size_t n )
 {
@@ -1008,181 +1452,161 @@ jobjectArray nativeKeyToJavaKey(JNIEnv *env, PartitionedMap *map, Key *key) {
     return ret;
 }
 
-void deleteKey(JNIEnv *env, PartitionedMap *map, Key *key) {
+jboolean serializeKeyValue(JNIEnv *env, PartitionedMap *map, jbyte *bytes, int len, int *offset, Key *key, uint64_t value) {
+
+	/*
 	for (int i = 0; i < key->len; i++) {
 		if (key->key[i] == 0) {
+			printf("null key field: offset=%i", i);
+			fflush(stdout);
+			return;
+		}
+	}
+	*/
+
+	for (int i = 0; i < key->len; i++) {
+		if (offset[0] > len) {
+			return false;
+		}
+		if (key->key[i] == 0) {
+			bytes[offset[0]++] = 0;
 			continue;
+		}
+		else {
+			bytes[offset[0]++] = 1;
 		}
 		int type = map->dataTypes[i];
-
 		switch (type) {
-			case ROWID:
-			case BIGINT:
-			case DATE:
-			case TIME:
-				delete (uint64_t*)key->key[i];
-			break;
-			case SMALLINT:
-				delete (short*)key->key[i];
-				break;
-			case INTEGER:
-				delete (int*)key->key[i];
-				break;
-			case TINYINT:
-				delete (uint8_t*)key->key[i];
-				break;
-			case NUMERIC:
-			case DECIMAL:
-				delete (std::string *)key->key[i];
-			break;
-			case VARCHAR:
-			case CHAR:
-			case LONGVARCHAR:
-			case NCHAR:
-			case NVARCHAR:
-			case LONGNVARCHAR:
-			case NCLOB:
-			{
-				sb_utf8str *str = (sb_utf8str*)key->key[i];
-				delete[] str->bytes;
-				delete str;
-			}
-			break;
-			case TIMESTAMP:
-			{
-				//printf("deleting");
-				//fflush(stdout);
-				uint64_t *entry = (uint64_t*)key->key[i];
-				delete[] entry;
-			}
-			break;
-			case DOUBLE:
-			case FLOAT:
-			{
-				delete (double*)key->key[i];
-			}
-			break;
-			case REAL:
-			{
-				delete (float*)key->key[i];
-			}
-			break;
-			default:
-			{
-				if (env != 0) {
-					//char *buffer = new char[75];
-					printf("Unsupported datatype in deleteKey: type=%d", type);
-					//logError(env, buffer);
-					//delete[] buffer;
-				}
-			}
-
-		}
-
-	}
-}
-
-
-class DeleteQueueEntry {
-	public:
-		PartitionedMap *map = 0;
-		Key *key = 0;
-		uint64_t time = 0;
-		DeleteQueueEntry *next = 0;
-		DeleteQueueEntry *prev = 0;
-};
-
-uint64_t getCurrMillis() {
-#ifdef _WIN32
-	SYSTEMTIME time;
-	GetSystemTime(&time);
-	return (time.wSecond * 1000) + time.wMilliseconds;
-#else
-	struct timeval tp;
-	gettimeofday(&tp, NULL);
-	return (uint64_t)tp.tv_sec * 1000L + tp.tv_usec / 1000;
-#endif
-}
-class DeleteQueue {
-    std::mutex queueLock;
-	DeleteQueueEntry *head = 0;
-	DeleteQueueEntry *tail = 0;
-
-public:
-	void push(DeleteQueueEntry *entry) {
+		case ROWID:
+		case BIGINT:
 		{
-			
-			entry->time = getCurrMillis();
-			std::lock_guard<std::mutex> lock(queueLock);
-			if (tail == 0) {
-				head = tail = entry;
-			}
-			else {
-				tail->next = entry;
-				entry->prev = tail;
-				tail = entry;
+			if (!writeLong(*((uint64_t*)key->key[i]), bytes, offset, len)) {
+				return false;
 			}
 		}
-	}
-
-	DeleteQueueEntry *pop() {
+		break;
+		case SMALLINT:
 		{
-			std::lock_guard<std::mutex> lock(queueLock);
-			if (head == 0) {
-				return 0;
+			if (!writeShort(*((short*)key->key[i]), bytes, offset, len)) {
+				return false;
 			}
-
-			if (getCurrMillis() - head->time > 10000) {
-				return 0;
-			}
-
-			DeleteQueueEntry *ret = 0;
-			ret = head;
-			head = ret->next;
-			if (head == 0) {
-				tail = 0;
-			}
-			return ret;
 		}
-	}
-};
-
-DeleteQueue *deleteQueue = new DeleteQueue();
-
-std::thread *deleteThread;
-
-
-void deleteRunner() {
-	printf("started runner");
-	fflush(stdout);
-	while (!shutdownFlag) {
-		DeleteQueueEntry *entry = deleteQueue->pop();
-		if (entry == 0) {
-//			printf("popped nothing");
-//			fflush(stdout);
-			std::this_thread::sleep_for(std::chrono::milliseconds(10000));
+		break;
+		case INTEGER:
+		{
+			if (!writeInt(*((int*)key->key[i]), bytes, offset, len)) {
+				return false;
+			}
+		}
+		break;
+		case TINYINT:
+		{
+			if (offset[0] > len) {
+				return false;
+			}
+			bytes[offset[0]++] = (jbyte)*(uint8_t*)key->key[i];
+		}
+		break;
+		case DATE:
+		{
+			if (!writeLong(*(uint64_t*)key->key[i], bytes, offset, len)) {
+				return false;
+			}
+		}
+		break;
+		case TIME:
+		{
+			if (!writeLong(*(uint64_t*)key->key[i], bytes, offset, len)) {
+				return false;
+			}
+		}
+		break;
+		case TIMESTAMP:
+		{
+			if (!writeLong(((uint64_t*)key->key[i])[0], bytes, offset, len)) {
+				return false;
+			}
+			if (!writeInt((int)((uint64_t*)key->key[i])[1], bytes, offset, len)) {
+				return false;
+			}
+		}
+		break;
+		case DOUBLE:
+		case FLOAT:
+		{
+			uint64_t bits;
+			memcpy(&bits, (double*)key->key[i], sizeof bits);
+			if (!writeLong(bits, bytes, offset, len)) {
+				return false;
+			}
+		}
+		break;
+		case REAL:
+		{
+			uint32_t bits;
+			memcpy(&bits, (float*)key->key[i], sizeof bits);
+			if (!writeInt(bits, bytes, offset, len)) {
+				return false;
+			}
+		}
+		break;
+		case NUMERIC:
+		case DECIMAL:
+		{
+			std::string *s = (std::string*)key->key[i];
+			const char *str = ((std::string*)key->key[i])->c_str();
+			size_t slen = s->length();
+			if (!writeLong(slen, bytes, offset, len)) {
+				return false;
+			}
+			if (offset[0] + slen * 2 > len) {
+				return false;
+			}
+			for (int i = 0; i < slen; i++) {
+				uint16_t v = str[i];
+				bytes[offset[0]++] = (v >> 8) & 0xFF;
+				bytes[offset[0]++] = (v >> 0) & 0xFF;
+			}
+		}
+		break;
+		case VARCHAR:
+		case CHAR:
+		case LONGVARCHAR:
+		case NCHAR:
+		case NVARCHAR:
+		case LONGNVARCHAR:
+		case NCLOB:
+		{
+			const uint16_t *str = ((sb_utf8str*)key->key[i])->bytes;
+			int slen = ((sb_utf8str*)key->key[i])->len;
+			if (!writeLong(slen, bytes, offset, len)) {
+				return false;
+			}
+			if (offset[0] + slen * 2 > len) {
+				return false;
+			}
+			for (int i = 0; i < slen; i++) {
+				uint16_t v = str[i];
+				bytes[offset[0]++] = (v >> 8) & 0xFF;
+				bytes[offset[0]++] = (v >> 0) & 0xFF;
+			}
+		}
+		break;
+		default:
+		{
+			//char *buffer = new char[75];
+			printf("Unsupported datatype in serializeKeyValue: type=%d", type);
+			//logError(env, buffer);
+			//delete[] buffer;
 			continue;
 		}
-//		printf("############# deleting");
-//		fflush(stdout);
-		deleteKey(0, entry->map, entry->key);
-		delete entry;
-	}
-}
 
-void pushDelete(PartitionedMap *map, Key *key) {
-	if (deleteThread == 0) {
-		printf("creating thread");
-		fflush(stdout);
-		deleteThread = new std::thread(deleteRunner);
-		deleteThread->detach();
-		printf("created thread");
-		fflush(stdout);
+	    }
 	}
-	DeleteQueueEntry *entry = new DeleteQueueEntry();
-	entry->map = map;
-	entry->key = key;
-	deleteQueue->push(entry);
+	if (!writeLong(value, bytes, offset, len)) {
+		return false;
+	}
+	return true;
 }
 
 std::mutex partitionIdLock;
@@ -1278,15 +1702,6 @@ JNIEXPORT jlong JNICALL Java_com_sonicbase_index_NativePartitionedTree_put
 	}
 }
 
- class SortedListNode {
- 	public:
- 	 SortedListNode *next = 0;
- 	SortedListNode *prev = 0;
- 	Key *key = 0;
-	uint64_t value;
- 	int partition;
- };
-
 
 class SortedList {
  	SortedListNode *head = 0;
@@ -1294,12 +1709,58 @@ class SortedList {
 	bool ascending = true;
 	PartitionedMap *map = 0;
 
+	SortedListNode **pools = 0;
+	int currPoolOffset = 0;
+	int poolCount = 0;
+	int poolSize = 0;;
+	std::mutex l;
+
  	public:
 
- 	SortedList(PartitionedMap *map, bool ascending) {
+ 	SortedList(PartitionedMap *map, bool ascending, int size) {
  		this->map = map;
  		this->ascending = ascending;
+		//poolSize = size;
+		//pools = new SortedListNode*[1];
+		//pools[0] = new SortedListNode[size];
+		//poolCount = 1;
  	}
+
+	~SortedList() {/*
+		SortedListNode *curr = head;
+		while (curr != 0) {
+			SortedListNode *next = curr->next;
+			delete curr;
+			curr = next;
+		}
+		*/
+
+		
+		//for (int i = 0; i < poolCount; i++) {
+			//delete[] pools[i];
+		//}
+		//delete[] pools;
+		
+	}
+
+	SortedListNode *allocateNode() {
+		//return new SortedListNode();
+		std::lock_guard<std::mutex> lock(l);
+
+		currPoolOffset++;
+		if (currPoolOffset > poolSize) {
+			//printf("called resize");
+			//fflush(stdout);
+
+			SortedListNode **newPools = new SortedListNode*[++poolCount];
+			memcpy(newPools, pools, (poolCount - 1) * sizeof(SortedListNode*));
+			newPools[poolCount - 1] = new SortedListNode[poolSize];
+			delete[] pools;
+			pools = newPools;
+			currPoolOffset = 1;
+		}
+		return &pools[poolCount - 1][currPoolOffset - 1];
+	}
 
 	int size() {
 		int ret = 0;
@@ -1459,15 +1920,6 @@ class SortedList {
 
 		return ret;
  	}
-
- 	~SortedList() {
- 		SortedListNode *curr = head;
- 		while (curr != 0) {
- 			SortedListNode *next = curr->next;
- 			delete curr;
- 			curr = next;
- 		}
- 	}
  };
 
 
@@ -1530,7 +1982,7 @@ int nextEntries(PartitionedMap* map, int count, int numRecordsPerPartition, int 
 }
 
 void getNextEntryFromPartition(
-        PartitionedMap* map, SortedList *sortedList, SortedListNode *node, std::vector<PartitionResults*> currResults,
+        PartitionedMap* map, SortedList *sortedList, SortedListNode *node, PartitionResults* currResults,
         int count, int numRecordsPerPartition,
         PartitionResults* entry, int partition, Key *currKey, jboolean first, bool tail) {
 
@@ -1586,15 +2038,15 @@ void getNextEntryFromPartition(
 //    fflush(stdout);
     entry->posWithinPartition++;
     entry->partition = partition;
-    node->key = entry->key;
-    node->value = entry->value;
-    node->partition = partition;
+	node->key = entry->key;
+	node->value = entry->value;
+	node->partition = partition;
 	node->next = 0;
 	node->prev = 0;
-    sortedList->push(node);
+	sortedList->push(node);
 }
 
-bool next(PartitionedMap* map, SortedList *sortedList, std::vector<PartitionResults*> currResults,
+bool next(PartitionedMap* map, SortedList *sortedList, PartitionResults* currResults,
 	int count, int numRecordsPerPartition, Key **keys, uint64_t* values,
     int* posInTopLevelArray, int* retCount, bool tail) {
 
@@ -1615,7 +2067,7 @@ bool next(PartitionedMap* map, SortedList *sortedList, std::vector<PartitionResu
 
     currKey = node->key;
     currValue = node->value;
-    getNextEntryFromPartition(map, sortedList, node, currResults, count, numRecordsPerPartition, currResults[*posInTopLevelArray],
+    getNextEntryFromPartition(map, sortedList, node, currResults, count, numRecordsPerPartition, &currResults[*posInTopLevelArray],
         *posInTopLevelArray, currKey, false, tail);
 
     if (currKey == 0) {
@@ -1626,11 +2078,14 @@ bool next(PartitionedMap* map, SortedList *sortedList, std::vector<PartitionResu
     keys[(*retCount)] = currKey;
     values[(*retCount)] = currValue;
     (*retCount)++;
+
+	//delete node;
+
     return true;
 }
 
-jint JNICALL tailHeadlockArray
-  (JNIEnv *env, jobject obj, jlong indexId, jobjectArray jstartKey, jint count, jboolean first, bool tail, jobjectArray jKeys, jlongArray jValues) {
+jboolean JNICALL tailHeadlockArray
+(JNIEnv *env, jobject obj, jlong indexId, jobjectArray jstartKey, jint count, jboolean first, bool tail, jbyteArray bytes, jint len) {
 	if (SB_DEBUG) {
 		printf("tailHeadBlockArray begin\n");
 		fflush(stdout);
@@ -1640,46 +2095,64 @@ jint JNICALL tailHeadlockArray
 
 	PartitionedMap* map = getIndex(env, indexId);
 	if (map == 0) {
-		return 0;
+		return true;
 	}
 
-   int posInTopLevelArray = 0;
+	int posInTopLevelArray = 0;
 
-   Key *startKey = javaKeyToNativeKey(env, map, jstartKey);
+	Key *startKey = javaKeyToNativeKey(env, map, jstartKey);
 
-	SortedList sortedList(map, tail);
+	SortedList sortedList(map, tail, count);
 
-   std::vector<PartitionResults*> currResults(PARTITION_COUNT);
+	PartitionResults* currResults = new PartitionResults[PARTITION_COUNT];
+	//std::vector<PartitionResults*> currResults(PARTITION_COUNT);
 
-   for (int partition = 0; partition < PARTITION_COUNT; partition++) {
-       currResults[partition] = new PartitionResults(numRecordsPerPartition);
-       getNextEntryFromPartition(map, &sortedList, new SortedListNode(), currResults, count, numRecordsPerPartition,
-       currResults[partition], partition, startKey, first, tail);
-   }
+	/*
+	std::vector<std::future<int>> results(PARTITION_COUNT);
+	for (int partition = 0; partition < PARTITION_COUNT; partition++) {
+		results[partition] = threadPool.push([map, partition, currResults, &sortedList, count, startKey, first, tail, numRecordsPerPartition](int) {
+			currResults[partition].init(numRecordsPerPartition);
+			getNextEntryFromPartition(map, &sortedList, &currResults[partition].sortedListNode, currResults, count, numRecordsPerPartition,
+				&currResults[partition], partition, startKey, first, tail);
+			return partition;
+		});
+	}
 
-   //printf("###################### next\n");
+	for (int partition = 0; partition < PARTITION_COUNT; partition++) {
+		results[partition].get();
+	}
+	*/
+
+	for (int partition = 0; partition < PARTITION_COUNT; partition++) {
+		currResults[partition].init(numRecordsPerPartition);
+		getNextEntryFromPartition(map, &sortedList, &currResults[partition].sortedListNode, currResults, count, numRecordsPerPartition,
+			&currResults[partition], partition, startKey, first, tail);
+	}
+
+	//printf("###################### next\n");
 
 
-    Key **keys = new Key*[count];
-    for (int i = 0; i < count; i++) {
-    	keys[i] = 0;
-    }
+	Key **keys = new Key*[count];
+	for (int i = 0; i < count; i++) {
+		keys[i] = 0;
+	}
 	uint64_t* values = new uint64_t[count];
-    int retCount = 0;
-    bool firstEntry = true;
-    while (retCount < count) {
-        if (!next(map, &sortedList, currResults, count, numRecordsPerPartition, keys, values, &posInTopLevelArray, &retCount, tail)) {
-            break;
-        }
+	int retCount = 0;
+	bool firstEntry = true;
+	while (retCount < count) {
+		if (!next(map, &sortedList, currResults, count, numRecordsPerPartition, keys, values, &posInTopLevelArray, &retCount, tail)) {
+			break;
+		}
 		if (firstEntry && (!first /*|| !tail*/)) {
 			if (map->comparator->compare((void**)keys[0], startKey) == 0) {
 				retCount = 0;
 			}
 			firstEntry = false;
 		}
-    }
+	}
 
 
+	/*
 	jlong *valuesArray = env->GetLongArrayElements(jValues, 0);
 
 	for (int i = 0; i < retCount; i++) {
@@ -1688,33 +2161,118 @@ jint JNICALL tailHeadlockArray
 	}
 
 	env->ReleaseLongArrayElements(jValues, valuesArray, 0);
+	*/
+
+	try
+	{
+		jboolean isCopy;
+		jbyte* rawjBytes = env->GetByteArrayElements(bytes, &isCopy);
+
+		jboolean fit = true;
+		int *offset = new int[1]{ 0 };
+		if (!writeLong(retCount, rawjBytes, offset, len)) {
+			fit = false;
+		}
+		else {
+			for (int i = 0; i < retCount; i++) {
+				fit = serializeKeyValue(env, map, rawjBytes, len, offset, keys[i], values[i]);
+				if (!fit) {
+					break;
+				}
+			}
+		}
+		delete[] offset;
 
 
-    delete[] keys;
-    delete[] values;
-    deleteKey(env, map, startKey);
+		//printf("wrote bytets %i\n", len);
 
-    for (int i = 0; i < PARTITION_COUNT; i++) {
-        delete[] currResults[i]->keys;
-        delete[] currResults[i]->values;
-        delete currResults[i];
-    }
+		/*
+		lzo_uint outLen = 0;
+		lzo_bytep out = allocOut(vector.size(), outLen);
+		lzo_uint newLen = 0;
+		lzo_bytep newBytes = lzoCompress(jBytes, vector.size(), out, outLen, newLen);
+		*/
 
-	if (SB_DEBUG) {
-		printf("tailHeadBlockArray end\n");
-		fflush(stdout);
+		//jbyte *bytes = new jbyte[newLen];
+		//for (int i = 0; i < newLen; i++) {
+			//bytes[i] = newBytes[i];
+		//}
+
+//		jbyteArray bArray = env->NewByteArray(newLen);
+
+		env->ReleaseByteArrayElements(bytes, rawjBytes, 0);
+		//env->SetByteArrayRegion(bytes, 0, newLen, (jbyte*)jBytes);// newBytes);
+
+		//delete[] newBytes;
+		//delete[] jBytes;
+
+		delete[] keys;
+		delete[] values;
+		deleteKey(env, map, startKey);
+		delete[] currResults;
+
+		if (SB_DEBUG) {
+			printf("tailHeadBlockArray end\n");
+			fflush(stdout);
+		}
+
+		return fit;
 	}
-	return retCount;
-  }
+	catch (...) {
+		/* Oops I missed identifying this exception! */
+		jclass jc = env->FindClass("java/lang/Error");
+		if (jc) env->ThrowNew(jc, "Unidentified exception => "
+			"Improve rethrow_cpp_exception_as_java_exception()");
+	}
+	return true;
+}
+JNIEXPORT jint JNICALL Java_com_sonicbase_index_NativePartitionedTree_getResultsObjects
+(JNIEnv *env, jobject obj, jlong indexId, jobjectArray startKey, jint count, jboolean first, jobjectArray jKeys, jlongArray jValues) {
 
-JNIEXPORT jint JNICALL Java_com_sonicbase_index_NativePartitionedTree_headBlockArray
-  (JNIEnv *env, jobject obj, jlong indexId, jobjectArray startKey, jint count, jboolean first, jobjectArray keys, jlongArray values) {
-  return tailHeadlockArray(env, obj, indexId, startKey, count, first, false, keys, values);
+	jlong *valuesArray = env->GetLongArrayElements(jValues, 0);
+
+	for (int i = 0; i < count; i++) {
+		uint64_t value = 1000 + i;
+		jobjectArray ret = env->NewObjectArray(1, gObject_class, NULL);
+		jobject obj = env->CallStaticObjectMethod(gLong_class, gLong_valueOf_mid, *((uint64_t*)&value));
+		env->SetObjectArrayElement(ret, 0, obj);
+	
+		env->SetObjectArrayElement(jKeys, i, ret);
+		valuesArray[i] = value;
+	}
+
+	env->ReleaseLongArrayElements(jValues, valuesArray, 0);
+
+	return count;
 }
 
-JNIEXPORT jint JNICALL Java_com_sonicbase_index_NativePartitionedTree_tailBlockArray
-  (JNIEnv *env, jobject obj, jlong indexId, jobjectArray startKey, jint count, jboolean first, jobjectArray keys, jlongArray values) {
-  return tailHeadlockArray(env, obj, indexId, startKey, count, first, true, keys, values);
+JNIEXPORT jbyteArray JNICALL Java_com_sonicbase_index_NativePartitionedTree_getResultsBytes
+(JNIEnv *env, jobject obj, jlong indexId, jobjectArray startKey, jint count, jboolean first)
+{
+	std::vector<jbyte> vector;
+
+	for (int i = 0; i < 8 * 2 * count; i++) {
+		vector.push_back(i);
+	}
+
+	jbyteArray bArray = env->NewByteArray(vector.size());
+	jbyte *jBytes = env->GetByteArrayElements(bArray, 0);
+	for (int i = 0; i < 8 * 2 * count; i++) {
+		jBytes[i] = vector[i];
+	}
+	env->ReleaseByteArrayElements(bArray, jBytes, 0);
+
+	return bArray;
+}
+
+JNIEXPORT jboolean JNICALL Java_com_sonicbase_index_NativePartitionedTree_headBlockArray
+  (JNIEnv *env, jobject obj, jlong indexId, jobjectArray startKey, jint count, jboolean first, jbyteArray bytes, jint len) {
+  return tailHeadlockArray(env, obj, indexId, startKey, count, first, false, bytes, len);
+}
+
+JNIEXPORT jboolean JNICALL Java_com_sonicbase_index_NativePartitionedTree_tailBlockArray
+  (JNIEnv *env, jobject obj, jlong indexId, jobjectArray startKey, jint count, jboolean first, jbyteArray bytes, jint len) {
+  return tailHeadlockArray(env, obj, indexId, startKey, count, first, true, bytes, len);
 }
 
 JNIEXPORT jlong JNICALL Java_com_sonicbase_index_NativePartitionedTree_remove
@@ -1770,16 +2328,6 @@ JNIEXPORT jlong JNICALL Java_com_sonicbase_index_NativePartitionedTree_remove
     return retValue;
 
 }
-
-class MyFreeNode : public FreeNode {
-public:
-	void free(void *map, my_node *p) {
-		pushDelete((PartitionedMap *)map, p->key);
-		delete p;
-	}
-};
-
-FreeNode *freeNode = new MyFreeNode();
 
 
 JNIEXPORT void JNICALL Java_com_sonicbase_index_NativePartitionedTree_clear
@@ -2331,6 +2879,17 @@ jint JNI_OnLoad(JavaVM* vm, void* reserved) {
         return JNI_ERR;
     }
 
+	/*
+	* Step 1: initialize the LZO library
+	*/
+	/*int ret = lzo_init();
+	if (ret != LZO_E_OK)
+	{
+		printf("internal error - lzo_init() failed !!!\n");
+		printf("(this usually indicates a compiler bug - try recompiling\nwithout optimizations, and enable '-DLZO_DEBUG' for diagnostics)\n");
+		return 4;
+	}
+	*/
 	jclass cls = env->FindClass("com/sonicbase/index/NativePartitionedTree");
     gNativePartitioned_class = (jclass) env->NewGlobalRef(cls);
 	gNativePartitionedTree_logError_mid = env->GetMethodID(cls, "logError", "(Ljava/lang/String;)V");

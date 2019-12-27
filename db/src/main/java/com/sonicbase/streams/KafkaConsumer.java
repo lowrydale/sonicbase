@@ -31,7 +31,6 @@ public class KafkaConsumer implements StreamsConsumer {
   private List<TopicPartition> ownedPartitions;
   private int sonicBaseShardCount;
   private List<org.apache.kafka.clients.consumer.KafkaConsumer> consumers = new ArrayList<>();
-  private String cluster;
   private Config config;
   private Map<String, Object> streamConfig;
 
@@ -61,10 +60,9 @@ public class KafkaConsumer implements StreamsConsumer {
   }
 
   @Override
-  public int init(String cluster, Config config, Map<String, Object> streamConfig) {
+  public int init(Config config, String installDir, Map<String, Object> streamConfig) {
 
     try {
-      this.cluster = cluster;
       this.config = config;
       this.streamConfig = streamConfig;
       topic = (String) streamConfig.get("topic");
@@ -84,9 +82,7 @@ public class KafkaConsumer implements StreamsConsumer {
       List<Config.Shard> array = config.getShards();
       Config.Shard shard = array.get(0);
       List<Config.Replica> replicasArray = shard.getReplicas();
-      final String address = config.getBoolean("clientIsPrivate") ?
-          replicasArray.get(0).getString("privateAddress") :
-          replicasArray.get(0).getString("publicAddress");
+      final String address = replicasArray.get(0).getString("address");
       final int port = replicasArray.get(0).getInt("port");
 
       Class.forName("com.sonicbase.jdbcdriver.Driver");

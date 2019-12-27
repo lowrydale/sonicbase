@@ -30,7 +30,8 @@ import java.util.concurrent.atomic.AtomicLong;
 // I prefer to return null instead of an empty array
 // I don't know a good way to reduce the parameter count
 public class DatabaseClient {
-  public static final short SERIALIZATION_VERSION = 30;
+  public static final short SERIALIZATION_VERSION = 31;
+  public static final short SERIALIZATION_VERSION_31 = 31;
   public static final short SERIALIZATION_VERSION_30 = 30;
   public static final short SERIALIZATION_VERSION_29 = 29;
   public static final short SERIALIZATION_VERSION_28 = 28;
@@ -44,7 +45,7 @@ public class DatabaseClient {
   public static final short SERIALIZATION_VERSION_20 = 20;
   public static final short SERIALIZATION_VERSION_19 = 19;
 
-  public static final int SELECT_PAGE_SIZE = 256;
+  public static final int SELECT_PAGE_SIZE = 1000;
   public static final int OPTIMIZED_RANGE_PAGE_SIZE = 4096;
   private static final String SHUTTING_DOWN_STR = "Shutting down";
   private static final String NONE_STR = "__none__";
@@ -58,7 +59,7 @@ public class DatabaseClient {
   private final boolean isClient;
   private final int shard;
   private final int replica;
-  private static final ConcurrentHashMap<String, Thread> statsRecorderThreads = new ConcurrentHashMap<>();
+  private static Thread statsRecorderThread;
   private final String allocatedStack;
   private final StatementHandlerFactory statementHandlerFactory;
   private final String[] hosts;
@@ -66,7 +67,7 @@ public class DatabaseClient {
   private Server[][] servers;
   private final AtomicBoolean isShutdown = new AtomicBoolean();
   public static final AtomicInteger clientRefCount = new AtomicInteger();
-  public static final Map<String, DatabaseClient> sharedClients = new ConcurrentHashMap<>();
+  private static DatabaseClient sharedClient;
   public static final Queue<DatabaseClient> allClients = new ConcurrentLinkedQueue<>();
 
   private DatabaseCommon common = new DatabaseCommon();
@@ -170,30 +171,36 @@ public class DatabaseClient {
   };
 
   private static final Set<String> parallelVerbs = new HashSet<>();
-  private String cluster;
   private ClientStatsHandler clientStatsHandler = new ClientStatsHandler();
   private AtomicBoolean shutdownStatsRecorderThreads = new AtomicBoolean();
+
+  public static DatabaseClient getSharedClient() {
+    return sharedClient;
+  }
+
+  public static void setSharedClient(DatabaseClient client) {
+    sharedClient = client;
+  }
 
   public Server[][] getServersArray() {
     return servers;
   }
 
   public DatabaseClient(String host, int port, int shard, int replica, boolean isClient) {
-    this(null, new String[]{host + ":" + port}, shard, replica, isClient, null, null, false);
+    this(new String[]{host + ":" + port}, shard, replica, isClient, null, null, false);
   }
 
   public DatabaseClient(String[] hosts, int shard, int replica, boolean isClient) {
-    this(null, hosts, shard, replica, isClient, null, null, false);
+    this(hosts, shard, replica, isClient, null, null, false);
   }
 
-  public DatabaseClient(String cluster, String host, int port, int shard, int replica, boolean isClient,
+  public DatabaseClient(String host, int port, int shard, int replica, boolean isClient,
                         DatabaseCommon common, Object databaseServer) {
-    this(cluster, new String[]{host + ":" + port}, shard, replica, isClient, common, databaseServer, false);
+    this(new String[]{host + ":" + port}, shard, replica, isClient, common, databaseServer, false);
   }
 
-  public DatabaseClient(String cluster, String[] hosts, int shard, int replica, boolean isClient, DatabaseCommon common,
+  public DatabaseClient(String[] hosts, int shard, int replica, boolean isClient, DatabaseCommon common,
                         Object databaseServer, boolean isShared) {
-    this.cluster = cluster;
     synchronized (DatabaseClient.class) {
       if (executor == null) {
         executor = ThreadUtil.createExecutor(128, "SonicBase Client Thread");
@@ -233,22 +240,18 @@ public class DatabaseClient {
     statsTimer = new java.util.Timer();
 
     if (!isShared) {
-      cluster = getCluster();
       synchronized (DatabaseClient.class) {
-          DatabaseClient sharedClient = sharedClients.get(cluster);
         if (sharedClient == null) {
-          logger.info("Initializing sharedClient: cluster=" + cluster);
+          logger.info("Initializing sharedClient");
 
-          sharedClient = new DatabaseClient(cluster, hosts, shard, replica, isClient, common, databaseServer, true);
-          sharedClients.put(cluster, sharedClient);
+          this.sharedClient = new DatabaseClient(hosts, shard, replica, isClient, common, databaseServer, true);
 
-          Thread statsRecorderThread = ThreadUtil.createThread(new ClientStatsHandler.QueryStatsRecorder(
-              sharedClient, cluster, shutdownStatsRecorderThreads), "SonicBase Stats Recorder - cluster=" + cluster);
+          statsRecorderThread = ThreadUtil.createThread(new ClientStatsHandler.QueryStatsRecorder(
+              sharedClient, shutdownStatsRecorderThreads), "SonicBase Stats Recorder");
           statsRecorderThread.start();
-          statsRecorderThreads.put(getCluster(), statsRecorderThread);
         }
         else {
-          logger.info("Initializing sharedClient - already initialized: cluster=" + cluster);
+          logger.info("Initializing sharedClient - already initialized");
         }
       }
     }
@@ -257,10 +260,6 @@ public class DatabaseClient {
 
   public static AtomicInteger getClientRefCount() {
     return clientRefCount;
-  }
-
-  public static Map<String, DatabaseClient> getSharedClients() {
-    return sharedClients;
   }
 
   public static Queue<DatabaseClient> getAllClients() {
@@ -455,27 +454,26 @@ public class DatabaseClient {
     List<DatabaseClient> toShutdown = new ArrayList<>();
     boolean shouldShutdown = false;
     synchronized (DatabaseClient.class) {
-      if (clientRefCount.decrementAndGet() == sharedClients.values().size()) {
+      if (clientRefCount.decrementAndGet() == 0) {
         shouldShutdown = true;
-        toShutdown.addAll(sharedClients.values());
-        sharedClients.clear();
+        toShutdown.add(sharedClient);
+        sharedClient = null;
       }
     }
     if (shouldShutdown) {
       logger.info("Shutting down shared client");
       shutdownStatsRecorderThreads.set(true);
-      for (Thread thread : statsRecorderThreads.values()) {
-        thread.interrupt();
+      if (statsRecorderThread != null) {
+        statsRecorderThread.interrupt();
         try {
-          thread.join();
+          statsRecorderThread.join();
         }
         catch (InterruptedException e) {
           Thread.currentThread().interrupt();
           throw new DatabaseException(e);
         }
       }
-
-      statsRecorderThreads.clear();
+      statsRecorderThread = null;
 
       for (DatabaseClient client : toShutdown) {
         client.shutdown();
@@ -488,17 +486,6 @@ public class DatabaseClient {
 
       DatabaseSocketClient.shutdown();
     }
-  }
-
-
-
-  public String getCluster() {
-    if (this.cluster != null) {
-      return this.cluster;
-    }
-    syncConfig();
-    this.cluster = common.getServersConfig().getCluster();
-    return this.cluster;
   }
 
   public ReconfigureResults reconfigureCluster() {
@@ -623,8 +610,7 @@ public class DatabaseClient {
       for (int j = 0; j < servers[i].length; j++) {
         ServersConfig.Host replicaHost = localShard.getReplicas()[j];
 
-        servers[i][j] = new Server(isPrivate ? replicaHost.getPrivateAddress() : replicaHost.getPublicAddress(),
-            replicaHost.getPort());
+        servers[i][j] = new Server(replicaHost.getaddress(), replicaHost.getPort());
       }
     }
   }
@@ -1373,7 +1359,7 @@ public class DatabaseClient {
                                 boolean disableStats, int schemaRetryCount, Statement statement,
                                 String sqlToUse) throws SQLException {
     ClientStatsHandler.HistogramEntry histogramEntry = disableStats ? null :
-        clientStatsHandler.registerQueryForStats(getCluster(), dbName, sqlToUse);
+        clientStatsHandler.registerQueryForStats(dbName, sqlToUse);
     long beginNanos = System.nanoTime();
     boolean success = false;
     try {

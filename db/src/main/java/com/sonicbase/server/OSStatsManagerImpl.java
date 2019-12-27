@@ -443,7 +443,7 @@ public class OSStatsManagerImpl {
         if (line == null) {
           break;
         }
-        if (line.toLowerCase().startsWith("cpu")) {
+        if (line.toLowerCase().startsWith("cpu") || line.toLowerCase().startsWith("%cpu")) {
           cpuLine = line;
         }
         if (lastLine != null || line.trim().toLowerCase().startsWith("pid")) {
@@ -477,8 +477,16 @@ public class OSStatsManagerImpl {
     }
 
     try {
+      boolean needsSpace = false;
       int pos = cpuLine.indexOf("%id");
+      if (pos == -1) {
+        needsSpace = true;
+        pos = cpuLine.indexOf("id");
+      }
       int pos2 = cpuLine.lastIndexOf(" ", pos);
+      if (needsSpace) {
+        pos2 = cpuLine.lastIndexOf(" ", pos2 - 1);
+      }
       ret.cpu = 100d - Double.valueOf(cpuLine.substring(pos2, pos).trim());
     }
     catch (Exception e) {
@@ -760,7 +768,19 @@ public class OSStatsManagerImpl {
   private void getJavaMemStats(AtomicReference<Double> javaMemMin, AtomicReference<Double> javaMemMax) {
     String line = null;
 
-    File file = new File(server.getGcLog() + ".0.current");
+    String[] parts = server.getGcLog().split("/");
+
+    String correctFilename = parts[parts.length - 1];
+    File dir = new File(server.getGcLog()).getParentFile();
+    for (String filename : dir.list()) {
+      if (filename.equals(parts[parts.length - 1]) ||
+          (filename.startsWith(parts[parts.length - 1]) && filename.endsWith("current"))) {
+        correctFilename = filename;
+      }
+    }
+
+    File file = new File(dir, correctFilename);
+    System.out.println("GC: filename=" + file.getAbsolutePath());
     try (ReversedLinesFileReader fr = new ReversedLinesFileReader(file, Charset.forName("utf-8"))) {
       String ch;
       do {
@@ -768,9 +788,10 @@ public class OSStatsManagerImpl {
         if (ch == null) {
           break;
         }
-        if (ch.contains("PSYoungGen:") && ch.contains("Times:")) {
-          //153.889: [GC (Allocation Failure) [PSYoungGen: 2658451K->65976K(2690560K)] 2830514K->238047K(3554304K), 0.0261834 secs] [Times: user=0.16 sys=0.01, real=0.03 secs]
-          int pos = ch.indexOf("]");
+        //[2019-12-25T08:35:56.759-0700][11.956s] GC(32) Pause Young (Normal) (G1 Evacuation Pause) 176M->92M(521M) 32.365ms
+        if (ch.contains("(G1 Evacuation Pause)") && ch.contains("->")) { //jdk11
+          System.out.println(ch);
+          int pos = ch.indexOf("(G1 Evacuation Pause)") + "(G1 Evacuation Pause)".length();
           int pos2 = ch.indexOf("->", pos + 1);
           String max = ch.substring(pos + 1, pos2);
           max = max.trim();
@@ -778,16 +799,16 @@ public class OSStatsManagerImpl {
           maxValue.trim();
           double maxGig = Double.parseDouble(maxValue);
           if (max.endsWith("K") || max.endsWith("k")) {
-            maxGig = maxGig / 1000d / 1000d;
+            maxGig = maxGig / 1024d / 1024d;
           }
           else if (max.endsWith("G") || max.endsWith("g")) {
             maxGig = maxGig;
           }
           else if (max.endsWith("M") || max.endsWith("m")) {
-            maxGig = maxGig / 1000d;
+            maxGig = maxGig / 1024d;
           }
           else if (max.endsWith("T") || max.endsWith("t")) {
-            maxGig = maxGig * 1000d;
+            maxGig = maxGig * 1024d;
           }
           javaMemMax.set(maxGig);
 
@@ -799,16 +820,62 @@ public class OSStatsManagerImpl {
           minValue.trim();
           double minGig = Double.parseDouble(minValue);
           if (min.endsWith("K") || min.endsWith("k")) {
-            minGig = minGig / 1000d / 1000d;
+            minGig = minGig / 1024d / 1024d;
           }
           else if (min.endsWith("G") || min.endsWith("g")) {
             minGig = minGig;
           }
           else if (min.endsWith("M") || min.endsWith("m")) {
-            minGig = minGig / 1000d;
+            minGig = minGig / 1024d;
           }
           else if (min.endsWith("T") || min.endsWith("t")) {
-            minGig *= minGig / 1000d;
+            minGig *= minGig / 1024d;
+          }
+          javaMemMin.set(minGig);
+          System.out.println("GC: max=" + maxGig + ", min=" + minGig);
+          break;
+        }
+        else if (ch.contains("PSYoungGen:") && ch.contains("Times:")) {
+          //153.889: [GC (Allocation Failure) [PSYoungGen: 2658451K->65976K(2690560K)] 2830514K->238047K(3554304K), 0.0261834 secs] [Times: user=0.16 sys=0.01, real=0.03 secs]
+          int pos = ch.indexOf("]");
+          int pos2 = ch.indexOf("->", pos + 1);
+          String max = ch.substring(pos + 1, pos2);
+          max = max.trim();
+          String maxValue = max.substring(0, max.length() - 1);
+          maxValue.trim();
+          double maxGig = Double.parseDouble(maxValue);
+          if (max.endsWith("K") || max.endsWith("k")) {
+            maxGig = maxGig / 1024d / 1024d;
+          }
+          else if (max.endsWith("G") || max.endsWith("g")) {
+            maxGig = maxGig;
+          }
+          else if (max.endsWith("M") || max.endsWith("m")) {
+            maxGig = maxGig / 1024d;
+          }
+          else if (max.endsWith("T") || max.endsWith("t")) {
+            maxGig = maxGig * 1024d;
+          }
+          javaMemMax.set(maxGig);
+
+          pos = ch.indexOf("->", pos);
+          pos2 = ch.indexOf("(", pos);
+          String min = ch.substring(pos + 2, pos2);
+          min = min.trim();
+          String minValue = min.substring(0, min.length() - 1);
+          minValue.trim();
+          double minGig = Double.parseDouble(minValue);
+          if (min.endsWith("K") || min.endsWith("k")) {
+            minGig = minGig / 1024d / 1024d;
+          }
+          else if (min.endsWith("G") || min.endsWith("g")) {
+            minGig = minGig;
+          }
+          else if (min.endsWith("M") || min.endsWith("m")) {
+            minGig = minGig / 1024d;
+          }
+          else if (min.endsWith("T") || min.endsWith("t")) {
+            minGig *= minGig / 1024d;
           }
           javaMemMin.set(minGig);
           break;
@@ -825,10 +892,10 @@ public class OSStatsManagerImpl {
                   maxGig = Double.valueOf(value.substring(0, value.length() - 1));
                 }
                 else if (value.contains("m")) {
-                  maxGig = Double.valueOf(value.substring(0, value.length() - 1)) / 1000d;
+                  maxGig = Double.valueOf(value.substring(0, value.length() - 1)) / 1024d;
                 }
                 else if (value.contains("t")) {
-                  maxGig = Double.valueOf(value.substring(0, value.length() - 1)) * 1000d;
+                  maxGig = Double.valueOf(value.substring(0, value.length() - 1)) * 1024d;
                 }
                 javaMemMax.set(maxGig);
               }
@@ -845,10 +912,10 @@ public class OSStatsManagerImpl {
                     minGig = Double.valueOf(value.substring(0, value.length() - 1));
                   }
                   else if (value.contains("m")) {
-                    minGig = Double.valueOf(value.substring(0, value.length() - 1)) / 1000d;
+                    minGig = Double.valueOf(value.substring(0, value.length() - 1)) / 1024d;
                   }
                   else if (value.contains("t")) {
-                    minGig = Double.valueOf(value.substring(0, value.length() - 1)) * 1000d;
+                    minGig = Double.valueOf(value.substring(0, value.length() - 1)) * 1024d;
                   }
                   javaMemMin.set(minGig);
                 }
@@ -1338,10 +1405,10 @@ public class OSStatsManagerImpl {
                     actualGig = Double.valueOf(value.substring(0, value.length() - 1));
                   }
                   else if (value.contains("m")) {
-                    actualGig = Double.valueOf(value.substring(0, value.length() - 1)) / 1000d;
+                    actualGig = Double.valueOf(value.substring(0, value.length() - 1)) / 1024d;
                   }
                   else if (value.contains("t")) {
-                    actualGig = Double.valueOf(value.substring(0, value.length() - 1)) * 1000d;
+                    actualGig = Double.valueOf(value.substring(0, value.length() - 1)) * 1024d;
                   }
 
                   double xmxValue = 0;
@@ -1349,10 +1416,10 @@ public class OSStatsManagerImpl {
                     xmxValue = Double.valueOf(server.getXmx().substring(0, server.getXmx().length() - 1));
                   }
                   else if (value.contains("m")) {
-                    xmxValue = Double.valueOf(server.getXmx().substring(0, server.getXmx().length() - 1)) / 1000d;
+                    xmxValue = Double.valueOf(server.getXmx().substring(0, server.getXmx().length() - 1)) / 1024d;
                   }
                   else if (value.contains("t")) {
-                    xmxValue = Double.valueOf(server.getXmx().substring(0, server.getXmx().length() - 1)) * 1000d;
+                    xmxValue = Double.valueOf(server.getXmx().substring(0, server.getXmx().length() - 1)) * 1024d;
                   }
 
                   if (max.contains("%")) {

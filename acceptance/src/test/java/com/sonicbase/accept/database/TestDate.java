@@ -8,7 +8,7 @@ import java.util.Date;
 
 public class TestDate {
 
-  @Test
+  @Test(enabled=false)
   public void test() throws ParseException {
     Date date = DateUtils.fromString("2018-12-08T03:57:46.915");
     System.out.println(date.toString());

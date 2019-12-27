@@ -51,7 +51,7 @@ public class TestBulkImport {
     serverB1.shutdown();
     serverB2.shutdown();
 
-    System.out.println("client refCount=" + DatabaseClient.getClientRefCount().get() + ", sharedClients=" + DatabaseClient.getSharedClients().size());
+    System.out.println("client refCount=" + DatabaseClient.getClientRefCount().get());
 
     System.out.println("finished");
   }
@@ -60,7 +60,7 @@ public class TestBulkImport {
   public void beforeClass() throws IOException, InterruptedException, SQLException, ClassNotFoundException {
     try {
       System.setProperty("log4j.configuration", "test-log4j.xml");
-      String configStr = IOUtils.toString(new BufferedInputStream(getClass().getResourceAsStream("/config/config-2-servers-a.yaml")), "utf-8");
+      final String configStr = IOUtils.toString(new BufferedInputStream(getClass().getResourceAsStream("/config/config-2-servers-a.yaml")), "utf-8");
       Config config = new Config(configStr);
 
       FileUtils.deleteDirectory(new File(System.getProperty("user.home"), "db-data"));
@@ -71,12 +71,11 @@ public class TestBulkImport {
 
       String role = "primaryMaster";
 
-
       final CountDownLatch latch = new CountDownLatch(4);
       serverA1 = new NettyServer(128);
       Thread thread = new Thread(() -> {
         serverA1.startServer(new String[]{"-port", String.valueOf(9010), "-host", "localhost",
-            "-mport", String.valueOf(9010), "-mhost", "localhost", "-cluster", "2-servers-a", "-shard", String.valueOf(0)});
+            "-mport", String.valueOf(9010), "-mhost", "localhost", "-cluster", "2-servers-a", "-config", configStr, "-shard", String.valueOf(0)});
         latch.countDown();
       });
       thread.start();
@@ -90,7 +89,7 @@ public class TestBulkImport {
       serverA2 = new NettyServer(128);
       thread = new Thread(() -> {
         serverA2.startServer(new String[]{"-port", String.valueOf(9060), "-host", "localhost",
-            "-mport", String.valueOf(9060), "-mhost", "localhost", "-cluster", "2-servers-a", "-shard", String.valueOf(1)});
+            "-mport", String.valueOf(9060), "-mhost", "localhost", "-cluster", "2-servers-a", "-config", configStr, "-shard", String.valueOf(1)});
         latch.countDown();
       });
       thread.start();
@@ -101,10 +100,11 @@ public class TestBulkImport {
         Thread.sleep(100);
       }
 
+      final String configStrB = IOUtils.toString(new BufferedInputStream(getClass().getResourceAsStream("/config/config-2-servers-b.yaml")), "utf-8");
       serverB1 = new NettyServer(128);
       thread = new Thread(() -> {
         serverB1.startServer(new String[]{"-port", String.valueOf(9110), "-host", "localhost",
-            "-mport", String.valueOf(9110), "-mhost", "localhost", "-cluster", "2-servers-b", "-shard", String.valueOf(0)});
+            "-mport", String.valueOf(9110), "-mhost", "localhost", "-cluster", "2-servers-b", "-config", configStrB, "-shard", String.valueOf(0)});
         latch.countDown();
       });
       thread.start();
@@ -118,7 +118,7 @@ public class TestBulkImport {
       serverB2 = new NettyServer(128);
       thread = new Thread(() -> {
         serverB2.startServer(new String[]{"-port", String.valueOf(9160), "-host", "localhost",
-            "-mport", String.valueOf(9160), "-mhost", "localhost", "-cluster", "2-servers-b", "-shard", String.valueOf(1)});
+            "-mport", String.valueOf(9160), "-mhost", "localhost", "-cluster", "2-servers-b", "-config", configStrB, "-shard", String.valueOf(1)});
         latch.countDown();
       });
       thread.start();

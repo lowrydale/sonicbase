@@ -39,18 +39,13 @@ public class AWSSQSConsumer implements StreamsConsumer {
     }
   }
 
-  public File getInstallDir(Config config) {
-    String dir = config.getString("installDirectory");
-    return new File(dir.replace("$HOME", System.getProperty("user.home")));
-  }
-
   public void shutdown() {
     this.shutdown = true;
     sqsClient.shutdown();
   }
 
   @Override
-  public int init(String cluster, Config config, Map<String, Object> streamConfig) {
+  public int init(Config config, String installDir, Map<String, Object> streamConfig) {
     try {
       logger.info("aws sqs init - begin");
       final ClientConfiguration clientConfig = new ClientConfiguration();
@@ -60,8 +55,7 @@ public class AWSSQSConsumer implements StreamsConsumer {
 
       AmazonSQSClientBuilder builder = AmazonSQSClient.builder();
 
-      File installDir = getInstallDir(config);
-      File keysFile = new File(installDir, "/keys/" + cluster + "-awskeys");
+      File keysFile = new File(installDir, "/keys/sonicbase-awskeys");
       if (!keysFile.exists()) {
         builder.setCredentials(new InstanceProfileCredentialsProvider(true));
       }

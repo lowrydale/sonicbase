@@ -70,15 +70,14 @@ public class ResultSetImplTest {
         "    {\n" +
         "      \"replicas\": [\n" +
         "        {\n" +
-        "          \"publicAddress\": \"localhost\",\n" +
-        "          \"privateAddress\": \"localhost\",\n" +
+        "          \"address\": \"localhost\",\n" +
         "          \"port\": 9010,\n" +
         "          \"httpPort\": 8080\n" +
         "        }\n" +
         "      ]\n" +
         "    }\n" +
         "  ]}\n");
-    serversConfig = new ServersConfig("test", (ArrayNode) ((ObjectNode)node).withArray("shards"), true, true);
+    serversConfig = new ServersConfig((ArrayNode) ((ObjectNode)node).withArray("shards"), true, true);
     //when(common.getServersConfig()).thenReturn(serversConfig);
     common.setServersConfig(serversConfig);
     when(client.getCommon()).thenReturn(common);
@@ -131,7 +130,7 @@ public class ResultSetImplTest {
         return new IndexLookup() {
           @Override
           public SelectContextImpl lookup(ExpressionImpl expression1, Expression topLevelExpression) {
-            assertEquals(getCount(), 256);
+            assertEquals(getCount(), DatabaseClient.SELECT_PAGE_SIZE);
             assertEquals(getIndexName(), "_primarykey");
             assertEquals(getLeftOp(), Operator.EQUAL);
             assertEquals(getRightOp(), null);

@@ -49,19 +49,35 @@ JNIEXPORT void JNICALL Java_com_sonicbase_index_NativePartitionedTree_clear
 
 /*
  * Class:     com_sonicbase_index_NativePartitionedTree
- * Method:    tailBlockArray
+ * Method:    getResultsBytes
+ * Signature: (J[Ljava/lang/Object;IZ)[B
+ */
+JNIEXPORT jbyteArray JNICALL Java_com_sonicbase_index_NativePartitionedTree_getResultsBytes
+  (JNIEnv *, jobject, jlong, jobjectArray, jint, jboolean);
+
+/*
+ * Class:     com_sonicbase_index_NativePartitionedTree
+ * Method:    getResultsObjects
  * Signature: (J[Ljava/lang/Object;IZ[[Ljava/lang/Object;[J)I
  */
-JNIEXPORT jint JNICALL Java_com_sonicbase_index_NativePartitionedTree_tailBlockArray
+JNIEXPORT jint JNICALL Java_com_sonicbase_index_NativePartitionedTree_getResultsObjects
   (JNIEnv *, jobject, jlong, jobjectArray, jint, jboolean, jobjectArray, jlongArray);
 
 /*
  * Class:     com_sonicbase_index_NativePartitionedTree
- * Method:    headBlockArray
- * Signature: (J[Ljava/lang/Object;IZ[[Ljava/lang/Object;[J)I
+ * Method:    tailBlockArray
+ * Signature: (J[Ljava/lang/Object;IZ[BI)Z
  */
-JNIEXPORT jint JNICALL Java_com_sonicbase_index_NativePartitionedTree_headBlockArray
-  (JNIEnv *, jobject, jlong, jobjectArray, jint, jboolean, jobjectArray, jlongArray);
+JNIEXPORT jboolean JNICALL Java_com_sonicbase_index_NativePartitionedTree_tailBlockArray
+  (JNIEnv *, jobject, jlong, jobjectArray, jint, jboolean, jbyteArray, jint);
+
+/*
+ * Class:     com_sonicbase_index_NativePartitionedTree
+ * Method:    headBlockArray
+ * Signature: (J[Ljava/lang/Object;IZ[BI)Z
+ */
+JNIEXPORT jboolean JNICALL Java_com_sonicbase_index_NativePartitionedTree_headBlockArray
+  (JNIEnv *, jobject, jlong, jobjectArray, jint, jboolean, jbyteArray, jint);
 
 /*
  * Class:     com_sonicbase_index_NativePartitionedTree

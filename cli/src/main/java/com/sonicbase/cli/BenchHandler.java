@@ -18,12 +18,13 @@ import java.util.ArrayList;
 import java.util.List;
 import java.util.concurrent.*;
 
+import static com.sonicbase.cli.Cli.getConfig;
+import static com.sonicbase.cli.Cli.resolvePath;
+
 public class BenchHandler {
 
   public static final String USER_DIR_STR = "user.dir";
-  public static final String PUBLIC_ADDRESS_STR = "publicAddress";
   public static final String BENCH_START_STR = "/bench/start/";
-  public static final String CLUSTER_STR = "?cluster=";
   public static final String COUNT_1000000000_OFFSET_STR = "&count=1000000000&offset=";
   public static final String COUNT_STR = "count";
   private static long benchStartTime;
@@ -36,8 +37,8 @@ public class BenchHandler {
   }
 
 
-  void initBench(String cluster) throws IOException {
-    Config config = cli.getConfig(cluster);
+  void initBench() throws IOException {
+    Config config = getConfig();
     benchUris.clear();
     List<Config.Client> clients = config.getClients();
     if (clients != null) {
@@ -47,29 +48,22 @@ public class BenchHandler {
       benchExecutor = new ThreadPoolExecutor(Math.max(1, clients.size()), Math.max(1, clients.size()), 10000L, TimeUnit.MILLISECONDS, new ArrayBlockingQueue<Runnable>(1000), new ThreadPoolExecutor.CallerRunsPolicy());
       for (int i = 0; i < clients.size(); i++) {
         Config.Client replica = clients.get(i);
-        String externalAddress = replica.getString(PUBLIC_ADDRESS_STR);
+        String address = replica.getString("address");
         int port = replica.getInt("port");
-        benchUris.add("http://" + externalAddress + ":" + port);
+        benchUris.add("http://" + address + ":" + port);
       }
     }
   }
 
 
-  private void benchStopCluster() throws IOException, InterruptedException, ExecutionException {
-    String cluster = cli.getCurrCluster();
-    if (cluster == null) {
-      cli.println("Error, not using a cluster");
-      return;
-    }
-    Config config = cli.getConfig(cluster);
-    final String installDir = cli.resolvePath(config.getString("installDirectory"));
+  private void benchStopCluster() throws  InterruptedException, ExecutionException {
+    Config config = getConfig();
     List<Config.Client> clients = config.getClients();
     List<Future> futures = new ArrayList<>();
     for (int i = 0; i < clients.size(); i++) {
       final Config.Client client = clients.get(i);
       futures.add(cli.getExecutor().submit((Callable) () -> {
-        stopBenchServer(config, client.getString(PUBLIC_ADDRESS_STR), client.getString("privateAddress"),
-            client.getInt("port"), installDir);
+        stopBenchServer(config, client.getString("address"), client.getInt("port"));
         return null;
       }));
     }
@@ -79,10 +73,8 @@ public class BenchHandler {
     cli.println("Stopped benchmark cluster");
   }
 
-  private void stopBenchServer(Config config, String externalAddress, String privateAddress,
-                                      int port, String installDir) throws IOException, InterruptedException, UnirestException {
-    String deployUser = config.getString("user");
-    if (externalAddress.equals("127.0.0.1") || externalAddress.equals("localhost")) {
+  private void stopBenchServer(Config config, String address, int port) throws IOException, InterruptedException, UnirestException {
+    if (address.equals("127.0.0.1") || address.equals("localhost")) {
       ProcessBuilder builder = null;
       if (cli.isCygwin() || cli.isWindows()) {
         cli.println("killing windows: port=" + port);
@@ -97,22 +89,22 @@ public class BenchHandler {
     else {
       ProcessBuilder builder = null;
       Process p = null;
-      if (cli.isWindows()) {
-        GetRequest request = Unirest.get("http://" + privateAddress + ":8081/stop-server?port=" + port);
+//      if (cli.isWindows()) {
+        GetRequest request = Unirest.get("http://" + address + ":" + getControllerPort() + "/bench-stop-server?port=" + port);
         HttpResponse<String> response = request.asString();
         if (response.getStatus() != 200) {
-          throw new DatabaseException("Error starting server: host=" + privateAddress);
+          throw new DatabaseException("Error starting server: host=" + address);
         }
-      }
-      else {
-        builder = new ProcessBuilder().command("ssh", "-n", "-f", "-o",
-            "UserKnownHostsFile=/dev/null", "-o", "StrictHostKeyChecking=no", deployUser + "@" +
-                externalAddress, installDir + "/bin/kill-server", "BenchServer", String.valueOf(port), String.valueOf(port), String.valueOf(port), String.valueOf(port));
-        p = builder.start();
-      }
-      if (p != null) {
-        p.waitFor();
-      }
+//      }
+//      else {
+//        builder = new ProcessBuilder().command("ssh", "-n", "-f", "-o",
+//            "UserKnownHostsFile=/dev/null", "-o", "StrictHostKeyChecking=no", deployUser + "@" +
+//                address, installDir + "/bin/kill-server", "BenchServer", String.valueOf(port), String.valueOf(port), String.valueOf(port), String.valueOf(port));
+//        p = builder.start();
+//      }
+//      if (p != null) {
+//        p.waitFor();
+//      }
     }
   }
 
@@ -140,43 +132,43 @@ public class BenchHandler {
     benchStartTime = System.currentTimeMillis();
     List<Response> responses = null;
     if (test.equals("insert")) {
-      responses = sendBenchRequest(cli,BENCH_START_STR + test + CLUSTER_STR + cli.getCurrCluster() +
+      responses = sendBenchRequest(cli,BENCH_START_STR + test + "?" +
           COUNT_1000000000_OFFSET_STR + offset);
     }
     else if (test.equals("delete")) {
-      responses = sendBenchRequest(cli,BENCH_START_STR + test + CLUSTER_STR + cli.getCurrCluster() +
+      responses = sendBenchRequest(cli,BENCH_START_STR + test + "?" +
           COUNT_1000000000_OFFSET_STR + offset);
     }
     else if (test.equals("aws-insert")) {
-      responses = sendBenchRequest(cli,BENCH_START_STR + test + CLUSTER_STR + cli.getCurrCluster() +
+      responses = sendBenchRequest(cli,BENCH_START_STR + test + "?" +
           COUNT_1000000000_OFFSET_STR + offset);
     }
     else if (test.equals("aws-delete")) {
-      responses = sendBenchRequest(cli,BENCH_START_STR + test + CLUSTER_STR + cli.getCurrCluster() +
+      responses = sendBenchRequest(cli,BENCH_START_STR + test + "?" +
           COUNT_1000000000_OFFSET_STR + offset);
     }
     else if (test.equals("kafka-insert")) {
-      responses = sendBenchRequest(cli,BENCH_START_STR + test + CLUSTER_STR + cli.getCurrCluster() +
+      responses = sendBenchRequest(cli,BENCH_START_STR + test + "?" +
           COUNT_1000000000_OFFSET_STR + offset);
     }
     else if (test.equals("kafka-delete")) {
-      responses = sendBenchRequest(cli,BENCH_START_STR + test + CLUSTER_STR + cli.getCurrCluster() +
+      responses = sendBenchRequest(cli,BENCH_START_STR + test + "?" +
           COUNT_1000000000_OFFSET_STR + offset);
     }
     else if (test.equals("identity")) {
-      responses = sendBenchRequest(cli,BENCH_START_STR + test + CLUSTER_STR + cli.getCurrCluster() +
+      responses = sendBenchRequest(cli,BENCH_START_STR + test + "?" +
           "&count=1000000000&queryType=" + queryType);
     }
     else if (test.equals("joins")) {
-      responses = sendBenchRequest(cli,BENCH_START_STR + test + CLUSTER_STR + cli.getCurrCluster() +
+      responses = sendBenchRequest(cli,BENCH_START_STR + test + "?" +
           "&count=1000000000&queryType=" + queryType);
     }
     else if (test.equals("range")) {
-      responses = sendBenchRequest(cli,BENCH_START_STR + test + CLUSTER_STR + cli.getCurrCluster() +
+      responses = sendBenchRequest(cli,BENCH_START_STR + test + "?" +
           "&count=1000000000");
     }
     else if (test.equals("check")) {
-      responses = sendBenchRequest(cli,BENCH_START_STR + test + CLUSTER_STR + cli.getCurrCluster() +
+      responses = sendBenchRequest(cli,BENCH_START_STR + test + "?" +
           "&count=1000000000");
     }
     for (int i = 0; i < responses.size(); i++) {
@@ -390,15 +382,8 @@ public class BenchHandler {
   }
 
   private void benchStartCluster() throws IOException, InterruptedException, ExecutionException {
-    final String cluster = cli.getCurrCluster();
-    if (cluster == null) {
-      cli.println("Error, not using a cluster");
-      return;
-    }
 
-    Config config = cli.getConfig(cluster);
-    String dir = config.getString("installDirectory");
-    final String installDir = cli.resolvePath(dir);
+    Config config = getConfig();
 
     benchStopCluster();
 
@@ -408,8 +393,8 @@ public class BenchHandler {
     for (int i = 0; i < clients.size(); i++) {
       final Config.Client client = clients.get(i);
       futures.add(benchExecutor.submit((Callable) () -> {
-        startBenchServer(config, client.getString(PUBLIC_ADDRESS_STR),
-            client.getString("privateAddress"), String.valueOf(client.getInt("port")), installDir, cluster);
+        startBenchServer(config,
+            client.getString("address"), String.valueOf(client.getInt("port")));
         return null;
       }));
     }
@@ -425,58 +410,56 @@ public class BenchHandler {
 
   }
 
-  private void startBenchServer(Config config, String externalAddress, String privateAddress, String port, String installDir,
-                                       String cluster) throws IOException, InterruptedException, UnirestException {
+  private Integer getControllerPort() {
+    Config config = Cli.getConfig();
+    Integer port = config.getInt("defaultControllerPort");
+    if (port == null) {
+      port = 8081;
+    }
+    return port;
+  }
+
+  private void startBenchServer(Config config, String address, String port) throws IOException, InterruptedException, UnirestException {
     String deployUser = config.getString("user");
     String maxHeap = config.getString("maxJavaHeap");
     if (port == null) {
       port = "9010";
     }
-    String searchHome = installDir;
-    if (externalAddress.equals("127.0.0.1") || externalAddress.equals("localhost")) {
+    if (address.equals("127.0.0.1") || address.equals("localhost")) {
       maxHeap = cli.getMaxHeap(config);
 
-      if (!searchHome.startsWith("/")) {
-        File file = new File(System.getProperty("user.home"), searchHome);
-        searchHome = file.getAbsolutePath();
-      }
-      searchHome = new File(System.getProperty(USER_DIR_STR)).getAbsolutePath();
       ProcessBuilder builder = null;
       if (cli.isCygwin() || cli.isWindows()) {
         cli.println("starting bench server: userDir=" + System.getProperty(USER_DIR_STR));
 
-        builder = new ProcessBuilder().command("bin/start-bench-server-task.bat", port, searchHome);
+        builder = new ProcessBuilder().command("bin/start-bench-server-task.bat", port);
         Process p = builder.start();
         p.waitFor();
       }
       else {
-        builder = new ProcessBuilder().command("bash", "bin/start-bench-server", privateAddress, port, maxHeap, searchHome, cluster);
+        builder = new ProcessBuilder().command("bash", "bin/start-bench-server", port);
         builder.start();
       }
-      cli.println("Started server: address=" + externalAddress + ", port=" + port + ", maxJavaHeap=" + maxHeap);
+      cli.println("Started server: address=" + address + ", port=" + port);
       return;
     }
     maxHeap = cli.getMaxHeap(config);
-    cli.println("Home=" + searchHome);
 
-    cli.println("1=" + deployUser + "@" + externalAddress + ", 2=" + installDir +
-        ", 3=" + privateAddress + ", 4=" + port + ", 5=" + maxHeap + ", 6=" + searchHome +
-        ", 7=" + cluster);
-    if (cli.isWindows()) {
+    //if (cli.isWindows()) {
       cli.println("starting bench server: userDir=" + System.getProperty(USER_DIR_STR));
 
-      GetRequest request = Unirest.get("http://" + privateAddress + ":8081/start-bench-server?port=" + port);
+      GetRequest request = Unirest.get("http://" + address + ":" + getControllerPort() + "/start-bench-server?port=" + port);
       HttpResponse<String> response = request.asString();
       if (response.getStatus() != 200) {
-        throw new DatabaseException("Error starting server: host=" + privateAddress);
+        throw new DatabaseException("Error starting server: host=" + address);
       }
-    }
-    else {
-      ProcessBuilder builder = new ProcessBuilder().command("bash", "bin/do-start-bench", deployUser + "@" + externalAddress,
-          installDir, privateAddress, port, maxHeap, searchHome, cluster);
-      cli.println("Started server: address=" + externalAddress + ", port=" + port + ", maxJavaHeap=" + maxHeap);
-      Process p = builder.start();
-      p.waitFor();
-    }
+//    }
+//    else {
+//      ProcessBuilder builder = new ProcessBuilder().command("bash", "bin/do-start-bench", deployUser + "@" + address,
+//          installDir, address, port, maxHeap, searchHome, cluster);
+//      cli.println("Started server: address=" + address + ", port=" + port + ", maxJavaHeap=" + maxHeap);
+//      Process p = builder.start();
+//      p.waitFor();
+//    }
   }
 }

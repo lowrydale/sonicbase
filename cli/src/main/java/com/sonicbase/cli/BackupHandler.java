@@ -7,8 +7,6 @@ import java.sql.SQLException;
 
 
 class BackupHandler {
-
-  private static final String ERROR_NOT_USING_A_CLUSTER_STR = "Error, not using a cluster";
   private static final String ERROR_STR = ", error=";
   private final Cli cli;
 
@@ -17,24 +15,12 @@ class BackupHandler {
   }
 
   void startBackup() throws SQLException, ClassNotFoundException {
-    String cluster = cli.getCurrCluster();
-    if (cluster == null) {
-      cli.println(ERROR_NOT_USING_A_CLUSTER_STR);
-      return;
-    }
-
     cli.initConnection();
 
     cli.getConn().startBackup();
   }
 
   void startRestore(String command) throws SQLException, ClassNotFoundException {
-    String cluster = cli.getCurrCluster();
-    if (cluster == null) {
-      cli.println(ERROR_NOT_USING_A_CLUSTER_STR);
-      return;
-    }
-
     cli.initConnection();
 
     String subDir = command.substring(command.indexOf("start restore") + "start restore".length());
@@ -47,12 +33,6 @@ class BackupHandler {
   }
 
   void backupStatus() throws SQLException, ClassNotFoundException {
-    String cluster = cli.getCurrCluster();
-    if (cluster == null) {
-      cli.println(ERROR_NOT_USING_A_CLUSTER_STR);
-      return;
-    }
-
     cli.initConnection();
 
     if (cli.getConn().isBackupComplete()) {
@@ -73,12 +53,6 @@ class BackupHandler {
   }
 
   void restoreStatus() throws SQLException, ClassNotFoundException {
-    String cluster = cli.getCurrCluster();
-    if (cluster == null) {
-      cli.println(ERROR_NOT_USING_A_CLUSTER_STR);
-      return;
-    }
-
     cli.initConnection();
 
     if (cli.getConn().isRestoreComplete()) {

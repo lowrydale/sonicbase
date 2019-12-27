@@ -8,7 +8,7 @@ import java.util.Map;
 
 public interface StreamsConsumer {
 
-  int init(String cluster, Config config, Map<String, Object> streamConfig);
+  int init(Config config, String installDir, Map<String, Object> streamConfig);
 
   void initThread();
 

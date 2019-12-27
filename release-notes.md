@@ -1,3 +1,8 @@
+1.3.1
+simplified administration
+optimized native index
+various bug fixes
+
 1.3.0
 added support for native indices
 improved unicode support

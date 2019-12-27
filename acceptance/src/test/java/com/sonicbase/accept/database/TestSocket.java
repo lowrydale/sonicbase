@@ -12,11 +12,11 @@ import static org.testng.Assert.assertEquals;
 
 public class TestSocket {
 
-  @Test
+  @Test(enabled=false)
   public void test() throws InterruptedException {
     Thread thread = new Thread(() -> {
       NettyServer server = new NettyServer();
-      String argsStr = "-host localhost -port 9010 -cluster 1-local -gclog gc.log -xmx 2G";
+      String argsStr = "-host localhost -port 9010 -gclog gc.log -xmx 2G";
       String[] args = argsStr.split(" ");
       server.startServer(args);
     });

@@ -17,7 +17,6 @@ import net.sf.jsqlparser.expression.operators.relational.ExpressionList;
 import net.sf.jsqlparser.parser.CCJSqlParserManager;
 import net.sf.jsqlparser.statement.Statement;
 import net.sf.jsqlparser.statement.execute.Execute;
-import org.apache.commons.collections.map.HashedMap;
 import org.apache.commons.io.FileUtils;
 import org.apache.commons.io.IOUtils;
 import org.apache.commons.lang.exception.ExceptionUtils;
@@ -49,7 +48,7 @@ public class DatabaseServer {
 
   private static final String SHARDS_STR = "shards";
   private static final String REPLICAS_STR = "replicas";
-  private static final String PRIVATE_ADDRESS_STR = "privateAddress";
+  private static final String ADDRESS_STR = "address";
   private static final String CLIENT_IS_PRIVATE_STR = "clientIsPrivate";
   private static final String OPTIMIZE_READS_FOR_STR = "optimizeReadsFor";
   private static final String NONE_STR = "__none__";
@@ -87,7 +86,6 @@ public class DatabaseServer {
   static final boolean USE_SNAPSHOT_MGR_OLD = true;
   private int port;
   private String host;
-  private String cluster;
 
   private AtomicBoolean isRunning;
   private ThreadPoolExecutor executor;
@@ -144,7 +142,7 @@ public class DatabaseServer {
 
   private Thread metricsThread;
 
-  private Map<String, SimpleStats> stats = new HashedMap();
+  private Map<String, SimpleStats> stats = new HashMap<>();
   private Thread serverStatsMonitorThread;
 
   public static boolean[][] getDeathOverride() {
@@ -383,7 +381,7 @@ public class DatabaseServer {
   }
 
   public static Map<String, SimpleStats> initStats() {
-    Map<String, SimpleStats> stats = new HashedMap();
+    Map<String, SimpleStats> stats = new HashMap<>();
     stats.put(METRIC_INSERT, new SimpleStats());
     stats.put(METRIC_INNER_INSERT, new SimpleStats());
     stats.put(METRIC_SECONDARY_INDEX_INSERT, new SimpleStats());
@@ -405,24 +403,24 @@ public class DatabaseServer {
   }
 
   public void setConfig(
-      final Config config, String cluster, String host, int port, AtomicBoolean isRunning,
-      AtomicBoolean isRecovered, String gclog, String xmx) {
-    setConfig(config, cluster, host, port, false, isRunning, isRecovered, gclog, xmx, false, false);
+      final Config config, String host, int port, AtomicBoolean isRunning,
+      AtomicBoolean isRecovered, String gclog, String xmx, String installDir) {
+    setConfig(config, host, port, false, isRunning, isRecovered, gclog, xmx, false, false, installDir);
   }
 
   public void setConfig(
-      final Config config, String cluster, String host, int port,
+      final Config config, String host, int port,
       boolean unitTest, AtomicBoolean isRunning, AtomicBoolean isRecovered, String gclog, boolean nonDurable) {
-    setConfig(config, cluster, host, port, unitTest, isRunning, isRecovered, gclog, null, nonDurable, false);
+    setConfig(config, host, port, unitTest, isRunning, isRecovered, gclog, null, nonDurable, false, installDir);
   }
 
   public void setConfig(
-      final Config config, String cluster, String host, int port,
-      boolean unitTest, AtomicBoolean isRunning, AtomicBoolean isRecovered, String gclog, String xmx, boolean notDurable, boolean disablePro) {
+      final Config config, String host, int port,
+      boolean unitTest, AtomicBoolean isRunning, AtomicBoolean isRecovered, String gclog, String xmx,
+      boolean notDurable, boolean disablePro, String installDir) {
     this.isRunning = isRunning;
     this.isRecovered = isRecovered;
     this.config = config;
-    this.cluster = cluster;
     this.host = host;
     this.port = port;
     this.xmx = xmx;
@@ -433,9 +431,7 @@ public class DatabaseServer {
     this.dataDir = config.getString("dataDirectory");
     this.dataDir = dataDir.replace("$HOME", System.getProperty(USER_HOME_STR));
     this.dataDir = dataDir.replace("$WORKING_DIR", System.getProperty(USER_DIR_STR));
-    this.installDir = config.getString("installDirectory");
-    this.installDir = installDir.replace("$HOME", System.getProperty(USER_HOME_STR));
-    this.installDir = installDir.replace("WORKING_DIR", System.getProperty(USER_DIR_STR));
+    this.installDir = installDir;
     List<Config.Shard> shards = config.getShards();
     int replicaCount = shards.get(0).getReplicas().size();
     if (replicaCount > 1) {
@@ -452,11 +448,11 @@ public class DatabaseServer {
 
     initTimers();
 
-    this.masterAddress = firstServer.getString(PRIVATE_ADDRESS_STR);
+    this.masterAddress = firstServer.getString(ADDRESS_STR);
     this.masterPort = firstServer.getInt("port");
 
     common.setIsNotDurable(notDurable);
-    if (firstServer.getString(PRIVATE_ADDRESS_STR).equals(host) &&
+    if (firstServer.getString(ADDRESS_STR).equals(host) &&
         firstServer.getInt("port") == port) {
       this.shard = 0;
       this.replica = 0;
@@ -466,9 +462,9 @@ public class DatabaseServer {
     }
     boolean isInternal = initIsInternal(config);
     boolean optimizedForThroughput = initOpimizedFor(config);
-    serversConfig = new ServersConfig(cluster, shards, isInternal, optimizedForThroughput);
+    serversConfig = new ServersConfig(shards, isInternal, optimizedForThroughput);
 
-    initServersForUnitTest(cluster, host, port, unitTest, serversConfig);
+    initServersForUnitTest(host, port, unitTest, serversConfig);
 
     this.replica = serversConfig.getThisReplica(host, port);
 
@@ -478,11 +474,11 @@ public class DatabaseServer {
     this.shard = common.getShard();
     this.shardCount = serversConfig.getShardCount();
 
-    com.sonicbase.logger.Logger.init(cluster, shard, replica, stats.get(METRIC_LOG_MESSAGE).getCount(), config.getString("logstashServers"));
+    com.sonicbase.logger.Logger.init(shard, replica, stats.get(METRIC_LOG_MESSAGE).getCount(), config.getString("logstashServers"));
 
     common.setServersConfig(serversConfig);
 
-    logger.info("config={}", config);
+    logger.info("config={}", config.toString());
 
     logger.info("useUnsafe={}", useUnsafe);
 
@@ -1111,10 +1107,7 @@ public class DatabaseServer {
       }
       List<Config.Shard> array = config.getShards();
       List<Config.Replica> replicasArray = array.get(0).getReplicas();
-      Boolean node = config.getBoolean(CLIENT_IS_PRIVATE_STR);
-      final String address = node != null && node ?
-          replicasArray.get(0).getString(PRIVATE_ADDRESS_STR) :
-          replicasArray.get(0).getString("publicAddress");
+      final String address = replicasArray.get(0).getString(ADDRESS_STR);
       final int localPort = replicasArray.get(0).getInt("port");
 
       Class.forName("com.sonicbase.jdbcdriver.Driver");
@@ -1354,7 +1347,7 @@ public class DatabaseServer {
       if (this.client.get() != null) {
         return this.client.get();
       }
-      DatabaseClient localClient = new DatabaseClient(cluster, masterAddress, masterPort, common.getShard(), common.getReplica(),
+      DatabaseClient localClient = new DatabaseClient(masterAddress, masterPort, common.getShard(), common.getReplica(),
           false, common, this);
       this.client.set(localClient);
       return this.client.get();
@@ -1508,10 +1501,6 @@ public class DatabaseServer {
 
   public void replayLogs() {
     logManager.replayLogs();
-  }
-
-  public String getCluster() {
-    return cluster;
   }
 
   void setShardCount(int shardCount) {
@@ -1716,16 +1705,12 @@ public class DatabaseServer {
     return replica;
   }
 
-  private void initServersForUnitTest(String cluster, String host, int port, boolean unitTest, ServersConfig serversConfig) {
+  private void initServersForUnitTest(String host, int port, boolean unitTest, ServersConfig serversConfig) {
 
     for (ServersConfig.Shard shard : serversConfig.getShards()) {
       for (ServersConfig.Host replica : shard.getReplicas()) {
 
-        String hostPort = replica.getPublicAddress() + ":" + replica.getPort();
-
-        doInitServersForUnitTest(hostPort, unitTest, serversConfig);
-
-        hostPort = replica.getPrivateAddress() + ":" + replica.getPort();
+        String hostPort = replica.getaddress() + ":" + replica.getPort();
 
         doInitServersForUnitTest(hostPort, unitTest, serversConfig);
       }
@@ -1808,10 +1793,7 @@ public class DatabaseServer {
           List<Config.Shard> array = config.getShards();
           Config.Shard shard = array.get(0);
           List<Config.Replica> replicasArray = shard.getReplicas();
-          Boolean priv = config.getBoolean("clientIsPrivate");
-          final String address = priv != null && priv ?
-              replicasArray.get(0).getString("privateAddress") :
-              replicasArray.get(0).getString("publicAddress");
+          final String address = replicasArray.get(0).getString("address");
           final int port = replicasArray.get(0).getInt("port");
 
           Class.forName("com.sonicbase.jdbcdriver.Driver");
@@ -2402,19 +2384,14 @@ public class DatabaseServer {
   public ComObject reconfigureCluster(ComObject cobj, boolean replayedCommand) {
     ServersConfig oldConfig = common.getServersConfig();
     try {
-      File file = new File(System.getProperty(USER_DIR_STR), "config/config-" + getCluster() + ".yaml");
-      if (!file.exists()) {
-        file = new File(System.getProperty(USER_DIR_STR), "/src/main/resources/config/config-" + getCluster() + ".yaml");
-      }
-
-      String configStr = IOUtils.toString(new BufferedInputStream(new FileInputStream(file)), "utf-8");
+      String configStr = IOUtils.toString(new BufferedInputStream(Config.getConfigStream()), "utf-8");
       logger.info("Config: {}", configStr);
       Config config = new Config(configStr);
 
       boolean isInternal = initIsInternal(config);
       boolean optimizedForThroughput = initOpimizedFor(config);
 
-      ServersConfig newConfig = new ServersConfig(cluster, config.getShards(),
+      ServersConfig newConfig = new ServersConfig(config.getShards(),
            isInternal, optimizedForThroughput);
 
       common.setServersConfig(newConfig);

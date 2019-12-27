@@ -25,7 +25,7 @@ import java.util.concurrent.atomic.AtomicBoolean;
 public class ClientStatsHandler {
   private static final Logger logger = LoggerFactory.getLogger(ClientStatsHandler.class);
 
-  private static final ConcurrentHashMap<String, ConcurrentHashMap<String, HistogramEntry>> registeredQueries = new ConcurrentHashMap<>();
+  private static final ConcurrentHashMap<String, HistogramEntry> registeredQueries = new ConcurrentHashMap<>();
   private final Thread statsEnabler;
   private boolean disableStats;
 
@@ -72,22 +72,18 @@ public class ClientStatsHandler {
   }
 
   public static class QueryStatsRecorder implements Runnable {
-
-    private final String cluster;
     private final DatabaseClient client;
     private final Long sleepOverride;
     private AtomicBoolean shutdownStatsRecorderThreads;
 
-    public QueryStatsRecorder(DatabaseClient client, String cluster, AtomicBoolean shutdownStatsRecorderThreads) {
+    public QueryStatsRecorder(DatabaseClient client, AtomicBoolean shutdownStatsRecorderThreads) {
       this.client = client;
-      this.cluster = cluster;
       sleepOverride = null;
       this.shutdownStatsRecorderThreads = shutdownStatsRecorderThreads;
     }
 
-    public QueryStatsRecorder(DatabaseClient client, String cluster, long sleepOverride) {
+    public QueryStatsRecorder(DatabaseClient client, long sleepOverride) {
       this.client = client;
-      this.cluster = cluster;
       this.sleepOverride = sleepOverride;
     }
 
@@ -111,7 +107,7 @@ public class ClientStatsHandler {
       Thread.sleep(sleepOverride == null ? 15_000 : sleepOverride);
 
       boolean oneIsAlive = false;
-      DatabaseClient sharedClient = DatabaseClient.getSharedClients().get(cluster);
+      DatabaseClient sharedClient = DatabaseClient.getSharedClient();
       ServersConfig.Host[] replicas = sharedClient.getCommon().getServersConfig().getShards()[0].getReplicas();
       oneIsAlive = checkIfAtLeastOneHostIsAlive(oneIsAlive, replicas);
 
@@ -120,13 +116,13 @@ public class ClientStatsHandler {
         return;
       }
 
-      if (registeredQueries.get(cluster) == null) {
+      if (registeredQueries == null) {
         return;
       }
       ComObject cobj = new ComObject(1);
-      ComArray array = cobj.putArray(ComObject.Tag.HISTOGRAM_SNAPSHOT, ComObject.Type.OBJECT_TYPE, registeredQueries.get(cluster).size());
+      ComArray array = cobj.putArray(ComObject.Tag.HISTOGRAM_SNAPSHOT, ComObject.Type.OBJECT_TYPE, registeredQueries.size());
 
-      for (HistogramEntry entry : registeredQueries.get(cluster).values()) {
+      for (HistogramEntry entry : registeredQueries.values()) {
         if (entry.getHistogram() == null || entry.getHistogram().getCount() == 0) {
           continue;
         }
@@ -235,17 +231,12 @@ public class ClientStatsHandler {
     }
   }
 
-  public HistogramEntry registerQueryForStats(String cluster, String dbName, String sql) {
+  public HistogramEntry registerQueryForStats(String dbName, String sql) {
     try {
       if (this.disableStats) {
         return null;
       }
-      ConcurrentHashMap<String, HistogramEntry> clusterEntry = registeredQueries.get(cluster);
-      if (clusterEntry == null) {
-        clusterEntry = new ConcurrentHashMap<>();
-        registeredQueries.put(cluster, clusterEntry);
-      }
-      HistogramEntry entry = clusterEntry.get(sql);
+      HistogramEntry entry = registeredQueries.get(sql);
       if (entry != null) {
         //make a copy because background thread may wipe out the histogram
         HistogramEntry retEntry = new HistogramEntry();
@@ -268,7 +259,7 @@ public class ClientStatsHandler {
       cobj.put(ComObject.Tag.DB_NAME, dbName);
       cobj.put(ComObject.Tag.SQL, sql);
 
-      DatabaseClient sharedClient = DatabaseClient.getSharedClients().get(cluster);
+      DatabaseClient sharedClient = DatabaseClient.getSharedClient();
       byte[] ret = sendToMasterOnSharedClient(cobj, sharedClient);
       if (ret == null) {
         disableStats = true;
@@ -290,7 +281,7 @@ public class ClientStatsHandler {
         retEntry.setMaxedLatencies(entry.getMaxedLatencies());
         entry.setQuery(sql);
         retEntry.setQuery(sql);
-        clusterEntry.put(sql, entry);
+        registeredQueries.put(sql, entry);
         return retEntry;
       }
     }

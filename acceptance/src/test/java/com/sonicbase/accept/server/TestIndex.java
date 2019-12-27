@@ -49,7 +49,7 @@ public class TestIndex {
       server.shutdown();
     }
 
-    System.out.println("client refCount=" + DatabaseClient.clientRefCount.get() + ", sharedClients=" + DatabaseClient.sharedClients.size() + ", class=TestIndex");
+    System.out.println("client refCount=" + DatabaseClient.clientRefCount.get() + ", class=TestIndex");
     for (DatabaseClient client : DatabaseClient.allClients) {
       System.out.println("Stack:\n" + client.getAllocatedStack());
     }
@@ -78,7 +78,8 @@ public class TestIndex {
       //          String role = "primaryMaster";
 
       dbServers[i] = new DatabaseServer();
-      dbServers[i].setConfig(config, "4-servers", "localhost", 9010 + (50 * i), true, new AtomicBoolean(true), new AtomicBoolean(true), null, false);
+      Config.copyConfig("4-servers");
+      dbServers[i].setConfig(config, "localhost", 9010 + (50 * i), true, new AtomicBoolean(true), new AtomicBoolean(true), null, false);
       dbServers[i].setRole(role);
       //          return null;
       //        }

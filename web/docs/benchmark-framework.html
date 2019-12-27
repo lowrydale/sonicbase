@@ -1,0 +1,114 @@
+<!doctype html>
+<html>
+<head>
+  <link rel="canonical" href="http://sonicbase.com/docs/benchmark-framework.html"/>
+
+  <meta charset="UTF-8">
+    <meta name="description" content="SonicBase benchmark framework. Use the benchmark framwork to analyze performance of the database.">
+
+    <title>SonicBase - In-Memory Database. Benchmark Framework</title>
+    <meta http-equiv="X-UA-Compatible" content="IE=edge">
+    <meta name="viewport" content="width=device-width, initial-scale=1">
+    <link href="../css/singlePageTemplate.css" rel="stylesheet" type="text/css">
+    <script type="text/javascript" src="../javascript/main.js"></script>
+    <!-- Global site tag (gtag.js) - Google Analytics -->
+    <script async src="https://www.googletagmanager.com/gtag/js?id=UA-109032274-1"></script>
+
+  <link rel="stylesheet" href="../css/tomorrow-night-bright.css">
+  <script src="../javascript/highlight.min.js"></script>
+  <script>hljs.initHighlightingOnLoad();</script>
+
+
+  <script>
+        window.dataLayer = window.dataLayer || [];
+        function gtag(){dataLayer.push(arguments);}
+        gtag('js', new Date());
+
+        gtag('config', 'UA-109032274-1');
+        ga('require', 'displayfeatures');
+    </script>
+</head>
+<body>
+<div class="container">
+    <header id="myHeader">
+        <div class="mobile">
+            <a href="../index.html">
+                <h4 class="logo">SonicBase™</h4>
+            </a>
+        </div>
+
+        <div class="desktop">
+            <a href="../index.html">
+                <img style="margin-top:3px" src="../images/logo-white.gif" width="50px"/><h4 class="logo">SonicBase™</h4>
+            </a>
+        <nav>
+            <ul>
+                <li><a href="../index.html">HOME</a></li>
+                <li> <a href="../documentation.html">DOCUMENTATION</a></li>
+                <li><a href="../contact.html">CONTACT</a></li>
+            </ul>
+        </nav>
+        </div>
+    </header>
+
+    <script>
+        if (isFramed()) {
+            document.getElementById("myHeader").style.display = "none";
+        }
+    </script>
+
+    <div class="main-page-text">
+      <div class="intro">SonicBase. In-memory embedded or distributed streaming sql database</div>
+
+
+        <div class="mylink">
+
+            <h1>Benchmark Framework</h1>
+          SonicBase includes a benchmark framework which allows you to analyze the performance of the database. To run
+          the benchmark framework you must configure client machines to do the work. The following is an example of a configuration
+          that includes clients. Usually you need as many or more clients than servers.
+
+          <pre class="YAML"><code>
+replicationFactor: 1
+dataDirectory: $WORKING_DIR/db-data
+installDirectory: $WORKING_DIR
+maxJavaHeap: 20%
+useUnsafe: true
+user: ubuntu
+clientIsPrivate: false
+defaultPort: 9010
+defaultHttpPort: 8080
+servers:
+- server:
+    address: localhost
+clients:
+- client:
+    address: 10.0.0.240
+- client:
+    address: 10.0.0.241
+</code></pre>
+          <br/>
+          <h2>Initialization</h2>
+          To start the benchmark clients type "bench start cluster". To stop the benchmark clients type "bench stop cluster".
+          You must load the schema that is used for the benchmarks. Type "run script init-tables.command". This will load
+          the schema.
+          <h2>Batch Insert</h2>
+          To do a batch insert test, type "bench start insert 0", where 0 is the start offset of the ids to insert in the
+          database. To monitor progress of the inserts type "bench stats insert". To stop the inserts type "bench stop "cluster".
+          When doig a insert benchmark you must be careful to stop the test before you run out of memory.
+          <h2>Batch Identity Lookup</h2>
+          To do a batch identity lookup test, type "bench start identity batch". This does a lookup with the "in expression".
+          To monitor progress of the lookups
+          type "bench stats identity". To stop the lookups type "bench stop cluster".<br/>
+          <br/>
+          You may also do a batch lookup with composite keys. The command for this is "bench start identity cbatch".
+          <h2>Range Lookup</h2>
+          To do a range lookup test, type "bench start range". To monitor progress of the lookups type
+          "bench stats range". To stop the lookups type "bench stop cluster".<br/>
+          <br/>
+          Note that if you stop a test with "bench stop cluster" you will need to type "bench start cluster" before running
+          the next test.
+</div>
+</div>
+</body>
+</html>

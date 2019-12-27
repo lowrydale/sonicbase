@@ -1,7 +1,0 @@
-#!/bin/bash
-echo starting server
-nohup ./runclass com.sonicbase.server.NettyServer -host localhost -port 9010 -mhost localhost -mport 9010 -role master -shard 0 > ~/server0.log &
-sleep 5
-nohup ./runclass com.sonicbase.server.NettyServer -host localhost -port 9060 -mhost localhost -mport 9010 -role master -shard 1 > ~/server1.log &
-nohup ./runclass com.sonicbase.server.NettyServer -host localhost -port 9110 -mhost localhost -mport 9010 -role master -shard 2 > ~/server2.log &
-nohup ./runclass com.sonicbase.server.NettyServer -host localhost -port 9160 -mhost localhost -mport 9010 -role master -shard 3 > ~/server3.log &

@@ -20,7 +20,7 @@ public class NettyServerTest {
 
     final NettyServer server = new NettyServer();
     Thread thread = new Thread(() -> {
-      String argsStr = "-host localhost -port 9010 -cluster 1-local -gclog gc.log -xmx 2G";
+      String argsStr = "-host localhost -port 9010 -gclog gc.log -xmx 2G";
       String[] args = argsStr.split(" ");
       server.startServer(args);
     });

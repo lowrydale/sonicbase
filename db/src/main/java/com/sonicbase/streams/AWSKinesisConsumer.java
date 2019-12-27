@@ -55,11 +55,6 @@ public class AWSKinesisConsumer implements StreamsConsumer {
     }
   }
 
-  public File getInstallDir(Config config) {
-    String dir = config.getString("installDirectory");
-    return new File(dir.replace("$HOME", System.getProperty("user.home")));
-  }
-
   public void shutdown() {
     this.shutdown = true;
     try {
@@ -76,9 +71,7 @@ public class AWSKinesisConsumer implements StreamsConsumer {
       List<Config.Shard> array = config.getShards();
       com.sonicbase.common.Config.Shard shard =  array.get(0);
       List<Config.Replica> replicasArray = shard.getReplicas();
-      final String address = config.getBoolean("clientIsPrivate") ?
-          replicasArray.get(0).getString("privateAddress") :
-          replicasArray.get(0).getString("publicAddress");
+      final String address = replicasArray.get(0).getString("address");
       final int port = replicasArray.get(0).getInt("port");
 
       Class.forName("com.sonicbase.jdbcdriver.Driver");
@@ -135,11 +128,9 @@ public class AWSKinesisConsumer implements StreamsConsumer {
   }
 
   @Override
-  public int init(String cluster, Config config, Map<String, Object> streamConfig) {
+  public int init(Config config, String installDir, Map<String, Object> streamConfig) {
     try {
       logger.info("aws kinesis consumer init - begin");
-
-      File installDir = getInstallDir(config);
 
       initConnection(config);
       initTable();
@@ -151,7 +142,7 @@ public class AWSKinesisConsumer implements StreamsConsumer {
 
       AmazonKinesisClientBuilder clientBuilder = AmazonKinesisClientBuilder.standard();
 
-      File keysFile = new File(installDir, "/keys/" + cluster + "-awskeys");
+      File keysFile = new File(installDir, "/keys/sonicbase-awskeys");
       if (!keysFile.exists()) {
         clientBuilder.setCredentials(new InstanceProfileCredentialsProvider(true));
       }

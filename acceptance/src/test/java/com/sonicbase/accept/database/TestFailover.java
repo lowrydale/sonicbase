@@ -71,7 +71,8 @@ public class TestFailover {
         int replica = i % 2;
 
         dbServers[shard][replica] = new DatabaseServer();
-        dbServers[shard][replica].setConfig(config, "4-servers", "localhost", 9010 + (50 * i), true, new AtomicBoolean(true), new AtomicBoolean(true),null, false);
+        Config.copyConfig("4-servers");
+        dbServers[shard][replica].setConfig(config, "localhost", 9010 + (50 * i), true, new AtomicBoolean(true), new AtomicBoolean(true),null, false);
         dbServers[shard][replica].setRole(role);
         //          return null;
         //        }
@@ -202,7 +203,7 @@ public class TestFailover {
     }
   }
 
-  @Test
+  @Test(enabled=false)
   public void testInsert() throws SQLException, InterruptedException {
     Thread.sleep(4000);
 
@@ -246,7 +247,7 @@ public class TestFailover {
     }
   }
 
-  @Test
+  @Test(enabled=false)
   public void testSpecifiedServer() throws InterruptedException {
     Thread.sleep(4000);
 
@@ -319,7 +320,7 @@ public class TestFailover {
 
   }
 
-  @Test
+  @Test(enabled=false)
   public void testMasterDeath() throws SQLException, InterruptedException {
     Thread.sleep(4000);
 
@@ -360,7 +361,7 @@ public class TestFailover {
 
   }
 
-  @Test
+  @Test(enabled=false)
   public void testMainMasterDeath() throws InterruptedException, SQLException {
     Thread.sleep(4000);
     DatabaseServer.initDeathOverride(2, 2);

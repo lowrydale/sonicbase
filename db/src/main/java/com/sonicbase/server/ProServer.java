@@ -4,7 +4,6 @@ import com.sonicbase.aws.AWSClient;
 import com.sonicbase.common.Config;
 import com.sonicbase.jdbcdriver.ConnectionProxy;
 import com.sonicbase.query.DatabaseException;
-import com.sonicbase.streams.StreamManager;
 import org.apache.commons.lang.exception.ExceptionUtils;
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
@@ -22,7 +21,7 @@ public class ProServer {
   private final DatabaseServer server;
   private final BackupManager backupManager;
   private final MonitorManager monitorManager;
-  private final OSStatsManager osStatasManager;
+  private final OSStatsManager osStatsManager;
   private final Config config;
   private AWSClient awsClient;
   private HttpServer httpServer;
@@ -35,11 +34,11 @@ public class ProServer {
     this.config = server.getConfig();
     this.backupManager = new BackupManager(this, server);
     this.monitorManager = new MonitorManager(this, server);
-    this.osStatasManager = new OSStatsManager(this, server);
+    this.osStatsManager = new OSStatsManager(this, server);
 
     server.getMethodInvoker().registerMethodProvider("BackupManager", backupManager);
     server.getMethodInvoker().registerMethodProvider("MonitorManager", monitorManager);
-    server.getMethodInvoker().registerMethodProvider("OSStatsManager", osStatasManager);
+    server.getMethodInvoker().registerMethodProvider("OSStatsManager", osStatsManager);
 
     List<Config.Shard> shards = config.getShards();
 
@@ -48,7 +47,7 @@ public class ProServer {
       List<Config.Replica> replicas = shards.get(i).getReplicas();
       for (int j = 0; j < replicas.size(); j++) {
         Config.Replica replica = replicas.get(j);
-        if (replica.getString("privateAddress").equals(server.getHost()) &&
+        if (replica.getString("address").equals(server.getHost()) &&
             replica.getInt("port") == server.getPort()) {
           if (replica.getInt("httpPort") != null) {
             httpPort = replica.getInt("httpPort");
@@ -77,7 +76,7 @@ public class ProServer {
       sysConnection = null;
     }
     httpServer.shutdown();
-    osStatasManager.shutdown();
+    osStatsManager.shutdown();
     monitorManager.shutdown();
     backupManager.shutdown();
   }
@@ -101,8 +100,8 @@ public class ProServer {
     return monitorManager;
   }
 
-  public OSStatsManager getOsStatasManager() {
-    return osStatasManager;
+  public OSStatsManager getOsStatsManager() {
+    return osStatsManager;
   }
 
   public Connection getSysConnection() {
@@ -116,10 +115,7 @@ public class ProServer {
           List<Config.Shard> array = config.getShards();
           Config.Shard shard = array.get(0);
           List<Config.Replica> replicasArray = shard.getReplicas();
-          Boolean priv = config.getBoolean("clientIsPrivate");
-          final String address = priv != null && priv ?
-              replicasArray.get(0).getString("privateAddress") :
-              replicasArray.get(0).getString("publicAddress");
+          final String address = replicasArray.get(0).getString("address");
           final int port = replicasArray.get(0).getInt("port");
 
           Class.forName("com.sonicbase.jdbcdriver.Driver");

@@ -186,7 +186,9 @@ public class DataUtils {
 
 
   public static void writeSignedVarLong(long value, byte[] bytes, int[] offset) throws IOException {
-    writeVarLong((value << 1) ^ (value >> 63), bytes, offset);
+    value = (value << 1);
+    long tmp = (value >> 63);
+    writeVarLong(value ^ tmp, bytes, offset);
   }
 
   public static int bytesToUnsignedShort(byte[] bytes, int[] offset) {

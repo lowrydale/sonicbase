@@ -195,7 +195,7 @@ public class TestPerformance {
         final NettyServer server0_0 = new NettyServer(128);
         Thread thread = new Thread(() -> {
           server0_0.startServer(new String[]{"-port", String.valueOf(9010), "-host", LOCALHOST_STR,
-              "-mport", String.valueOf(9010), "-mhost", LOCALHOST_STR, "-cluster", "2-servers-a", "-shard", String.valueOf(0)});
+              "-mport", String.valueOf(9010), "-mhost", LOCALHOST_STR, "-shard", String.valueOf(0)});
           latch.countDown();
         });
         serverThreads.add(thread);
@@ -211,7 +211,7 @@ public class TestPerformance {
         final NettyServer server0_1 = new NettyServer(128);
         thread = new Thread(() -> {
           server0_1.startServer(new String[]{"-port", String.valueOf(9060), "-host", LOCALHOST_STR,
-              "-mport", String.valueOf(9060), "-mhost", LOCALHOST_STR, "-cluster", "2-servers-a", "-shard", String.valueOf(0)});
+              "-mport", String.valueOf(9060), "-mhost", LOCALHOST_STR, "-shard", String.valueOf(0)});
           latch.countDown();
         });
         serverThreads.add(thread);

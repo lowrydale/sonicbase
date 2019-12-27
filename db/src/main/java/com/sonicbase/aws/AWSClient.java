@@ -43,14 +43,11 @@ public class AWSClient {
   private static Logger logger = LoggerFactory.getLogger(AWSClient.class);
   private final ThreadPoolExecutor downloadExecutor;
 
-  private File installDir;
   private TransferManager transferManager;
 
   public AWSClient(ProServer proServer, DatabaseServer server) {
     this.server = server;
     Config config = proServer.getConfig();
-    String dir = config.getString("installDirectory");
-    installDir = new File(dir.replace("$HOME", System.getProperty("user.home")));
     downloadExecutor = ThreadUtil.createExecutor(8, "AWS S3 Download Thread");
   }
 
@@ -60,10 +57,9 @@ public class AWSClient {
         return transferManager;
       }
     }
-    String cluster = server.getCluster();
-    File keysFile = new File(installDir, KEYS_PART_STR + cluster + AWSKEYS_STR);
+    File keysFile = new File(server.getInstallDir(), KEYS_PART_STR + "sonicbase" + AWSKEYS_STR);
     if (!keysFile.exists()) {
-      throw new DatabaseException(cluster + "-awskeys file not found");
+      throw new DatabaseException("sonicbase-awskeys file not found");
     }
     BasicAWSCredentials awsCredentials = null;
     try (BufferedReader reader = new BufferedReader(new InputStreamReader(new FileInputStream(keysFile)))) {
@@ -90,8 +86,7 @@ public class AWSClient {
     config.setSocketTimeout(6_000_000);
     config.setRequestTimeout(6_000_000);
 
-    String cluster = server.getCluster();
-    File keysFile = new File(installDir, KEYS_PART_STR + cluster + AWSKEYS_STR);
+    File keysFile = new File(server.getInstallDir(), KEYS_PART_STR + "sonicbase" + AWSKEYS_STR);
     if (!keysFile.exists()) {
       return new AmazonS3Client(new InstanceProfileCredentialsProvider(true), config);
     }
@@ -116,8 +111,7 @@ public class AWSClient {
     config.setRequestTimeout(20_000);
     config.setConnectionTimeout(60_000);
 
-    String cluster = server.getCluster();
-    File keysFile = new File(installDir, KEYS_PART_STR + cluster + AWSKEYS_STR);
+    File keysFile = new File(server.getInstallDir(), KEYS_PART_STR + "sonicbase" + AWSKEYS_STR);
     if (!keysFile.exists()) {
       return new AmazonSQSClient(new InstanceProfileCredentialsProvider(true), config);
     }

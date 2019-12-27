@@ -1,0 +1,119 @@
+<!doctype html>
+<html>
+<head>
+  <link rel="canonical" href="http://sonicbase.com/docs/elasticsearch.html"/>
+
+  <meta charset="UTF-8">
+<title>SonicBase - In-Memory Database. Monitoring</title>
+    <meta http-equiv="X-UA-Compatible" content="IE=edge">
+    <meta name="viewport" content="width=device-width, initial-scale=1">
+    <meta name="description" content="SonicBase provides integration with Elasticsearch.">
+    <link href="../css/singlePageTemplate.css" rel="stylesheet" type="text/css">
+    <script type="text/javascript" src="../javascript/main.js"></script>
+    <!-- Global site tag (gtag.js) - Google Analytics -->
+    <script async src="https://www.googletagmanager.com/gtag/js?id=UA-109032274-1"></script>
+
+    <link rel="stylesheet" href="../css/tomorrow-night-bright.css">
+    <script src="../javascript/highlight.min.js"></script>
+    <script>hljs.initHighlightingOnLoad();</script>
+
+    <script>
+        window.dataLayer = window.dataLayer || [];
+        function gtag(){dataLayer.push(arguments);}
+        gtag('js', new Date());
+
+        gtag('config', 'UA-109032274-1');
+        ga('require', 'displayfeatures');
+    </script>
+</head>
+
+<body>
+<div class="container">
+    <header id="myHeader">
+        <div class="mobile">
+            <a href="../index.html">
+                <h4 class="logo">SonicBase™</h4>
+            </a>
+        </div>
+
+        <div class="desktop">
+            <a href="../index.html">
+                <img style="margin-top:3px" src="../images/logo-white.gif" width="50px"/><h4 class="logo">SonicBase™</h4>
+            </a>
+        <nav>
+            <ul>
+                <li><a href="../index.html">HOME</a></li>
+                <li> <a href="../documentation.html">DOCUMENTATION</a></li>
+                <li><a href="../contact.html">CONTACT</a></li>
+            </ul>
+        </nav>
+        </div>
+    </header>
+
+    <script>
+        if (isFramed()) {
+            document.getElementById("myHeader").style.display = "none";
+        }
+    </script>
+
+    <div class="main-page-text">
+        <div class="intro">SonicBase. In-memory embedded or distributed streaming sql database</div>
+
+        <h1>Elasticsearch Integration</h1>
+        SonicBase includes a streams provider that allows you to stream inserts, updates and deletes to your
+        Elasticsearch cluster.<br/>
+        <br/>
+        <h2>Configuration</h2>
+        To integrate with Elasticsearch you must configure the streams provider in your cluster config file. An example
+        configuration follows:
+
+        <pre class="YAML"><code>
+streams:
+  processorThreadCount: 8
+  producers:
+  - producer:
+      className: com.sonicbase.streams.ElasticsearchProducer
+      mappingFile: es-mapping.yaml
+      maxBatchSize: 200
+</code></pre>
+        The mapping file must be located in the $SONICBASE_HOME/config directory.
+
+        <h2>Mapping File</h2>
+        You must provide a mapping file to instruct SonicBase on how to send the data to ElasticSearch. An example
+        mapping file is shown below<br/>
+
+        <pre class="YAML"><code>
+esClusters:
+- esCluster:
+  name: es1
+  hosts: 127.0.0.1:9200
+sbClusters:
+- sbCluster:
+  name: 1-local
+  databases:
+  - database:
+    name: db
+    tables:
+    - table:
+      name: persons
+      esCluster: es1
+      esIndex: persons
+      fields:
+        id1: id1
+        id2: id2
+        name: name
+        socialsecuritynumber: ssn
+</code></pre>
+        <br/>
+        You provide settings for Elasticsearch clusters, SonicBase clusters, databases and tables.<br/>
+        <lu>
+            <li>esCluster - name and comma delimited list of hosts for the cluster</li>
+            <li>sbCluster - name of the SonicBase cluster and list of databases in the cluster you want to integrate</li>
+            <li>database - name of the SonicBase database and list of tables in the database you want to integrate</li>
+            <li>table - name of the SonicBase table, fields and the esCluster and esIndex you want to send records to</li>
+            <li>fields - Sonicbase field name, followed by a colon, followed by the esIndex field name</li>
+        </lu>
+    </div>
+</div>
+</body>
+</html>

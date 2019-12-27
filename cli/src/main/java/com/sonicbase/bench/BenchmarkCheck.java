@@ -37,7 +37,7 @@ public class BenchmarkCheck {
   final AtomicLong selectCount = new AtomicLong();
   final AtomicLong readCount = new AtomicLong();
 
-  public void start(String address, final AtomicLong insertBegin, final AtomicLong insertHighest, final String cluster,
+  public void start(String address, final AtomicLong insertBegin, final AtomicLong insertHighest,
                     final int shardCount, final Integer shard, final long count) {
     shutdown = false;
     selectBegin.set(System.currentTimeMillis());
@@ -45,15 +45,6 @@ public class BenchmarkCheck {
     mainThread = new Thread(() -> {
       try {
         final AtomicInteger cycle = new AtomicInteger();
-
-        File file = new File(System.getProperty("user.dir"), "config/config-" + cluster + ".yaml");
-        if (!file.exists()) {
-          file = new File(System.getProperty("user.dir"), "db/src/main/resources/config/config-" + cluster + ".yaml");
-          logger.info("Loaded config resource dir");
-        }
-        else {
-          logger.info("Loaded config default dir");
-        }
 
         logger.info("Using address: address={}", address);
 

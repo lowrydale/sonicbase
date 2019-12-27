@@ -1,13 +1,8 @@
-export SONIC_BASE_HOME=$4
-
-if [ ${4:0:1} != "/" ]
-then
-  export SONIC_BASE_HOME=$HOME/$SONIC_BASE_HOME
-fi
+export SONIC_BASE_HOME="$(dirname $( cd "$( dirname "${BASH_SOURCE[0]}" )" && pwd ))"
 
 cd $SONIC_BASE_HOME
 
 mkdir -p $SONIC_BASE_HOME/logs
 
-nohup $SONIC_BASE_HOME/bin/runclass com.sonicbase.cli.Deploy $1 $2 > $SONIC_BASE_HOME/logs/deploy.log 2>&1 &
+nohup $SONIC_BASE_HOME/bin/runclass com.sonicbase.cli.Deploy $1 $2 $3 > $SONIC_BASE_HOME/logs/deploy.log 2>&1 &
 

@@ -51,7 +51,7 @@ public class BenchmarkDelete {
   final AtomicLong selectCount = new AtomicLong();
   final AtomicLong readCount = new AtomicLong();
 
-  public void start(String address, final String cluster, final int shardCount, final Integer shard, final long count) {
+  public void start(String address, final int shardCount, final Integer shard, final long count) {
     shutdown = false;
     selectBegin.set(System.currentTimeMillis());
     doResetStats();
@@ -60,15 +60,6 @@ public class BenchmarkDelete {
         final AtomicInteger cycle = new AtomicInteger();
         final long startId = shard * count;
         logger.info("startId={}, count={}, shard={}", startId, count, shard);
-
-        File file = new File(System.getProperty("user.dir"), "config/config-" + cluster + ".yaml");
-        if (!file.exists()) {
-          file = new File(System.getProperty("user.dir"), "db/src/main/resources/config/config-" + cluster + ".yaml");
-          logger.info("Loaded config resource dir");
-        }
-        else {
-          logger.info("Loaded config default dir");
-        }
 
         logger.info("Using address: address={}", address);
 

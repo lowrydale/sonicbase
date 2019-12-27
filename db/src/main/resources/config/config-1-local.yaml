@@ -1,21 +1,10 @@
 replicationFactor: 1
-dataDirectory: $WORKING_DIR/db-data
-installDirectory: $WORKING_DIR
-compressRecords: false
-useUnsafe: true
+dataDirectory: $HOME/db-data
 maxJavaHeap: 20%
 user: ubuntu
-clientIsPrivate: false
 defaultPort: 9010
 defaultHttpPort: 8080
-#logstashServers: 127.0.0.1:9001
-#streams:
-#  processorThreadCount: 8
-#  producers:
-#  - producer:
-#      className: com.sonicbase.streams.ElasticsearchProducer
-#      mappingFile: es-mapping.yaml
-#      maxBatchSize: 200
+defaultControllerPort: 8081
 servers:
 - server:
     address: localhost

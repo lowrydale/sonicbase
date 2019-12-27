@@ -1,6 +1,9 @@
 #!/bin/bash
 
 export _XMX_=1g
-export SONIC_BASE_HOME="$( cd "$( dirname "${BASH_SOURCE[0]}" )" && pwd )"/..
+export SONIC_BASE_HOME="$(dirname $( cd "$( dirname "${BASH_SOURCE[0]}" )" && pwd ))"
 export LOG4J_FILE="cli-log4j.xml"
-./runclass com.sonicbase.cli.Cli "$@"
+
+export _GC_LOG_FILENAME_=$SONIC_BASE_HOME/logs/cli-gc.log
+
+$SONIC_BASE_HOME/bin/runclass com.sonicbase.cli.Cli "$@" -gclog $_GC_LOG_FILENAME_

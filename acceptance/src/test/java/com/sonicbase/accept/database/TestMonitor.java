@@ -7,7 +7,7 @@ import java.util.List;
 
 public class TestMonitor {
 
-  @Test
+  @Test(enabled=false)
   public void test() {
     String ch = "   [Eden: 58.0M(58.0M)->0.0B(58.0M) Survivors: 1024.0K->1024.0K Heap: 81.9M(179.0M)->23.9M(179.0M)]";
 
@@ -31,7 +31,7 @@ public class TestMonitor {
     }
   }
 
-  @Test
+  @Test(enabled=false)
   public void testNet() {
     String line = " 0.60      0.53";
     List<Double> transRate = new ArrayList<>();
@@ -69,7 +69,7 @@ public class TestMonitor {
     System.out.println(total / transRate.size());
   }
 
-  @Test
+  @Test(enabled=false)
   public void testFormat() {
     System.out.println(String.format("%s\t%.2f%%\t%.2fg\t%.2fg\t%.2fg\t%.2fKB\t%.2fKB\t%s",
         "12.0.0.1", 200.3, 0.003, 0.24, 0.59, 100.2, 100.2, "60g"));

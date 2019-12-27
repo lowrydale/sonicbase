@@ -22,6 +22,7 @@ import net.jpountz.lz4.LZ4Factory;
 import net.jpountz.lz4.LZ4FastDecompressor;
 import org.apache.commons.cli.*;
 import org.apache.commons.io.IOUtils;
+import org.apache.commons.lang.StringUtils;
 import org.apache.commons.lang.exception.ExceptionUtils;
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
@@ -724,11 +725,13 @@ public class NettyServer {
       String disableStr = line.getOptionValue(DISABLE_STR);
       String installDir = line.getOptionValue("installDir");
       boolean disable = DISABLE_STR.equals(disableStr);
-      String configStr;
+      String configStr = line.getOptionValue("config");
 
       InputStream in = Config.getConfigStream();
       try {
-        configStr = IOUtils.toString(new BufferedInputStream(in), UTF8_STR);
+        if (StringUtils.isEmpty(configStr)) {
+          configStr = IOUtils.toString(new BufferedInputStream(in), UTF8_STR);
+        }
 
         Config config = new Config(configStr);
         String role = line.getOptionValue("role");
@@ -854,6 +857,9 @@ public class NettyServer {
     op.setRequired(false);
     options.addOption(op);
     op = new Option("i", "installDir", true, "installDir");
+    op.setRequired(false);
+    options.addOption(op);
+    op = new Option("f", "config", true, "config");
     op.setRequired(false);
     options.addOption(op);
 

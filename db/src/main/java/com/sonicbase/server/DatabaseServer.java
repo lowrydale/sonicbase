@@ -17,7 +17,6 @@ import net.sf.jsqlparser.expression.operators.relational.ExpressionList;
 import net.sf.jsqlparser.parser.CCJSqlParserManager;
 import net.sf.jsqlparser.statement.Statement;
 import net.sf.jsqlparser.statement.execute.Execute;
-import org.apache.commons.collections.map.HashedMap;
 import org.apache.commons.io.FileUtils;
 import org.apache.commons.io.IOUtils;
 import org.apache.commons.lang.exception.ExceptionUtils;
@@ -143,7 +142,7 @@ public class DatabaseServer {
 
   private Thread metricsThread;
 
-  private Map<String, SimpleStats> stats = new HashedMap();
+  private Map<String, SimpleStats> stats = new HashMap<>();
   private Thread serverStatsMonitorThread;
 
   public static boolean[][] getDeathOverride() {
@@ -382,7 +381,7 @@ public class DatabaseServer {
   }
 
   public static Map<String, SimpleStats> initStats() {
-    Map<String, SimpleStats> stats = new HashedMap();
+    Map<String, SimpleStats> stats = new HashMap<>();
     stats.put(METRIC_INSERT, new SimpleStats());
     stats.put(METRIC_INNER_INSERT, new SimpleStats());
     stats.put(METRIC_SECONDARY_INDEX_INSERT, new SimpleStats());

@@ -110,7 +110,7 @@ public class TestPartitionManagerConsistencyIdentity {
     }
   }
 
-  @Test
+  @Test(enabled=false)
   public void test() {
     try {
 

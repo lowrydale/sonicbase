@@ -42,6 +42,9 @@ public class EmbeddedApplication {
         }
       }
     }
+    catch (Exception e) {
+      e.printStackTrace();
+    }
     finally {
       db.shutdown();
     }

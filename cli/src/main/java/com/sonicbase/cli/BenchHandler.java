@@ -74,7 +74,6 @@ public class BenchHandler {
   }
 
   private void stopBenchServer(Config config, String address, int port) throws IOException, InterruptedException, UnirestException {
-    String deployUser = config.getString("user");
     if (address.equals("127.0.0.1") || address.equals("localhost")) {
       ProcessBuilder builder = null;
       if (cli.isCygwin() || cli.isWindows()) {

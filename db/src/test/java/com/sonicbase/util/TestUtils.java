@@ -8,7 +8,6 @@ import com.sonicbase.schema.FieldSchema;
 import com.sonicbase.schema.IndexSchema;
 import com.sonicbase.schema.TableSchema;
 import com.sonicbase.server.DatabaseServer;
-import org.apache.commons.collections.map.HashedMap;
 
 import java.io.UnsupportedEncodingException;
 import java.math.BigDecimal;

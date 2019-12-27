@@ -34,7 +34,7 @@ public class TestDeltaManager {
 
   }
 
-  @Test
+  @Test(enabled=false)
   public void test() {
     try {
 
@@ -233,7 +233,7 @@ public class TestDeltaManager {
     }
   }
 
-  @Test
+  @Test(enabled=false)
   public void testRolling() {
     try {
       String configStr = IOUtils.toString(new BufferedInputStream(getClass().getResourceAsStream("/config/config-4-servers.yaml")), "utf-8");
@@ -325,7 +325,7 @@ public class TestDeltaManager {
     }
   }
 
-  @Test
+  @Test(enabled=false)
   public void testKeys() {
     try {
       String configStr = IOUtils.toString(new BufferedInputStream(getClass().getResourceAsStream("/config/config-4-servers.yaml")), "utf-8");
@@ -526,7 +526,7 @@ public class TestDeltaManager {
     }
   }
 
-  @Test
+  @Test(enabled=false)
   public void testDuplicateKeys() {
     try {
       String configStr = IOUtils.toString(new BufferedInputStream(getClass().getResourceAsStream("/config/config-4-servers.yaml")), "utf-8");

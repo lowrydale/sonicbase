@@ -686,6 +686,9 @@ public class ExpressionImpl implements Expression {
           if (key[i] instanceof byte[]) {
             hashCode += Arrays.hashCode((byte[]) key[i]);
           }
+          else if (key[i] instanceof char[]) {
+            hashCode += Arrays.hashCode((char[]) key[i]);
+          }
           else if (key[i] instanceof Blob) {
             hashCode += Arrays.hashCode(((Blob) key[i]).getData());
           }
@@ -719,6 +722,12 @@ public class ExpressionImpl implements Expression {
           }
           else if (key[i] instanceof byte[]) {
             if (Arrays.equals((byte[]) key[i], (byte[]) ((Key) o).key[i])) {
+              continue;
+            }
+            return false;
+          }
+          else if (key[i] instanceof char[]) {
+            if (Arrays.equals((char[]) key[i], (char[]) ((Key) o).key[i])) {
               continue;
             }
             return false;
@@ -844,7 +853,7 @@ public class ExpressionImpl implements Expression {
       if (fields.length ==  columns.length) {
         shouldIndex = prepareToReadRecordsWhereFieldsLenEqualsColumnsLen(columns, fields, shouldIndex);
       }
-      else {
+      else if (columns.length < fields.length){
         shouldIndex = prepareToReadRecordsWhereFieldsLenNotEqualsColumnsLen(columns, fields, shouldIndex);
       }
       if (shouldIndex) {

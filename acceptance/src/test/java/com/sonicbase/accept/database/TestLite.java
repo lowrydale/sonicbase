@@ -26,7 +26,7 @@ import static org.testng.Assert.assertEquals;
 
 public class TestLite {
 
-  @Test
+  @Test(enabled=false)
   public void testFileDate() throws IOException {
     File file = new File(System.getProperty("user.hom"), "/tmp/test.txt");
     file.getParentFile().mkdirs();
@@ -36,7 +36,7 @@ public class TestLite {
     System.out.println(file.lastModified());
   }
 
-  @Test
+  @Test(enabled=false)
   public void testBoundaryTimestamp() {
     TimeZone tz = TimeZone.getTimeZone("UTC");
     SimpleDateFormat format1 = new SimpleDateFormat("yyyy-MM-dd HH:mm:ss.SSS GG");
@@ -73,7 +73,7 @@ public class TestLite {
     }
   }
 
-  @Test
+  @Test(enabled=false)
   public void testBoundary() {
     TimeZone tz = TimeZone.getTimeZone("UTC");
     SimpleDateFormat format1 = new SimpleDateFormat("yyyy-MM-dd HH:mm:ss.SSS GG");
@@ -107,7 +107,7 @@ public class TestLite {
     }
   }
 
-  @Test
+  @Test(enabled=false)
   public void testOldDate() throws ParseException {
     TimeZone tz = TimeZone.getTimeZone("UTC");
     SimpleDateFormat format1 = new SimpleDateFormat("yyyy-MM-dd HH:mm:ss.SSS GG");
@@ -119,7 +119,7 @@ public class TestLite {
     System.out.println(format1.format(cal.getTimeInMillis()));
   }
 
-  @Test
+  @Test(enabled=false)
   public void testDateAgain() throws ParseException {
     Calendar cal = DateUtils.fromDbCalString("2009-12-1");
 
@@ -135,7 +135,7 @@ public class TestLite {
     System.out.println(DateUtils.toDbString(cal));
   }
 
-  @Test
+  @Test(enabled=false)
   public void testDate() throws ParseException {
     Calendar cal = Calendar.getInstance();
     cal.set(Calendar.HOUR_OF_DAY, 0);
@@ -179,7 +179,7 @@ public class TestLite {
     System.out.println("fromDbCalString: " + DateUtils.toDbString(cal));
   }
 
-  @Test
+  @Test(enabled=false)
   public  void testDateFormat() throws ParseException {
     Date date = new Date(System.currentTimeMillis());
     String str = DateUtils.fromDate(date);
@@ -189,13 +189,14 @@ public class TestLite {
       date.getMinutes() + ":" + date.getSeconds());
   }
 
-  @Test
+  @Test(enabled=false)
   public void testVarint() throws IOException {
     long len = Varint.sizeOfSignedVarLong(125);
     System.out.println(len);
 
   }
-  @Test
+
+  @Test(enabled=false)
   public void testDelete() throws InterruptedException {
     final ConcurrentSkipListMap<Long, Long> map = new ConcurrentSkipListMap<>();
     for (int i = 0; i < 1_000_000; i++) {
@@ -247,7 +248,7 @@ public class TestLite {
     Thread.sleep(110000000L);
   }
 
-  @Test
+  @Test(enabled=false)
   public void testKeyHash() {
     for (int i = 0; i < 1_000_000; i++) {
       Object[] key1 = new Object[]{(long)i};
@@ -260,7 +261,7 @@ public class TestLite {
     }
   }
 
-  @Test
+  @Test(enabled=false)
   public void testSocket1() {
     long begin = System.currentTimeMillis();
     try {
@@ -274,7 +275,7 @@ public class TestLite {
     }
   }
 
-  @Test
+  @Test(enabled=false)
   public void testSocket2() {
     long begin = System.currentTimeMillis();
     try {
@@ -289,12 +290,12 @@ public class TestLite {
     }
 
 }
-  @Test
+  @Test(enabled=false)
   public void test() {
     System.out.println(DateUtils.toString(new Date(System.currentTimeMillis())));
   }
 
-  @Test
+  @Test(enabled=false)
   public void testSchema() throws InterruptedException, IOException {
 
     File schemaFile = new File(System.getProperty("user.home"), "tmp/schema.bin");
@@ -307,7 +308,7 @@ public class TestLite {
 
   }
 
-  @Test
+  @Test(enabled=false)
   public void testRecord() {
     byte[] bytes = new byte[100];
     Record.setDbViewNumber(bytes, 100);

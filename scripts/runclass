@@ -28,7 +28,7 @@ echo "ver=$ver1"
 if [[ "$ver1" == *"\"1.8."* ]]
 then
   echo "java version=8"
-  java_opts="$java_opts -verbose:gc -XX:+UseGCLogFileRotation -XX:NumberOfGCLogFiles=3 -XX:GCLogFileSize=2m -Xloggc:$_GC_"
+  java_opts="$java_opts -verbose:gc -XX:+PrintGCDetails -XX:+PrintGCTimeStamps -XX:+UseGCLogFileRotation -XX:NumberOfGCLogFiles=3 -XX:GCLogFileSize=2m -Xloggc:$_GC_"
 fi
 
 if [[ $ver1 == *"\"11."* ]] || [[ $ver1 == *"\"1.11."* ]] || [[ $ver1 == *"\"12."* ]] || [[ $ver1 == *"\"1.12."* ]] || [[ $ver1 == *"\"13."* ]] || [[ $ver1 == *"\"1.13."* ]]

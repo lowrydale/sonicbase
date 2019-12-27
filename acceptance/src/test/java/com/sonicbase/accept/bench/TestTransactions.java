@@ -129,7 +129,7 @@ public class TestTransactions {
     ((ConnectionProxy)conn2).getDatabaseClient().syncSchema();
   }
 
-  @Test
+  @Test(enabled=false)
   public void test() throws SQLException {
 
     PreparedStatement stmt = conn.prepareStatement("truncate table persons");
@@ -163,7 +163,7 @@ public class TestTransactions {
     assertEquals(resultSet.getString("socialsecuritynumber"), "ssn");
   }
 
-  @Test
+  @Test(enabled=false)
   public void testConcurrent() throws SQLException, InterruptedException {
 
     PreparedStatement stmt = conn.prepareStatement("truncate table persons");
@@ -219,7 +219,7 @@ public class TestTransactions {
   }
 
 
-  @Test
+  @Test(enabled=false)
   public void testConcurrent2() throws SQLException, InterruptedException {
 
     PreparedStatement stmt = conn.prepareStatement("truncate table persons");
@@ -293,7 +293,7 @@ public class TestTransactions {
     assertEquals(resultSet.getString("socialsecuritynumber"), "ssn-2");
   }
 
-  @Test
+  @Test(enabled=false)
   public void testConcurrent3() throws SQLException, InterruptedException {
 
     PreparedStatement stmt = conn.prepareStatement("truncate table persons");
@@ -391,7 +391,7 @@ public class TestTransactions {
     assertTrue(resultSet.next());
   }
 
-  @Test
+  @Test(enabled=false)
   public void testConcurrent4() throws SQLException, InterruptedException {
 
     PreparedStatement stmt = conn.prepareStatement("truncate table persons");
@@ -489,7 +489,7 @@ public class TestTransactions {
   }
 
 
-  @Test
+  @Test(enabled=false)
     public void testConcurrentSecondaryKeys() throws SQLException, InterruptedException {
 
       PreparedStatement stmt = conn.prepareStatement("truncate table persons");

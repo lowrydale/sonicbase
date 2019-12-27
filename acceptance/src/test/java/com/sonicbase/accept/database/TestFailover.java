@@ -203,7 +203,7 @@ public class TestFailover {
     }
   }
 
-  @Test
+  @Test(enabled=false)
   public void testInsert() throws SQLException, InterruptedException {
     Thread.sleep(4000);
 
@@ -247,7 +247,7 @@ public class TestFailover {
     }
   }
 
-  @Test
+  @Test(enabled=false)
   public void testSpecifiedServer() throws InterruptedException {
     Thread.sleep(4000);
 
@@ -320,7 +320,7 @@ public class TestFailover {
 
   }
 
-  @Test
+  @Test(enabled=false)
   public void testMasterDeath() throws SQLException, InterruptedException {
     Thread.sleep(4000);
 
@@ -361,7 +361,7 @@ public class TestFailover {
 
   }
 
-  @Test
+  @Test(enabled=false)
   public void testMainMasterDeath() throws InterruptedException, SQLException {
     Thread.sleep(4000);
     DatabaseServer.initDeathOverride(2, 2);

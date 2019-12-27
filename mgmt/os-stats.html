@@ -242,7 +242,7 @@
           drawResMem(stats.avg, col1x, row2y, draw, winWidth, winHeight, max, '#3ad03c');
           drawResMem(stats.max, col1x, row2y, draw, winWidth, winHeight, max, '#ff0000');
 
-          max = stats.maxMem;
+          max = stats.maxJavaMem;
 
           draw.text('Java Heap Max').center(col2x + winWidth / 2, row2y - 10)
           draw.rect(winWidth, winHeight).fill('#000').stroke({width: 2}).move(col2x, row2y);
@@ -254,7 +254,7 @@
           drawJMemMax(stats.avg, col2x, row2y, draw, winWidth, winHeight, max, '#3ad03c');
           drawJMemMax(stats.max, col2x, row2y, draw, winWidth, winHeight, max, '#ff0000');
 
-          max = stats.maxMem;
+          max = stats.maxJavaMem;
 
           draw.text('Java Heap Min').center(col3x + winWidth / 2, row2y - 10)
           draw.rect(winWidth, winHeight).fill('#000').stroke({width: 2}).move(col3x, row2y);

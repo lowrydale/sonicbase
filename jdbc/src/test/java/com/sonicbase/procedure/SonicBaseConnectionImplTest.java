@@ -141,12 +141,7 @@ public class SonicBaseConnectionImplTest {
     catch (SQLException e) {
     }
 
-    try {
-      conn.getHoldability();
-      fail();
-    }
-    catch (SQLException e) {
-    }
+    assertEquals(conn.getHoldability(), ResultSet.HOLD_CURSORS_OVER_COMMIT);
 
     try {
       conn.setSavepoint();

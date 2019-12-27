@@ -1208,11 +1208,18 @@ public class Cli {
               columns.add(new SelectColumn(columnName, columnOffset));
             }
             else if (item.getExpression() instanceof Column) {
-              String tableName = ((Column) item.getExpression()).getTable().getName().toLowerCase();
+              String tableName = null;
+              if (((Column) item.getExpression()).getTable() != null &&
+                  ((Column) item.getExpression()).getTable().getName() != null) {
+                tableName = ((Column) item.getExpression()).getTable().getName().toLowerCase();
+              }
               if (tableName == null) {
                 tableName = fromTable;
               }
-              String actualColumnName = ((Column) item.getExpression()).getColumnName().toLowerCase();
+              String actualColumnName = null;
+              if (((Column) item.getExpression()).getColumnName() != null) {
+                actualColumnName = ((Column) item.getExpression()).getColumnName().toLowerCase();
+              }
               if (columnName == null) {
                 columnName = actualColumnName;
               }

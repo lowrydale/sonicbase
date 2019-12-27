@@ -93,7 +93,7 @@ public class TestPartitionManagerConsistency {
     }
   }
 
-  @Test
+  @Test(enabled=false)
   public void test() {
     try {
 

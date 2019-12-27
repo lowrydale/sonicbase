@@ -8,6 +8,7 @@ import com.sonicbase.jdbcdriver.ConnectionProxy;
 import com.sonicbase.server.DatabaseServer;
 import org.apache.commons.io.FileUtils;
 import org.apache.commons.io.IOUtils;
+import org.testng.annotations.AfterMethod;
 import org.testng.annotations.BeforeClass;
 import org.testng.annotations.Test;
 
@@ -27,10 +28,25 @@ import static org.testng.Assert.*;
 public class TestNativePartitionedTreeImpl {
 
   private DatabaseClient clusterClient;
+  private DatabaseServer[] dbServers;
+  private ThreadPoolExecutor executor;
+  private DatabaseClient client;
+  private Connection conn;
 
   @BeforeClass
   public void beforeClass() {
     System.setProperty("log4j.configuration", "test-log4j.xml");
+  }
+
+  @AfterMethod
+  private void shutdown() throws SQLException {
+    client.shutdown();
+    conn.close();
+
+    for (DatabaseServer server : dbServers) {
+      server.shutdown();
+    }
+    executor.shutdown();
   }
 
   private Connection initDb(String createTableStatement) throws IOException, InterruptedException, ExecutionException, ClassNotFoundException, SQLException {
@@ -39,8 +55,8 @@ public class TestNativePartitionedTreeImpl {
 
     FileUtils.deleteDirectory(new File(System.getProperty("user.home"), "db-data"));
 
-    final DatabaseServer[] dbServers = new DatabaseServer[2];
-    ThreadPoolExecutor executor = new ThreadPoolExecutor(32, 32, 10000, TimeUnit.MILLISECONDS, new ArrayBlockingQueue<Runnable>(1000), new ThreadPoolExecutor.CallerRunsPolicy());
+    dbServers = new DatabaseServer[2];
+    executor = new ThreadPoolExecutor(32, 32, 10000, TimeUnit.MILLISECONDS, new ArrayBlockingQueue<Runnable>(1000), new ThreadPoolExecutor.CallerRunsPolicy());
 
     String role = "primaryMaster";
 
@@ -67,10 +83,10 @@ public class TestNativePartitionedTreeImpl {
 
     Class.forName("com.sonicbase.jdbcdriver.Driver");
 
-    DatabaseClient client = new DatabaseClient("localhost", 9010, -1, -1, true);
+    client = new DatabaseClient("localhost", 9010, -1, -1, true);
 
     client.createDatabase("db");
-    Connection conn = DriverManager.getConnection("jdbc:sonicbase:localhost:9010/db", "user", "password");
+    conn = DriverManager.getConnection("jdbc:sonicbase:localhost:9010/db", "user", "password");
 
     clusterClient = ((ConnectionProxy) conn).getDatabaseClient();
 

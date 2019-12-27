@@ -129,7 +129,7 @@ public class TestMisc {
     return value;
   }
 
-  @Test
+  @Test(enabled=false)
   public void testStoredProcedure() throws SQLException {
     PreparedStatement stmt = conn.prepareStatement("CREATE PROCEDURE RAISE_PRICE(\n" +
         "    IN coffeeName varchar(32),\n" +
@@ -143,13 +143,13 @@ public class TestMisc {
     stmt.execute();
   }
 
-  @Test
+  @Test(enabled=false)
   public void testCallStoredProcedure() throws SQLException {
     PreparedStatement stmt = conn.prepareStatement("CALL myProdcedure(1, 2, 3)");
     stmt.execute();
   }
 
-  @Test
+  @Test(enabled=false)
   public void testMem() {
     String secondToLastLine = "  PID USER      PR  NI    VIRT    RES    SHR S  %CPU %MEM     TIME+ COMMAND";
     String lastLine = "20631 ubuntu    20   0 38.144g 4.746g  22044 S 256.2  7.9   2:07.40 java";
@@ -166,21 +166,21 @@ public class TestMisc {
 
   }
 
-  @Test
+  @Test(enabled=false)
   public void testWhite() {
     String str = "s   a b  c ";
     String[] parts = str.split("\\s+");
     System.out.println("test");
   }
 
-  @Test
+  @Test(enabled=false)
   public void testMath() {
     double value = 17179869184d;
     value = value / 1024d / 1024d / 1024d;
     System.out.println(value);
   }
 
-  @Test
+  @Test(enabled=false)
   public void testIndex() {
     ConcurrentSkipListMap<Object[], Integer> index = new ConcurrentSkipListMap<>(new Comparator<Object[]>() {
       @Override

@@ -105,7 +105,7 @@ public class TestPartitionManagerConsistencySecondaryIndex {
     }
   }
 
-  @Test
+  @Test(enabled=false)
   public void test() {
     try {
 

@@ -186,7 +186,7 @@ public class TestNoKey {
     }
   }
 
-  @Test
+  @Test(enabled=false)
   public void test() throws SQLException {
     PreparedStatement stmt = conn.prepareStatement("select * from nokeysecondaryindex");
     ResultSet rs = stmt.executeQuery();

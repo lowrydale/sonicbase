@@ -167,6 +167,20 @@ public class MonitorHandler extends AbstractHandler {
         }
       }
       logger.info("os_totals count: " + totalsCount);
+
+      double xmxValue = 0;
+      String xmxSetting = server.getXmx();
+      if (xmxSetting.contains("g")) {
+        xmxValue = Double.valueOf(xmxSetting.substring(0, xmxSetting.length() - 1));
+      }
+      else if (xmxSetting.contains("m")) {
+        xmxValue = Double.valueOf(xmxSetting.substring(0, xmxSetting.length() - 1)) / 1024d;
+      }
+      else if (xmxSetting.contains("t")) {
+        xmxValue = Double.valueOf(xmxSetting.substring(0, xmxSetting.length() - 1)) * 1024d;
+      }
+
+      node.put("maxJavaMem", xmxValue);
       node.put("maxMem", maxMem);
       node.put("maxDisk", maxDisk / 1024 / 1024 / 1024);
 
@@ -188,9 +202,12 @@ public class MonitorHandler extends AbstractHandler {
       String query = null;
       if (timeStr2 == null) {
         query = "select * from os_stats where time_val > ? order by time_val asc";
+        logger.info("getting os_stats: stmt=\"select * from os_stats where time_val > '" + timeStr + "' order by time_val asc\"");
       }
       else {
         query = "select * from os_stats where time_val > ? and time_val < ? order by time_val asc";
+        logger.info("getting os_stats: stmt=\"select * from os_stats where time_val > '" + timeStr +
+            "' and time_val < '" + timeStr2 + "' order by time_val asc\"");
       }
       try (PreparedStatement stmt = conn.prepareStatement(query)) {
         stmt.setString(1, timeStr);
@@ -324,8 +341,8 @@ public class MonitorHandler extends AbstractHandler {
           for (OSStats currStats : entry.getValue()) {
             historgrams.cpuHistogram.update((long)currStats.cpu);
             historgrams.resGigHistogram.update((long)currStats.resGig);
-            historgrams.javaMemMinHistogram.update((long)currStats.javaMemMin);
-            historgrams.javaMemMaxHistogram.update((long)currStats.javaMemMax);
+            historgrams.javaMemMinHistogram.update((long) (currStats.javaMemMin * 1024d));
+            historgrams.javaMemMaxHistogram.update((long) (currStats.javaMemMax * 1024d));
             historgrams.netInHistogram.update((long)currStats.netIn);
             historgrams.netOutHistogram.update((long)currStats.netOut);
             historgrams.diskAvailHistogram.update((long)currStats.diskAvail);
@@ -351,8 +368,8 @@ public class MonitorHandler extends AbstractHandler {
       obj.put("net_in", h.netInSnapshot.getMax());
       obj.put("net_out", h.netOutSnapshot.getMax());
       obj.put("r_mem", h.resGigSnapshot.getMax());
-      obj.put("j_min", h.javaMemMinSnapshot.getMax());
-      obj.put("j_max", h.javaMemMaxSnapshot.getMax());
+      obj.put("j_min", h.javaMemMinSnapshot.getMax() / 1024d);
+      obj.put("j_max", h.javaMemMaxSnapshot.getMax() / 1024d);
       obj.put("d_avail", h.diskAvailSnapshot.getMax() / 1024 / 1024 / 1024);
     }
     ArrayNode p75 = node.putArray("p75");
@@ -365,8 +382,8 @@ public class MonitorHandler extends AbstractHandler {
       obj.put("net_in", h.netInSnapshot.get75thPercentile());
       obj.put("net_out", h.netOutSnapshot.get75thPercentile());
       obj.put("r_mem", h.resGigSnapshot.get75thPercentile());
-      obj.put("j_min", h.javaMemMinSnapshot.get75thPercentile());
-      obj.put("j_max", h.javaMemMaxSnapshot.get75thPercentile());
+      obj.put("j_min", h.javaMemMinSnapshot.get75thPercentile() / 1024d);
+      obj.put("j_max", h.javaMemMaxSnapshot.get75thPercentile() / 1024d);
       obj.put("d_avail", h.diskAvailSnapshot.get75thPercentile() / 1024 / 1024 / 1024);
     }
     ArrayNode p95 = node.putArray("p95");
@@ -379,8 +396,8 @@ public class MonitorHandler extends AbstractHandler {
       obj.put("net_in", h.netInSnapshot.get95thPercentile());
       obj.put("net_out", h.netOutSnapshot.get95thPercentile());
       obj.put("r_mem", h.resGigSnapshot.get95thPercentile());
-      obj.put("j_min", h.javaMemMinSnapshot.get95thPercentile());
-      obj.put("j_max", h.javaMemMaxSnapshot.get95thPercentile());
+      obj.put("j_min", h.javaMemMinSnapshot.get95thPercentile() / 1024d);
+      obj.put("j_max", h.javaMemMaxSnapshot.get95thPercentile() / 1024d);
       obj.put("d_avail", h.diskAvailSnapshot.get95thPercentile() / 1024 / 1024 / 1024);
     }
     ArrayNode p99 = node.putArray("p99");
@@ -393,8 +410,8 @@ public class MonitorHandler extends AbstractHandler {
       obj.put("net_in", h.netInSnapshot.get99thPercentile());
       obj.put("net_out", h.netOutSnapshot.get99thPercentile());
       obj.put("r_mem", h.resGigSnapshot.get99thPercentile());
-      obj.put("j_min", h.javaMemMinSnapshot.get99thPercentile());
-      obj.put("j_max", h.javaMemMaxSnapshot.get99thPercentile());
+      obj.put("j_min", h.javaMemMinSnapshot.get99thPercentile() / 1024d);
+      obj.put("j_max", h.javaMemMaxSnapshot.get99thPercentile() / 1024d);
       obj.put("d_avail", h.diskAvailSnapshot.get99thPercentile() / 1024 / 1024 / 1024);
     }
     ArrayNode p999 = node.putArray("p999");
@@ -407,8 +424,8 @@ public class MonitorHandler extends AbstractHandler {
       obj.put("net_in", h.netInSnapshot.get999thPercentile());
       obj.put("net_out", h.netOutSnapshot.get999thPercentile());
       obj.put("r_mem", h.resGigSnapshot.get999thPercentile());
-      obj.put("j_min", h.javaMemMinSnapshot.get999thPercentile());
-      obj.put("j_max", h.javaMemMaxSnapshot.get999thPercentile());
+      obj.put("j_min", h.javaMemMinSnapshot.get999thPercentile() / 1024d);
+      obj.put("j_max", h.javaMemMaxSnapshot.get999thPercentile() / 1024d);
       obj.put("d_avail", h.diskAvailSnapshot.get999thPercentile() / 1024 / 1024 / 1024);
     }
     ArrayNode avg = node.putArray("avg");
@@ -421,8 +438,8 @@ public class MonitorHandler extends AbstractHandler {
       obj.put("net_in", h.netInSnapshot.getMean());
       obj.put("net_out", h.netOutSnapshot.getMean());
       obj.put("r_mem", h.resGigSnapshot.getMean());
-      obj.put("j_min", h.javaMemMinSnapshot.getMean());
-      obj.put("j_max", h.javaMemMaxSnapshot.getMean());
+      obj.put("j_min", h.javaMemMinSnapshot.getMean() / 1024d);
+      obj.put("j_max", h.javaMemMaxSnapshot.getMean() / 1024d);
       obj.put("d_avail", h.diskAvailSnapshot.getMean() / 1024 / 1024 / 1024);
     }
   }

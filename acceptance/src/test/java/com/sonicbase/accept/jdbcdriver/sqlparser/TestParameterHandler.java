@@ -7,7 +7,7 @@ import java.io.*;
 
 public class TestParameterHandler {
 
-  @Test
+  @Test(enabled=false)
   public void test() throws Exception {
     ParameterHandler handler = new ParameterHandler();
     handler.setString(1, "testing");

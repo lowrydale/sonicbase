@@ -12,7 +12,7 @@ import static org.testng.Assert.assertEquals;
 
 public class TestSocket {
 
-  @Test
+  @Test(enabled=false)
   public void test() throws InterruptedException {
     Thread thread = new Thread(() -> {
       NettyServer server = new NettyServer();

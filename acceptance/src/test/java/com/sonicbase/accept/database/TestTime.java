@@ -11,7 +11,7 @@ import java.util.Date;
 
 public class TestTime {
 
-  @Test
+  @Test(enabled=false)
   public void test() {
     DateFormat writeFormat = new SimpleDateFormat( "yyyy-MM-dd HH:mm:ss");
     Date date = null;

@@ -121,7 +121,7 @@ public class TestDataTypes2 {
 
   }
 
-  @Test
+  @Test(enabled=false)
   public void test() throws SQLException {
     PreparedStatement stmt = conn.prepareStatement("select * from query_stats");
     ResultSet rs = stmt.executeQuery();
@@ -139,7 +139,7 @@ public class TestDataTypes2 {
     assertFalse(rs.next());
   }
 
-  @Test
+  @Test(enabled=false)
   public void testComObject() {
     ComObject cobj = new ComObject(3);
     long duration = 40404022;

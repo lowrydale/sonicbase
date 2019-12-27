@@ -6,7 +6,7 @@ import java.util.concurrent.ConcurrentSkipListMap;
 
 public class TestMisc {
 
-  @Test
+  @Test(enabled=false)
   public void test() {
     ConcurrentSkipListMap<Long, Integer> map = new ConcurrentSkipListMap<>();
     map.put(100L, 100);

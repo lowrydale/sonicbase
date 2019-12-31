@@ -206,7 +206,7 @@
     <slf4j-log4j12.version>1.7.25</slf4j-log4j12.version>
     <snakeyaml.version>1.21</snakeyaml.version>
     <testng.version>6.8</testng.version>
-    <commons-cli.version>1.3.2</commons-cli.version>
+    <commons-cli.version>1.3.1</commons-cli.version>
     <aws-java-sdk.version>1.11.400</aws-java-sdk.version>
     <quartz-jobs.version>2.2.1</quartz-jobs.version>
     <mockito.version>2.8.47</mockito.version>

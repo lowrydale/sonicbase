@@ -260,12 +260,11 @@ public class ClientStatsHandler {
       cobj.put(ComObject.Tag.SQL, sql);
 
       DatabaseClient sharedClient = DatabaseClient.getSharedClient();
-      byte[] ret = sendToMasterOnSharedClient(cobj, sharedClient);
-      if (ret == null) {
+      ComObject retObj = sendToMasterOnSharedClient(cobj, sharedClient);
+      if (retObj == null) {
         disableStats = true;
       }
       else {
-        ComObject retObj = new ComObject(ret);
         entry = new HistogramEntry();
         HistogramEntry retEntry = new HistogramEntry();
         entry.setQueryId(retObj.getLong(ComObject.Tag.ID));
@@ -291,7 +290,7 @@ public class ClientStatsHandler {
     return null;
   }
 
-  public byte[] sendToMasterOnSharedClient(ComObject cobj, DatabaseClient sharedClient) {
+  public ComObject sendToMasterOnSharedClient(ComObject cobj, DatabaseClient sharedClient) {
     return sharedClient.sendToMaster(cobj);
   }
 

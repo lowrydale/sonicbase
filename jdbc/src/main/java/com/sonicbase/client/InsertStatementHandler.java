@@ -172,7 +172,7 @@ public class InsertStatementHandler implements StatementHandler {
   }
 
   public List<PreparedInsert> prepareInsert(InsertRequest request,
-                                            List<PreparedInsert> completed, AtomicLong recordId, long nonTransId, AtomicInteger originalOffset) throws UnsupportedEncodingException, SQLException {
+                                            List<PreparedInsert> completed, long nonTransId, AtomicInteger originalOffset) throws UnsupportedEncodingException, SQLException {
     List<PreparedInsert> ret = new ArrayList<>();
 
     String dbName = request.dbName;
@@ -188,7 +188,7 @@ public class InsertStatementHandler implements StatementHandler {
     }
     int tableId = tableSchema.getTableId();
 
-    long id = getRecordId(recordId, dbName, tableSchema);
+    long id = getRecordId(dbName, tableSchema);
 
     long transId = 0;
     if (!client.isExplicitTrans()) {
@@ -278,25 +278,12 @@ public class InsertStatementHandler implements StatementHandler {
     return keys;
   }
 
-  private long getRecordId(AtomicLong recordId, String dbName, TableSchema tableSchema) {
-    long id = -1;
-    for (IndexSchema indexSchema : tableSchema.getIndices().values()) {
-      if (indexSchema.isPrimaryKey()) {// && indexSchema.getFields()[0].equals(SONICBASE_ID_STR)) {
-        if (recordId.get() == -1L) {
-          id = client.allocateId(dbName);
-        }
-        else {
-          id = recordId.get();
-        }
-        recordId.set(id);
-        break;
-      }
-    }
-    return id;
+  private long getRecordId(String dbName, TableSchema tableSchema) {
+    return client.allocateId(dbName);
   }
 
   public static List<KeyInfo> getKeys(TableSchema tableSchema, List<String> columnNames,
-                                                     List<Object> values, long id) {
+                                      List<Object> values, long id) {
     List<KeyInfo> ret = new ArrayList<>();
     for (Map.Entry<String, IndexSchema> indexSchema : tableSchema.getIndices().entrySet()) {
       String[] fields = indexSchema.getValue().getFields();
@@ -315,19 +302,15 @@ public class InsertStatementHandler implements StatementHandler {
         }
       }
       if (shouldIndex) {
-
         doGetKeys(tableSchema, columnNames, values, id, ret, indexSchema);
       }
     }
     return ret;
   }
 
-  private static void doGetKeys(TableSchema tableSchema, List<String> columnNames, List<Object> values, long id, List<KeyInfo> ret, Map.Entry<String, IndexSchema> indexSchema) {
+  private static void doGetKeys(TableSchema tableSchema, List<String> columnNames, List<Object> values, long id,
+                                List<KeyInfo> ret, Map.Entry<String, IndexSchema> indexSchema) {
     String[] indexFields = indexSchema.getValue().getFields();
-    int[] fieldOffsets = new int[indexFields.length];
-    for (int i = 0; i < indexFields.length; i++) {
-      fieldOffsets[i] = tableSchema.getFieldOffset(indexFields[i]);
-    }
     TableSchema.Partition[] currPartitions = indexSchema.getValue().getCurrPartitions();
 
     Object[] key = new Object[indexFields.length];
@@ -436,14 +419,13 @@ public class InsertStatementHandler implements StatementHandler {
     boolean origIgnore = insertStatement.isIgnore();
     insertStatement.setIgnore(false);
     List<PreparedInsert> completed = new ArrayList<>();
-    AtomicLong recordId = new AtomicLong(-1L);
     if (getBatch().get() != null) {
       getBatch().get().add(request);
     }
     while (!client.getShutdown()) {
       try {
         if (getBatch().get() == null) {
-          doInsert(dbName, insertStatement, schemaRetryCount, request, completed, recordId);
+          doInsert(dbName, insertStatement, schemaRetryCount, request, completed);
         }
         break;
       }
@@ -479,7 +461,7 @@ public class InsertStatementHandler implements StatementHandler {
   }
 
   private void doInsert(String dbName, InsertStatementImpl insertStatement, int schemaRetryCount, InsertRequest request,
-                        List<PreparedInsert> completed, AtomicLong recordId) throws UnsupportedEncodingException, SQLException {
+                        List<PreparedInsert> completed) throws UnsupportedEncodingException, SQLException {
     long nonTransId = 0;
     if (!client.isExplicitTrans()) {
       nonTransId = client.allocateId(dbName);
@@ -488,7 +470,7 @@ public class InsertStatementHandler implements StatementHandler {
 
     while (true) {
       try {
-        List<PreparedInsert> inserts = prepareInsert(request, completed, recordId, nonTransId, new AtomicInteger());
+        List<PreparedInsert> inserts = prepareInsert(request, completed, nonTransId, new AtomicInteger());
         List<PreparedInsert> insertsWithRecords = new ArrayList<>();
         List<PreparedInsert> insertsWithKey = new ArrayList<>();
         for (PreparedInsert insert : inserts) {
@@ -605,12 +587,11 @@ public class InsertStatementHandler implements StatementHandler {
 
     Exception lastException = null;
     try {
-      byte[] ret = client.send("UpdateManager:insertIndexEntryByKeyWithRecord", keyInfo.shard, 0, cobj, DatabaseClient.Replica.DEF);
+      ComObject ret = client.send("UpdateManager:insertIndexEntryByKeyWithRecord", keyInfo.shard, 0, cobj, DatabaseClient.Replica.DEF);
       if (ret == null) {
         throw new FailedToInsertException("No response for key insert");
       }
-      ComObject retObj = new ComObject(ret);
-      int retVal = retObj.getInt(ComObject.Tag.COUNT);
+      int retVal = ret.getInt(ComObject.Tag.COUNT);
       if (retVal != 1) {
         throw new FailedToInsertException("Incorrect response from server: value=" + retVal);
       }
@@ -799,9 +780,8 @@ public class InsertStatementHandler implements StatementHandler {
 
     insertStatement.serialize(cobj);
 
-    byte[] bytes = client.send(null, Math.abs(ThreadLocalRandom.current().nextInt() % client.getShardCount()),
+    ComObject retObj = client.send(null, Math.abs(ThreadLocalRandom.current().nextInt() % client.getShardCount()),
         Math.abs(ThreadLocalRandom.current().nextLong()), cobj, DatabaseClient.Replica.DEF);
-    ComObject retObj = new ComObject(bytes);
     return retObj.getInt(ComObject.Tag.COUNT);
   }
 
@@ -847,11 +827,11 @@ public class InsertStatementHandler implements StatementHandler {
 
           String dbName = getBatch().get().get(0).dbName;
 
-          Map<Integer, PreparedInsert> withRecordPreparedById = new HashMap<>();
+          Map<Integer, PreparedInsert> withRecordPreparedById = new HashMap<>(withRecordPrepared.size());
           for (PreparedInsert insert : withRecordPrepared) {
             withRecordPreparedById.put(insert.insertId, insert);
           }
-          Map<Integer, PreparedInsert> preparedKeysById = new HashMap<>();
+          Map<Integer, PreparedInsert> preparedKeysById = new HashMap<>(preparedKeys.size());
           for (PreparedInsert insert : preparedKeys) {
             preparedKeysById.put(insert.insertId, insert);
           }
@@ -1122,8 +1102,9 @@ public class InsertStatementHandler implements StatementHandler {
   private void prepareInserts(List<PreparedInsert> withRecordPrepared, Map<Integer, PreparedInsert> withRecordPreparedMap,
                               List<PreparedInsert> preparedKeys, long nonTransId, AtomicInteger originalOffset) throws UnsupportedEncodingException, SQLException {
     int insertId = 0;
+
     for (InsertRequest request : getBatch().get()) {
-      List<PreparedInsert> inserts = prepareInsert(request, new ArrayList<>(), new AtomicLong(-1L), nonTransId,
+      List<PreparedInsert> inserts = prepareInsert(request, new ArrayList<>(), nonTransId,
           originalOffset);
       for (PreparedInsert insert : inserts) {
         if (client.isExplicitTrans() && insert.ignore) {
@@ -1181,14 +1162,14 @@ public class InsertStatementHandler implements StatementHandler {
         if (cobjs2.get(offset).getArray(ComObject.Tag.INSERT_OBJECTS).getArray().isEmpty()) {
           return new ComObject(2);
         }
-        byte[] ret = client.send("UpdateManager:batchInsertIndexEntryByKey", offset, 0, cobjs2.get(offset),
+        ComObject ret = client.send("UpdateManager:batchInsertIndexEntryByKey", offset, 0, cobjs2.get(offset),
             DatabaseClient.Replica.DEF);
 
         for (PreparedInsert insert : processed.get(offset)) {
           preparedKeys.remove(insert);
         }
 
-        return new ComObject(ret);
+        return ret;
       }));
     }
     List<ComObject> responses = new ArrayList<>();
@@ -1208,12 +1189,11 @@ public class InsertStatementHandler implements StatementHandler {
         if (cobjs1.get(offset).getArray(ComObject.Tag.INSERT_OBJECTS).getArray().isEmpty()) {
           return new ComObject(2);
         }
-        byte[] ret = client.send("UpdateManager:batchInsertIndexEntryByKeyWithRecord", offset, 0,
+        ComObject retObj = client.send("UpdateManager:batchInsertIndexEntryByKeyWithRecord", offset, 0,
             cobjs1.get(offset), DatabaseClient.Replica.DEF);
-        if (ret == null) {
+        if (retObj == null) {
           throw new FailedToInsertException("No response for key insert");
         }
-        ComObject retObj = new ComObject(ret);
         if (retObj.getInt(ComObject.Tag.COUNT) == null) {
           throw new DatabaseException("count not returned: obj=" + retObj.toString());
         }

@@ -139,8 +139,7 @@ public class TestSecondaryIndex {
       while (true) {
         ComObject cobj = new ComObject(1);
         cobj.put(ComObject.Tag.METHOD, "DatabaseServer:areAllLongRunningCommandsComplete");
-        byte[] bytes = ((ConnectionProxy) conn).getDatabaseClient().sendToMaster(cobj);
-        ComObject retObj = new ComObject(bytes);
+        ComObject retObj = ((ConnectionProxy) conn).getDatabaseClient().sendToMaster(cobj);
         if (retObj.getBoolean(ComObject.Tag.IS_COMPLETE)) {
           break;
         }

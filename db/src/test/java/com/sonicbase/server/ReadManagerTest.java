@@ -422,7 +422,7 @@ public class ReadManagerTest {
     retObj.put(ComObject.Tag.COUNT_RETURNED, (long)records.length);
 
     when(client.send(   anyString(), anyInt(), anyInt(), (ComObject) anyObject(), eq(DatabaseClient.Replica.DEF))).thenReturn(
-        retObj.serialize()
+        retObj
     );
     SelectStatementImpl select = new SelectStatementImpl(client);
     when(server.getDatabaseClient()).thenReturn(client);
@@ -586,7 +586,7 @@ public class ReadManagerTest {
         (Answer) invocationOnMock -> {
           Object[] args = invocationOnMock.getArguments();
           //retObj.serialize()
-          return readManager.indexLookup((ComObject)args[3], false).serialize();
+          return readManager.indexLookup((ComObject)args[3], false);
         }
     );
 

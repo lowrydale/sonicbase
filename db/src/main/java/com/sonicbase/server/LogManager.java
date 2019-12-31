@@ -644,8 +644,7 @@ public class LogManager {
         return;
       }
       if (isHealthy.get()) {
-        byte[] ret = server.getClient().send(null, server.getShard(), replica, cobj, DatabaseClient.Replica.SPECIFIED);
-        ComObject retObj = new ComObject(ret);
+        ComObject retObj = server.getClient().send(null, server.getShard(), replica, cobj, DatabaseClient.Replica.SPECIFIED);
         ComArray filenames = retObj.getArray(ComObject.Tag.FILENAMES);
         if (filenames != null) {
           for (int i = 0; i < filenames.getArray().size(); i++) {
@@ -657,8 +656,7 @@ public class LogManager {
             cobj.put(ComObject.Tag.REPLICA, server.getReplica());
             cobj.put(ComObject.Tag.FILENAME, filename);
 
-            ret = server.getClient().send(null, server.getShard(), replica, cobj, DatabaseClient.Replica.SPECIFIED);
-            retObj = new ComObject(ret);
+            retObj = server.getClient().send(null, server.getShard(), replica, cobj, DatabaseClient.Replica.SPECIFIED);
             byte[] bytes = retObj.getByteArray(ComObject.Tag.BINARY_FILE_CONTENT);
 
             sendQueueFile(replica, filename, bytes);
@@ -972,7 +970,7 @@ public class LogManager {
     for (final NettyServer.Request currRequest : finalBatch) {
       futures.add(executor.submit((Callable) () -> {
         try {
-          server.invokeMethod(currRequest.getBody(), currRequest.getSequence0(), currRequest.getSequence1(),
+          server.invokeMethod(null, currRequest.getBody(), currRequest.getSequence0(), currRequest.getSequence1(),
               true, false, null, null);
           countReplayed.incrementAndGet();
           if (System.currentTimeMillis() - lastLogged.get() > 2000) {

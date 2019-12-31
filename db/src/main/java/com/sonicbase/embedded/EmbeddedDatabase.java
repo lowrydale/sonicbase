@@ -49,6 +49,7 @@ public class EmbeddedDatabase {
       config.put("useUnsafe", useUnsafe);
 
       server = new DatabaseServer();
+      server.setIsEmbedded(true);
       String installDir = new File(System.getProperty("user.dir")).getAbsolutePath();
       server.setConfig(config, "localhost", 8999, true,
           new AtomicBoolean(true), new AtomicBoolean(true), "", "", notDurable, true, installDir);

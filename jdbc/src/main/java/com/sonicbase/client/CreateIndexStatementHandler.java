@@ -70,8 +70,7 @@ public class CreateIndexStatementHandler implements StatementHandler {
 
     cobj.put(ComObject.Tag.FIELDS_STR, builder.toString());
 
-    byte[] ret = client.sendToMaster("SchemaManager:createIndex", cobj);
-    ComObject retObj = new ComObject(ret);
+    ComObject retObj = client.sendToMaster("SchemaManager:createIndex", cobj);
     client.getCommon().deserializeSchema(retObj.getByteArray(ComObject.Tag.SCHEMA_BYTES));
   }
 

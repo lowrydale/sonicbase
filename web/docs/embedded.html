@@ -63,10 +63,6 @@ SonicBase can be embedded in your server. EmbeddedDatabase is a simple class tha
 		a few methods on this class that you will need to use:<br/>
 		<br/>
 		<lu><li>
-			setUseUnsafe - set to true if you want SonicBase to use unsafe memory. Unsafe memory allows for less memory
-			consumption, but it is more complicated to manage (you have to set the Xmx setting just right). The default
-			if you don't set this option is to not use unsafe.
-		</li><li>
 			setDurability - pass in the path to the location you want data stored on disk. If this method is not called then
 			SonicBase will operate in an in-memory only mode.
 		</li><li>
@@ -102,7 +98,6 @@ SonicBase can be embedded in your server. EmbeddedDatabase is a simple class tha
 		<pre class="java"><code>
 EmbeddedDatabase db = new EmbeddedDatabase();
 try {
-  db.setUseUnsafe(false);
   db.setDurability(System.getProperty("user.home") + "/db-data.embedded");
   db.purge();
   db.start();

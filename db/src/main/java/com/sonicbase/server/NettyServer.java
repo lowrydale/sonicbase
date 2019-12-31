@@ -445,9 +445,9 @@ public class NettyServer {
     private List<Response> processRequests(List<Request> requests, AtomicLong timeLogging, AtomicLong handlerTime) {
       List<Response> ret = new ArrayList<>();
       for (Request request : requests) {
-        byte[] retBody = getDatabaseServer().invokeMethod(request.body, -1L, (short) -1L,
+        ComObject retBody = getDatabaseServer().invokeMethod(null, request.body, -1L, (short) -1L,
             false, true, timeLogging, handlerTime);
-        Response response = new Response(retBody);
+        Response response = new Response(retBody == null ? null : retBody.serialize());
         ret.add(response);
       }
       return ret;
@@ -923,11 +923,10 @@ public class NettyServer {
         }
         ComObject cobj = new ComObject(1);
         cobj.put(ComObject.Tag.METHOD, "DatabaseServer:healthCheckPriority");
-        byte[] ret = databaseServer.getDatabaseClient().send(null, shard, replica, cobj,
+        ComObject ret = databaseServer.getDatabaseClient().send(null, shard, replica, cobj,
             DatabaseClient.Replica.SPECIFIED);
         if (ret != null) {
-          ComObject retObj = new ComObject(ret);
-          String status = retObj.getString(ComObject.Tag.STATUS);
+          String status = ret.getString(ComObject.Tag.STATUS);
           if (status.equals("{\"status\" : \"ok\"}")) {
             break;
           }

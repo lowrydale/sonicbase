@@ -136,7 +136,7 @@ public class PartitionManagerTest {
         (Answer) invocation -> {
 //            Object[] args = invocation.getArguments();
 //            return partitionManager.getPartitionSize((ComObject)args[3], false).serialize();
-          return bytes0;
+          return new ComObject(bytes0);
         });
 
     cobj = new ComObject(1);
@@ -153,19 +153,17 @@ public class PartitionManagerTest {
     size1Obj.put(ComObject.Tag.RAW_SIZE, (long) 0);
     array.add(size1Obj);
 
-    byte[] bytes1 = cobj.serialize();
     when(client.send(eq("PartitionManager:getPartitionSize"), eq(1), eq((long) 0), (ComObject) anyObject(), eq(DatabaseClient.Replica.MASTER))).thenReturn(
-        bytes1
+        cobj
     );
 
     cobj = new ComObject(1);
     array = cobj.putArray(ComObject.Tag.KEYS, ComObject.Type.BYTE_ARRAY_TYPE, 1);
     array.add(DatabaseCommon.serializeKey(tableSchema, "_primarykey", keys.get(4)));
-    bytes1 = cobj.serialize();
     when(client.send(eq("PartitionManager:getKeyAtOffset"), eq(0), eq((long) 0), (ComObject) anyObject(), eq(DatabaseClient.Replica.MASTER))).thenAnswer(
         (Answer) invocation -> {
           Object[] args = invocation.getArguments();
-          return partitionManager.getKeyAtOffset((ComObject) args[3], false).serialize();
+          return partitionManager.getKeyAtOffset((ComObject) args[3], false);
         });
 
 //    cobj.put(ComObject.Tag.replica, 0);
@@ -178,7 +176,7 @@ public class PartitionManagerTest {
         eq(DatabaseClient.Replica.SPECIFIED))).thenAnswer(
         (Answer) invocation -> {
           Object[] args = invocation.getArguments();
-          return partitionManager.isShardRepartitioningComplete((ComObject) args[3], false).serialize();
+          return partitionManager.isShardRepartitioningComplete((ComObject) args[3], false);
         });
 
 
@@ -321,7 +319,7 @@ public class PartitionManagerTest {
           public Object answer(InvocationOnMock invocation) {
 //            Object[] args = invocation.getArguments();
 //            return partitionManager.getPartitionSize((ComObject)args[3], false).serialize();
-            return bytes0;
+            return new ComObject(bytes0);
           }
         });
 
@@ -339,20 +337,18 @@ public class PartitionManagerTest {
     size1Obj.put(ComObject.Tag.RAW_SIZE, (long) 0);
     array.add(size1Obj);
 
-    byte[] bytes1 = cobj.serialize();
     when(client.send(eq("PartitionManager:getPartitionSize"), eq(1), eq((long) 0), (ComObject) anyObject(), eq(DatabaseClient.Replica.MASTER))).thenReturn(
-        bytes1
+        cobj
     );
 
     cobj = new ComObject(1);
     array = cobj.putArray(ComObject.Tag.KEYS, ComObject.Type.BYTE_ARRAY_TYPE, 1);
     array.add(DatabaseCommon.serializeKey(tableSchema, "_primarykey", keys.get(4)));
-    bytes1 = cobj.serialize();
     when(client.send(eq("PartitionManager:getKeyAtOffset"), eq(0), eq((long) 0), (ComObject) anyObject(), eq(DatabaseClient.Replica.MASTER))).thenAnswer(
         new Answer() {
           public Object answer(InvocationOnMock invocation) {
             Object[] args = invocation.getArguments();
-            return partitionManager.getKeyAtOffset((ComObject) args[3], false).serialize();
+            return partitionManager.getKeyAtOffset((ComObject) args[3], false);
           }
         });
 
@@ -487,7 +483,7 @@ public class PartitionManagerTest {
               cobj.put(ComObject.Tag.SEQUENCE_0, 10000L);
               cobj.put(ComObject.Tag.SEQUENCE_1, 10000L);
 
-              return partitionManager.getIndexCounts(cobj, false).serialize();
+              return partitionManager.getIndexCounts(cobj, false);
             }
           });
 
@@ -707,7 +703,7 @@ public class PartitionManagerTest {
           public Object answer(InvocationOnMock invocation) {
             Object[] args = invocation.getArguments();
             ComObject retObj = partitionManagers[(Integer) args[1]].getPartitionSize((ComObject) args[3], false);
-            return retObj.serialize();
+            return retObj;
           }
         });
 
@@ -737,7 +733,7 @@ public class PartitionManagerTest {
 //                throw new DatabaseException(e);
 //              }
             }
-            return retObj.serialize();
+            return retObj;
           }
         });
 
@@ -752,7 +748,7 @@ public class PartitionManagerTest {
         new Answer() {
           public Object answer(InvocationOnMock invocation) {
             Object[] args = invocation.getArguments();
-            return partitionManagers[(Integer) args[1]].rebalanceOrderedIndex((ComObject) args[3], false).serialize();
+            return partitionManagers[(Integer) args[1]].rebalanceOrderedIndex((ComObject) args[3], false);
           }
         });
 
@@ -761,7 +757,7 @@ public class PartitionManagerTest {
         new Answer() {
           public Object answer(InvocationOnMock invocation) {
             Object[] args = invocation.getArguments();
-            return partitionManagers[(Integer) args[1]].isShardRepartitioningComplete((ComObject) args[3], false).serialize();
+            return partitionManagers[(Integer) args[1]].isShardRepartitioningComplete((ComObject) args[3], false);
           }
         });
 
@@ -821,7 +817,7 @@ public class PartitionManagerTest {
               ComObject cobj = (ComObject) args[3];
               cobj.put(ComObject.Tag.SEQUENCE_0, 10000L);
               cobj.put(ComObject.Tag.SEQUENCE_1, 10000L);
-              return partitionManagers[(Integer) args[1]].moveIndexEntries(cobj, false).serialize();
+              return partitionManagers[(Integer) args[1]].moveIndexEntries(cobj, false);
 
 //              Object[] args = invocation.getArguments();
 //              ComObject cobj = (ComObject) args[3];

@@ -31,9 +31,7 @@ class BulkImportHandler {
     ComObject cobj = new ComObject(2);
     cobj.put(ComObject.Tag.METHOD, "BulkImportManager:getBulkImportProgress");
     cobj.put(ComObject.Tag.DB_NAME, cli.getCurrDbName());
-    byte[] bytes = cli.getConn().sendToMaster(cobj);
-    ComObject retObj = new ComObject(bytes);
-
+    ComObject retObj = cli.getConn().sendToMaster(cobj);
     ComArray array = retObj.getArray(ComObject.Tag.PROGRESS_ARRAY);
     for (int i = 0; i < array.getArray().size(); i++) {
       ComObject tableObj = (ComObject) array.getArray().get(i);

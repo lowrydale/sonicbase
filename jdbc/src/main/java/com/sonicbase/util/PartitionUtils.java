@@ -63,7 +63,7 @@ public class PartitionUtils {
           ComObject cobj = new ComObject(2);
           cobj.put(ComObject.Tag.DB_NAME, dbName);
           cobj.put(ComObject.Tag.SCHEMA_VERSION, client.getCommon().getSchemaVersion());
-          byte[] response = client.send("PartitionManager:getIndexCounts", shard, 0, cobj, DatabaseClient.Replica.MASTER);
+          ComObject response = client.send("PartitionManager:getIndexCounts", shard, 0, cobj, DatabaseClient.Replica.MASTER);
           synchronized (ret) {
             processResponseForGetIndexCounts(ret, shard, response);
             return null;
@@ -93,9 +93,8 @@ public class PartitionUtils {
     }
   }
 
-  private static void processResponseForGetIndexCounts(GlobalIndexCounts ret, int shard, byte[] response) {
-    ComObject retObj = new ComObject(response);
-    ComArray tables = retObj.getArray(ComObject.Tag.TABLES);
+  private static void processResponseForGetIndexCounts(GlobalIndexCounts ret, int shard, ComObject response) {
+    ComArray tables = response.getArray(ComObject.Tag.TABLES);
     if (tables != null) {
       for (int i1 = 0; i1 < tables.getArray().size(); i1++) {
         ComObject tableObj = (ComObject) tables.getArray().get(i1);

@@ -1050,9 +1050,8 @@ public class BulkImportManager {
   private int startBulkImportOnServerDoSendToReplica(String tableName, String dbName, List<ComObject> requests,
                                                      Set<String> assigned, int requestOffset, int shard, int replica) {
     if (!cancelBulkImport.get(dbName + ":" + tableName).get() && !assigned.contains(shard + ":" + replica)) {
-      byte[] bytes = server.getClient().send(null, shard, replica,
+      ComObject retObj = server.getClient().send(null, shard, replica,
           requests.get(requestOffset), DatabaseClient.Replica.SPECIFIED);
-      ComObject retObj = new ComObject(bytes);
       if (retObj.getBoolean(ComObject.Tag.ACCEPTED)) {
         assigned.add(shard + ":" + replica);
         logger.info("Successfully startedBulkImportOnServer: db={}, table={}, shard={}, replica={}",
@@ -1227,8 +1226,7 @@ public class BulkImportManager {
   private void doGetBulkImportStatus(ConcurrentHashMap<String, ConcurrentHashMap<String, BulkImportStatus>> bulkImportStatus,
                                      ComObject cobj, int shard, int replica) {
     String dbName;
-    byte[] bytes = server.getClient().send(null, shard, replica, cobj, DatabaseClient.Replica.SPECIFIED);
-    ComObject retObj = new ComObject(bytes);
+    ComObject retObj = server.getClient().send(null, shard, replica, cobj, DatabaseClient.Replica.SPECIFIED);
 
     ComArray array = retObj.getArray(ComObject.Tag.STATUSES);
     for (int k = 0; k < array.getArray().size(); k++) {
@@ -1358,8 +1356,7 @@ public class BulkImportManager {
       logger.info("bulkImport setting shouldProcess=true");
       cobj.put(ComObject.Tag.SHOULD_PROCESS, true);
     }
-    byte[] bytes = server.getClient().send(null, shard, replica, cobj, DatabaseClient.Replica.SPECIFIED);
-    ComObject retObj = new ComObject(bytes);
+    ComObject retObj = server.getClient().send(null, shard, replica, cobj, DatabaseClient.Replica.SPECIFIED);
     if (retObj.getBoolean(ComObject.Tag.ACCEPTED)) {
       logger.info("bulkImport successfully started coordinateBulkImportForTable: db={}, table={}, shard={}, replica={}",
           dbName, tableName, shard, replica);

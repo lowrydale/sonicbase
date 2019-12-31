@@ -1,3 +1,7 @@
+1.3.2
+optimizations (focus on embedded)
+fixed missing start-controller script
+
 1.3.1
 simplified administration
 optimized native index

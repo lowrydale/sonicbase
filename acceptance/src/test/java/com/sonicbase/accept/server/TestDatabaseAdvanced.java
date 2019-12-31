@@ -278,8 +278,7 @@ public class TestDatabaseAdvanced {
 
     boolean complete = false;
     while (!complete) {
-      byte[] bytes = client.send("DatabaseServer:isServerReloadFinished", 1, 1, cobj, DatabaseClient.Replica.SPECIFIED);
-      ComObject retObj = new ComObject(bytes);
+      ComObject retObj = client.send("DatabaseServer:isServerReloadFinished", 1, 1, cobj, DatabaseClient.Replica.SPECIFIED);
       complete = retObj.getBoolean(ComObject.Tag.IS_COMPLETE);
       Thread.sleep(200);
     }

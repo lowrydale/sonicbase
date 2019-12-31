@@ -328,15 +328,11 @@ public class DatabaseCommon {
   }
 
   private Schema ensureSchemaExists(String dbName) {
-    synchronized (this) {
-      //faster than computeIfAbsent
-      Schema ret = this.schema.get(dbName);
-      if (ret == null) {
-        ret = new Schema();
-        this.schema.put(dbName, ret);
-      }
-      return ret;
+    Schema ret = this.schema.get(dbName); //faster than computeIfAbsent
+    if (ret == null) {
+      return this.schema.computeIfAbsent(dbName, (k) -> new Schema());
     }
+    return ret;
   }
 
   private void serializeSchema(String dbName, DataOutputStream out) {
@@ -1091,7 +1087,6 @@ public class DatabaseCommon {
     Varint.writeSignedVarLong(0, out); //marker indicating we have a serialization version
     Varint.writeSignedVarLong(SERIALIZATION_VERSION, out);
     Varint.writeSignedVarLong(schemaVersion, out);
-
 
     int offset = 0;
     for (Object field : fields) {

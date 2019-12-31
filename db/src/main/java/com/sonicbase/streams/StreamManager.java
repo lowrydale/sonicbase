@@ -569,7 +569,7 @@ public class StreamManager {
     }
 
     try {
-      byte[] ret = server.getDatabaseClient().send("StreamManager:processMessages", server.getShard(),
+      ComObject ret = server.getDatabaseClient().send("StreamManager:processMessages", server.getShard(),
           0, cobj, DatabaseClient.Replica.DEF);
       //processMessages(cobj);
 

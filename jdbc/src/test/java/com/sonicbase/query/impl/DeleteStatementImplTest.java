@@ -63,10 +63,10 @@ public class DeleteStatementImplTest {
         array.add(bytes);
       }
 
-      retObj.put(ComObject.Tag.CURR_OFFSET, records.length);
-      retObj.put(ComObject.Tag.COUNT_RETURNED, records.length);
+      retObj.put(ComObject.Tag.CURR_OFFSET, (long)records.length);
+      retObj.put(ComObject.Tag.COUNT_RETURNED, (long)records.length);
 
-      return retObj.serialize();
+      return retObj;
     });
     CCJSqlParserManager parser = new CCJSqlParserManager();
     Delete delete = (Delete) parser.parse(new StringReader("delete from table1 where field1=0"));

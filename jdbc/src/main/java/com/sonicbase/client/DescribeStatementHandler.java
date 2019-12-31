@@ -318,12 +318,11 @@ public class DescribeStatementHandler {
   }
 
   private void deserializeSchema(int j, int i, Map<String, String> line, ComObject cobj) {
-    byte[] ret;
+    ComObject ret;
     try {
       ret = client.send("DatabaseServer:getSchema", j, i, cobj, DatabaseClient.Replica.SPECIFIED);
-      ComObject retObj = new ComObject(ret);
       DatabaseCommon tmpCommon = new DatabaseCommon();
-      tmpCommon.deserializeSchema(retObj.getByteArray(ComObject.Tag.SCHEMA_BYTES));
+      tmpCommon.deserializeSchema(ret.getByteArray(ComObject.Tag.SCHEMA_BYTES));
       line.put("version", String.valueOf(tmpCommon.getSchemaVersion()));
     }
     catch (Exception e) {
@@ -404,8 +403,7 @@ public class DescribeStatementHandler {
     cobj.put(ComObject.Tag.DB_NAME, "__none__");
     cobj.put(ComObject.Tag.SCHEMA_VERSION, client.getCommon().getSchemaVersion());
 
-    byte[] ret = client.send("OSStatsManager:getOSStats", shard, replica, cobj, DatabaseClient.Replica.SPECIFIED);
-    ComObject retObj = new ComObject(ret);
+    ComObject retObj = client.send("OSStatsManager:getOSStats", shard, replica, cobj, DatabaseClient.Replica.SPECIFIED);
 
     double resGig = retObj.getDouble(ComObject.Tag.RES_GIG);
     double cpu = retObj.getDouble(ComObject.Tag.CPU);

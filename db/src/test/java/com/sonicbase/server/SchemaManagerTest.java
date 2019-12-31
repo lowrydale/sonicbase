@@ -517,7 +517,7 @@ public class SchemaManagerTest {
 
     when(client.send(eq("PartitionManager:getIndexCounts"), anyInt(), anyLong(), any(ComObject.class),
         eq(DatabaseClient.Replica.MASTER))).thenReturn(
-        new ComObject(1).serialize()
+        new ComObject(1)
     );
 
     schemaManager.createIndex(cobj, false);
@@ -531,10 +531,9 @@ public class SchemaManagerTest {
     ComObject index = (ComObject) indexArray.getArray().get(0);
     index.put(ComObject.Tag.SCHEMA_VERSION, 1000);
 
-    byte[] bytes = schemaVersions.serialize();
     when(client.send(eq("SchemaManager:getSchemaVersions"), eq(0), eq((long)1), any(ComObject.class),
         eq(DatabaseClient.Replica.SPECIFIED))).thenReturn(
-        bytes
+        schemaVersions
     );
 
     when(client.sendToAllShards(eq("SchemaManager:updateTableSchema"), anyLong(), any(ComObject.class),
@@ -568,7 +567,7 @@ public class SchemaManagerTest {
     schemaRet.put(ComObject.Tag.INDEX_SCHEMA, indexSchema);
 
     when(client.send(eq("SchemaManager:getIndexSchema"), anyInt(), anyLong(), any(ComObject.class),
-      eq(DatabaseClient.Replica.SPECIFIED))).thenReturn(schemaRet.serialize());
+      eq(DatabaseClient.Replica.SPECIFIED))).thenReturn(schemaRet);
 
     common.getTables("test").get("table1").getIndices().clear();
     File indexDir = server.getSnapshotManager().getIndexSchemaDir("test", "table1", "index1");

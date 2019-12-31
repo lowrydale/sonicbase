@@ -25,7 +25,7 @@ public class DatabaseServerProxy {
     try {
       Class clz = Class.forName("com.sonicbase.server.DatabaseServer");
       indexLookupExpression = clz.getMethod("indexLookupExpression", ComObject.class,  StoredProcedureContextImpl.class);
-      invokeMethod = clz.getMethod("invokeMethod", byte[].class, boolean.class, boolean.class);
+      invokeMethod = clz.getMethod("invokeMethod", ComObject.class, byte[].class, boolean.class, boolean.class);
       serverSelect = clz.getMethod("serverSelect", ComObject.class, boolean.class, StoredProcedureContextImpl.class);
       indexLookup = clz.getMethod("indexLookup", ComObject.class, StoredProcedureContextImpl.class);
       serverSetSelect = clz.getMethod("serverSetSelect", ComObject.class, boolean.class, StoredProcedureContextImpl.class);
@@ -52,9 +52,9 @@ public class DatabaseServerProxy {
     }
   }
 
-  public static byte[] invokeMethod(Object server, final byte[] body, boolean replayedCommand, boolean enableQueuing) {
+  public static ComObject invokeMethod(Object server, ComObject body, boolean replayedCommand, boolean enableQueuing) {
     try {
-      return (byte[]) invokeMethod.invoke(server, body, replayedCommand, enableQueuing);
+      return (ComObject) invokeMethod.invoke(server, body, null, replayedCommand, enableQueuing);
     }
     catch (Exception e) {
       throw new DatabaseException(e);

@@ -235,7 +235,7 @@ public class DescribeStatementHandlerTest {
           else if ((int)args[1] == 1 && (long)args[2] == 1) {
             retObj.put(ComObject.Tag.PORT, 10060);
           }
-          return retObj.serialize();
+          return retObj;
         }
       });
       TableSchema tableSchema = ClientTestUtils.createTable();
@@ -310,7 +310,7 @@ public class DescribeStatementHandlerTest {
         }
         byte[] bytes = common.serializeSchema(SERIALIZATION_VERSION);
         retObj.put(ComObject.Tag.SCHEMA_BYTES, bytes);
-        return retObj.serialize();
+        return retObj;
       }
     });
 

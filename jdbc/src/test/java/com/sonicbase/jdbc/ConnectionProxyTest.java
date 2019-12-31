@@ -1,6 +1,7 @@
 package com.sonicbase.jdbc;
 
 import com.sonicbase.client.DatabaseClient;
+import com.sonicbase.common.ComObject;
 import com.sonicbase.common.DatabaseCommon;
 import com.sonicbase.jdbcdriver.ConnectionProxy;
 import com.sonicbase.schema.TableSchema;
@@ -39,12 +40,17 @@ public class ConnectionProxyTest {
     when(standaloneClient.isBackupComplete()).thenReturn(true);
     when(standaloneClient.getReplicaCount()).thenReturn(1);
     when(standaloneClient.getShardCount()).thenReturn(1);
-    when(standaloneClient.send(anyString(), anyInt(), anyInt(), anyObject(), anyObject())).
-        thenReturn(new byte[]{123});
+    ComObject cobj = new ComObject(1);
+    cobj.put(ComObject.Tag.COUNT, 123);
+    when(standaloneClient.send(anyString(), anyInt(), anyInt(), anyObject(), anyObject())).thenReturn(cobj);
+    cobj = new ComObject(1);
+    cobj.put(ComObject.Tag.COUNT, 125);
     when(standaloneClient.send(anyString(), anyInt(), anyInt(), anyObject(), anyObject(), anyBoolean())).
-        thenReturn(new byte[]{125});
+        thenReturn(cobj);
+    cobj = new ComObject(1);
+    cobj.put(ComObject.Tag.COUNT, 11);
     when(standaloneClient.sendToMaster(anyObject())).
-        thenReturn(new byte[]{11});
+        thenReturn(cobj);
     connWithClient.createDatabase("db");
 
     assertTrue(connWithClient.databaseExists("db"));
@@ -63,12 +69,18 @@ public class ConnectionProxyTest {
     when(client.isBackupComplete()).thenReturn(true);
     when(client.getReplicaCount()).thenReturn(1);
     when(client.getShardCount()).thenReturn(1);
+    cobj = new ComObject(1);
+    cobj.put(ComObject.Tag.COUNT, 124);
     when(client.send(anyString(), anyInt(), anyInt(), anyObject(), anyObject())).
-      thenReturn(new byte[]{124});
+      thenReturn(cobj);
+    cobj = new ComObject(1);
+    cobj.put(ComObject.Tag.COUNT, 126);
     when(client.send(anyString(), anyInt(), anyInt(), anyObject(), anyObject(), anyBoolean())).
-        thenReturn(new byte[]{126});
+        thenReturn(cobj);
+    cobj = new ComObject(1);
+    cobj.put(ComObject.Tag.COUNT, 12);
     when(client.sendToMaster(anyObject())).
-        thenReturn(new byte[]{12});
+        thenReturn(cobj);
 
     conn.createDatabase("db");
 
@@ -86,17 +98,17 @@ public class ConnectionProxyTest {
     assertEquals(conn.getSchemaVersion(), 100);
 
 
-    assertEquals(connWithClient.send(null, 0, 0, null, ConnectionProxy.Replica.DEF), new byte[]{123});
-    assertEquals(conn.send(null, 0, 0, null, ConnectionProxy.Replica.DEF), new byte[]{124});
+    assertEquals((int)connWithClient.send(null, 0, 0, null, ConnectionProxy.Replica.DEF).getInt(ComObject.Tag.COUNT), 123);
+    assertEquals((int)conn.send(null, 0, 0, null, ConnectionProxy.Replica.DEF).getInt(ComObject.Tag.COUNT), 124);
 
-    assertEquals(connWithClient.send(null, 0, 0, null, ConnectionProxy.Replica.DEF, true), new byte[]{125});
-    assertEquals(conn.send(null, 0, 0, null, ConnectionProxy.Replica.DEF, true), new byte[]{126});
+    assertEquals((int)connWithClient.send(null, 0, 0, null, ConnectionProxy.Replica.DEF, true).getInt(ComObject.Tag.COUNT), 125);
+    assertEquals((int)conn.send(null, 0, 0, null, ConnectionProxy.Replica.DEF, true).getInt(ComObject.Tag.COUNT), 126);
 
     assertEquals(connWithClient.getTables("test").get("table1").getName(), "table1");
     assertEquals(conn.getTables("test").get("table1").getName(), "table1");
 
-    assertEquals(connWithClient.sendToMaster(null), new byte[]{11});
-    assertEquals(conn.sendToMaster(null), new byte[]{12});
+    assertEquals((int)connWithClient.sendToMaster(null).getInt(ComObject.Tag.COUNT), 11);
+    assertEquals((int)conn.sendToMaster(null).getInt(ComObject.Tag.COUNT), 12);
 
     connWithClient.checkClosed();
     conn.checkClosed();

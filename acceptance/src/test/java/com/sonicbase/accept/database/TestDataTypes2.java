@@ -144,13 +144,13 @@ public class TestDataTypes2 {
     ComObject cobj = new ComObject(3);
     long duration = 40404022;
     cobj.put(ComObject.Tag.DB_NAME,"db");
-    cobj.put(ComObject.Tag.ID, 100);
+    cobj.put(ComObject.Tag.ID, 100L);
     cobj.put(ComObject.Tag.DURATION, duration);
 
     byte[] bytes = cobj.serialize();
     cobj = new ComObject(bytes);
     assertEquals(cobj.getString(ComObject.Tag.DB_NAME), "db");
-    assertEquals((long)cobj.getLong(ComObject.Tag.ID), 100);
+    assertEquals((long)cobj.getLong(ComObject.Tag.ID), 100L);
 
     assertEquals((long)cobj.getLong(ComObject.Tag.DURATION), duration);
   }

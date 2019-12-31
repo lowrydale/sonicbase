@@ -99,7 +99,7 @@ public class LogManagerTest {
 
     serversConfig.getShards()[0].getReplicas()[0].setDead(true);
 
-    when(server.invokeMethod(any(byte[].class), anyLong(), anyLong(), eq(true), eq(false),
+    when(server.invokeMethod(any(), any(byte[].class), anyLong(), anyLong(), eq(true), eq(false),
         any(AtomicLong.class), any(AtomicLong.class))).thenAnswer(
         new Answer() {
           public Object answer(InvocationOnMock invocation) {

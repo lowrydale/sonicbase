@@ -98,21 +98,28 @@ public class MethodInvoker {
     priorityCommands.add("LicenseManager:licenseCheckin");
   }
 
-  public byte[] invokeMethod(final byte[] requestBytes, long logSequence0, long logSequence1,
-                             boolean replayedCommand, boolean enableQueuing, AtomicLong timeLogging, AtomicLong handlerTime) {
+  public ComObject invokeMethod(ComObject body, byte[] requestBytes, long logSequence0, long logSequence1,
+                                boolean replayedCommand, boolean enableQueuing, AtomicLong timeLogging, AtomicLong handlerTime) {
     try {
       if (shutdown) {
         throw new DatabaseException("Shutdown in progress");
       }
-      ComObject request = new ComObject(requestBytes);
+      ComObject request = body;
+      if (request == null) {
+        request = new ComObject(requestBytes);
+      }
       String methodStr = request.getString(ComObject.Tag.METHOD);
 
       if (server.isApplyingQueuesAndInteractive()) {
         replayedCommand = true;
       }
 
+      if (!server.isNotDurable() && requestBytes == null) {
+        requestBytes = body.serialize();
+      }
+
       if (methodStr.equals("queueForOtherServer")) {
-        return queueForOtherServer(requestBytes, request);
+        return new ComObject(queueForOtherServer(requestBytes, request));
       }
 
       Long existingSequence0 = getExistingSequence0(request);
@@ -137,10 +144,10 @@ public class MethodInvoker {
         logRequest.getLatch().await();
       }
       if (ret == null) {
-        return null;
+        return null;//return new ComObject(1);
       }
 
-      return ret.serialize();
+      return ret;
     }
     catch (InterruptedException e) {
       Thread.currentThread().interrupt();
@@ -150,12 +157,12 @@ public class MethodInvoker {
       throw e; //don't log
     }
     catch (Exception e) {
-      handleGenericException(requestBytes, e);
+      handleGenericException(body, e);
     }
     return null;
   }
 
-  private void handleGenericException(byte[] requestBytes, Exception e) {
+  private void handleGenericException(ComObject body, Exception e) {
 
     if (-1 != ExceptionUtils.indexOfThrowable(e, SchemaOutOfSyncException.class)) {
       throw new DatabaseException(e); //don't log
@@ -170,7 +177,7 @@ public class MethodInvoker {
       throw new DatabaseException(e);
     }
     try {
-      logger.error("Error handling command: method=" + new ComObject(requestBytes).getString(ComObject.Tag.METHOD), e);
+      logger.error("Error handling command: method=" + body.getString(ComObject.Tag.METHOD), e);
     }
     catch (Exception e1) {
       throw new DatabaseException(e);

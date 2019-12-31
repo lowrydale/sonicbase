@@ -367,9 +367,7 @@ public class TestBulkImport {
     ComObject cobj = new ComObject(2);
     cobj.put(ComObject.Tag.METHOD, "BulkImportManager:getBulkImportProgress");
     cobj.put(ComObject.Tag.DB_NAME, "test");
-    byte[] bytes = conn.sendToMaster(cobj);
-    ComObject retObj = new ComObject(bytes);
-
+    ComObject retObj = conn.sendToMaster(cobj);
     ComArray array = retObj.getArray(ComObject.Tag.PROGRESS_ARRAY);
     for (int i = 0; i < array.getArray().size(); i++) {
       ComObject tableObj = (ComObject) array.getArray().get(i);

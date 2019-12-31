@@ -32,8 +32,8 @@ public class TestSnapshotManagerLostEntries {
   final int recordCount = 10_000;
 
   class MonitorServer extends com.sonicbase.server.DatabaseServer {
-    public byte[] invokeMethod(final byte[] body, long logSequence0, long logSequence1,
-                               boolean replayedCommand, boolean enableQueuing, AtomicLong timeLogging, AtomicLong handlerTime) {
+    public ComObject invokeMethod(final byte[] body, long logSequence0, long logSequence1,
+                                  boolean replayedCommand, boolean enableQueuing, AtomicLong timeLogging, AtomicLong handlerTime) {
       if (replayedCommand) {
         if (countPlayed.incrementAndGet() % 10000 == 0) {
           System.out.println("count=" + countPlayed.get());
@@ -44,7 +44,7 @@ public class TestSnapshotManagerLostEntries {
           System.out.println("Value already set");
         }
       }
-      return super.invokeMethod(body, logSequence0, logSequence1, replayedCommand, enableQueuing, timeLogging, handlerTime);
+      return super.invokeMethod(null, body, logSequence0, logSequence1, replayedCommand, enableQueuing, timeLogging, handlerTime);
     }
   }
 

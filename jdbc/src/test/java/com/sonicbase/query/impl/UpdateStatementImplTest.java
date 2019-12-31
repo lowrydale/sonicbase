@@ -62,10 +62,10 @@ public class UpdateStatementImplTest {
         array.add(bytes);
       }
 
-      retObj.put(ComObject.Tag.CURR_OFFSET, records.length);
-      retObj.put(ComObject.Tag.COUNT_RETURNED, records.length);
+      retObj.put(ComObject.Tag.CURR_OFFSET, (long)records.length);
+      retObj.put(ComObject.Tag.COUNT_RETURNED, (long)records.length);
 
-      return retObj.serialize();
+      return retObj;
     });
     CCJSqlParserManager parser = new CCJSqlParserManager();
     Update update = (Update) parser.parse(new StringReader("update table1 set field1=1, field2='1' where field1=0"));

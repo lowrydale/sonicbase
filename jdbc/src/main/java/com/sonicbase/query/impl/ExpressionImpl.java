@@ -179,11 +179,10 @@ public class ExpressionImpl implements Expression {
 
   private static Counter evaluateCounterGetKeys(DatabaseCommon common, DatabaseClient client, String dbName,
                                                 Counter counter, ComObject cobj, Counter lastCounter, int i) throws IOException {
-    byte[] ret = client.send("ReadManager:evaluateCounterGetKeys", i, 0, cobj, DatabaseClient.Replica.DEF);
-    ComObject retObj = new ComObject(ret);
+    ComObject ret = client.send("ReadManager:evaluateCounterGetKeys", i, 0, cobj, DatabaseClient.Replica.DEF);
 
-    byte[] minKeyBytes = retObj.getByteArray(ComObject.Tag.MIN_KEY);
-    byte[] maxKeyBytes = retObj.getByteArray(ComObject.Tag.MAX_KEY);
+    byte[] minKeyBytes = ret.getByteArray(ComObject.Tag.MIN_KEY);
+    byte[] maxKeyBytes = ret.getByteArray(ComObject.Tag.MAX_KEY);
 
     Counter minCounter = null;
     if (minKeyBytes != null) {
@@ -382,10 +381,9 @@ public class ExpressionImpl implements Expression {
         false, tableSchema,
         indexName, null, BinaryExpression.Operator.EQUAL, null, key, null);
 
-    byte[] ret = client.send("ReadManager:evaluateCounterWithRecord", selectedShards.get(0), 0, cobj, DatabaseClient.Replica.DEF);
-    ComObject retObj = new ComObject(ret);
+    ComObject ret = client.send("ReadManager:evaluateCounterWithRecord", selectedShards.get(0), 0, cobj, DatabaseClient.Replica.DEF);
     Counter retCounter = new Counter();
-    byte[] counterBytes = retObj.getByteArray(ComObject.Tag.LEGACY_COUNTER);
+    byte[] counterBytes = ret.getByteArray(ComObject.Tag.LEGACY_COUNTER);
     retCounter.deserialize(counterBytes);
     return retCounter;
   }
@@ -1194,7 +1192,7 @@ public class ExpressionImpl implements Expression {
         cobj.put(ComObject.Tag.DB_NAME, dbName);
         cobj.put(ComObject.Tag.SCHEMA_VERSION, common.getSchemaVersion());
         cobj.put(ComObject.Tag.COUNT, count);
-        byte[] lookupRet = client.send("ReadManager:batchIndexLookup", shard, -1, cobj,
+        ComObject lookupRet = client.send("ReadManager:batchIndexLookup", shard, -1, cobj,
             DatabaseClient.Replica.DEF);
 
         BatchLookupReturn currRet = batchLookupIdsProcessResults(dbName, common, client, forceSelectOnServer, tableSchema, indexSchema, columns,
@@ -1266,11 +1264,10 @@ public class ExpressionImpl implements Expression {
                                                                 RecordCache recordCache, int viewVersion,
                                                                 boolean restrictToThisServer,
                                                                 StoredProcedureContextImpl procedureContext,
-                                                                int schemaRetryCount, byte[] lookupRet) throws EOFException {
-    ComObject retObj = new ComObject(lookupRet);
+                                                                int schemaRetryCount, ComObject lookupRet) throws EOFException {
     Map<Integer, Object[][]> retKeys = new HashMap<>();
     Map<Integer, Record[]> retRecords = new HashMap<>();
-    ComArray retKeysArray = retObj.getArray(ComObject.Tag.RET_KEYS);
+    ComArray retKeysArray = lookupRet.getArray(ComObject.Tag.RET_KEYS);
     for (Object entryObj : retKeysArray.getArray()) {
       ComObject retEntryObj = (ComObject)entryObj;
       int offset1 = retEntryObj.getInt(ComObject.Tag.OFFSET);
@@ -1475,9 +1472,9 @@ public class ExpressionImpl implements Expression {
         retObj = DatabaseServerProxy.indexLookupExpression(client.getDatabaseServer(), cobj, procedureContext);
       }
       else {
-        byte[] lookupRet = client.send("ReadManager:indexLookupExpression", localShard, 0, cobj,
+        ComObject lookupRet = client.send("ReadManager:indexLookupExpression", localShard, 0, cobj,
             DatabaseClient.Replica.DEF);
-        retObj = new ComObject(lookupRet);
+        retObj = lookupRet;
       }
       ProcessTableScanResults processTableScanResults = new ProcessTableScanResults(dbName, client, tableSchema, nextKey,
           recordCache, counters, groupByContext, currOffset, limit, offset, restrictToThisServer, localShard, common,

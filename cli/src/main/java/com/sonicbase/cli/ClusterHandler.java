@@ -239,8 +239,7 @@ public class ClusterHandler {
 
           Thread thread = new Thread(() -> {
             try {
-              byte[] bytes = cli.getConn().send(null, shardOffset, replicaOffset, cobj, ConnectionProxy.Replica.SPECIFIED, true);
-              ComObject retObj = new ComObject(bytes);
+              ComObject retObj = cli.getConn().send(null, shardOffset, replicaOffset, cobj, ConnectionProxy.Replica.SPECIFIED, true);
               String retStr = retObj.getString(ComObject.Tag.STATUS);
               if (retStr.equals(STATUS_OK_STR)) {
                 ok2.set(true);
@@ -257,8 +256,7 @@ public class ClusterHandler {
               cobj1.put(ComObject.Tag.METHOD, DATABASE_SERVER_GET_RECOVER_PROGRESS_STR);
 
               try {
-                byte[] bytes = cli.getConn().send(null, shardOffset, replicaOffset, cobj1, ConnectionProxy.Replica.SPECIFIED, true);
-                ComObject retObj = new ComObject(bytes);
+                ComObject retObj = cli.getConn().send(null, shardOffset, replicaOffset, cobj1, ConnectionProxy.Replica.SPECIFIED, true);
                 double percentComplete = retObj.getDouble(ComObject.Tag.PERCENT_COMPLETE);
                 String stage = retObj.getString(ComObject.Tag.STAGE);
                 Boolean error = retObj.getBoolean(ComObject.Tag.ERROR);
@@ -404,8 +402,7 @@ public class ClusterHandler {
 
           Thread thread = new Thread(() -> {
             try {
-              byte[] bytes = cli.getConn().send(null, shardOffset, replicaOffset, cobj, ConnectionProxy.Replica.SPECIFIED);
-              ComObject retObj = new ComObject(bytes);
+              ComObject retObj = cli.getConn().send(null, shardOffset, replicaOffset, cobj, ConnectionProxy.Replica.SPECIFIED);
               String retStr = retObj.getString(ComObject.Tag.STATUS);
               if (retStr.equals(STATUS_OK_STR)) {
                 ok2.set(true);
@@ -421,9 +418,8 @@ public class ClusterHandler {
               pcobj.put(ComObject.Tag.SCHEMA_VERSION, cli.getConn().getSchemaVersion());
               pcobj.put(ComObject.Tag.METHOD, DATABASE_SERVER_GET_RECOVER_PROGRESS_STR);
               try {
-                byte[] bytes = cli.getConn().send(null, shardOffset, replicaOffset,
+                ComObject retObj = cli.getConn().send(null, shardOffset, replicaOffset,
                     pcobj, ConnectionProxy.Replica.SPECIFIED, true);
-                ComObject retObj = new ComObject(bytes);
                 double percentComplete = retObj.getDouble(ComObject.Tag.PERCENT_COMPLETE);
                 String stage = retObj.getString(ComObject.Tag.STAGE);
                 Boolean error = retObj.getBoolean(ComObject.Tag.ERROR);
@@ -486,8 +482,7 @@ public class ClusterHandler {
     ComObject cobj = new ComObject(2);
     cobj.put(ComObject.Tag.DB_NAME, NONE_STR);
     cobj.put(ComObject.Tag.SCHEMA_VERSION, conn.getSchemaVersion());
-    byte[] bytes = conn.send("DatabaseServer:isServerReloadFinished", shard, replica, cobj, ConnectionProxy.Replica.SPECIFIED);
-    ComObject retObj = new ComObject(bytes);
+    ComObject retObj = conn.send("DatabaseServer:isServerReloadFinished", shard, replica, cobj, ConnectionProxy.Replica.SPECIFIED);
     return retObj.getBoolean(ComObject.Tag.IS_COMPLETE);
   }
 
@@ -958,8 +953,7 @@ public class ClusterHandler {
         try {
           cli.initConnection();
 
-          byte[] bytes = cli.getConn().send(null, shard, replica, cobj, ConnectionProxy.Replica.MASTER, true);
-          ComObject retObj = new ComObject(bytes);
+          ComObject retObj = cli.getConn().send(null, shard, replica, cobj, ConnectionProxy.Replica.MASTER, true);
           String retStr = retObj.getString(ComObject.Tag.STATUS);
           if (retStr.equals(STATUS_OK_STR)) {
             ok.set(true);
@@ -973,8 +967,7 @@ public class ClusterHandler {
           cobj1.put(ComObject.Tag.METHOD, DATABASE_SERVER_GET_RECOVER_PROGRESS_STR);
 
           try {
-            byte[] bytes = cli.getConn().send(null, shard, replica, cobj1, ConnectionProxy.Replica.SPECIFIED, true);
-            ComObject retObj = new ComObject(bytes);
+            ComObject retObj = cli.getConn().send(null, shard, replica, cobj1, ConnectionProxy.Replica.SPECIFIED, true);
             double percentComplete = retObj.getDouble(ComObject.Tag.PERCENT_COMPLETE);
             String stage = retObj.getString(ComObject.Tag.STAGE);
             Boolean error = retObj.getBoolean(ComObject.Tag.ERROR);
@@ -1105,7 +1098,7 @@ public class ClusterHandler {
     ComObject cobj = new ComObject(2);
     cobj.put(ComObject.Tag.DB_NAME, NONE_STR);
     cobj.put(ComObject.Tag.SCHEMA_VERSION, cli.getConn().getSchemaVersion());
-    byte[] bytes = cli.getConn().send("DatabaseServer:disableServer", shard, replica, cobj, ConnectionProxy.Replica.SPECIFIED);
+    ComObject bytes = cli.getConn().send("DatabaseServer:disableServer", shard, replica, cobj, ConnectionProxy.Replica.SPECIFIED);
 
   }
 
@@ -1121,7 +1114,7 @@ public class ClusterHandler {
     ComObject cobj = new ComObject(2);
     cobj.put(ComObject.Tag.DB_NAME, NONE_STR);
     cobj.put(ComObject.Tag.SCHEMA_VERSION, cli.getConn().getSchemaVersion());
-    byte[] bytes = cli.getConn().send("DatabaseServer:enableServer", shard, replica, cobj, ConnectionProxy.Replica.SPECIFIED);
+    ComObject bytes = cli.getConn().send("DatabaseServer:enableServer", shard, replica, cobj, ConnectionProxy.Replica.SPECIFIED);
 
   }
 }

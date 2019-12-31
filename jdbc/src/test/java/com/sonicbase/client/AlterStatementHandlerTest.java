@@ -37,7 +37,7 @@ public class AlterStatementHandlerTest {
       calledAdd.set(true);
       ComObject ret = new ComObject(1);
       ret.put(ComObject.Tag.SCHEMA_BYTES, common.serializeSchema((short) 1000));
-      return ret.serialize();
+      return ret;
     });
 
     handler.execute("test", null, "alter table addColumn add column id3 BIGINT", alter, null, 100L, 100L, (short)100,false, null, 0);
@@ -63,7 +63,7 @@ public class AlterStatementHandlerTest {
       calledDrop.set(true);
       ComObject ret = new ComObject(1);
       ret.put(ComObject.Tag.SCHEMA_BYTES, common.serializeSchema((short) 1000));
-      return ret.serialize();
+      return ret;
     });
 
     handler.execute("test", null, "alter table addColumn drop column id3 BIGINT", alter, null, 100L, 100L, (short)100,false, null, 0);

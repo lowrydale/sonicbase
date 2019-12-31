@@ -27,8 +27,8 @@ public class TestLongManagerLostEntries {
   final AtomicInteger countPlayed = new AtomicInteger();
 
   class MonitorServer extends com.sonicbase.server.DatabaseServer {
-    public byte[] invokeMethod(final byte[] body, long logSequence0, long logSequence1,
-                                boolean replayedCommand, boolean enableQueuing, AtomicLong timeLogging, AtomicLong handlerTime) {
+    public ComObject invokeMethod(ComObject cobj1, final byte[] body, long logSequence0, long logSequence1,
+                                  boolean replayedCommand, boolean enableQueuing, AtomicLong timeLogging, AtomicLong handlerTime) {
       if (replayedCommand) {
         if (countPlayed.incrementAndGet() % 10000 == 0) {
           System.out.println("count=" + countPlayed.get());
@@ -39,7 +39,7 @@ public class TestLongManagerLostEntries {
           System.out.println("Value already set");
         }
       }
-      return super.invokeMethod(body, logSequence0, logSequence1, replayedCommand, enableQueuing, timeLogging, handlerTime);
+      return super.invokeMethod(cobj1, body, logSequence0, logSequence1, replayedCommand, enableQueuing, timeLogging, handlerTime);
     }
   }
 

@@ -144,6 +144,7 @@ public class DatabaseServer {
 
   private Map<String, SimpleStats> stats = new HashMap<>();
   private Thread serverStatsMonitorThread;
+  private boolean isEmbedded;
 
   public static boolean[][] getDeathOverride() {
     return deathOverride;
@@ -293,6 +294,14 @@ public class DatabaseServer {
 
   public Map<Long, Boolean> getIsOpForRebalanceMap() {
     return isOpForRebalance;
+  }
+
+  public void setIsEmbedded(boolean isEmbedded) {
+    this.isEmbedded = isEmbedded;
+  }
+
+  public boolean isEmbedded() {
+    return isEmbedded;
   }
 
   private class AggregateStats {
@@ -965,8 +974,7 @@ public class DatabaseServer {
           cobj.put(ComObject.Tag.DB_NAME, NONE_STR);
           cobj.put(ComObject.Tag.SCHEMA_VERSION, common.getSchemaVersion());
           cobj.put(ComObject.Tag.METHOD, "DatabaseServer:healthCheck");
-          byte[] bytes = getDatabaseClient().send(null, shard, replica, cobj, DatabaseClient.Replica.SPECIFIED, true);
-          ComObject retObj = new ComObject(bytes);
+          ComObject retObj = getDatabaseClient().send(null, shard, replica, cobj, DatabaseClient.Replica.SPECIFIED, true);
           if (retObj.getString(ComObject.Tag.STATUS).equals(STATUS_OK_STR)) {
             isHealthy.set(true);
           }
@@ -1222,9 +1230,9 @@ public class DatabaseServer {
 
       List<StoredProcedureResponse> responses = new ArrayList<>();
       for (Future future : futures) {
-        byte[] ret = (byte[]) future.get();
+        ComObject ret = (ComObject) future.get();
         if (ret != null) {
-          StoredProcedureResponseImpl response = new StoredProcedureResponseImpl(common, new ComObject(ret));
+          StoredProcedureResponseImpl response = new StoredProcedureResponseImpl(common, ret);
           responses.add(response);
         }
       }
@@ -1670,9 +1678,8 @@ public class DatabaseServer {
     ComObject cobj = new ComObject(2);
     cobj.put(ComObject.Tag.DB_NAME, NONE_STR);
     cobj.put(ComObject.Tag.SCHEMA_VERSION, common.getSchemaVersion());
-    byte[] ret = getDatabaseClient().send("DatabaseServer:getDbNames", 0, 0, cobj,
+    ComObject retObj = getDatabaseClient().send("DatabaseServer:getDbNames", 0, 0, cobj,
         DatabaseClient.Replica.MASTER, true);
-    ComObject retObj = new ComObject(ret);
     ComArray array = retObj.getArray(ComObject.Tag.DB_NAMES);
     for (int i = 0; i < array.getArray().size(); i++) {
       String dbName = (String) array.getArray().get(i);
@@ -2029,16 +2036,16 @@ public class DatabaseServer {
     return addressMap;
   }
 
-  public byte[] invokeMethod(final byte[] body, boolean replayedCommand, boolean enableQueuing) {
-    return invokeMethod(body, -1L, (short) -1L, replayedCommand, enableQueuing, null, null);
+  public ComObject invokeMethod(ComObject body, byte[] requestBytes, boolean replayedCommand, boolean enableQueuing) {
+    return invokeMethod(body, requestBytes, -1L, (short) -1L, replayedCommand, enableQueuing, null, null);
   }
 
-  public byte[] invokeMethod(final byte[] body, long logSequence0, long logSequence1,
-                             boolean replayedCommand, boolean enableQueuing, AtomicLong timeLogging, AtomicLong handlerTime) {
+  public ComObject invokeMethod(ComObject body, byte[] requestBytes, long logSequence0, long logSequence1,
+                                boolean replayedCommand, boolean enableQueuing, AtomicLong timeLogging, AtomicLong handlerTime) {
     if (methodInvoker == null) {
       throw new DeadServerException("Server not running");
     }
-    return methodInvoker.invokeMethod(body, logSequence0, logSequence1, replayedCommand, enableQueuing, timeLogging, handlerTime);
+    return methodInvoker.invokeMethod(body, requestBytes, logSequence0, logSequence1, replayedCommand, enableQueuing, timeLogging, handlerTime);
   }
 
   public ComObject prepareToComeAlive(ComObject cobj, boolean replayedCommand) {
@@ -2141,8 +2148,7 @@ public class DatabaseServer {
       final int localReplica = j;
 
       futures.add(localExecutor.submit((Callable) () -> {
-        byte[] bytes = getClient().send(null, localShard, localReplica, cobj2, DatabaseClient.Replica.SPECIFIED);
-        ComObject retObj = new ComObject(bytes);
+        ComObject retObj = getClient().send(null, localShard, localReplica, cobj2, DatabaseClient.Replica.SPECIFIED);
         DatabaseCommon tmpCommon = new DatabaseCommon();
         tmpCommon.deserializeSchema(retObj.getByteArray(ComObject.Tag.SCHEMA_BYTES));
         synchronized (common) {
@@ -2193,8 +2199,7 @@ public class DatabaseServer {
         ComObject rcobj = new ComObject(4);
         rcobj.put(ComObject.Tag.DB_NAME, "__none__");
         rcobj.put(ComObject.Tag.SCHEMA_VERSION, getCommon().getSchemaVersion());
-        byte[] bytes = getClient().send("DatabaseServer:prepareSourceForServerReload", getShard(), 0, rcobj, DatabaseClient.Replica.MASTER);
-        ComObject retObj = new ComObject(bytes);
+        ComObject retObj = getClient().send("DatabaseServer:prepareSourceForServerReload", getShard(), 0, rcobj, DatabaseClient.Replica.MASTER);
         ComArray files = retObj.getArray(ComObject.Tag.FILENAMES);
 
         downloadFilesForReload(files);
@@ -2216,7 +2221,7 @@ public class DatabaseServer {
         ComObject rcobj = new ComObject(2);
         rcobj.put(ComObject.Tag.DB_NAME, "__none__");
         rcobj.put(ComObject.Tag.SCHEMA_VERSION, getCommon().getSchemaVersion());
-        byte[] bytes = getClient().send("DatabaseServer:finishServerReloadForSource", getShard(),
+        ComObject bytes = getClient().send("DatabaseServer:finishServerReloadForSource", getShard(),
             0, rcobj, DatabaseClient.Replica.MASTER);
 
         isServerRoloadRunning = false;
@@ -2298,9 +2303,8 @@ public class DatabaseServer {
         cobj.put(ComObject.Tag.DB_NAME, "__none__");
         cobj.put(ComObject.Tag.SCHEMA_VERSION, getCommon().getSchemaVersion());
         cobj.put(ComObject.Tag.FILENAME, filename);
-        byte[] bytes = getClient().send("DatabaseServer:getDatabaseFile", getShard(),
+        ComObject retObj = getClient().send("DatabaseServer:getDatabaseFile", getShard(),
             0, cobj, DatabaseClient.Replica.MASTER);
-        ComObject retObj = new ComObject(bytes);
         byte[] content = retObj.getByteArray(ComObject.Tag.BINARY_FILE_CONTENT);
 
         filename = fixReplica("deletes", filename);
@@ -2426,14 +2430,14 @@ public class DatabaseServer {
       long nextId;
       long maxId;
       synchronized (nextIdLock) {
-        if (!notDurable) {
+        if (notDurable) {
           if (maxRecordId == null) {
             nextId = 1;
-            maxRecordId = maxId = 1000000;
+            maxRecordId = maxId = 100_000_000;
           }
           else {
             nextId = maxRecordId + 1;
-            maxRecordId += 1000000;
+            maxRecordId += 100_000_000;
             maxId = maxRecordId;
           }
         }
@@ -2442,13 +2446,13 @@ public class DatabaseServer {
           file.getParentFile().mkdirs();
           if (!file.exists()) {
             nextId = 1;
-            maxId = 1000000;
+            maxId = 10_000_000;
           }
           else {
             try (BufferedReader reader = new BufferedReader(new InputStreamReader(new FileInputStream(file)))) {
               maxId = Long.valueOf(reader.readLine());
               nextId = maxId + 1;
-              maxId += 1000000;
+              maxId += 10_000_000;
             }
             if (file.exists()) {
               Files.delete(file.toPath());
@@ -2477,7 +2481,7 @@ public class DatabaseServer {
   public ComObject pushMaxRecordId(ComObject cobj, boolean replayedCommand) {
     try {
       synchronized (nextIdLock) {
-        if (!notDurable) {
+        if (notDurable) {
           long maxId = maxRecordId == null ? 0 : maxRecordId;
           pushMaxRecordId(NONE_STR, maxId);
         }
@@ -2527,7 +2531,7 @@ public class DatabaseServer {
     try {
       logger.info("setMaxRecordId - begin");
       synchronized (nextIdLock) {
-        if (!notDurable) {
+        if (notDurable) {
           maxRecordId = maxId;
         }
         else {

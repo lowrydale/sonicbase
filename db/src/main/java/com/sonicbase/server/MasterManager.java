@@ -375,10 +375,9 @@ public class MasterManager {
           cobj.put(ComObject.Tag.SCHEMA_VERSION, server.getCommon().getSchemaVersion());
           cobj.put(ComObject.Tag.METHOD, "DatabaseServer:getSchema");
 
-          byte[] ret = server.getClient().send(null, monitorShards[i], monitorReplicas[i], cobj,
+          ComObject retObj = server.getClient().send(null, monitorShards[i], monitorReplicas[i], cobj,
               DatabaseClient.Replica.SPECIFIED, true);
           DatabaseCommon tempCommon = new DatabaseCommon();
-          ComObject retObj = new ComObject(ret);
           tempCommon.deserializeSchema(retObj.getByteArray(ComObject.Tag.SCHEMA_BYTES));
           int masterReplica = tempCommon.getServersConfig().getShards()[0].getMasterReplica();
           if (masterReplica == server.getReplica()) {
@@ -485,9 +484,8 @@ public class MasterManager {
           cobj.put(ComObject.Tag.METHOD, "MasterManager:electNewMaster");
           cobj.put(ComObject.Tag.REQUESTED_MASTER_SHARD, shard);
           cobj.put(ComObject.Tag.REQUESTED_MASTER_REPLICA, j);
-          byte[] bytes = server.getDatabaseClient().send(null, monitorShard, monitorReplica,
+          ComObject retObj = server.getDatabaseClient().send(null, monitorShard, monitorReplica,
               cobj, DatabaseClient.Replica.SPECIFIED);
-          ComObject retObj = new ComObject(bytes);
           int otherServersElectedMaster = retObj.getInt(ComObject.Tag.SELECTED_MASTE_REPLICA);
           if (otherServersElectedMaster != j) {
             logger.info("Other server elected different master: shard={}, other={}", shard, otherServersElectedMaster);

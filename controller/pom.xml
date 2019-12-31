@@ -4,14 +4,14 @@
     <groupId>com.sonicbase</groupId>
     <artifactId>sonicbase-controller</artifactId>
     <packaging>jar</packaging>
-    <version>1.3.1</version>
+    <version>1.3.2</version>
     <name>sonicbase-controller</name>
     <url>http://maven.apache.org</url>
 
     <parent>
         <groupId>com.sonicbase</groupId>
         <artifactId>sonicbase-root</artifactId>
-        <version>1.3.1</version>
+        <version>1.3.2</version>
     </parent>
 
     <build>

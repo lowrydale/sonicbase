@@ -111,9 +111,8 @@ public class CreateTableStatementHandler implements StatementHandler {
       cobj.put(ComObject.Tag.MASTER_SLAVE, "master");
       cobj.put(ComObject.Tag.CREATE_TABLE_STATEMENT, createTableStatement.serialize());
 
-      byte[] ret = client.sendToMaster("SchemaManager:createTable", cobj);
-      ComObject retObj = new ComObject(ret);
-      client.getCommon().deserializeSchema(retObj.getByteArray(ComObject.Tag.SCHEMA_BYTES));
+      ComObject ret = client.sendToMaster("SchemaManager:createTable", cobj);
+      client.getCommon().deserializeSchema(ret.getByteArray(ComObject.Tag.SCHEMA_BYTES));
 
       return 1;
     }

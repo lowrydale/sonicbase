@@ -6,8 +6,7 @@ import com.sonicbase.common.ComArray;
 import com.sonicbase.common.ComObject;
 import com.sonicbase.query.InsertStatement;
 
-import java.util.ArrayList;
-import java.util.List;
+import java.util.*;
 
 @SuppressWarnings({"squid:S1168", "squid:S00107"})
 // I prefer to return null instead of an empty array

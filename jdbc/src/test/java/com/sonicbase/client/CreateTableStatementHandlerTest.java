@@ -56,7 +56,7 @@ public class CreateTableStatementHandlerTest {
           called.set(true);
           ComObject ret = new ComObject(1);
           ret.put(ComObject.Tag.SCHEMA_BYTES, common.serializeSchema((short) 1000));
-          return ret.serialize();
+          return ret;
         });
     CreateTableStatementHandler handler = new CreateTableStatementHandler(client);
     handler.execute("test", null, "create table table1", create, null, 100L, 100L, (short)100, false, null, 0);

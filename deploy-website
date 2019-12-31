@@ -1,1 +1,1 @@
-rsync -rvlLt --delete -e "ssh -i ~/amazonkeys/db.pem" /Users/lowryda/Dropbox/git/sonicbase/db/src/web/* ec2-user@34.204.57.5:/website
+rsync -rvlLt --delete -e "ssh -i ~/amazonkeys/db.pem" /Users/lowryda/Dropbox/git/sonicbase/web/* ec2-user@34.204.57.5:/website

@@ -89,18 +89,18 @@ public class SelectStatementHandlerTest {
     final AtomicInteger callCount = new AtomicInteger();
     client = new DatabaseClient("localhost", 9010, 0, 0, false, common, null) {
 
-      public byte[] sendToMaster(ComObject body) {
+      public ComObject sendToMaster(ComObject body) {
         return null;
       }
 
-      public byte[] send(String method,
-                         int shard, long authUser, ComObject body, Replica replica) {
+      public ComObject send(String method,
+                            int shard, long authUser, ComObject body, Replica replica) {
         if (method.equals("DatabaseServer:getConfig")) {
           callCount.incrementAndGet();
         }
 
         if (method.equals("ReadManager:indexLookupExpression")) {
-          return new ComObject(1).serialize();
+          return new ComObject(1);
         }
         else if (method.equals("ReadManager:serverSetSelect")) {
           ComObject retObj = new ComObject(5);
@@ -128,7 +128,7 @@ public class SelectStatementHandlerTest {
               }
             }
           }
-          return retObj.serialize();
+          return retObj;
         }
         else if (method.equals("ReadManager:indexLookup")) {
           ComObject retObj = new ComObject(5);
@@ -141,10 +141,10 @@ public class SelectStatementHandlerTest {
             array.add(bytes);
           }
 
-          retObj.put(ComObject.Tag.CURR_OFFSET, records.length);
-          retObj.put(ComObject.Tag.COUNT_RETURNED, records.length);
+          retObj.put(ComObject.Tag.CURR_OFFSET, (long)records.length);
+          retObj.put(ComObject.Tag.COUNT_RETURNED, (long)records.length);
 
-          return retObj.serialize();
+          return retObj;
         }
         else if (method.equals("ReadManager:batchIndexLookup")) {
           ComObject retObj = new ComObject(1);
@@ -173,7 +173,7 @@ public class SelectStatementHandlerTest {
               }
             }
           }
-          return retObj.serialize();
+          return retObj;
         }
         else if (method.equals("ReadManager:serverSelect")) {
 
@@ -185,14 +185,14 @@ public class SelectStatementHandlerTest {
             ComArray recordArray = tableArray.addArray(ComObject.Type.BYTE_ARRAY_TYPE, 1);
             recordArray.add(record);
           }
-          return retObj.serialize();
+          return retObj;
         }
         return null;
       }
     };
 
     client.setClientStatsHandler(new ClientStatsHandler() {
-      public byte[] sendToMasterOnSharedClient(ComObject cobj, DatabaseClient sharedClient) {
+      public ComObject sendToMasterOnSharedClient(ComObject cobj, DatabaseClient sharedClient) {
         return null;
       }
     });

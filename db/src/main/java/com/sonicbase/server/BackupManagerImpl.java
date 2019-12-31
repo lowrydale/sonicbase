@@ -521,8 +521,8 @@ public class BackupManagerImpl {
           cobj.put(ComObject.Tag.DB_NAME, "__none__");
           cobj.put(ComObject.Tag.SCHEMA_VERSION, server.getCommon().getSchemaVersion());
 
-          ComObject ret = new ComObject(server.getDatabaseClient().send("BackupManager:doGetBackupSizes",
-              finalI, finalJ, cobj, DatabaseClient.Replica.SPECIFIED));
+          ComObject ret = server.getDatabaseClient().send("BackupManager:doGetBackupSizes",
+              finalI, finalJ, cobj, DatabaseClient.Replica.SPECIFIED);
           return ret;
         }));
       }
@@ -645,8 +645,8 @@ public class BackupManagerImpl {
             cobj.put(ComObject.Tag.DB_NAME, "__none__");
             cobj.put(ComObject.Tag.SCHEMA_VERSION, server.getCommon().getSchemaVersion());
 
-            ComObject ret = new ComObject(server.getDatabaseClient().send("BackupManager:doGetRestoreSizes",
-                finalI, finalJ, cobj, DatabaseClient.Replica.SPECIFIED));
+            ComObject ret = server.getDatabaseClient().send("BackupManager:doGetRestoreSizes",
+                finalI, finalJ, cobj, DatabaseClient.Replica.SPECIFIED);
             return ret;
           }));
         }
@@ -1074,11 +1074,11 @@ public class BackupManagerImpl {
       ComObject cobj = new ComObject(2);
       cobj.put(ComObject.Tag.DB_NAME, "__none__");
       cobj.put(ComObject.Tag.SCHEMA_VERSION, server.getCommon().getSchemaVersion());
-      byte[][] ret = server.getDatabaseClient().sendToAllShards("BackupManager:prepareForBackup",
+      ComObject[] ret = server.getDatabaseClient().sendToAllShards("BackupManager:prepareForBackup",
           0, cobj, DatabaseClient.Replica.MASTER);
       int[] masters = new int[server.getShardCount()];
       for (int i = 0; i < ret.length; i++) {
-        ComObject retObj = new ComObject(ret[i]);
+        ComObject retObj = ret[i];
         masters[i] = retObj.getInt(ComObject.Tag.REPLICA);
       }
       logger.info("Backup Master - prepareForBackup - finished");
@@ -1184,9 +1184,8 @@ public class BackupManagerImpl {
       outer:
       for (int shard = 0; shard < server.getShardCount(); shard++) {
         try {
-          byte[] currRet = server.getDatabaseClient().send("BackupManager:isBackupComplete", shard,
+          ComObject retObj = server.getDatabaseClient().send("BackupManager:isBackupComplete", shard,
               masters[shard], iscobj, DatabaseClient.Replica.SPECIFIED);
-          ComObject retObj = new ComObject(currRet);
           finished = retObj.getBoolean(ComObject.Tag.IS_COMPLETE);
           if (!finished) {
             break outer;
@@ -1587,7 +1586,7 @@ public class BackupManagerImpl {
       ComObject cobj = new ComObject(2);
       cobj.put(ComObject.Tag.DB_NAME, "__none__");
       cobj.put(ComObject.Tag.SCHEMA_VERSION, server.getCommon().getSchemaVersion());
-      byte[][] ret = server.getDatabaseClient().sendToAllShards("BackupManager:prepareForRestore", 0,
+      ComObject[] ret = server.getDatabaseClient().sendToAllShards("BackupManager:prepareForRestore", 0,
           cobj, DatabaseClient.Replica.ALL, true);
 
       if (type.equals("AWS")) {
@@ -1664,9 +1663,8 @@ public class BackupManagerImpl {
       for (int shard = 0; shard < server.getShardCount(); shard++) {
         for (int replica = 0; replica < server.getReplicationFactor(); replica++) {
           try {
-            byte[] currRet = server.getDatabaseClient().send(verb, shard, replica, cobj,
+            ComObject retObj = server.getDatabaseClient().send(verb, shard, replica, cobj,
                 DatabaseClient.Replica.SPECIFIED, true);
-            ComObject retObj = new ComObject(currRet);
             boolean finished = retObj.getBoolean(ComObject.Tag.IS_COMPLETE);
             if (!finished) {
               break outer;
@@ -1688,7 +1686,7 @@ public class BackupManagerImpl {
 
   private void doFileSystemRestore(String subDirectory) {
     ComObject cobj;
-    byte[][] ret;// if fileSystem
+    ComObject[] ret;// if fileSystem
     //    tell all servers to copy files to backup directory with a specific root directory
     String directory = (String) backupConfig.get("directory");
     cobj = new ComObject(4);
@@ -1702,7 +1700,7 @@ public class BackupManagerImpl {
 
   private void doAWSRestore(String subDirectory) {
     ComObject cobj;
-    byte[][] ret;// if aws
+    ComObject[] ret;// if aws
     //    tell all servers to upload with a specific root directory
 
     String bucket = (String) backupConfig.get("bucket");

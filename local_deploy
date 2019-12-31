@@ -105,7 +105,7 @@ rsync -rvlLt start-bench-server-task.bat $HOME/sonicbase/bin
 rsync -rvlLt start-license-server-task.bat $HOME/sonicbase/bin
 rsync -rvlLt start-bench-server.vbs $HOME/sonicbase/bin
 rsync -rvlLt start-license-server.vbs $HOME/sonicbase/bin
-rsync -rvlLt start-controller.bat $HOME/sonicbase/bin
+rsync -rvlLt start-controller $HOME/sonicbase/bin
 rsync -rvlLt start-controller.bat $HOME/sonicbase/bin
 rsync -rvlLt do-start-controller.bat $HOME/sonicbase/bin
 rsync -rvlLt do-start-controller.vbs $HOME/sonicbase/bin

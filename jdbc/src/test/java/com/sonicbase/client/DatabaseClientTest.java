@@ -87,7 +87,7 @@ public class DatabaseClientTest {
   public void testCreateDatabase() {
 
     DatabaseClient client = new DatabaseClient("localhost", 9010, 0, 0, false, common, null) {
-      public byte[] sendToMaster(ComObject cobj) {
+      public ComObject sendToMaster(ComObject cobj) {
         assertEquals(cobj.getString(ComObject.Tag.DB_NAME), "test");
         assertEquals(cobj.getString(ComObject.Tag.MASTER_SLAVE), "master");
         assertEquals(cobj.getString(ComObject.Tag.METHOD), "SchemaManager:createDatabase");
@@ -106,7 +106,7 @@ public class DatabaseClientTest {
   @Test
   public void testGetPartitionSize() {
     DatabaseClient client = new DatabaseClient("localhost", 9010, 0, 0, false, common, null) {
-      public byte[] send(String verb, int shard, long partition, ComObject cobj, Replica replica) {
+      public ComObject send(String verb, int shard, long partition, ComObject cobj, Replica replica) {
 
         cobj = new ComObject(1);
         ComArray array = cobj.putArray(ComObject.Tag.SIZES, ComObject.Type.OBJECT_TYPE, 1);
@@ -116,7 +116,7 @@ public class DatabaseClientTest {
         size0Obj.put(ComObject.Tag.RAW_SIZE, (long)1001);
         array.add(size0Obj);
 
-        return cobj.serialize();
+        return cobj;
       }
       protected void syncConfig() {
 
@@ -130,12 +130,12 @@ public class DatabaseClientTest {
   @Test
   public void testIsRepartitioningComplete() {
     DatabaseClient client = new DatabaseClient("localhost", 9010, 0, 0, false, common, null) {
-      public byte[] sendToMaster(String verb, ComObject cobj) {
+      public ComObject sendToMaster(String verb, ComObject cobj) {
 
         if (verb.equals("PartitionManager:isRepartitioningComplete")) {
           ComObject ret = new ComObject(1);
           ret.put(ComObject.Tag.FINISHED, true);
-          return ret.serialize();
+          return ret;
         }
         return null;
       }
@@ -153,7 +153,7 @@ public class DatabaseClientTest {
     final AtomicBoolean committing = new AtomicBoolean();
     final AtomicBoolean called = new AtomicBoolean();
     DatabaseClient client = new DatabaseClient("localhost", 9010, 0, 0, false, common, null) {
-      public byte[][] sendToAllShards(
+      public ComObject[] sendToAllShards(
           final String method,
           final long authUser, final ComObject body, final Replica replica) {
         if (committing.get()) {
@@ -200,14 +200,14 @@ public class DatabaseClientTest {
   @Test
   public void testAllocateId() {
     DatabaseClient client = new DatabaseClient("localhost", 9010, 0, 0, false, common, null) {
-      public byte[] sendToMaster(String method, ComObject cobj) {
+      public ComObject sendToMaster(String method, ComObject cobj) {
         ComObject retObj = new ComObject(2);
         retObj.put(ComObject.Tag.NEXT_ID, 1001L);
-        retObj.put(ComObject.Tag.MAX_ID, 2000);
-        return retObj.serialize();
+        retObj.put(ComObject.Tag.MAX_ID, 2000L);
+        return retObj;
       }
-      public byte[] send(String method,
-                         int shard, long authUser, ComObject body, Replica replica) {
+      public ComObject send(String method,
+                            int shard, long authUser, ComObject body, Replica replica) {
 
         ComObject retObj = new ComObject(1);
         try {
@@ -217,7 +217,7 @@ public class DatabaseClientTest {
           common.getTablesById("test").put(tableSchema.getTableId(), tableSchema);
           byte[] bytes = common.serializeSchema((short)1000);
           retObj.put(ComObject.Tag.SCHEMA_BYTES, bytes);
-          return retObj.serialize();
+          return retObj;
         }
         catch (IOException e) {
           throw new DatabaseException(e);
@@ -246,31 +246,31 @@ public class DatabaseClientTest {
     common.setServersConfig(config);
 
     DatabaseClient client = new DatabaseClient("localhost", 9010, 0, 0, false, common, null) {
-      public byte[] sendToMaster(String method, ComObject cobj) {
+      public ComObject sendToMaster(String method, ComObject cobj) {
         ComObject retObj = new ComObject(2);
         retObj.put(ComObject.Tag.NEXT_ID, 1001L);
-        retObj.put(ComObject.Tag.MAX_ID, 2000);
-        return retObj.serialize();
+        retObj.put(ComObject.Tag.MAX_ID, 2000L);
+        return retObj;
       }
-      public byte[] send(String method,
-                         int shard, long authUser, ComObject body, Replica replica) {
+      public ComObject send(String method,
+                            int shard, long authUser, ComObject body, Replica replica) {
 
         if (method.equals("BackupManager:isEntireRestoreComplete")) {
           ComObject retObj = new ComObject(1);
           retObj.put(ComObject.Tag.IS_COMPLETE, true);
-          return retObj.serialize();
+          return retObj;
         }
         if (method.equals("BackupManager:isEntireBackupComplete")) {
           ComObject retObj = new ComObject(1);
           retObj.put(ComObject.Tag.IS_COMPLETE, true);
-          return retObj.serialize();
+          return retObj;
         }
         if (method.equals("DatabaseServer:getConfig")) {
           ComObject retObj = new ComObject(1);
           try {
             byte[] bytes = common.serializeConfig(SERIALIZATION_VERSION);
             retObj.put(ComObject.Tag.CONFIG_BYTES, bytes);
-            return retObj.serialize();
+            return retObj;
           }
           catch (IOException e) {
             throw new DatabaseException(e);
@@ -285,7 +285,7 @@ public class DatabaseClientTest {
           common.getTablesById("test").put(tableSchema.getTableId(), tableSchema);
           byte[] bytes = common.serializeSchema((short)1000);
           retObj.put(ComObject.Tag.SCHEMA_BYTES, bytes);
-          return retObj.serialize();
+          return retObj;
         }
         catch (IOException e) {
           throw new DatabaseException(e);
@@ -303,11 +303,11 @@ public class DatabaseClientTest {
   public void testSyncSchema() {
 
     DatabaseClient client = new DatabaseClient("localhost", 9010, 0, 0, false, common, null) {
-      public byte[] sendToMaster(ComObject body) {
+      public ComObject sendToMaster(ComObject body) {
         return null;
       }
-      public byte[] send(String method,
-                         int shard, long authUser, ComObject body, Replica replica) {
+      public ComObject send(String method,
+                            int shard, long authUser, ComObject body, Replica replica) {
 
         ComObject retObj = new ComObject(1);
         try {
@@ -317,7 +317,7 @@ public class DatabaseClientTest {
           common.getTablesById("test").put(tableSchema.getTableId(), tableSchema);
           byte[] bytes = common.serializeSchema((short)1000);
           retObj.put(ComObject.Tag.SCHEMA_BYTES, bytes);
-          return retObj.serialize();
+          return retObj;
         }
         catch (IOException e) {
           throw new DatabaseException(e);
@@ -379,7 +379,7 @@ public class DatabaseClientTest {
         };
       }
 
-      public byte[] sendToMaster(ComObject body) {
+      public ComObject sendToMaster(ComObject body) {
         return null;
       }
       public void syncSchema() {
@@ -412,7 +412,7 @@ public class DatabaseClientTest {
         };
       }
 
-      public byte[] sendToMaster(ComObject body) {
+      public ComObject sendToMaster(ComObject body) {
         return null;
       }
       public void syncSchema() {
@@ -611,15 +611,15 @@ public class DatabaseClientTest {
     final AtomicInteger callCount = new AtomicInteger();
     DatabaseClient client = new DatabaseClient("localhost", 9010, 0, 0, false, common, null) {
 
-      public byte[] send(String method,
-                         int shard, long authUser, ComObject body, Replica replica) {
+      public ComObject send(String method,
+                            int shard, long authUser, ComObject body, Replica replica) {
         if (shard == 0 && authUser == 1) {
           calledGetSchema.set(true);
         }
         return null;
       }
 
-      public byte[] send(
+      public ComObject send(
           String batchKey, Server[] replicas, int shard, long authUser,
           ComObject body, Replica replica) {
         if (callCount.incrementAndGet() == 1) {
@@ -641,8 +641,8 @@ public class DatabaseClientTest {
     final AtomicInteger callCount = new AtomicInteger();
     DatabaseClient client = new DatabaseClient("localhost", 9010, 0, 0, false, common, null) {
 
-      public byte[] send(String method,
-                         int shard, long authUser, ComObject body, Replica replica, boolean ignoreDeath) {
+      public ComObject send(String method,
+                            int shard, long authUser, ComObject body, Replica replica, boolean ignoreDeath) {
         callCount.incrementAndGet();
         return null;
       }
@@ -660,8 +660,8 @@ public class DatabaseClientTest {
     final AtomicInteger callCount = new AtomicInteger();
     DatabaseClient client = new DatabaseClient("localhost", 9010, 0, 0, false, common, null) {
 
-      public byte[] send(String method,
-                         int shard, long authUser, ComObject body, Replica replica) {
+      public ComObject send(String method,
+                            int shard, long authUser, ComObject body, Replica replica) {
         if (method.equals("DatabaseServer:getConfig")) {
           callCount.incrementAndGet();
         }

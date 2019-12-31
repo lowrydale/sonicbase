@@ -278,8 +278,7 @@ public class IndexLookup {
       retObj = DatabaseServerProxy.indexLookup(client.getDatabaseServer(), cobj, expression.getProcedureContext());
     }
     else {
-      byte[] lookupRet = client.send("ReadManager:indexLookup", localShard, 0, cobj, DatabaseClient.Replica.DEF);
-      retObj = new ComObject(lookupRet);
+      retObj = client.send("ReadManager:indexLookup", localShard, 0, cobj, DatabaseClient.Replica.DEF);
     }
     return retObj;
   }

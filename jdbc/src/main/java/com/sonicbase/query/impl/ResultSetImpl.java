@@ -1982,10 +1982,8 @@ public class ResultSetImpl implements ResultSet {
         cobj.put(ComObject.Tag.CURR_OFFSET, currOffset.get());
         cobj.put(ComObject.Tag.COUNT_RETURNED, countReturned.get());
 
-        byte[] recordRet = databaseClient.send("ReadManager:serverSelect", selectStatement.getServerSelectShardNumber(),
+        ComObject retObj = databaseClient.send("ReadManager:serverSelect", selectStatement.getServerSelectShardNumber(),
             selectStatement.getServerSelectReplicaNumber(), cobj, DatabaseClient.Replica.SPECIFIED);
-
-        ComObject retObj = new ComObject(recordRet);
         selectStatement.deserialize(retObj.getByteArray(ComObject.Tag.LEGACY_SELECT_STATEMENT));
 
         if (retObj.getLong(ComObject.Tag.CURR_OFFSET) != null) {

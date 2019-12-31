@@ -31,11 +31,11 @@ public class ClientStatsHandlerTest {
         (Answer) invocationOnMock -> {called.set(true); return null;});
 
     ClientStatsHandler handler = new ClientStatsHandler() {
-      public byte[] sendToMasterOnSharedClient(ComObject cobj, DatabaseClient sharedClient) {
+      public ComObject sendToMasterOnSharedClient(ComObject cobj, DatabaseClient sharedClient) {
         called.set(true);
         ComObject retObj = new ComObject(1);
-        retObj.put(ComObject.Tag.ID, 100_000);
-        return retObj.serialize();
+        retObj.put(ComObject.Tag.ID, 100_000L);
+        return retObj;
       }
     };
     ClientStatsHandler.HistogramEntry histogramEntry = new ClientStatsHandler.HistogramEntry();

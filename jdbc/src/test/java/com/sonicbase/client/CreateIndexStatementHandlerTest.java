@@ -43,7 +43,7 @@ public class CreateIndexStatementHandlerTest {
           called.set(true);
           ComObject ret = new ComObject(2);
           ret.put(ComObject.Tag.SCHEMA_BYTES, common.serializeSchema((short) 1000));
-          return ret.serialize();
+          return ret;
         });
 
     handler.execute("test", null, "create index index1 on table1 field1, field2", create, null, 100L, 100L, (short)100, false, null, 0);

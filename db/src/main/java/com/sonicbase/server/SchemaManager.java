@@ -765,9 +765,8 @@ public class SchemaManager {
       ComObject cobj = new ComObject(2);
       cobj.put(ComObject.Tag.DB_NAME, dbName);
       cobj.put(ComObject.Tag.SCHEMA_VERSION, server.getClient().getCommon().getSchemaVersion());
-      byte[] response = server.getClient().send("PartitionManager:getIndexCounts", shard, 0, cobj,
+      ComObject retObj = server.getClient().send("PartitionManager:getIndexCounts", shard, 0, cobj,
           DatabaseClient.Replica.MASTER);
-      ComObject retObj = new ComObject(response);
       ComArray tables = retObj.getArray(ComObject.Tag.TABLES);
       if (tables != null) {
         for (int i = 0; i < tables.getArray().size(); i++) {
@@ -1001,10 +1000,9 @@ public class SchemaManager {
           break;
         }
         ComObject cobj = new ComObject(1);
-        byte[] ret = server.getDatabaseClient().send("SchemaManager:getSchemaVersions", shard, replica, cobj,
+        ComObject retObj = server.getDatabaseClient().send("SchemaManager:getSchemaVersions", shard, replica, cobj,
             DatabaseClient.Replica.SPECIFIED);
-        if (ret != null) {
-          ComObject retObj = new ComObject(ret);
+        if (retObj != null) {
           retObj.put(ComObject.Tag.SHARD, shard);
           retObj.put(ComObject.Tag.REPLICA, replica);
           return retObj;
@@ -1093,9 +1091,8 @@ public class SchemaManager {
       cobj.put(ComObject.Tag.TABLE_NAME, currTableName);
       cobj.put(ComObject.Tag.INDEX_NAME, currIndexName);
 
-      byte[] ret = server.getDatabaseClient().send("SchemaManager:getIndexSchema", shard, replica, cobj,
+      ComObject retObj = server.getDatabaseClient().send("SchemaManager:getIndexSchema", shard, replica, cobj,
           DatabaseClient.Replica.SPECIFIED);
-      ComObject retObj = new ComObject(ret);
       return retObj.getByteArray(ComObject.Tag.INDEX_SCHEMA);
     }
     catch (Exception e) {
@@ -1246,8 +1243,7 @@ public class SchemaManager {
       cobj.put(ComObject.Tag.DB_NAME, currDbName);
       cobj.put(ComObject.Tag.TABLE_NAME, currTableName);
 
-      byte[] ret = server.getDatabaseClient().send(null, shard, replica, cobj, DatabaseClient.Replica.SPECIFIED);
-      ComObject retObj = new ComObject(ret);
+      ComObject retObj = server.getDatabaseClient().send(null, shard, replica, cobj, DatabaseClient.Replica.SPECIFIED);
       return retObj.getByteArray(ComObject.Tag.TABLE_SCHEMA);
     }
     catch (Exception e) {

@@ -250,7 +250,7 @@ public class LongRunningCalls {
     }
 
     private void doExecute(Queue<SingleCommand> parentList) {
-      longRunningCommands.server.invokeMethod(body, false, false);
+      longRunningCommands.server.invokeMethod(null, body, false, false);
       synchronized (parentList) {
         parentList.remove(SingleCommand.this);
       }

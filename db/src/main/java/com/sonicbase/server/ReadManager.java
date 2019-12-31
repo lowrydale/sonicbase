@@ -681,8 +681,7 @@ public class ReadManager {
 
   @SchemaReadLock
   public ComObject serverSelect(ComObject cobj, boolean replayedCommand) {
-    return serverSelect(cobj,
-        false,null);
+    return serverSelect(cobj, false, null);
   }
 
   ComObject serverSelect(ComObject cobj, boolean restrictToThisServer, StoredProcedureContextImpl procedureContext) {

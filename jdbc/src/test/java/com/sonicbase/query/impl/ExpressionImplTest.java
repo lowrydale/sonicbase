@@ -67,7 +67,7 @@ public class ExpressionImplTest {
         public Object answer(InvocationOnMock invocationOnMock) throws Throwable {
           ComObject retObj = new ComObject(1);
           retObj.put(ComObject.Tag.COUNT_LONG, 2_001L);
-          return retObj.serialize();
+          return retObj;
         }
       });
       when(client.getExecutor()).thenReturn(executor);
@@ -131,10 +131,10 @@ public class ExpressionImplTest {
             array.add(bytes);
           }
 
-          retObj.put(ComObject.Tag.CURR_OFFSET, records.length);
-          retObj.put(ComObject.Tag.COUNT_RETURNED, records.length);
+          retObj.put(ComObject.Tag.CURR_OFFSET, (long)records.length);
+          retObj.put(ComObject.Tag.COUNT_RETURNED, (long)records.length);
 
-          return retObj.serialize();
+          return retObj;
         }
       });
       when(client.getExecutor()).thenReturn(executor);
@@ -216,7 +216,7 @@ public class ExpressionImplTest {
           offset.incrementAndGet();
           counter.setCount(0L);
           retObj.put(ComObject.Tag.LEGACY_COUNTER, counter.serialize());
-          return retObj.serialize();
+          return retObj;
         }
       });
       when(client.send(eq("ReadManager:evaluateCounterGetKeys"), anyInt(), anyLong(), anyObject(), anyObject())).thenAnswer(new Answer(){
@@ -242,7 +242,7 @@ public class ExpressionImplTest {
           counter.setCount(0L);
           retObj.put(ComObject.Tag.LEGACY_COUNTER, counter.serialize());
 
-          return retObj.serialize();
+          return retObj;
         }
       });
       when(client.send(eq("ReadManager:indexLookup"), anyInt(), anyLong(), anyObject(), anyObject())).thenAnswer(new Answer(){
@@ -258,8 +258,8 @@ public class ExpressionImplTest {
             array.add(bytes);
           }
 
-          retObj.put(ComObject.Tag.CURR_OFFSET, records.length);
-          retObj.put(ComObject.Tag.COUNT_RETURNED, records.length);
+          retObj.put(ComObject.Tag.CURR_OFFSET, (long)records.length);
+          retObj.put(ComObject.Tag.COUNT_RETURNED, (long)records.length);
 
           array = retObj.putArray(ComObject.Tag.COUNTERS, ComObject.Type.BYTE_ARRAY_TYPE, 1);
 
@@ -277,7 +277,7 @@ public class ExpressionImplTest {
           array.add(counter.serialize());
 
 
-          return retObj.serialize();
+          return retObj;
         }
       });
       when(client.getExecutor()).thenReturn(executor);

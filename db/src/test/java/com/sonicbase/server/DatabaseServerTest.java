@@ -50,7 +50,7 @@ public class  DatabaseServerTest {
           Object[] args = invocation.getArguments();
           ComObject retObj = (ComObject) args[3];
           retObj.put(ComObject.Tag.STATUS, "{\"status\" : \"ok\"}");
-          return retObj.serialize();
+          return retObj;
         });
 
 
@@ -93,7 +93,7 @@ public class  DatabaseServerTest {
     ComObject cobj = new ComObject(8);
     cobj.put(ComObject.Tag.METHOD, "echo");
     cobj.put(ComObject.Tag.COUNT, 1);
-    server.getMethodInvoker().invokeMethod(cobj.serialize(), 0, 0, false, true, new AtomicLong(), new AtomicLong());
+    server.getMethodInvoker().invokeMethod(cobj, null, 0, 0, false, true, new AtomicLong(), new AtomicLong());
     assertEquals(server.getMethodInvoker().getEchoCount(), 1);
 
     DatabaseServer.initDeathOverride(2, 2);
@@ -251,6 +251,7 @@ public class  DatabaseServerTest {
   @Test
   public void testAllocateHighestId() throws IOException {
     DatabaseServer server = new DatabaseServer();
+    server.setNotDurable(false);
     server.setDataDir(new File(System.getProperty("user.dir"), "db-data").getAbsolutePath());
 
     FileUtils.deleteDirectory(new File(server.getDataDir()));
@@ -261,12 +262,31 @@ public class  DatabaseServerTest {
     ComObject retObj = server.allocateRecordIds(cobj, false);
 
     assertEquals((long)retObj.getLong(ComObject.Tag.NEXT_ID), 1L);
-    assertEquals((long)retObj.getLong(ComObject.Tag.MAX_ID), 1000000L);
+    assertEquals((long)retObj.getLong(ComObject.Tag.MAX_ID), 10_000_000L);
 
     retObj = server.allocateRecordIds(cobj, false);
 
-    assertEquals((long)retObj.getLong(ComObject.Tag.NEXT_ID), 1000001L);
-    assertEquals((long)retObj.getLong(ComObject.Tag.MAX_ID), 2000000L);
+    assertEquals((long)retObj.getLong(ComObject.Tag.NEXT_ID), 10_000_001L);
+    assertEquals((long)retObj.getLong(ComObject.Tag.MAX_ID), 20_000_000L);
+
+    server = new DatabaseServer();
+    server.setNotDurable(false);
+    server.setDataDir(new File(System.getProperty("user.dir"), "db-data").getAbsolutePath());
+
+    client = mock(DatabaseClient.class);
+    server.setDatabaseClient(client);
+
+    cobj = new ComObject(1);
+    retObj = server.allocateRecordIds(cobj, false);
+
+    assertEquals((long)retObj.getLong(ComObject.Tag.NEXT_ID), 20_000_001L);
+    assertEquals((long)retObj.getLong(ComObject.Tag.MAX_ID), 30_000_000L);
+
+    retObj = server.allocateRecordIds(cobj, false);
+
+    assertEquals((long)retObj.getLong(ComObject.Tag.NEXT_ID), 30_000_001L);
+    assertEquals((long)retObj.getLong(ComObject.Tag.MAX_ID), 40_000_000L);
+
   }
 
   @Test
@@ -315,7 +335,8 @@ public class  DatabaseServerTest {
         thenAnswer((Answer) invocationOnMock -> {
           ComObject ret = new ComObject(1);
           ComArray array = ret.putArray(ComObject.Tag.DB_NAMES, ComObject.Type.STRING_TYPE, 1);
-          array.add("my-db"); return ret.serialize();});
+          array.add("my-db"); return ret;
+        });
 
     server.syncDbNames();
 

@@ -231,7 +231,7 @@ public class SelectStatementHandler implements StatementHandler {
       retObj = DatabaseServerProxy.serverSetSelect(client.getDatabaseServer(), cobj, restrictToThisServer, procedureContext);
     }
     else {
-      byte[] recordRet = null;
+      ComObject recordRet = null;
       if (setOperation.getShard() == null) {
         recordRet = client.send("ReadManager:serverSetSelect", Math.abs(ThreadLocalRandom.current().nextInt() % client.getShardCount()),
             Math.abs(ThreadLocalRandom.current().nextLong()), cobj, DatabaseClient.Replica.DEF);
@@ -240,7 +240,7 @@ public class SelectStatementHandler implements StatementHandler {
         recordRet = client.send("ReadManager:serverSetSelect", setOperation.getShard(), setOperation.getReplica(), cobj,
             DatabaseClient.Replica.SPECIFIED);
       }
-      retObj = new ComObject(recordRet);
+      retObj = recordRet;
     }
 
     handleResponseForServerSetSelect(dbName, tableNames, setOperation, ret, retObj);

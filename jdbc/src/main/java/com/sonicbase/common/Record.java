@@ -168,22 +168,13 @@ public class Record {
   }
 
   public void snapshot(DataOutputStream out, DatabaseCommon common, short serializationVersion) throws IOException {
-    ByteArrayOutputStream bytesOut = new ByteArrayOutputStream();
-    DataOutputStream headerOut = new DataOutputStream(bytesOut);
-
-    headerOut.writeShort(serializationVersion);
-    headerOut.writeLong(sequence0);
-    headerOut.writeLong(sequence1);
-    headerOut.writeShort(sequence2);
-
-    headerOut.writeInt(dbViewNumber);
-    headerOut.writeShort(dbViewFlags);
-    Varint.writeSignedVarLong(transId, headerOut);
-
-    headerOut.close();
-    byte[] bytes = bytesOut.toByteArray();
-
-    out.write(bytes);
+    out.writeShort(serializationVersion);
+    out.writeLong(sequence0);
+    out.writeLong(sequence1);
+    out.writeShort(sequence2);
+    out.writeInt(dbViewNumber);
+    out.writeShort(dbViewFlags);
+    Varint.writeSignedVarLong(transId, out);
     Varint.writeSignedVarLong(tableSchema.getTableId(), out);
     DatabaseCommon.serializeFields(fields, out, tableSchema, common.getSchemaVersion());
   }

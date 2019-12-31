@@ -760,8 +760,7 @@ public class Cli {
           cobj.put(ComObject.Tag.METHOD, "DatabaseServer:healthCheck");
 
           try {
-            byte[] bytes = getConn().send(null, shard, replica, cobj, ConnectionProxy.Replica.SPECIFIED);
-            ComObject retObj = new ComObject(bytes);
+            ComObject retObj = getConn().send(null, shard, replica, cobj, ConnectionProxy.Replica.SPECIFIED);
             String retStr = retObj.getString(ComObject.Tag.STATUS);
             if (retStr.equals("{\"status\" : \"ok\"}")) {
               return null;
@@ -843,8 +842,7 @@ public class Cli {
             ComObject cobj = new ComObject(2);
             cobj.put(ComObject.Tag.DB_NAME, currDbName);
             cobj.put(ComObject.Tag.SCHEMA_VERSION, conn.getSchemaVersion());
-            byte[] ret = conn.send("MonitorManager:getOSStats", shard, replica, cobj, ConnectionProxy.Replica.SPECIFIED);
-            ComObject retObj = new ComObject(ret);
+            ComObject retObj = conn.send("MonitorManager:getOSStats", shard, replica, cobj, ConnectionProxy.Replica.SPECIFIED);
             double resGig = retObj.getDouble(ComObject.Tag.RES_GIG);
             double cpu = retObj.getDouble(ComObject.Tag.CPU);
             double javaMemMin = retObj.getDouble(ComObject.Tag.JAVA_MEM_MIN);
@@ -908,12 +906,11 @@ public class Cli {
           cobj.put(ComObject.Tag.DB_NAME, currDbName);
           cobj.put(ComObject.Tag.SCHEMA_VERSION, 1);
           cobj.put(ComObject.Tag.FILENAME, filename);
-          byte[] bytes = conn.send("SnapshotManager:getFile", shard, replica, cobj, ConnectionProxy.Replica.SPECIFIED);
-          if (bytes != null) {
+          ComObject retObj = conn.send("SnapshotManager:getFile", shard, replica, cobj, ConnectionProxy.Replica.SPECIFIED);
+          if (retObj != null) {
             File file = new File(dir, filename);
             file.getParentFile().mkdirs();
             FileUtils.deleteQuietly(file);
-            ComObject retObj = new ComObject(bytes);
             try (FileOutputStream fileOut = new FileOutputStream(file)) {
               fileOut.write(retObj.getByteArray(ComObject.Tag.BINARY_FILE_CONTENT));
             }

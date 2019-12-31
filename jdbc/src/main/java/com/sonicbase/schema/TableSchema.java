@@ -17,6 +17,7 @@ import java.util.concurrent.ConcurrentHashMap;
 public class TableSchema {
   private int version;
   private List<FieldSchema> fields = new ArrayList<>();
+  private Map<String, FieldSchema> fieldsByName = new HashMap<>();
   private final Map<String, Integer> fieldOffsets = new ConcurrentHashMap<>();
   private String name;
   private Map<String, IndexSchema> indexes = new ConcurrentHashMap<>();
@@ -27,6 +28,7 @@ public class TableSchema {
 
   public void addField(FieldSchema schema) {
     fields.add(schema);
+    fieldsByName.put(schema.getName(), schema);
     fieldOffsets.put(schema.getName(), fieldOffsets.size());
   }
 
@@ -40,6 +42,10 @@ public class TableSchema {
 
   public List<FieldSchema> getFields() {
     return fields;
+  }
+
+  public Map<String, FieldSchema> getFieldsByName() {
+    return fieldsByName;
   }
 
   public String[] getPrimaryKey() {
@@ -57,6 +63,7 @@ public class TableSchema {
     this.fields = fields;
     for (int i = 0; i < fields.size(); i++) {
       fieldOffsets.put(fields.get(i).getName(), i);
+      fieldsByName.put(fields.get(i).getName(), fields.get(i));
     }
   }
 
@@ -322,6 +329,7 @@ public class TableSchema {
       field.deserialize(in, serializationVersion);
       fields.add(field);
       fieldOffsets.put(field.getName(), i);
+      fieldsByName.put(field.getName(), field);
     }
     int prevCount = in.readInt();
     for (int i = 0; i < prevCount; i++) {

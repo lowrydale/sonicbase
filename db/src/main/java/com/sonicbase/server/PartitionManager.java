@@ -355,8 +355,7 @@ public class PartitionManager extends Thread {
         ComObject cobj = new ComObject(2);
         cobj.put(ComObject.Tag.DB_NAME, "__none__");
         cobj.put(ComObject.Tag.SCHEMA_VERSION, databaseServer.getCommon().getSchemaVersion());
-        byte[] bytes = databaseServer.getClient().send("PartitionManager:isShardRepartitioningComplete", shard, masters[shard], cobj, DatabaseClient.Replica.SPECIFIED);
-        ComObject retObj = new ComObject(bytes);
+        ComObject retObj = databaseServer.getClient().send("PartitionManager:isShardRepartitioningComplete", shard, masters[shard], cobj, DatabaseClient.Replica.SPECIFIED);
         long count = retObj.getLong(ComObject.Tag.COUNT_LONG);
         String exception = retObj.getString(ComObject.Tag.EXCEPTION);
         boolean finished = retObj.getBoolean(ComObject.Tag.FINISHED);
@@ -472,9 +471,8 @@ public class PartitionManager extends Thread {
         cobj.put(ComObject.Tag.TABLE_NAME, finalTableName);
         cobj.put(ComObject.Tag.INDEX_NAME, indexName);
         try {
-          byte[] ret = databaseServer.getDatabaseClient().send("PartitionManager:rebalanceOrderedIndex",
+          ComObject retObj = databaseServer.getDatabaseClient().send("PartitionManager:rebalanceOrderedIndex",
               shard, 0, cobj, DatabaseClient.Replica.MASTER);
-          ComObject retObj = new ComObject(ret);
           masters[shard] = retObj.getInt(ComObject.Tag.REPLICA);
         }
         catch (Exception e) {
@@ -721,9 +719,8 @@ public class PartitionManager extends Thread {
     cobj.put(ComObject.Tag.TABLE_NAME, tableName);
     cobj.put(ComObject.Tag.INDEX_NAME, indexName);
     cobj.put(ComObject.Tag.DURATION, lastCycleDuration);
-    byte[] ret = databaseServer.getDatabaseClient().send("PartitionManager:getPartitionSize", shard, 0,
+    ComObject retObj = databaseServer.getDatabaseClient().send("PartitionManager:getPartitionSize", shard, 0,
         cobj, DatabaseClient.Replica.MASTER);
-    ComObject retObj = new ComObject(ret);
     return retObj.getArray(ComObject.Tag.SIZES);
   }
 
@@ -1565,8 +1562,8 @@ public class PartitionManager extends Thread {
         keys.remove(innerObj);
       }
     }
-    ComObject ret = new ComObject(databaseServer.getDatabaseClient().send("PartitionManager:moveIndexEntries", shard, 0, cobj,
-        DatabaseClient.Replica.DEF));
+    ComObject ret = databaseServer.getDatabaseClient().send("PartitionManager:moveIndexEntries", shard, 0, cobj,
+        DatabaseClient.Replica.DEF);
     ComArray failedKeys = ret.getArray(ComObject.Tag.KEYS);
     ConcurrentSkipListMap<Object[], Object[]> failedKeysMap = null;
     if (!failedKeys.getArray().isEmpty()) {
@@ -2276,16 +2273,15 @@ public class PartitionManager extends Thread {
       for (OffsetEntry offset : offsets) {
         array.add(offset.offset);
       }
-      byte[] ret = databaseServer.getDatabaseClient().send("PartitionManager:getKeyAtOffset", shard,
+      ComObject retObj = databaseServer.getDatabaseClient().send("PartitionManager:getKeyAtOffset", shard,
           0, cobj, DatabaseClient.Replica.MASTER);
 
-      if (ret == null) {
+      if (retObj == null) {
         throw new IllegalStateException("Key not found on shard: shard=" + shard +
             ", table=" + tableName + INDEX_STR + indexName);
       }
 
       StringBuilder builder = new StringBuilder();
-      ComObject retObj = new ComObject(ret);
       ComArray keyArray = retObj.getArray(ComObject.Tag.KEYS);
       List<Object[]> keys = new ArrayList<>();
       if (keyArray != null) {

@@ -40,14 +40,14 @@ public class InsertStatementHandlerTest {
         (Answer) invocationOnMock ->{ calledWithRecord.set(true);
         ComObject ret = new ComObject(1);
         ret.put(ComObject.Tag.COUNT, 1);
-        return ret.serialize();});
+        return ret;});
 
     AtomicBoolean calledWithoutRecord = new AtomicBoolean();
     when(client.send(eq("UpdateManager:insertIndexEntryByKey"), anyInt(), anyInt(), anyObject(), anyObject())).thenAnswer(
         (Answer) invocationOnMock ->{ calledWithoutRecord.set(true);
           ComObject ret = new ComObject(1);
           ret.put(ComObject.Tag.COUNT, 1);
-          return ret.serialize();});
+          return ret;});
 
     CCJSqlParserManager parser = new CCJSqlParserManager();
     Insert insert = (Insert) parser.parse(new StringReader("insert into table1 (field1, field2) values (1, '1')"));

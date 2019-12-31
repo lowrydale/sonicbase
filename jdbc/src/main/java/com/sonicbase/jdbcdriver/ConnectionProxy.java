@@ -200,24 +200,24 @@ public class ConnectionProxy implements Connection {
     }
   }
 
-  public byte[] send(String method,
-                     int shard, long authUser, ComObject body, Replica replica) {
+  public ComObject send(String method,
+                        int shard, long authUser, ComObject body, Replica replica) {
     if (client != null) {
       return client.send(method, shard, authUser, body, replica.cliReplica);
     }
     return clients.get(url).client.send(method, shard, authUser, body, replica.cliReplica);
   }
 
-  public byte[][] sendToAllShards(String method,
-                     long authUser, ComObject body, Replica replica) {
+  public ComObject[] sendToAllShards(String method,
+                                     long authUser, ComObject body, Replica replica) {
     if (client != null) {
       return client.sendToAllShards(method, authUser, body, replica.cliReplica);
     }
     return clients.get(url).client.sendToAllShards(method, authUser, body, replica.cliReplica);
   }
 
-  public byte[] send(String batchKey,
-                     int shard, long authUser, ComObject body, Replica replica, boolean ignoreDeath) {
+  public ComObject send(String batchKey,
+                        int shard, long authUser, ComObject body, Replica replica, boolean ignoreDeath) {
     if (client != null) {
       return client.send(batchKey, shard, authUser,  body, replica.cliReplica, ignoreDeath);
     }
@@ -245,14 +245,14 @@ public class ConnectionProxy implements Connection {
     return clients.get(url).client.reconfigureCluster();
   }
 
-  public byte[] sendToMaster(ComObject body) {
+  public ComObject sendToMaster(ComObject body) {
     if (client != null) {
       return client.sendToMaster(body);
     }
     return clients.get(url).client.sendToMaster(body);
   }
 
-  public byte[] sendToMaster(String method, ComObject body) {
+  public ComObject sendToMaster(String method, ComObject body) {
     if (client != null) {
       return client.sendToMaster(method, body);
     }

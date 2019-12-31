@@ -892,7 +892,7 @@ public class SelectStatementImpl extends StatementImpl implements SelectStatemen
         ComObject cobj = new ComObject(7);
         cobj.put(ComObject.Tag.LEGACY_SELECT_STATEMENT, serialize());
         cobj.put(ComObject.Tag.SCHEMA_VERSION, client.getCommon().getSchemaVersion());
-        cobj.put(ComObject.Tag.COUNT, pageSize);
+        cobj.put(ComObject.Tag.COUNT, (int)(long)pageSize);
         cobj.put(ComObject.Tag.DB_NAME, dbName);
         cobj.put(ComObject.Tag.CURR_OFFSET, currOffset.get());
         cobj.put(ComObject.Tag.COUNT_RETURNED, countReturned.get());
@@ -903,10 +903,10 @@ public class SelectStatementImpl extends StatementImpl implements SelectStatemen
           retObj = DatabaseServerProxy.serverSelect(client.getDatabaseServer(), cobj, restrictToThisServer, procedureContext);
         }
         else {
-          byte[] recordRet = client.send("ReadManager:serverSelect",
+          ComObject recordRet = client.send("ReadManager:serverSelect",
               Math.abs(ThreadLocalRandom.current().nextInt() % client.getShardCount()),
               Math.abs(ThreadLocalRandom.current().nextLong()), cobj, DatabaseClient.Replica.DEF);
-          retObj = new ComObject(recordRet);
+          retObj = recordRet;
         }
 
         if (explain != null) {
@@ -1126,9 +1126,8 @@ public class SelectStatementImpl extends StatementImpl implements SelectStatemen
 
           prepareComObjectForCountRecords(dbName, cobj);
 
-          byte[] lookupRet = client.send("ReadManager:countRecords", shard, 0, cobj, DatabaseClient.Replica.MASTER);
-          ComObject retObj = new ComObject(lookupRet);
-          return (long) retObj.getLong(ComObject.Tag.COUNT_LONG);
+          ComObject lookupRet = client.send("ReadManager:countRecords", shard, 0, cobj, DatabaseClient.Replica.MASTER);
+          return (long) lookupRet.getLong(ComObject.Tag.COUNT_LONG);
         }));
       }
       for (Future future : futures) {
@@ -1326,18 +1325,18 @@ public class SelectStatementImpl extends StatementImpl implements SelectStatemen
 
     Object[][][] actualIds = ids.getIds();
     ConcurrentSkipListSet<Object[][]> map = new ConcurrentSkipListSet<>(comparator);
-    map.addAll(Arrays.asList(actualIds));
 
-    Object[][][] retIds = new Object[map.size()][][];
+    Object[][][] retIds = new Object[actualIds.length][][];
     int localOffset = 0;
     for (int i = 0; i < actualIds.length; i++) {
-      if (map.contains(actualIds[i])) {
+      if (map.add(actualIds[i])) {
         retIds[localOffset] = actualIds[i];
-        map.remove(actualIds[i]);
         localOffset++;
       }
     }
-    ids.setIds(retIds);
+    Object[][][] finalIds = new Object[map.size()][][];
+    System.arraycopy(retIds, 0, finalIds, 0, map.size());
+    ids.setIds(finalIds);
   }
 
   private ExpressionImpl.NextReturn handleJoins(int pageSize, String dbName, Explain explain, boolean restrictToThisServer,

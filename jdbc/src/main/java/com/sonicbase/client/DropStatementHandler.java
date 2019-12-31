@@ -34,8 +34,7 @@ public class DropStatementHandler implements StatementHandler {
       cobj.put(ComObject.Tag.METHOD, "SchemaManager:dropTable");
       cobj.put(ComObject.Tag.MASTER_SLAVE, MASTER_STR);
       cobj.put(ComObject.Tag.TABLE_NAME, table);
-      byte[] ret = client.sendToMaster(cobj);
-      ComObject retObj = new ComObject(ret);
+      ComObject retObj = client.sendToMaster(cobj);
       byte[] bytes = retObj.getByteArray(ComObject.Tag.SCHEMA_BYTES);
       client.getCommon().deserializeSchema(bytes);
     }
@@ -50,8 +49,7 @@ public class DropStatementHandler implements StatementHandler {
       cobj.put(ComObject.Tag.TABLE_NAME, tableName);
       cobj.put(ComObject.Tag.INDEX_NAME, indexName);
       cobj.put(ComObject.Tag.MASTER_SLAVE, MASTER_STR);
-      byte[] ret = client.send(null, 0, 0, cobj, DatabaseClient.Replica.MASTER);
-      ComObject retObj = new ComObject(ret);
+      ComObject retObj = client.send(null, 0, 0, cobj, DatabaseClient.Replica.MASTER);
       client.getCommon().deserializeSchema(retObj.getByteArray(ComObject.Tag.SCHEMA_BYTES));
     }
     else if (drop.getType().equalsIgnoreCase("database")) {
@@ -68,8 +66,7 @@ public class DropStatementHandler implements StatementHandler {
       cobj.put(ComObject.Tag.SCHEMA_VERSION, client.getCommon().getSchemaVersion());
       cobj.put(ComObject.Tag.METHOD, "SchemaManager:dropDatabase");
       cobj.put(ComObject.Tag.MASTER_SLAVE, MASTER_STR);
-      byte[] ret = client.send(null, 0, 0, cobj, DatabaseClient.Replica.MASTER);
-      ComObject retObj = new ComObject(ret);
+      ComObject retObj = client.send(null, 0, 0, cobj, DatabaseClient.Replica.MASTER);
       client.getCommon().deserializeSchema(retObj.getByteArray(ComObject.Tag.SCHEMA_BYTES));
     }
     return 1;

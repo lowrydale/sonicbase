@@ -379,7 +379,7 @@ public class ResultSetImplTest {
     when(client.send(eq("ReadManager:indexLookupExpression"), anyInt(), anyInt(), any(ComObject.class), eq(DatabaseClient.Replica.DEF))).thenAnswer(
         new Answer() {
           public Object answer(InvocationOnMock invocation) {
-            return new ComObject(1).serialize();
+            return new ComObject(1);
           }});
     expression.setTopLevelExpression(expression);
     expression.setCounters(countersList);

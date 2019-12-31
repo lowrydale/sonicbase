@@ -42,7 +42,7 @@ class BackupHandler {
       ComObject cobj = new ComObject(2);
       cobj.put(ComObject.Tag.DB_NAME, "__none__");
       cobj.put(ComObject.Tag.SCHEMA_VERSION, cli.getConn().getSchemaVersion());
-      ComObject retObj = new ComObject(cli.getConn().sendToMaster("BackupManager:getBackupStatus", cobj));
+      ComObject retObj = cli.getConn().sendToMaster("BackupManager:getBackupStatus", cobj);
       double percentComplete = retObj.getDouble(ComObject.Tag.PERCENT_COMPLETE);
       String error = retObj.getString(ComObject.Tag.EXCEPTION);
       percentComplete *= 100d;
@@ -62,7 +62,7 @@ class BackupHandler {
       ComObject cobj = new ComObject(2);
       cobj.put(ComObject.Tag.DB_NAME, "__none__");
       cobj.put(ComObject.Tag.SCHEMA_VERSION, cli.getConn().getSchemaVersion());
-      ComObject retObj = new ComObject(cli.getConn().sendToMaster("BackupManager:getRestoreStatus", cobj));
+      ComObject retObj = cli.getConn().sendToMaster("BackupManager:getRestoreStatus", cobj);
 
       String error = retObj.getString(ComObject.Tag.EXCEPTION);
       double percentComplete = retObj.getDouble(ComObject.Tag.PERCENT_COMPLETE);

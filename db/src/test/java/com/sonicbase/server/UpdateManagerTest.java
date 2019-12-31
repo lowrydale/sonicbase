@@ -387,7 +387,7 @@ public class UpdateManagerTest {
             cobj.put(ComObject.Tag.SEQUENCE_1, 1000L);
             ComObject ret = updateManager.batchInsertIndexEntryByKeyWithRecord(cobj, false);
             ret.put(ComObject.Tag.COUNT, 1);
-            return ret.serialize();
+            return ret;
           }
         });
     handler.executeBatch();
@@ -430,7 +430,7 @@ public class UpdateManagerTest {
             cobj.put(ComObject.Tag.SEQUENCE_1, sequence.incrementAndGet());
             ComObject ret = updateManager.batchInsertIndexEntryByKeyWithRecord(cobj, false);
             ret.put(ComObject.Tag.COUNT, 1);
-            return ret.serialize();
+            return ret;
           }
         });
 
@@ -443,7 +443,7 @@ public class UpdateManagerTest {
             cobj.put(ComObject.Tag.SEQUENCE_1, sequence.incrementAndGet());
             ComObject ret = updateManager.batchInsertIndexEntryByKey(cobj, false);
             ret.put(ComObject.Tag.COUNT, 1);
-            return ret.serialize();
+            return ret;
           }
         });
     int[] ret = handler.executeBatch();
@@ -514,7 +514,7 @@ public class UpdateManagerTest {
             cobj.put(ComObject.Tag.SEQUENCE_1, sequence.incrementAndGet());
             ComObject ret = updateManager.batchInsertIndexEntryByKeyWithRecord(cobj, false);
             ret.put(ComObject.Tag.COUNT, 1);
-            return ret.serialize();
+            return ret;
           }
         });
 
@@ -527,7 +527,7 @@ public class UpdateManagerTest {
             cobj.put(ComObject.Tag.SEQUENCE_1, sequence.incrementAndGet());
             ComObject ret = updateManager.batchInsertIndexEntryByKey(cobj, false);
             ret.put(ComObject.Tag.COUNT, 1);
-            return ret.serialize();
+            return ret;
           }
         });
     int[] ret = handler.executeBatch();
@@ -603,7 +603,7 @@ public class UpdateManagerTest {
             cobj.put(ComObject.Tag.SEQUENCE_1, sequence.incrementAndGet());
             ComObject ret = updateManager.batchInsertIndexEntryByKeyWithRecord(cobj, false);
             ret.put(ComObject.Tag.COUNT, 1);
-            return ret.serialize();
+            return ret;
           }
         });
 
@@ -616,7 +616,7 @@ public class UpdateManagerTest {
             cobj.put(ComObject.Tag.SEQUENCE_1, sequence.incrementAndGet());
             ComObject ret = updateManager.batchInsertIndexEntryByKey(cobj, false);
             ret.put(ComObject.Tag.COUNT, 1);
-            return ret.serialize();
+            return ret;
           }
         });
     int[] ret = handler.executeBatch();
@@ -698,7 +698,7 @@ public class UpdateManagerTest {
             cobj.put(ComObject.Tag.SEQUENCE_1, sequence.incrementAndGet());
             ComObject ret = updateManager.batchInsertIndexEntryByKeyWithRecord(cobj, false);
             ret.put(ComObject.Tag.COUNT, 1);
-            return ret.serialize();
+            return ret;
           }
         });
 
@@ -711,7 +711,7 @@ public class UpdateManagerTest {
             cobj.put(ComObject.Tag.SEQUENCE_1, sequence.incrementAndGet());
             ComObject ret = updateManager.batchInsertIndexEntryByKey(cobj, false);
             ret.put(ComObject.Tag.COUNT, 1);
-            return ret.serialize();
+            return ret;
           }
         });
     int[] ret = handler.executeBatch();
@@ -889,7 +889,7 @@ public class UpdateManagerTest {
             cobj.put(ComObject.Tag.SEQUENCE_1, sequence.incrementAndGet());
             ComObject ret = updateManager.batchInsertIndexEntryByKeyWithRecord(cobj, false);
             ret.put(ComObject.Tag.COUNT, 1);
-            return ret.serialize();
+            return ret;
           }
         });
 
@@ -905,7 +905,7 @@ public class UpdateManagerTest {
             cobj.put(ComObject.Tag.SEQUENCE_1, sequence.incrementAndGet());
             ComObject ret = updateManager.batchInsertIndexEntryByKey(cobj, false);
             ret.put(ComObject.Tag.COUNT, 1);
-            return ret.serialize();
+            return ret;
           }
         });
     int[] ret = handler.executeBatch();
@@ -1020,10 +1020,10 @@ public class UpdateManagerTest {
           array.add(bytes);
         }
 
-        retObj.put(ComObject.Tag.CURR_OFFSET, records.length);
-        retObj.put(ComObject.Tag.COUNT_RETURNED, records.length);
+        retObj.put(ComObject.Tag.CURR_OFFSET, (long)records.length);
+        retObj.put(ComObject.Tag.COUNT_RETURNED, (long)records.length);
 
-        return retObj.serialize();
+        return retObj;
       }
     });
     InsertStatementImpl insertStatement = new InsertStatementImpl(client);

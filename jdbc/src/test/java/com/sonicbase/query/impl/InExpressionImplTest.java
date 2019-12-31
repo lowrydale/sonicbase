@@ -68,12 +68,12 @@ public class InExpressionImplTest {
           array.add(bytes);
         }
 
-        retObj.put(ComObject.Tag.CURR_OFFSET, records.length);
-        retObj.put(ComObject.Tag.COUNT_RETURNED, records.length);
+        retObj.put(ComObject.Tag.CURR_OFFSET, (long)records.length);
+        retObj.put(ComObject.Tag.COUNT_RETURNED, (long)records.length);
 
         retObj.putArray(ComObject.Tag.RET_KEYS, ComObject.Type.OBJECT_TYPE, 1);
 
-        return retObj.serialize();
+        return retObj;
       });
 
       CCJSqlParserManager parser = new CCJSqlParserManager();

@@ -63,11 +63,11 @@
 
 <h1>Tutorial - Distributed Deploy</h1>
 <br/>
-In this tutorial we will walk you through the process of creating a cluster, deploying to it, starting the cluster and running commands on it.<br/>
+In this tutorial we will walk you through the process of starting a cluster and running commands on it.<br/>
 <br/>
       <h2>Install Java</h2>
       <div class="mylink">
-        Install <a href="https://www.oracle.com/technetwork/java/javase/downloads/index.html" target="_blank">jdk8 or jre8 or newer.</a>
+        Install jdk8 or jre8 or newer.
       </div>
 
       <h2>Download The Software</h2>
@@ -90,7 +90,7 @@ Go to the <a href="javascript:parent.window.location.href='../downloads.html'">d
         </div>
         <h2>Configure Servers</h2>
       In the "config.yaml" file in the "sonicbase/config" directory, configure the servers you want to use as follows:
-        <h3>Relication Factor</h3>
+        <h3>Replication Factor</h3>
         Set the "replicationFactor" node to the number of replicas you want.
         <h3>Default Port</h3>
         Set the "defaultPort" node to the port that should be used for all servers.
@@ -146,7 +146,7 @@ You should see the inserted record displayed in the client.
 <h2>Access From JDBC Driver</h2>
         <div class="mylink">
           Include the SonicBase jdbc driver in your application. The jar is located in the "sonicbase/lib" directory of the install directory.
-          It is named "sonicbase-jdbc-&lt;version&gt;.jar". Or you can include it from the Maven Centraol Repository.
+          It is named "sonicbase-jdbc-&lt;version&gt;.jar". Or you can include it from the Maven Central Repository.
           For more details, see <a href="jdbc-driver.html?framed=true">JDBC Driver</a>.<br/>
         </div>
         <br/>

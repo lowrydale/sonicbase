@@ -446,7 +446,7 @@ public class UpdateManager {
               synchronized (batchResponses) {
                 ComObject obj = new ComObject(3);
                 obj.put(ComObject.Tag.ORIGINAL_OFFSET, originalOffset);
-                obj.put(ComObject.Tag.ID, id);
+                obj.put(ComObject.Tag.ID, (long)id);
                 obj.put(ComObject.Tag.INT_STATUS, InsertStatementHandler.BATCH_STATUS_UNIQUE_CONSTRAINT_VIOLATION);
                 batchResponses.add(obj);
               }
@@ -457,7 +457,7 @@ public class UpdateManager {
               synchronized (batchResponses) {
                 ComObject obj = new ComObject(3);
                 obj.put(ComObject.Tag.ORIGINAL_OFFSET, originalOffset);
-                obj.put(ComObject.Tag.ID, id);
+                obj.put(ComObject.Tag.ID, (long)id);
                 obj.put(ComObject.Tag.INT_STATUS, InsertStatementHandler.BATCH_STATUS_FAILED);
                 batchResponses.add(obj);
               }
@@ -760,6 +760,9 @@ public class UpdateManager {
 
   void throttle() throws InterruptedException {
     insertCount.incrementAndGet();
+    if (server.isEmbedded()) {
+      return;
+    }
     synchronized (insertCount) {
       if (System.currentTimeMillis() - lastReset.get() > 30_000) {
         lastReset.set(System.currentTimeMillis());
@@ -872,7 +875,7 @@ public class UpdateManager {
         synchronized (batchResponses) {
           ComObject obj = new ComObject(3);
           obj.put(ComObject.Tag.ORIGINAL_OFFSET, originalOffset);
-          obj.put(ComObject.Tag.ID, originalId);
+          obj.put(ComObject.Tag.ID, (long)originalId);
           obj.put(ComObject.Tag.INT_STATUS, InsertStatementHandler.BATCH_STATUS_SUCCCESS);
           batchResponses.add(obj);
         }
@@ -889,7 +892,7 @@ public class UpdateManager {
           synchronized (batchResponses) {
             ComObject obj = new ComObject(3);
             obj.put(ComObject.Tag.ORIGINAL_OFFSET, originalOffset);
-            obj.put(ComObject.Tag.ID, originalId);
+            obj.put(ComObject.Tag.ID, (long)originalId);
             obj.put(ComObject.Tag.INT_STATUS, InsertStatementHandler.BATCH_STATUS_UNIQUE_CONSTRAINT_VIOLATION);
             batchResponses.add(obj);
           }
@@ -900,7 +903,7 @@ public class UpdateManager {
           synchronized (batchResponses) {
             ComObject obj = new ComObject(3);
             obj.put(ComObject.Tag.ORIGINAL_OFFSET, originalOffset);
-            obj.put(ComObject.Tag.ID, originalId);
+            obj.put(ComObject.Tag.ID, (long)originalId);
             obj.put(ComObject.Tag.INT_STATUS, InsertStatementHandler.BATCH_STATUS_FAILED);
             batchResponses.add(obj);
           }

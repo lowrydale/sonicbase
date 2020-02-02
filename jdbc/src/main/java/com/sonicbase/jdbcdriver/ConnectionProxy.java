@@ -29,6 +29,7 @@ public class ConnectionProxy implements Connection {
   private boolean autoCommit;
   private java.util.Map<String, Class<?>> typemap;
   private boolean closed = false;
+  private boolean embedded;
 
   public void addClient(String url, DatabaseClient client) {
     clients.computeIfAbsent(url, k -> new ClientEntry(client));
@@ -36,6 +37,10 @@ public class ConnectionProxy implements Connection {
 
   public void setClient(DatabaseClient client) {
     this.client = client;
+  }
+
+  public void setEmbedded(boolean embedded) {
+    this.embedded = embedded;
   }
 
 
@@ -276,7 +281,11 @@ public class ConnectionProxy implements Connection {
 
   public Statement createStatement() throws SQLException {
     try {
-      return new StatementProxy(this, clients.get(url).client, null);
+      StatementProxy ret = new StatementProxy(this, clients.get(url).client, null);
+      if (embedded) {
+        ((StatementProxy) ret).disableStats(true);
+      }
+      return ret;
     }
     catch (Exception e) {
       throw new SQLException(e);
@@ -426,9 +435,17 @@ public class ConnectionProxy implements Connection {
   public PreparedStatement prepareStatement(String sql) throws SQLException {
     try {
       if (client != null) {
-        return new StatementProxy(this, client, sql);
+        PreparedStatement ret = new StatementProxy(this, client, sql);
+        if (embedded) {
+          ((StatementProxy) ret).disableStats(true);
+        }
+        return ret;
       }
-      return new StatementProxy(this, clients.get(url).client, sql);
+      PreparedStatement ret = new StatementProxy(this, clients.get(url).client, sql);
+      if (embedded) {
+        ((StatementProxy) ret).disableStats(true);
+      }
+      return ret;
     }
     catch (Exception e) {
       throw new SQLException(e);

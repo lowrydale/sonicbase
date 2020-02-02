@@ -385,7 +385,8 @@ namespace skiplist
 
 			randomSeed = r | 0x0100; // ensure nonzero
 
-			head.set(new HeadIndex<K, V>(new Node<K, V>(NULL, BASE_HEADER, NULL), NULL, NULL, 1));
+			head = new HeadIndex<K, V>(new Node<K, V>(NULL, BASE_HEADER, NULL), NULL, NULL, 1);
+			atomicHead.set(head);
 		}
 
 		~ConcurrentSkipListMap() {
@@ -424,18 +425,22 @@ namespace skiplist
 			const K1 key;
 //JAVA TO C++ CONVERTER TODO TASK: 'volatile' has a different meaning in C++:
 //ORIGINAL LINE: volatile AtomicJava<Object> value;
-			AtomicJava<void*> value;
+			void* value;
+			AtomicJava<void*> atomicValue;
 //JAVA TO C++ CONVERTER TODO TASK: 'volatile' has a different meaning in C++:
 //ORIGINAL LINE: volatile AtomicJava<Node<K,V>> next;
-			AtomicJava<Node<K1, V1>*> next;
+			Node<K1, V1>* next;
+			AtomicJava<Node<K1, V1>*> atomicNext;
 
 			/**
 			 * Creates a new regular node.
 			 */
 			Node(K1 key, const void *value, const Node<K1, V1> *next) : key(key)
 			{
-				this->value.set((void*)value);
-				this->next.set((Node<K1, V1>*)next);
+				this->value = (void*)value;
+				this->atomicValue.set((void*)value);
+				this->next = (Node<K1, V1>*)next;
+				this->atomicNext.set((Node<K1, V1>*)next);
 			}
 
 			/**
@@ -447,8 +452,10 @@ namespace skiplist
 			 */
 			Node(const Node<K1, V1> *next) : key(K1())
 			{
-				this->value.set(this);
-				this->next.set((Node<K1, V1>*)next);
+				this->value = this;
+				this->atomicValue.set(this);
+				this->next = (Node<K1, V1>*)next;
+				this->atomicNext.set((Node<K1, V1>*)next);
 			}
 
 			/**
@@ -456,7 +463,11 @@ namespace skiplist
 			 */
 			bool casValue(void *cmp, void *val)
 			{
-				return value.compareAndSet(cmp, val);
+				bool ret = atomicValue.compareAndSet(cmp, val);
+				if (ret) {
+					value = atomicValue.get();
+				}
+				return ret;
 			}
 
 			/**
@@ -464,7 +475,11 @@ namespace skiplist
 			 */
 			bool casNext(Node<K1, V1> *cmp, Node<K1, V1> *val)
 			{
-				return next.compareAndSet(cmp, val);
+				bool ret = atomicNext.compareAndSet(cmp, val);
+				if (ret) {
+					next = atomicNext.get();
+				}
+				return ret;
 			}
 
 			/**
@@ -478,7 +493,7 @@ namespace skiplist
 			 */
 			bool isMarker()
 			{
-				return value.get() == this;
+				return value == this;
 			}
 
 			/**
@@ -487,7 +502,7 @@ namespace skiplist
 			 */
 			bool isBaseHeader()
 			{
-				return value.get() == BASE_HEADER;
+				return value == BASE_HEADER;
 			}
 
 			/**
@@ -514,15 +529,15 @@ namespace skiplist
 				 * help-out stages per call tends to minimize CAS
 				 * interference among helping threads.
 				 */
-				if (f == next.get() && this == b->next.get())
+				if (f == next && this == b->next)
 				{
-					if (f == NULL || f->value.get() != f) // not already marked
+					if (f == NULL || f->value != f) // not already marked
 					{
 						appendMarker(f);
 					}
 					else
 					{
-						b->casNext(this, f->next.get());
+						b->casNext(this, f->next);
 					}
 				}
 			}
@@ -535,7 +550,7 @@ namespace skiplist
 			 */
 			V1 getValidValue()
 			{
-				auto v = value.get();
+				auto v = value;
 				if (v == this || v == BASE_HEADER)
 				{
 					return NULL;
@@ -577,14 +592,16 @@ namespace skiplist
 			Index<K1, V1> *const down;
 //JAVA TO C++ CONVERTER TODO TASK: 'volatile' has a different meaning in C++:
 //ORIGINAL LINE: volatile AtomicJava<Index<K,V>> right;
-			AtomicJava<Index<K1, V1>*> right;
+			Index<K1, V1>* right;
+			AtomicJava<Index<K1, V1>*> atomicRight;
 
 			/**
 			 * Creates index node with given values.
 			 */
 			Index(Node<K1, V1> *node, Index<K1, V1> *down, Index<K1, V1> *right) : node(node), down(down)
 			{
-				this->right.set(right);
+				this->right = right;
+				this->atomicRight.set(right);
 			}
 
 			virtual int hashCode() {
@@ -600,7 +617,11 @@ namespace skiplist
 			 */
 			virtual bool casRight(Index<K1, V1> *cmp, Index<K1, V1> *val)
 			{
-				return right.compareAndSet(cmp, val);
+				bool ret = atomicRight.compareAndSet(cmp, val);
+				if (ret) {
+					right = atomicRight.get();
+				}
+				return ret;
 			}
 
 			/**
@@ -609,7 +630,7 @@ namespace skiplist
 			 */
 			virtual bool indexesDeletedNode()
 			{
-				return node->value.get() == NULL;
+				return node->value == NULL;
 			}
 
 			/**
@@ -623,8 +644,9 @@ namespace skiplist
 			virtual bool link(Index<K1, V1> *succ, Index<K1, V1> *newSucc)
 			{
 				Node<K1, V1> *n = node;
-				newSucc->right.set(succ);
-				return n->value.get() != NULL && casRight(succ, newSucc);
+				newSucc->right = succ;
+				newSucc->atomicRight.set(succ);
+				return n->value != NULL && casRight(succ, newSucc);
 			}
 
 			/**
@@ -636,7 +658,7 @@ namespace skiplist
 			 */
 			virtual bool unlink(Index<K1, V1> *succ)
 			{
-				return !indexesDeletedNode() && casRight(succ, succ->right.get());
+				return !indexesDeletedNode() && casRight(succ, succ->right);
 			}
 		};
 
@@ -659,7 +681,11 @@ namespace skiplist
 
 		bool casHead(HeadIndex<K, V> *cmp, HeadIndex<K, V> *val)
 		{
-			return head.compareAndSet(cmp, val);
+			bool ret = atomicHead.compareAndSet(cmp, val);
+			if (ret) {
+				head = atomicHead.get();
+			}
+			return ret;
 		}
 
 		/* ---------------- Comparison utilities -------------- */
@@ -781,15 +807,15 @@ namespace skiplist
 			}
 			for (;;)
 			{
-				Index<K, V> *q = head.get();
-				Index<K, V> *r = q->right.get();
+				Index<K, V> *q = head;
+				Index<K, V> *r = q->right;
 				for (;;)
 				{
 					if (r != NULL)
 					{
 						Node<K, V> *n = r->node;
 						K k = n->key;
-						if (n->value.get() == NULL)
+						if (n->atomicValue.get() == NULL)
 						{
 							if (!q->unlink(r))
 							{
@@ -803,13 +829,13 @@ namespace skiplist
 							//delete (V)r->node->value.get();
 							//delete r->node;
 							//delete r;
-							r = q->right.get(); // reread r
+							r = q->right; // reread r
 							continue;
 						}
 						if (key->compareTo(k) > 0)
 						{
 							q = r;
-							r = r->right.get();
+							r = r->right;
 							continue;
 						}
 					}
@@ -817,7 +843,7 @@ namespace skiplist
 					if (d != NULL)
 					{
 						q = d;
-						r = d->right.get();
+						r = d->right;
 					}
 					else
 					{
@@ -876,20 +902,20 @@ namespace skiplist
 			for (;;)
 			{
 				Node<K, V> *b = findPredecessor(key);
-				Node<K, V> *n = b->next.get();
+				Node<K, V> *n = b->next;
 				for (;;)
 				{
 					if (n == NULL)
 					{
 						return NULL;
 					}
-					Node<K, V> *f = n->next.get();
-					if (n != b->next.get()) // inconsistent read
+					Node<K, V> *f = n->next;
+					if (n != b->next) // inconsistent read
 					{
 						break;
 					}
-					AtomicJava<void*> *v = &n->value;
-					if (v->get() == NULL)
+					void *v = &n->atomicValue.get();
+					if (v == NULL)
 					{ // n is deleted
 						n->helpDelete(b, f);
 						//delete n->key;
@@ -897,7 +923,7 @@ namespace skiplist
 						//delete n;
 						break;
 					}
-					if (v->get() == n || b->value.get() == NULL) // b is deleted
+					if (v == n || b->value == NULL) // b is deleted
 					{
 						break;
 					}
@@ -932,8 +958,8 @@ namespace skiplist
 		{
 			Comparable<K> *key = comparable(okey);
 			Node<K, V> *bound = NULL;
-			Index<K, V> *q = head.get();
-			Index<K, V> *r = q->right.get();
+			Index<K, V> *q = head;
+			Index<K, V> *r = q->right;
 			Node<K, V> *n;
 			K k;
 			int c;
@@ -946,13 +972,13 @@ namespace skiplist
 					if ((c = key->compareTo(k)) > 0)
 					{
 						q = r;
-						r = r->right.get();
+						r a= r->right;
 						continue;
 					}
 					else if (c == 0)
 					{
-						AtomicJava<void*> *v = &n->value;
-						return (v->get() != NULL)? static_cast<V>(v->get()): getUsingFindNode(key);
+						void *v = n->atomicValue.get();
+						return (v != NULL)? static_cast<V>(v): getUsingFindNode(key);
 					}
 					else
 					{
@@ -964,7 +990,7 @@ namespace skiplist
 				if ((d = q->down) != NULL)
 				{
 					q = d;
-					r = d->right.get();
+					r = d->right;
 				}
 				else
 				{
@@ -973,14 +999,14 @@ namespace skiplist
 			}
 
 			// Traverse nexts
-			for (n = q->node->next.get(); n != NULL; n = n->next.get())
+			for (n = q->node->next; n != NULL; n = n->next)
 			{
 				if ((k = n->key) != NULL)
 				{
 					if ((c = key->compareTo(k)) == 0)
 					{
-						AtomicJava<void*> *v = &n->value;
-						return (v->get() != NULL)? static_cast<V>(v->get()): getUsingFindNode(key);
+						void *v = n->atomicValue.get();
+						return (v != NULL)? static_cast<V>(v): getUsingFindNode(key);
 					}
 					else if (c < 0)
 					{
@@ -1011,10 +1037,10 @@ namespace skiplist
 				{
 					return NULL;
 				}
-				AtomicJava<void*> *v = &n->value;
-				if (v->get() != NULL)
+				void *v = &n->atomicValue.get();
+				if (v != NULL)
 				{
-					return static_cast<V>(v->get());
+					return static_cast<V>(v);
 				}
 			}
 		}
@@ -1035,26 +1061,26 @@ namespace skiplist
 			for (;;)
 			{
 				Node<K, V> *b = findPredecessor(key);
-				Node<K, V> *n = b->next.get();
+				Node<K, V> *n = b->next;
 				for (;;)
 				{
 					if (n != NULL)
 					{
-						Node<K, V> *f = n->next.get();
-						if (n != b->next.get()) // inconsistent read
+						Node<K, V> *f = n->next;
+						if (n != b->next) // inconsistent read
 						{
 							break;
 						}
-						AtomicJava<void*> *v = &n->value;
-						if (v->get() == NULL)
+						void *v = n->value;
+						if (v == NULL)
 						{ // n is deleted
 							n->helpDelete(b, f);
-							//delete n->key;
-							//delete (V)n->value.get();
-							//delete n;
+							delete n->key;
+							delete (V)n->value.get();
+							delete n;
 							break;
 						}
-						if (v->get() == n || b->value.get() == NULL) // b is deleted
+						if (v == n || b->value == NULL) // b is deleted
 						{
 							break;
 						}
@@ -1067,7 +1093,7 @@ namespace skiplist
 						}
 						if (c == 0)
 						{
-							void *prev = v->get();
+							void *prev = v;
 							if (onlyIfAbsent || n->casValue(prev, value))
 							{
 								delete key;
@@ -1139,7 +1165,7 @@ namespace skiplist
 		 */
 		void insertIndex(Node<K, V> *z, int level)
 		{
-			HeadIndex<K, V> *h = head.get();
+			HeadIndex<K, V> *h = head;
 			int max = h->level;
 
 			if (level <= max)
@@ -1176,7 +1202,7 @@ namespace skiplist
 				int k;
 				for (;;)
 				{
-					oldh = head.get();
+					oldh = head;
 					int oldLevel = oldh->level;
 					if (level <= oldLevel)
 					{ // lost race to add level
@@ -1222,7 +1248,7 @@ namespace skiplist
 			{
 				int j = h->level;
 				Index<K, V> *q = h;
-				Index<K, V> *r = q->right.get();
+				Index<K, V> *r = q->right;
 				Index<K, V> *t = idx;
 				for (;;)
 				{
@@ -1231,19 +1257,19 @@ namespace skiplist
 						Node<K, V> *n = r->node;
 						// compare before deletion check avoids needing recheck
 						int c = key->compareTo(n->key);
-						if (n->value.get() == NULL)
+						if (n->value == NULL)
 						{
 							if (!q->unlink(r))
 							{
 								break;
 							}
-							r = q->right.get();
+							r = q->right;
 							continue;
 						}
 						if (c > 0)
 						{
 							q = r;
-							r = r->right.get();
+							r = r->right;
 							continue;
 						}
 					}
@@ -1276,7 +1302,7 @@ namespace skiplist
 						t = t->down;
 					}
 					q = q->down;
-					r = q->right.get();
+					r = q->right;
 				}
 			}
 		}
@@ -1309,28 +1335,28 @@ namespace skiplist
 			for (;;)
 			{
 				Node<K, V> *b = findPredecessor(key);
-				Node<K, V> *n = b->next.get();
+				Node<K, V> *n = b->next;
 				for (;;)
 				{
 					if (n == NULL)
 					{
 						return NULL;
 					}
-					Node<K, V> *f = n->next.get();
-					if (n != b->next.get()) // inconsistent read
+					Node<K, V> *f = n->next;
+					if (n != b->next) // inconsistent read
 					{
 						break;
 					}
-					AtomicJava<void*> *v = &n->value;
-					if (v->get() == NULL)
+					void *v = n->value;
+					if (v == NULL)
 					{ // n is deleted
 						n->helpDelete(b, f);
-						//delete n->key;
-						//delete (V)n->value.get();
-						//delete n;
+						delete n->key;
+						delete (V)n->value;
+						delete n;
 						break;
 					}
-					if (v->get() == n || b->value.get() == NULL) // b is deleted
+					if (v == n || b->value == NULL) // b is deleted
 					{
 						break;
 					}
@@ -1349,12 +1375,12 @@ namespace skiplist
 					{
 						return NULL;
 					}
-					void *prev = v->get();
+					void *prev = v;
 					if (!n->casValue(prev, NULL))
 					{
 						break;
 					}
-					delete (V)prev;
+					//delete (V)prev;
 					if (!n->appendMarker(f) || !b->casNext(n, f))
 					{
 						findNode(key); // Retry via findNode
@@ -1362,12 +1388,12 @@ namespace skiplist
 					else
 					{
 						findPredecessor(key); // Clean index
-						if (head.get()->right.get() == NULL)
+						if (head->right == NULL)
 						{
 							tryReduceLevel();
 						}
 						delete n->key;
-						delete (V)n->value.get();
+						//delete (V)n->value;
 						delete n;
 					}
 					return static_cast<V>(prev);
@@ -1398,12 +1424,12 @@ namespace skiplist
 	private:
 		void tryReduceLevel()
 		{
-			HeadIndex<K, V> *h = head.get();
+			HeadIndex<K, V> *h = head;
 			HeadIndex<K, V> *d;
 			HeadIndex<K, V> *e;
 			if (h->level > 3 && (d = static_cast<ConcurrentSkipListMap::HeadIndex<K, V>*>(h->down)) != NULL && 
-				(e = static_cast<ConcurrentSkipListMap::HeadIndex<K, V>*>(d->down)) != NULL && e->right.get() == NULL &&
-				d->right.get() == NULL && h->right.get() == NULL && casHead(h, d) && h->right.get() != NULL) // recheck
+				(e = static_cast<ConcurrentSkipListMap::HeadIndex<K, V>*>(d->down)) != NULL && e->right == NULL &&
+				d->right == NULL && h->right == NULL && casHead(h, d) && h->right != NULL) // recheck
 			{
 				casHead(d, h); // try to backout
 			}
@@ -1420,19 +1446,19 @@ namespace skiplist
 		{
 			for (;;)
 			{
-				Node<K, V> *b = head.get()->node;
-				Node<K, V> *n = b->next.get();
+				Node<K, V> *b = head->node;
+				Node<K, V> *n = b->next;
 				if (n == NULL)
 				{
 					return NULL;
 				}
-				if (n->value.get() != NULL)
+				if (n->value != NULL)
 				{
 					return n;
 				}
-				n->helpDelete(b, n->next.get());
+				n->helpDelete(b, n->next);
 				delete n->key;
-				delete (V)n->value.get();
+				delete (V)n->value;
 				delete n;
 
 			}
@@ -1446,19 +1472,19 @@ namespace skiplist
 		{
 			for (;;)
 			{
-				Node<K, V> *b = head.get()->node;
-				Node<K, V> *n = b->next.get();
+				Node<K, V> *b = head->node;
+				Node<K, V> *n = b->next;
 				if (n == NULL)
 				{
 					return NULL;
 				}
-				Node<K, V> *f = n->next.get();
-				if (n != b->next.get())
+				Node<K, V> *f = n->next;
+				if (n != b->next)
 				{
 					continue;
 				}
-				AtomicJava<void*> *v = &n->value;
-				if (v->get() == NULL)
+				void *v = n->value;
+				if (v == NULL)
 				{
 					n->helpDelete(b, f);
 					//delete n->key;
@@ -1466,7 +1492,7 @@ namespace skiplist
 					//delete n;
 					continue;
 				}
-				void *prev = v->get();
+				void *prev = v;
 				if (!n->casValue(prev, NULL))
 				{
 					continue;
@@ -1477,7 +1503,7 @@ namespace skiplist
 					findFirst(); // retry
 				}
 				clearIndexToFirst();
-				return new typename AbstractMap<K,V>::template SimpleImmutableEntry<K, V>(n->key, static_cast<V>(v->get()));
+				return new typename AbstractMap<K,V>::template SimpleImmutableEntry<K, V>(n->key, static_cast<V>(v));
 			}
 		}
 
@@ -1489,17 +1515,17 @@ namespace skiplist
 		{
 			for (;;)
 			{
-				Index<K, V> *q = head.get();
+				Index<K, V> *q = head;
 				for (;;)
 				{
-					Index<K, V> *r = q->right.get();
+					Index<K, V> *r = q->right;
 					if (r != NULL && r->indexesDeletedNode() && !q->unlink(r))
 					{
 						break;
 					}
 					if ((q = q->down) == NULL)
 					{
-						if (head.get()->right.get() == NULL)
+						if (head->right == NULL)
 						{
 							tryReduceLevel();
 						}
@@ -1524,16 +1550,16 @@ namespace skiplist
 			 * because this doesn't use comparisons.  So traversals of
 			 * both levels are folded together.
 			 */
-			Index<K, V> *q = head.get();
+			Index<K, V> *q = head;
 			for (;;)
 			{
 				Index<K, V> *d, *r;
-				if ((r = q->right.get()) != NULL)
+				if ((r = q->right) != NULL)
 				{
 					if (r->indexesDeletedNode())
 					{
 						q->unlink(r);
-						q = head.get(); // restart
+						q = head; // restart
 					}
 					else
 					{
@@ -1547,20 +1573,20 @@ namespace skiplist
 				else
 				{
 					Node<K, V> *b = q->node;
-					Node<K, V> *n = b->next.get();
+					Node<K, V> *n = b->next;
 					for (;;)
 					{
 						if (n == NULL)
 						{
 							return (b->isBaseHeader())? NULL : b;
 						}
-						Node<K, V> *f = n->next.get(); // inconsistent read
-						if (n != b->next.get())
+						Node<K, V> *f = n->next; // inconsistent read
+						if (n != b->next)
 						{
 							break;
 						}
-						AtomicJava<void*> *v = &n->value;
-						if (v->get() == NULL)
+						void *v = n->value;
+						if (v == NULL)
 						{ // n is deleted
 							n->helpDelete(b, f);
 							//delete n->key;
@@ -1568,14 +1594,14 @@ namespace skiplist
 							//delete n;
 							break;
 						}
-						if (v->get() == n || b->value.get() == NULL) // b is deleted
+						if (v == n || b->value == NULL) // b is deleted
 						{
 							break;
 						}
 						b = n;
 						n = f;
 					}
-					q = head.get(); // restart
+					q = head; // restart
 				}
 			}
 		}
@@ -1592,11 +1618,11 @@ namespace skiplist
 		{
 			for (;;)
 			{
-				Index<K, V> *q = head.get();
+				Index<K, V> *q = head;
 				for (;;)
 				{
 					Index<K, V> *d, *r;
-					if ((r = q->right.get()) != NULL)
+					if ((r = q->right) != NULL)
 					{
 						if (r->indexesDeletedNode())
 						{
@@ -1604,7 +1630,7 @@ namespace skiplist
 							break; // must restart
 						}
 						// proceed as far across as possible without overshooting
-						if (r->node->next.get() != NULL)
+						if (r->node->next != NULL)
 						{
 							q = r;
 							continue;
@@ -1633,7 +1659,7 @@ namespace skiplist
 			for (;;)
 			{
 				Node<K, V> *b = findPredecessorOfLast();
-				Node<K, V> *n = b->next.get();
+				Node<K, V> *n = b->next;
 				if (n == NULL)
 				{
 					if (b->isBaseHeader()) // empty
@@ -1647,13 +1673,13 @@ namespace skiplist
 				}
 				for (;;)
 				{
-					Node<K, V> *f = n->next.get();
-					if (n != b->next.get()) // inconsistent read
+					Node<K, V> *f = n->next;
+					if (n != b->next) // inconsistent read
 					{
 						break;
 					}
-					AtomicJava<void*> *v = &n->value;
-					if (v->get() == NULL)
+					void *v = n->value;
+					if (v == NULL)
 					{ // n is deleted
 						n->helpDelete(b, f);
 						//delete n->key;
@@ -1661,7 +1687,7 @@ namespace skiplist
 						//delete n;
 						break;
 					}
-					if (v->get() == n || b->value.get() == NULL) // b is deleted
+					if (v == n || b->value == NULL) // b is deleted
 					{
 						break;
 					}
@@ -1671,7 +1697,7 @@ namespace skiplist
 						n = f;
 						continue;
 					}
-					void * prev = v->get();
+					void * prev = v;
 					if (!n->casValue(prev, NULL))
 					{
 						break;
@@ -1686,12 +1712,12 @@ namespace skiplist
 					else
 					{
 						findPredecessor(ck); // Clean index
-						if (head.get()->right.get() == NULL)
+						if (head->right == NULL)
 						{
 							tryReduceLevel();
 						}
 					}
-					return new typename AbstractMap<K,V>::template SimpleImmutableEntry<K, V>(key, static_cast<V>(v->get()));
+					return new typename AbstractMap<K,V>::template SimpleImmutableEntry<K, V>(key, static_cast<V>(v));
 				}
 			}
 		}
@@ -1718,20 +1744,20 @@ namespace skiplist
 			for (;;)
 			{
 				Node<K, V> *b = findPredecessor(key);
-				Node<K, V> *n = b->next.get();
+				Node<K, V> *n = b->next;
 				for (;;)
 				{
 					if (n == NULL)
 					{
 						return ((rel & LT) == 0 || b->isBaseHeader())? NULL : b;
 					}
-					Node<K, V> *f = n->next.get();
-					if (n != b->next.get()) // inconsistent read
+					Node<K, V> *f = n->next;
+					if (n != b->next) // inconsistent read
 					{
 						break;
 					}
-					AtomicJava<void*> *v = &n->value;
-					if (v->get() == NULL)
+					void *v = n->value;
+					if (v == NULL)
 					{ // n is deleted
 						n->helpDelete(b, f);
 						//delete n->key;
@@ -1739,7 +1765,7 @@ namespace skiplist
 						//delete n;
 						break;
 					}
-					if (v->get() == n || b->value.get() == NULL) // b is deleted
+					if (v == n || b->value == NULL) // b is deleted
 					{
 						break;
 					}
@@ -1851,7 +1877,7 @@ namespace skiplist
 				throw NullPointerException();
 			}
 
-			HeadIndex<K, V> *h = head.get();
+			HeadIndex<K, V> *h = head;
 			Node<K, V> *basepred = h->node;
 
 			// Track the current rightmost node at each level. Uses an
@@ -1886,7 +1912,8 @@ namespace skiplist
 					throw NullPointerException();
 				}
 				Node<K, V> *z = new Node<K, V>(k, v, NULL);
-				basepred->next.set(z);
+				basepred->next = z;
+				basepred->atomicNext.set(z);
 				basepred = z;
 				if (j > 0)
 				{
@@ -1912,7 +1939,8 @@ namespace skiplist
 				}
 				it++;
 			}
-			head.set(h);
+			head = h;
+			atomicHead.set(h);
 		}
 
 		/* ------ skiplist.Map API methods ------ */
@@ -2005,7 +2033,7 @@ namespace skiplist
 			{
 				throw NullPointerException();
 			}
-			for (Node<K, V> *n = findFirst(); n != NULL; n = n->next.get())
+			for (Node<K, V> *n = findFirst(); n != NULL; n = n->next)
 			{
 				V v = n->getValidValue();
 				if (v != NULL && ((V)value)->equals(v))
@@ -2035,7 +2063,7 @@ namespace skiplist
 		virtual int size()
 		{
 			long long count = 0;
-			for (Node<K, V> *n = findFirst(); n != NULL; n = n->next.get())
+			for (Node<K, V> *n = findFirst(); n != NULL; n = n->next)
 			{
 				if (n->getValidValue() != NULL)
 				{
@@ -2239,14 +2267,14 @@ namespace skiplist
 				{
 					return false;
 				}
-				AtomicJava<void*> *v = &n->value;
-				if (v->get() != NULL)
+				void *v = n->value;
+				if (v != NULL)
 				{
-					if (!oldValue->equals(v->get()))
+					if (!oldValue->equals(v))
 					{
 						return false;
 					}
-					void *prev = v->get();
+					void *prev = v;
 					if (n->casValue(prev, newValue))
 					{
 						return true;
@@ -2279,10 +2307,10 @@ namespace skiplist
 				{
 					return NULL;
 				}
-				AtomicJava<void*> *v = &n->value;
-				if (v->get() != NULL && n->casValue(v->get(), value))
+				void *v = n->value;
+				if (v != NULL && n->casValue(v, value))
 				{
-					return (V)v->get();
+					return (V)v;
 				}
 			}
 		}
@@ -2591,10 +2619,10 @@ namespace skiplist
 					{
 						break;
 					}
-					AtomicJava<void*> *x = &next->value;
-					if (x->get() != NULL && x->get() != next)
+					void *x = next->value;
+					if (x != NULL && x != next)
 					{
-						nextValue = static_cast<V>(x->get());
+						nextValue = static_cast<V>(x);
 						break;
 					}
 				}
@@ -2617,15 +2645,15 @@ namespace skiplist
 				lastReturned = next;
 				for (;;)
 				{
-					next = next->next.get();
+					next = next->next;
 					if (next == NULL)
 					{
 						break;
 					}
-					AtomicJava<void*> *x = &next->value;
-					if (x->get() != NULL && x->get() != next)
+					void *x = next->value;
+					if (x != NULL && x != next)
 					{
-						nextValue = static_cast<V>(x->get());
+						nextValue = static_cast<V>(x);
 						break;
 					}
 				}
@@ -3410,7 +3438,7 @@ namespace skiplist
 			virtual int size()
 			{
 				long long count = 0;
-				for (ConcurrentSkipListMap::Node<K, V> *n = loNode(); isBeforeEnd(n); n = n->next.get())
+				for (ConcurrentSkipListMap::Node<K, V> *n = loNode(); isBeforeEnd(n); n = n->next)
 				{
 					if (n->getValidValue() != NULL)
 					{
@@ -3431,7 +3459,7 @@ namespace skiplist
 				{
 					throw NullPointerException();
 				}
-				for (ConcurrentSkipListMap::Node<K, V> *n = loNode(); isBeforeEnd(n); n = n->next.get())
+				for (ConcurrentSkipListMap::Node<K, V> *n = loNode(); isBeforeEnd(n); n = n->next)
 				{
 					V v = n->getValidValue();
 					if (v != NULL && ((V)value)->equals(v))
@@ -3444,7 +3472,7 @@ namespace skiplist
 
 			virtual void clear()
 			{
-				for (ConcurrentSkipListMap::Node<K, V> *n = loNode(); isBeforeEnd(n); n = n->next.get())
+				for (ConcurrentSkipListMap::Node<K, V> *n = loNode(); isBeforeEnd(n); n = n->next)
 				{
 					if (n->getValidValue() != NULL)
 					{
@@ -3753,6 +3781,9 @@ namespace skiplist
 
 			virtual Set<typename Map<K,V>::template Entry<K, V>*> *entrySet()
 			{
+				printf("getting entryset - inner\n");
+            	fflush(stdout);
+
 				Set<typename Map<K,V>::template Entry<K, V>*> *es = entrySetView;
 				return (es != NULL) ? es : (entrySetView = new EntrySet<K, V>(this));
 			}
@@ -3804,8 +3835,8 @@ namespace skiplist
 						{
 							break;
 						}
-						AtomicJava<void*> *x = &next->value;
-						if (x->get() != NULL && x->get() != next)
+						void *x = next->value;
+						if (x != NULL && x != next)
 						{
 							if (!outerInstance->inBounds(next->key))
 							{
@@ -3813,7 +3844,7 @@ namespace skiplist
 							}
 							else
 							{
-								nextValue = static_cast<V>(x->get());
+								nextValue = static_cast<V>(x);
 							}
 							break;
 						}
@@ -3849,13 +3880,13 @@ namespace skiplist
 				{
 					for (;;)
 					{
-						next = next->next.get();
+						next = next->next;
 						if (next == NULL)
 						{
 							break;
 						}
-						AtomicJava<void*> *x = &next->value;
-						if (x->get() != NULL && x->get() != next)
+						void *x = next->value;
+						if (x != NULL && x != next)
 						{
 							if (outerInstance->tooHigh(next->key))
 							{
@@ -3863,7 +3894,7 @@ namespace skiplist
 							}
 							else
 							{
-								nextValue = static_cast<V>(x->get());
+								nextValue = static_cast<V>(x);
 							}
 							break;
 						}
@@ -3879,8 +3910,8 @@ namespace skiplist
 						{
 							break;
 						}
-						AtomicJava<void*> *x = &next->value;
-						if (x->get() != NULL && x->get() != next)
+						void *x = next->value;
+						if (x != NULL && x != next)
 						{
 							if (outerInstance->tooLow(next->key))
 							{
@@ -3888,7 +3919,7 @@ namespace skiplist
 							}
 							else
 							{
-								nextValue = static_cast<V>(x->get());
+								nextValue = static_cast<V>(x);
 							}
 							break;
 						}
@@ -3992,7 +4023,8 @@ namespace skiplist
 		*/
 		//JAVA TO C++ CONVERTER TODO TASK: 'volatile' has a different meaning in C++:
 		//ORIGINAL LINE: private transient volatile AtomicJava<HeadIndex<K,V>> head;
-		AtomicJava<HeadIndex<K, V>*> head;
+		HeadIndex<K, V>* head;
+		AtomicJava<HeadIndex<K, V>*> atomicHead;
 
 		/**
 		* The comparatorField used to maintain order in this map, or null

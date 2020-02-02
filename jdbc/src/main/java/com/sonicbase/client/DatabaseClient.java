@@ -1321,7 +1321,7 @@ public class DatabaseClient {
   }
 
   private String convertCallToProcedure(String sql) {
-    if (toLower(sql.toLowerCase().substring(0, "call".length())).startsWith("call")) {
+    if (sql.toLowerCase().startsWith("call")) {
       int pos = sql.toLowerCase().indexOf("procedure");
       sql = sql.substring(pos + "procedure".length()).trim();
       if (sql.charAt(0) == '(') {
@@ -1515,11 +1515,20 @@ public class DatabaseClient {
 
   public long allocateId(String dbName) {
     long id = -1;
-    synchronized (idAllocatorLock) {
-      if (nextId.get() != -1 && nextId.get() <= maxAllocatedId.get()) {
-        id = nextId.getAndIncrement();
-      }
-      else {
+
+    boolean shouldAllocate = false;
+    long max = maxAllocatedId.get();
+    if (-1 == max) {
+      shouldAllocate = true;
+    }
+
+    id = nextId.getAndIncrement();
+    if (id > max) {
+      shouldAllocate = true;
+    }
+
+    if (shouldAllocate) {
+      synchronized (idAllocatorLock) {
         ComObject cobj = new ComObject(2);
         cobj.put(ComObject.Tag.DB_NAME, dbName);
         cobj.put(ComObject.Tag.SCHEMA_VERSION, common.getSchemaVersion());

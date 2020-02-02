@@ -402,7 +402,7 @@ public class UpdateStatementImpl extends StatementImpl implements UpdateStatemen
           id = (long)record.getFields()[0];
         }
         List<InsertStatementHandler.KeyInfo> previousKeys = InsertStatementHandler.getKeys(
-            tableSchema, columnNames, values, id);
+            client.getShardCount(), tableSchema, columnNames, values, id);
 
         List<ColumnImpl> qColumns = getColumns();
         List<ExpressionImpl> localSetExpressions = getSetExpressions();
@@ -442,7 +442,7 @@ public class UpdateStatementImpl extends StatementImpl implements UpdateStatemen
           updated = true;
           //update keys
 
-          List<InsertStatementHandler.KeyInfo> newKeys = InsertStatementHandler.getKeys(tableSchema, columnNames, values, id);
+          List<InsertStatementHandler.KeyInfo> newKeys = InsertStatementHandler.getKeys(client.getShardCount(), tableSchema, columnNames, values, id);
 
           Map<String, ConcurrentSkipListMap<Object[], InsertStatementHandler.KeyInfo>> orderedKeyInfosPrevious = new HashMap<>();
           Map<String, ConcurrentSkipListMap<Object[], InsertStatementHandler.KeyInfo>> orderedKeyInfosNew = new HashMap<>();

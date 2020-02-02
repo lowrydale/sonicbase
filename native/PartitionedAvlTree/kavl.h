@@ -57,6 +57,7 @@ int main(void) {
 
 #ifndef KAVL_H
 #define KAVL_H
+#include "sonicbase.h"
 
 #ifdef __STRICT_ANSI__
 #define inline __inline__
@@ -64,16 +65,9 @@ int main(void) {
 
 #define KAVL_MAX_DEPTH 64
 
-
-
 	
 class head_t;
 
-class Key {
-public:
-	uint8_t len;
-	void **key;
-};
 
 class my_node {
 public:
@@ -103,15 +97,11 @@ struct kavl_itr {
 };
 
 
-class Comparator {
-public:
-	virtual int compare(void *o1, void *o2) = 0;
-};
 #define kavl_size(head, p) ((p)? (p)->head->size : 0)
 #define kavl_size_child(head, q, i) ((q)->head->p[(i)]? (q)->head->p[(i)]->head->size : 0)
 
 
-my_node *kavl_find(const my_node *root, const my_node *x, unsigned *cnt_, Comparator *comparator) { \
+my_node *kavl_find(const my_node *root, const my_node *x, unsigned *cnt_, KAVLComparator *comparator) { \
 		const my_node *p = root; \
 		unsigned cnt = 0; \
 		while (p != 0) { \
@@ -157,7 +147,7 @@ my_node *kavl_find(const my_node *root, const my_node *x, unsigned *cnt_, Compar
 		return r; \
 	}
 
-	my_node *kavl_insert(my_node **root_, my_node *x, Comparator *comparator, unsigned *cnt_) { \
+	my_node *kavl_insert(my_node **root_, my_node *x, KAVLComparator *comparator, unsigned *cnt_) { \
 		unsigned char stack[KAVL_MAX_DEPTH]; \
 		my_node *path[KAVL_MAX_DEPTH]; \
 		my_node *bp, *bq; \
@@ -202,7 +192,7 @@ my_node *kavl_find(const my_node *root, const my_node *x, unsigned *cnt_, Compar
 		return x; \
 	}
 
-my_node *kavl_erase(my_node **root_, const my_node *x, unsigned *cnt_, Comparator *comparator) { \
+my_node *kavl_erase(my_node **root_, const my_node *x, unsigned *cnt_, KAVLComparator *comparator) { \
 			my_node *p, *path[KAVL_MAX_DEPTH], fake; \
 		unsigned char dir[KAVL_MAX_DEPTH]; \
 		int i, d = 0, cmp; \
@@ -324,7 +314,7 @@ const my_node *kavl_itr_first(const my_node *root) { \
 		return last;\
 	} 
 
-int kavl_itr_find(const my_node *root, const my_node *x, struct kavl_itr *itr, Comparator *comparator) { \
+int kavl_itr_find(const my_node *root, const my_node *x, struct kavl_itr *itr, KAVLComparator *comparator) { \
 		const my_node *p = root; \
 		itr->top = itr->stack - 1; \
 		while (p != 0) { \
@@ -344,7 +334,7 @@ int kavl_itr_find(const my_node *root, const my_node *x, struct kavl_itr *itr, C
 		} else return 0; \
 	} 
 
-int kavl_itr_find_prev(const my_node *root, const my_node *x, struct kavl_itr *itr, Comparator *comparator) {
+int kavl_itr_find_prev(const my_node *root, const my_node *x, struct kavl_itr *itr, KAVLComparator *comparator) {
 	\
 		const my_node *p = root; \
 		itr->top = itr->stack - 1; \

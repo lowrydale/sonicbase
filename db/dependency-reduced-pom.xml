@@ -669,6 +669,28 @@
       <artifactId>sonicbase-jdbc</artifactId>
       <version>1.3.2</version>
       <scope>provided</scope>
+      <exclusions>
+        <exclusion>
+          <artifactId>snakeyaml</artifactId>
+          <groupId>org.yaml</groupId>
+        </exclusion>
+        <exclusion>
+          <artifactId>guava</artifactId>
+          <groupId>com.google.guava</groupId>
+        </exclusion>
+        <exclusion>
+          <artifactId>slf4j-log4j12</artifactId>
+          <groupId>org.slf4j</groupId>
+        </exclusion>
+        <exclusion>
+          <artifactId>gson</artifactId>
+          <groupId>com.google.code.gson</groupId>
+        </exclusion>
+        <exclusion>
+          <artifactId>lzo-core</artifactId>
+          <groupId>org.anarres.lzo</groupId>
+        </exclusion>
+      </exclusions>
     </dependency>
     <dependency>
       <groupId>com.fasterxml.jackson.core</groupId>
@@ -686,12 +708,6 @@
       <groupId>com.fasterxml.jackson.core</groupId>
       <artifactId>jackson-core</artifactId>
       <version>2.9.6</version>
-      <scope>provided</scope>
-    </dependency>
-    <dependency>
-      <groupId>commons-io</groupId>
-      <artifactId>commons-io</artifactId>
-      <version>2.5</version>
       <scope>provided</scope>
     </dependency>
     <dependency>
@@ -765,12 +781,12 @@
           <groupId>org.mortbay.jetty</groupId>
         </exclusion>
         <exclusion>
-          <artifactId>lzo-core</artifactId>
-          <groupId>org.anarres.lzo</groupId>
-        </exclusion>
-        <exclusion>
           <artifactId>annotations</artifactId>
           <groupId>com.google.code.findbugs</groupId>
+        </exclusion>
+        <exclusion>
+          <artifactId>lzo-core</artifactId>
+          <groupId>org.anarres.lzo</groupId>
         </exclusion>
       </exclusions>
     </dependency>

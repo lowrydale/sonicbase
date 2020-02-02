@@ -90,6 +90,7 @@ public class EmbeddedDatabase {
 
   public Connection getConnection(String db) throws SQLException {
     Connection conn = DriverManager.getConnection("jdbc:sonicbase:localhost:8999/" + db);
+    ((ConnectionProxy) conn).setEmbedded(true);;
     DatabaseClient client = ((ConnectionProxy) conn).getDatabaseClient();
     client.syncSchema();
     return conn;

@@ -145,7 +145,7 @@ public class TestIndex {
     }
   }
 
-  @Test
+  @Test(enabled=false)
   public void testCompoundKeySort() {
 
     Schema schema = client.getSchema("test");

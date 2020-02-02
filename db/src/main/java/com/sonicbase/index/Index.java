@@ -86,7 +86,8 @@ public class Index {
         case DATE:
         case TIME:
         case TIMESTAMP:
-          impl = new NativePartitionedTreeImpl(port, this); //new LongIndexImpl(this); //
+          impl = new NativeSkipListMapImpl(port, this);// new NativePartitionedTreeImpl(port, this); //new LongIndexImpl(this); //
+//          impl = new NativePartitionedTreeImpl(port, this); //new LongIndexImpl(this); //
 //          impl = new ObjectIndexImpl(this, comparators);
         break;
         default:
@@ -95,7 +96,8 @@ public class Index {
       }
     }
     else {
-      impl = new NativePartitionedTreeImpl(port, this); //new LongIndexImpl(this); //
+      impl = new NativeSkipListMapImpl(port, this);// new NativePartitionedTreeImpl(port, this); //new LongIndexImpl(this); //
+//      impl = new NativePartitionedTreeImpl(port, this); //new LongIndexImpl(this); //
 //      impl = new ObjectIndexImpl(this, comparators);
     }
 

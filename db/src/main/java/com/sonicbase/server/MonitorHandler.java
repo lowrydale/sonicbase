@@ -170,13 +170,13 @@ public class MonitorHandler extends AbstractHandler {
 
       double xmxValue = 0;
       String xmxSetting = server.getXmx();
-      if (xmxSetting.contains("g")) {
+      if (xmxSetting.toLowerCase().contains("g")) {
         xmxValue = Double.valueOf(xmxSetting.substring(0, xmxSetting.length() - 1));
       }
-      else if (xmxSetting.contains("m")) {
+      else if (xmxSetting.toLowerCase().contains("m")) {
         xmxValue = Double.valueOf(xmxSetting.substring(0, xmxSetting.length() - 1)) / 1024d;
       }
-      else if (xmxSetting.contains("t")) {
+      else if (xmxSetting.toLowerCase().contains("t")) {
         xmxValue = Double.valueOf(xmxSetting.substring(0, xmxSetting.length() - 1)) * 1024d;
       }
 

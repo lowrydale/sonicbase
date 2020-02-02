@@ -244,6 +244,7 @@ public class TestDatabase {
       FileUtils.deleteDirectory(dir);
       dir.mkdirs();
 
+
       clusterClient.startBackup();
       while (true) {
         Thread.sleep(1000);

@@ -1285,7 +1285,7 @@ public class DatabaseServer {
     this.client.set(databaseClient);
   }
 
-  void setRecovered(boolean recovered) {
+  public void setRecovered(boolean recovered) {
     this.isRecovered.set(recovered);
   }
 
@@ -1758,7 +1758,11 @@ public class DatabaseServer {
   }
 
   public Indices getIndices(String dbName) {
-    return indexes.computeIfAbsent(dbName, k -> new Indices());
+    Indices ret = indexes.get(dbName);
+    if (ret == null) {
+      ret = indexes.computeIfAbsent(dbName, k -> new Indices());
+    }
+    return ret;
   }
 
   public Map<String, Indices> getIndices() {

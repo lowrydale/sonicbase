@@ -9,6 +9,8 @@ public class NativePartitionedTree {
 
   public native long put(long indexId, Object[] startKey, long value);
 
+  public native void put(long indexId, Object[][] startKey, long[] value, long[] retValues);
+
   public native long get(long indexId, Object[] key);
 
   public native long remove(long indexId, Object[] key);

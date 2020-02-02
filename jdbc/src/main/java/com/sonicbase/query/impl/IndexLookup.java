@@ -12,6 +12,7 @@ import com.sonicbase.schema.DataType;
 import com.sonicbase.schema.IndexSchema;
 import com.sonicbase.schema.TableSchema;
 import com.sonicbase.util.PartitionUtils;
+import net.sf.jsqlparser.schema.Table;
 import net.sf.jsqlparser.statement.select.Limit;
 import net.sf.jsqlparser.statement.select.Offset;
 import org.apache.commons.lang.exception.ExceptionUtils;
@@ -852,10 +853,12 @@ public class IndexLookup {
     }
 
     private void buildRetRecords(String dbName, DatabaseClient client, ComArray records, Record[] currRetRecords) {
+      TableSchema tableSchema = null;
       for (int k = 0; k < currRetRecords.length; k++) {
         byte[] recordBytes = (byte[])records.getArray().get(k);
         try {
-          currRetRecords[k] = new Record(dbName, client.getCommon(), recordBytes, null, false);
+          currRetRecords[k] = new Record(dbName, client.getCommon(), tableSchema, recordBytes, null, false);
+          tableSchema = currRetRecords[k].getTableSchema();
         }
         catch (Exception e) {
           throw new DatabaseException(e);

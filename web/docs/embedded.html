@@ -63,8 +63,11 @@ SonicBase can be embedded in your server. EmbeddedDatabase is a simple class tha
 		a few methods on this class that you will need to use:<br/>
 		<br/>
 		<lu><li>
-			setDurability - pass in the path to the location you want data stored on disk. If this method is not called then
-			SonicBase will operate in an in-memory only mode.
+			disableDurability - disable durability for the embedded database. If this call if made, SonicBase will operate
+			in an in-memory only mode.
+		</li><li>
+			setDurability - pass in the path to the location you want data stored on disk. If this call is made, data will be
+			persisted to disk.
 		</li><li>
 			purge - deletes all persisted data.
 		</li><li>

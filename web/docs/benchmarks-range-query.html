@@ -79,6 +79,7 @@ for (int i = 0; ; i++) {
     <tbody>
     <tr class="syntax-main">
       <td>Metric</td>
+      <td>Embedded</td>
       <td>4-server</td>
         <td>8-server</td>
         <td>16-server</td>
@@ -87,12 +88,14 @@ for (int i = 0; ; i++) {
     <tr>
       <td>Record size</td>
       <td>120 bytes</td>
+      <td>120 bytes</td>
         <td>120 bytes</td>
         <td>120 bytes</td>
         <td>120 bytes</td>
     </tr>
     <tr>
       <td>Record count</td>
+      <td>250 million</td>
       <td>750 million</td>
         <td>1.5 billion</td>
         <td>3 billion</td>
@@ -101,19 +104,22 @@ for (int i = 0; ; i++) {
     <tr>
       <td>Server total mem</td>
       <td>60g</td>
+      <td>60g</td>
         <td>60g</td>
         <td>60g</td>
         <td>60g</td>
     </tr>
     <tr>
       <td>Server xmx</td>
-      <td>36g</td>
-        <td>36g</td>
-        <td>36g</td>
-        <td>36g</td>
+      <td>8g</td>
+      <td>8g</td>
+        <td>8g</td>
+        <td>8g</td>
+        <td>8g</td>
     </tr>
     <tr>
       <td>Resident mem</td>
+      <td>59g</td>
       <td>52g</td>
         <td>52g</td>
         <td>52g</td>
@@ -121,6 +127,7 @@ for (int i = 0; ; i++) {
     </tr>
     <tr>
       <td>Client machine count</td>
+      <td>n/a</td>
       <td>8</td>
         <td>16</td>
         <td>32</td>
@@ -128,7 +135,8 @@ for (int i = 0; ; i++) {
     </tr>
         <tr>
       <td>Cores per client machine</td>
-      <td>4</td>
+      <td>n/a</td>
+          <td>4</td>
             <td>4</td>
             <td>4</td>
             <td>4</td>
@@ -136,6 +144,7 @@ for (int i = 0; ; i++) {
     <tr>
     	<td>Cores per server machine</td>
     	<td>8</td>
+      <td>8</td>
         <td>8</td>
         <td>8</td>
         <td>8</td>
@@ -143,6 +152,7 @@ for (int i = 0; ; i++) {
 
     <tr>
       <td>Call rate</td>
+      <td>3.6 mil/sec</td>
       <td>9 mil/sec</td>
         <td>19 mil/sec</td>
         <td>33 mil/sec</td>
@@ -150,20 +160,23 @@ for (int i = 0; ; i++) {
     </tr>
    <tr>
        <td>Call latency</td>
-       <td>55 micros</td>
+       <td>2 micros</td>
+     <td>55 micros</td>
        <td>54 micros</td>
        <td>64 micros</td>
        <td>59 micros</td>
    </tr>
      <tr>
       <td>Threads per client</td>
-      <td>16</td>
+      <td>8</td>
+       <td>16</td>
          <td>16</td>
          <td>16</td>
          <td>16</td>
     </tr>
     <tr>
     	<td>Shard Count</td>
+      <td>1</td>
     	<td>4</td>
         <td>8</td>
         <td>15</td>
@@ -172,6 +185,7 @@ for (int i = 0; ; i++) {
     <tr>
     	<td>Replica Count</td>
     	<td>1</td>
+      <td>1</td>
         <td>1</td>
         <td>1</td>
         <td>1</td>

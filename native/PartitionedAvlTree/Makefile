@@ -34,7 +34,7 @@ DEBUGGING := -DNDEBUG
 ifeq ($(ARCH),INTEL)
 #CC          := gcc
 CC          := g++
-CFLAGS      := -fPIC -O -O2 -O3 -pthread -std=c++0x  -I/usr/lib/jvm/java-8-openjdk-amd64/include/linux/ -I/usr/lib/jvm/java-8-openjdk-amd64/include/  -I/Library/Java/JavaVirtualMachines/jdk1.8.0_181.jdk/Contents/Home/include -I/Library/Java/JavaVirtualMachines/jdk1.8.0_181.jdk/Contents/Home/include/darwin
+CFLAGS      := -fPIC -O -O2 -O3 -pthread -std=c++0x  -I. -I./skiplistmap -I/usr/lib/jvm/java-8-openjdk-amd64/include/linux/ -I/usr/lib/jvm/java-8-openjdk-amd64/include/  -I/Library/Java/JavaVirtualMachines/jdk1.8.0_181.jdk/Contents/Home/include -I/Library/Java/JavaVirtualMachines/jdk1.8.0_181.jdk/Contents/Home/include/darwin
 #CFLAGS	    := -Wall -g  -Izlib -I/Library/Java/JavaVirtualMachines/jdk1.8.0_181.jdk/Contents/Home/include -I/Library/Java/JavaVirtualMachines/jdk1.8.0_181.jdk/Contents/Home/include/darwin
 LDFLAGS     := #-L
 endif
@@ -46,13 +46,13 @@ UNAME := $(shell uname)
 TARGETS    := $(GC_HARNESS_TARGETS)
 
 ifeq ($(UNAME), Linux)
-TARGETS    += linux/SonicBase.so #linux/SonicBase
+TARGETS    += linux/SonicBase.so linux/SonicBase
 OUT_DIR	:= linux
 LDFLAGS := $(LDFLAGS) -z muldefs
 endif
 
 ifeq ($(UNAME), Darwin)
-TARGETS    += mac/SonicBase.so #mac/SonicBase
+TARGETS    += mac/SonicBase.so mac/SonicBase
 OUT_DIR	:= mac
 endif
 
@@ -68,7 +68,9 @@ clean:
 
 csrc = $(wildcard lzo-2.10/src/*.c) \
  		$(wildcard ./*.c) \
-       $(wildcard ./*.cpp)
+       $(wildcard ./*.cpp) \
+ 		$(wildcard ./skiplistmap/*.c) \
+       $(wildcard ./skiplistmap/*.cpp)
 obj = $(csrc:.c=.o)
 
 $(OUT_DIR)/SonicBase.so: $(obj)
@@ -76,7 +78,7 @@ $(OUT_DIR)/SonicBase.so: $(obj)
 	@mkdir -p $(@D)
 	$(CC) -shared $(CFLAGS) -o $@ $^ $(LDFLAGS)
 
-#$(OUT_DIR)/SonicBase: $(obj)
-#	echo $(OUT_DIR)
-#	@mkdir -p $(@D)
-#	$(CC) $(CFLAGS) -o $@ $^ $(LDFLAGS) -v
+$(OUT_DIR)/SonicBase: $(obj)
+	echo $(OUT_DIR)
+	@mkdir -p $(@D)
+	$(CC) $(CFLAGS) -o $@ $^ $(LDFLAGS) -v

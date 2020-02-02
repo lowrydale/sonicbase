@@ -26,7 +26,7 @@ public class InsertStatementImpl extends StatementImpl implements InsertStatemen
   }
 
   public void setTableName(String tableName) {
-    this.tableName = tableName.toLowerCase();
+    this.tableName = DatabaseClient.toLower(tableName);
   }
 
   public List<Object> getValues() {

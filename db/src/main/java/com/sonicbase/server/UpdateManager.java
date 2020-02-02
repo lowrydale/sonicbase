@@ -302,7 +302,7 @@ public class UpdateManager {
     if (tableSchema.getFields().get(0).getName().equals("_sonicbase_id")) {
       id = (long) record.getFields()[0];
     }
-    List<InsertStatementHandler.KeyInfo> keys = InsertStatementHandler.getKeys(tableSchema, columnNames, values, id);
+    List<InsertStatementHandler.KeyInfo> keys = InsertStatementHandler.getKeys(server.getShardCount(), tableSchema, columnNames, values, id);
 
     for (final InsertStatementHandler.KeyInfo keyInfo : keys) {
       if (keyInfo.getIndexSchema().isPrimaryKey()) {
@@ -1509,9 +1509,15 @@ public class UpdateManager {
       }
       else {
         TableSchema tableSchema = server.getCommon().getDatabases().get(dbName).getTables().get(tableName);
-        List<Integer> selectedShards = PartitionUtils.findOrderedPartitionForRecord(true, false, tableSchema,
-            indexName, null, com.sonicbase.query.BinaryExpression.Operator.EQUAL, null, key, null);
-
+        List<Integer> selectedShards;
+        if (server.getShardCount() == 1) {
+         selectedShards = new ArrayList<>(1);
+         selectedShards.add(0);
+        }
+        else {
+          selectedShards = PartitionUtils.findOrderedPartitionForRecord(true, false, tableSchema,
+              indexName, null, com.sonicbase.query.BinaryExpression.Operator.EQUAL, null, key, null);
+        }
 
         if (!server.getSnapshotManager().isRecovering() && !server.getLogManager().isApplyingLogs() && selectedShards.get(0) != server.getShard()) {
           throw new DatabaseException("Incorrect shard: schemaShard=" + selectedShards.get(0) + ", actualShard=" + server.getShard());
@@ -1758,16 +1764,29 @@ public class UpdateManager {
   }
 
   private void truncateIndexRemoveFromIndex(Index index) {
-    Map.Entry<Object[], Object> indexEntry = index.firstEntry();
-    while (indexEntry != null) {
-      synchronized (indexEntry.getKey()) {
-        Object value = index.remove(indexEntry.getKey());
-        if (value != null) {
-          server.getAddressMap().delayedFreeUnsafeIds(value);
-        }
-      }
-      indexEntry = index.higherEntry(indexEntry.getKey());
+    Map .Entry<Object[], Object> indexEntry = index.firstEntry();
+    if (indexEntry == null) {
+      return;
     }
+    index.visitTailMap(indexEntry.getKey(), new Index.Visitor(){
+      @Override
+      public boolean visit(Object[] key, Object value) {
+        Object v = index.remove(key);
+        if (v != null) {
+          server.getAddressMap().delayedFreeUnsafeIds(v);
+        }
+        return true;
+      }
+    });
+//    while (indexEntry != null) {
+//      synchronized (indexEntry.getKey()) {
+//        Object value = index.remove(indexEntry.getKey());
+//        if (value != null) {
+//          server.getAddressMap().delayedFreeUnsafeIds(value);
+//        }
+//      }
+//      indexEntry = index.higherEntry(indexEntry.getKey());
+//    }
   }
 
   private void doRemoveIndexEntryByKey(

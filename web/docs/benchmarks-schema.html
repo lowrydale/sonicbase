@@ -76,14 +76,6 @@
       <td>BIGINT</td>
     </tr>
     <tr>
-      <td>SocialSecurityNumber</td>
-      <td>VARCHAR(20)</td>
-    </tr>
-    <tr>
-      <td>Relatives</td>
-      <td>VARCHAR(64000)</td>
-    </tr>
-    <tr>
       <td>Restricted</td>
       <td>BOOLEAN</td>
     </tr>
@@ -100,105 +92,23 @@
 </table>
 
 <br/>
+      <h3>For Distributed Test</h3>
         <pre class="java"><code>
-for (int offset = 0; offset < 100000000; offset++) {
-    PreparedStatement stmt = conn.prepareStatement("insert into persons (id1, id2, socialSecurityNumber, relatives, restricted, gender) VALUES (?, ?, ?, ?, ?, ?)");
+    PreparedStatement stmt = conn.prepareStatement("insert into persons (id1, id2, restricted, gender) VALUES (?, ?, ?, ?)");
     stmt.setLong(1, offset);
     stmt.setLong(2, (offset + 100) % 2);
-    stmt.setString(3, "933-28-" + offset);
-    stmt.setString(4, "12345678901,12345678901|12345678901,12345678901,12345678901,12345678901|12345678901");
-    stmt.setBoolean(5, false);
-    stmt.setString(6, "m");
-}<br/>
+    stmt.setBoolean(3, false);
+    stmt.setString(4, "m");
+<br/>
             </code></pre>
-<br/>
-<br/>
-<h2>Memberships Table</h2>
 
-<table class="syntax-table" border="1" cellpadding=2 cellspacing="0">
-    <tbody>
-    <tr class="syntax-main">
-        <td>Field</td>
-        <td>Datatype</td>
-    </tr>
-    <tr>
-        <td>personId</td>
-        <td>BIGINT</td>
-    </tr>
-    <tr>
-        <td>personId2</td>
-        <td>BIGINT</td>
-    </tr>
-    <tr>
-        <td>membershipName</td>
-        <td>VARCHAR(20)</td>
-    </tr>
-    <tr>
-        <td>resortId</td>
-        <td>BIGINT</td>
-    </tr>
-    <tr>
-        <td>PRIMARY KEY</td>
-        <td>personId, personId2</td>
-    </tr>
-
-    </tbody>
-</table>
-
-<br/>
-<br/>
-
+      <h3>For Embedded Test</h3>
         <pre class="java"><code>
-for (int i = 0; i < 100000000; i++)
-    for (int j = 0; j < 2; j++) {
-        stmt = conn.prepareStatement("insert into Memberships (personId, personId2, membershipName, resortId) VALUES (?, ?, ?, ?)");
-        long id1 = offset + i;
-        long id2 = j;
-        stmt.setLong(1, id1);
-        stmt.setLong(2, id2);
-        stmt.setString(3, "membership-" + j);
-        stmt.setLong(4, new long[]{1000, 2000}[j % 2]);
-    }
-}<br/>
+    PreparedStatement stmt = conn.prepareStatement("insert into persons (id1) VALUES (?)");
+    stmt.setLong(1, offset);
+<br/>
+
             </code></pre>
-<br/><br/>
-
-<h2>Resorts Table</h2>
-
-<table class="syntax-table" border="1" cellpadding=2 cellspacing="0">
-    <tbody>
-    <tr class="syntax-main">
-        <td width="50">Field</td>
-        <td width="33">Datatype</td>
-    </tr>
-    <tr>
-        <td>resortId</td>
-        <td>BIGINT</td>
-    </tr>
-    <tr>
-        <td>resortName</td>
-        <td>VARCHAR(20)</td>
-    </tr>
-    <tr>
-        <td>PRIMARY KEY</td>
-        <td>resortId</td>
-    </tr>
-
-    </tbody>
-</table>
-
-<br/>
-        <pre class="java"><code>
-PreparedStatement stmt = conn.prepareStatement("insert into Resorts (resortId, resortName) VALUES (?, ?)");
-stmt.setLong(1, 1000);
-stmt.setString(2, "resort-1000");
-assertEquals(stmt.executeUpdate(), 1);
-<br/>
-stmt = conn.prepareStatement("insert into Resorts (resortId, resortName) VALUES (?, ?)");
-stmt.setLong(1, 2000);
-stmt.setString(2, "resort-2000");
-assertEquals(stmt.executeUpdate(), 1);<br/>
-        </code></pre>
 <br/>
 </div>
 </div>

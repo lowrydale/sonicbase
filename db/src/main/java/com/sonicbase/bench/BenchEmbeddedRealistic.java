@@ -1,17 +1,12 @@
 /* © 2019 by Intellectual Reserve, Inc. All rights reserved. */
 package com.sonicbase.bench;
 
-import com.sonicbase.client.DatabaseClient;
 import com.sonicbase.embedded.EmbeddedDatabase;
-import com.sonicbase.jdbcdriver.ConnectionProxy;
 
-import java.sql.Connection;
-import java.sql.PreparedStatement;
-import java.sql.ResultSet;
-import java.sql.SQLException;
+import java.sql.*;
 import java.util.concurrent.atomic.AtomicLong;
 
-public class BenchEmbedded {
+public class BenchEmbeddedRealistic {
 
   public static void main(String[] args) throws SQLException, InterruptedException {
     int count = Integer.parseInt(args[0]);
@@ -25,7 +20,7 @@ public class BenchEmbedded {
     embedded.createDatabaseIfNeeded("test");
     Connection embeddedConn = embedded.getConnection("test");
 
-    try (PreparedStatement stmt = embeddedConn.prepareStatement("create table persons (id BIGINT, id2 BIGINT, PRIMARY KEY (id))")) {
+    try (PreparedStatement stmt = embeddedConn.prepareStatement("create table persons (ssn VARCHAR, given VARCHAR, surname VARCHAR, gender VARCHAR, birth DATE, PRIMARY KEY (ssn))")) {
       stmt.executeUpdate();
     }
 
@@ -37,8 +32,13 @@ public class BenchEmbedded {
       threads[i] = new Thread(() -> {
         try {
           for (int j = offset * count / threads.length; j < (offset + 1) * count / threads.length; j += 500) {
-            try (PreparedStatement stmt1 = embeddedConn.prepareStatement("insert into persons (id) values(?)")) {
+            try (PreparedStatement stmt1 = embeddedConn.prepareStatement("insert into persons (ssn, given, surname, gender, birth) values(?, ?, ?, ?, ?)")) {
               for (int k = 0; k < 500; k++) {
+                stmt1.setString(1, String.valueOf(j + 10_000_000 + k));
+                stmt1.setString(2, String.valueOf(j + 100_000 + k));
+                stmt1.setString(3, String.valueOf(j + 1_000_000 + k));
+                stmt1.setString(4, "male");
+                stmt1.setDate(5, new Date(System.currentTimeMillis()));;
                 stmt1.setLong(1, j + k);
                 stmt1.addBatch();
 
@@ -67,7 +67,7 @@ public class BenchEmbedded {
     for (int i = 0; i < rangeThreads.length; i++) {
       rangeThreads[i] = new Thread(() -> {
         try {
-          try (PreparedStatement stmt = embeddedConn.prepareStatement("select * from persons where id >= 0")) {
+          try (PreparedStatement stmt = embeddedConn.prepareStatement("select * from persons where SSN >= '0'")) {
             ResultSet rs = stmt.executeQuery();
             for (int j = 0; j < count / 2 && rs.next(); j++) {
               if (rangeCount.incrementAndGet() % 100_000 == 0) {
@@ -94,7 +94,7 @@ public class BenchEmbedded {
       identityThreads[i] = new Thread(() -> {
         try {
           for (int j = 0; j < 10_000; j++) {
-            StringBuilder builder = new StringBuilder("select id from persons where persons.id in (");
+            StringBuilder builder = new StringBuilder("select * from persons where persons.ssn in (");
             for (int k = 0; k < 3200; k++) {
               if (k != 0) {
                 builder.append(",");
@@ -105,7 +105,7 @@ public class BenchEmbedded {
 
             try (PreparedStatement stmt = embeddedConn.prepareStatement(builder.toString())) {
               for (int k = 0; k < 3200; k++) {
-                stmt.setLong(k + 1, k);
+                stmt.setString(k + 1, String.valueOf(k + 10_000_000));
               }
               ResultSet rs = stmt.executeQuery();
               while (rs.next()) {

@@ -25,10 +25,7 @@ import org.slf4j.LoggerFactory;
 import java.io.*;
 import java.math.BigDecimal;
 import java.util.*;
-import java.util.concurrent.Callable;
-import java.util.concurrent.ConcurrentSkipListSet;
-import java.util.concurrent.Future;
-import java.util.concurrent.ThreadLocalRandom;
+import java.util.concurrent.*;
 import java.util.concurrent.atomic.AtomicBoolean;
 import java.util.concurrent.atomic.AtomicInteger;
 import java.util.concurrent.atomic.AtomicLong;
@@ -1221,7 +1218,7 @@ public class SelectStatementImpl extends StatementImpl implements SelectStatemen
     if (ret == null) {
       return null;
     }
-    dedupIds(dbName, ret.getTableNames(), ret);
+    dedupIds(dbName, ret.getTableNames(), ret, client);
     return ret;
   }
 
@@ -1303,16 +1300,19 @@ public class SelectStatementImpl extends StatementImpl implements SelectStatemen
   }
 
 
-  private void dedupIds(String dbName, String[] tableNames, ExpressionImpl.NextReturn ids) {
-    if (ids.getIds() == null) {
+  private void dedupIds(String dbName, String[] tableNames, ExpressionImpl.NextReturn ids, DatabaseClient client) {
+    if (ids.getIds() == null || ids.getIds().length == 0) {
       return;
     }
     if (ids.getIds().length == 1) {
       return;
     }
+    if (client.getCommon().getServersConfig().getShards().length <= 1) {
+      return;
+    }
     final Comparator[][] comparators = new Comparator[tableNames.length][];
     for (int i = 0; i < tableNames.length; i++) {
-      TableSchema schema = client.getCommon().getTables(dbName).get(tableNames[i]);
+      TableSchema schema = this.client.getCommon().getTables(dbName).get(tableNames[i]);
       for (Map.Entry<String, IndexSchema> indexSchema : schema.getIndices().entrySet()) {
         if (indexSchema.getValue().isPrimaryKey()) {
           comparators[i] = indexSchema.getValue().getComparators();
@@ -1320,23 +1320,93 @@ public class SelectStatementImpl extends StatementImpl implements SelectStatemen
         }
       }
     }
-
-    DedupComparator comparator = new DedupComparator(comparators);
-
     Object[][][] actualIds = ids.getIds();
-    ConcurrentSkipListSet<Object[][]> map = new ConcurrentSkipListSet<>(comparator);
 
     Object[][][] retIds = new Object[actualIds.length][][];
     int localOffset = 0;
-    for (int i = 0; i < actualIds.length; i++) {
-      if (map.add(actualIds[i])) {
-        retIds[localOffset] = actualIds[i];
-        localOffset++;
+
+    Set<long[]> setMulti = new HashSet<>(actualIds.length);
+    Set<Long> setSingle = new HashSet<>(actualIds.length);
+    Map<ExpressionImpl.RecordCache.Key, ExpressionImpl.CachedRecord>[] tables =
+        new ConcurrentHashMap[ids.getTableNames().length];
+    for (int j = 0; j < ids.getTableNames().length; j++) {
+      tables[j] = recordCache.getRecordsForTable(ids.getTableNames()[j]);
+    }
+
+    ExpressionImpl.CachedRecord cachedRecord = tables[0].get(new ExpressionImpl.RecordCache.Key(actualIds[0][0]));
+
+    if (cachedRecord.getRecord().getFields()[0] == null) {
+      //keyRecord, has no recordId
+
+      DedupComparator comparator = new DedupComparator(comparators);
+
+      ConcurrentSkipListSet<Object[][]> map = new ConcurrentSkipListSet<>(comparator);
+
+      for (int i = 0; i < actualIds.length; i++) {
+        if (map.add(actualIds[i])) {
+          retIds[localOffset] = actualIds[i];
+          localOffset++;
+        }
+      }
+      Object[][][] finalIds = new Object[map.size()][][];
+      System.arraycopy(retIds, 0, finalIds, 0, map.size());
+      ids.setIds(finalIds);
+    }
+    else {
+
+      boolean missingRecord = false;
+      outer:
+      for (int i = 0; i < actualIds.length; i++) {
+        long[] recordIds = new long[tables.length];
+        for (int j = 0; j < tables.length; j++) {
+          cachedRecord = tables[j].get(new ExpressionImpl.RecordCache.Key(actualIds[i][j]));
+          if (cachedRecord == null) {
+            missingRecord = true;
+            break outer;
+          }
+          long recordId = (long) cachedRecord.getRecord().getFields()[0];
+          recordIds[j] = recordId;
+        }
+
+        if (recordIds.length == 1) {
+          if (setSingle.add(recordIds[0])) {
+            retIds[localOffset] = actualIds[i];
+            localOffset++;
+          }
+        }
+        else if (setMulti.add(recordIds)) {
+          retIds[localOffset] = actualIds[i];
+          localOffset++;
+        }
+      }
+
+      if (!missingRecord) {
+        if (setSingle.size() != 0) {
+          Object[][][] finalIds = new Object[setSingle.size()][][];
+          System.arraycopy(retIds, 0, finalIds, 0, setSingle.size());
+          ids.setIds(finalIds);
+        }
+        else {
+          Object[][][] finalIds = new Object[setMulti.size()][][];
+          System.arraycopy(retIds, 0, finalIds, 0, setMulti.size());
+          ids.setIds(finalIds);
+        }
+      }
+      else {
+        localOffset = 0;
+        DedupComparator comparator = new DedupComparator(comparators);
+        ConcurrentSkipListSet<Object[][]> map = new ConcurrentSkipListSet<>(comparator);
+        for (int i = 0; i < actualIds.length; i++) {
+          if (map.add(actualIds[i])) {
+            retIds[localOffset] = actualIds[i];
+            localOffset++;
+          }
+        }
+        Object[][][] finalIds = new Object[map.size()][][];
+        System.arraycopy(retIds, 0, finalIds, 0, map.size());
+        ids.setIds(finalIds);
       }
     }
-    Object[][][] finalIds = new Object[map.size()][][];
-    System.arraycopy(retIds, 0, finalIds, 0, map.size());
-    ids.setIds(finalIds);
   }
 
   private ExpressionImpl.NextReturn handleJoins(int pageSize, String dbName, Explain explain, boolean restrictToThisServer,

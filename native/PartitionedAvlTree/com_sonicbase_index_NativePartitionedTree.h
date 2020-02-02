@@ -20,8 +20,16 @@ JNIEXPORT jlong JNICALL Java_com_sonicbase_index_NativePartitionedTree_initIndex
  * Method:    put
  * Signature: (J[Ljava/lang/Object;J)J
  */
-JNIEXPORT jlong JNICALL Java_com_sonicbase_index_NativePartitionedTree_put
+JNIEXPORT jlong JNICALL Java_com_sonicbase_index_NativePartitionedTree_put__J_3Ljava_lang_Object_2J
   (JNIEnv *, jobject, jlong, jobjectArray, jlong);
+
+/*
+ * Class:     com_sonicbase_index_NativePartitionedTree
+ * Method:    put
+ * Signature: (J[[Ljava/lang/Object;[J[J)V
+ */
+JNIEXPORT void JNICALL Java_com_sonicbase_index_NativePartitionedTree_put__J_3_3Ljava_lang_Object_2_3J_3J
+  (JNIEnv *, jobject, jlong, jobjectArray, jlongArray, jlongArray);
 
 /*
  * Class:     com_sonicbase_index_NativePartitionedTree

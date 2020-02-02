@@ -36,11 +36,15 @@ public class Record {
     deserialize(dbName, common, bytes, null);
   }
 
-  public Record(String dbName, DatabaseCommon common, byte[] bytes, Set<Integer> columns, boolean readHeader) {
-    deserialize(dbName, common, bytes, columns, readHeader);
+  public Record(String dbName, DatabaseCommon common, TableSchema tableSchema, byte[] bytes, Set<Integer> columns, boolean readHeader) {
+    deserialize(dbName, common, tableSchema, bytes, columns, readHeader);
   }
 
   private void recoverFromSnapshot(String dbName, DatabaseCommon common, byte[] bytes, Set<Integer> columns, boolean readHeader) {
+    recoverFromSnapshot(dbName, common, null, bytes, columns, readHeader);
+  }
+
+  private void recoverFromSnapshot(String dbName, DatabaseCommon common, TableSchema knownTableSchema, byte[] bytes, Set<Integer> columns, boolean readHeader) {
     try {
       DataInputStream sin = new DataInputStream(new ByteArrayInputStream(bytes, !readHeader ? 26 : 0, !readHeader ?
           bytes.length - 26 : bytes.length));
@@ -55,6 +59,7 @@ public class Record {
       }
       transId = Varint.readSignedVarLong(sin);
       int tableId = (int) Varint.readSignedVarLong(sin);
+      tableSchema = knownTableSchema;
       if (tableSchema == null) {
         this.tableSchema = common.getTablesById(dbName).get(tableId);
       }
@@ -206,6 +211,10 @@ public class Record {
 
   public void deserialize(String dbName, DatabaseCommon common, byte[] bytes, Set<Integer> columns, boolean readHeader) {
     recoverFromSnapshot(dbName, common, bytes, columns, readHeader);
+  }
+
+  public void deserialize(String dbName, DatabaseCommon common, TableSchema tableSchema, byte[] bytes, Set<Integer> columns, boolean readHeader) {
+    recoverFromSnapshot(dbName, common, tableSchema, bytes, columns, readHeader);
   }
 
   public void deserialize(String dbName, DatabaseCommon common, byte[] bytes, Set<Integer> columns) {

@@ -187,39 +187,34 @@ public class TransactionManager {
   void preHandleTransaction(String dbName, String tableName, String indexName, boolean isExplicitTrans,
                             boolean isCommitting, long transactionId, Object[] primaryKey,
                             AtomicBoolean shouldExecute, AtomicBoolean shouldDeleteLock) {
-    ConcurrentSkipListMap<Object[], RecordLock> tableLocks;
     if (!locks.containsKey(dbName)) {
-      locks.put(dbName, new ConcurrentHashMap<>());
+      locks.computeIfAbsent(dbName, (k) -> new ConcurrentHashMap<>());
     }
-    tableLocks = locks.get(dbName).get(tableName);
 
-    tableLocks = createTableLocks(dbName, tableName, tableLocks);
+    ConcurrentSkipListMap<Object[], RecordLock> tableLocks = createTableLocks(dbName, tableName);
 
     doPreHandleTransaction(tableName, indexName, isExplicitTrans, isCommitting, transactionId, primaryKey,
         shouldExecute, shouldDeleteLock, tableLocks);
   }
 
-  private ConcurrentSkipListMap<Object[], RecordLock> createTableLocks(
-      String dbName, String tableName, ConcurrentSkipListMap<Object[], RecordLock> tableLocks) {
-    synchronized (locks) {
-      if (tableLocks == null) {
-        IndexSchema primaryKeySchema = null;
-        for (Map.Entry<String, IndexSchema> entry :
-            server.getCommon().getTables(dbName).get(tableName).getIndices().entrySet()) {
-          if (entry.getValue().isPrimaryKey()) {
-            primaryKeySchema = entry.getValue();
-            break;
-          }
+  private ConcurrentSkipListMap<Object[], RecordLock> createTableLocks(String dbName, String tableName) {
+    locks.get(dbName).computeIfAbsent(tableName, (k)->{
+      IndexSchema primaryKeySchema = null;
+      for (Map.Entry<String, IndexSchema> entry :
+          server.getCommon().getTables(dbName).get(tableName).getIndices().entrySet()) {
+        if (entry.getValue().isPrimaryKey()) {
+          primaryKeySchema = entry.getValue();
+          break;
         }
-        if (primaryKeySchema == null) {
-          throw new DatabaseException("primaryKeySchema is null: dbName=" + dbName + ", table=" + tableName);
-        }
-        final Comparator[] comparators = primaryKeySchema.getComparators();
-        tableLocks = new ConcurrentSkipListMap<>((o1, o2) -> getComparatorForTableLocks(comparators, o1, o2));
-        locks.get(dbName).put(tableName, tableLocks);
       }
-    }
-    return tableLocks;
+      if (primaryKeySchema == null) {
+        throw new DatabaseException("primaryKeySchema is null: dbName=" + dbName + ", table=" + tableName);
+      }
+      final Comparator[] comparators = primaryKeySchema.getComparators();
+      ConcurrentSkipListMap<Object[], RecordLock> locks = new ConcurrentSkipListMap<>((o1, o2) -> getComparatorForTableLocks(comparators, o1, o2));
+      return locks;
+    });
+    return locks.get(dbName).get(tableName);
   }
 
   private int getComparatorForTableLocks(Comparator[] comparators, Object[] o1, Object[] o2) {

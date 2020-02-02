@@ -265,6 +265,7 @@ public abstract class IndexLookup {
     if (columnOffsets == null || columnOffsets.isEmpty()) {
       columnOffsets = null;
     }
+    TableSchema tableSchema = null;;
     byte[][] ret = new byte[records.length][];
     for (int i = 0; i < records.length; i++) {
       byte[] recordBytes = records[i];
@@ -272,7 +273,8 @@ public abstract class IndexLookup {
 
       Record record = null;
       if (counters != null || groupContext != null) {
-        record = new Record(dbName, server.getCommon(), recordBytes, columnOffsets, false);
+        record = new Record(dbName, server.getCommon(), tableSchema, recordBytes, columnOffsets, false);
+        tableSchema = record.getTableSchema();
       }
       if (groupContext != null) {
         doEvaluateCounters(record);

@@ -2,6 +2,7 @@ package com.sonicbase.accept.server;
 
 import com.sonicbase.client.DatabaseClient;
 import com.sonicbase.common.Config;
+import com.sonicbase.index.NativeSkipListMapImpl;
 import com.sonicbase.jdbcdriver.ConnectionProxy;
 import org.apache.commons.io.IOUtils;
 import org.apache.commons.io.FileUtils;
@@ -14,12 +15,11 @@ import java.io.File;
 import java.sql.*;
 import java.util.ArrayList;
 import java.util.List;
+import java.util.Map;
 import java.util.concurrent.*;
 import java.util.concurrent.atomic.AtomicBoolean;
 
-import static org.testng.Assert.assertEquals;
-import static org.testng.Assert.assertFalse;
-import static org.testng.Assert.assertTrue;
+import static org.testng.Assert.*;
 
 public class TestLogManager {
 
@@ -101,7 +101,7 @@ public class TestLogManager {
     conn = DriverManager.getConnection("jdbc:sonicbase:localhost:9010", "user", "password");
 
     try {
-      ((ConnectionProxy) conn).getDatabaseClient().createDatabase("_sonicbase_sys");
+      ((ConnectionProxy) conn).getDatabaseClient().createDatabase("test");
     }
     catch (Exception e) {
       e.printStackTrace();
@@ -109,7 +109,7 @@ public class TestLogManager {
 
     conn.close();
 
-    conn = DriverManager.getConnection("jdbc:sonicbase:localhost:9010/_sonicbase_sys", "user", "password");
+    conn = DriverManager.getConnection("jdbc:sonicbase:localhost:9010/test", "user", "password");
 
     client = ((ConnectionProxy) conn).getDatabaseClient();
 
@@ -178,6 +178,51 @@ public class TestLogManager {
       server.shutdownRepartitioner();
     }
 
+    client.beginRebalance("test");
+
+
+    while (true) {
+      if (client.isRepartitioningComplete("test")) {
+        break;
+      }
+      Thread.sleep(1000);
+    }
+
+    for (com.sonicbase.server.DatabaseServer server : dbServers) {
+      server.shutdownRepartitioner();
+    }
+
+    client.beginRebalance("test");
+
+
+    while (true) {
+      if (client.isRepartitioningComplete("test")) {
+        break;
+      }
+      Thread.sleep(1000);
+    }
+
+    for (com.sonicbase.server.DatabaseServer server : dbServers) {
+      server.shutdownRepartitioner();
+    }
+
+
+    client.beginRebalance("test");
+
+
+    while (true) {
+      if (client.isRepartitioningComplete("test")) {
+        break;
+      }
+      Thread.sleep(1000);
+    }
+
+    for (com.sonicbase.server.DatabaseServer server : dbServers) {
+      server.shutdownRepartitioner();
+    }
+
+    Thread.sleep(10_000);
+
     stmt = conn.prepareStatement("describe shards");
     ResultSet ret = stmt.executeQuery();
     while (ret.next()) {
@@ -186,7 +231,7 @@ public class TestLogManager {
   }
 
   @Test
-  public void test() throws SQLException {
+  public void test() throws SQLException, InterruptedException {
 
     PreparedStatement stmt = conn.prepareStatement("select id, id2 from persons where id>=0 order by id asc");
     ResultSet ret = stmt.executeQuery();
@@ -216,6 +261,8 @@ public class TestLogManager {
 //      System.out.println("count logged: shard=" + server.getShard() + ", replica=" + server.getReplica() + ", count=" + server.getLogManager().getCountLogged());
 //    }
 
+    //NativeSkipListMapImpl.added.clear();
+
     for (com.sonicbase.server.DatabaseServer server : dbServers) {
       server.replayLogs();
     }
@@ -223,6 +270,72 @@ public class TestLogManager {
 //    for (DatabaseServer server : dbServers) {
 //      System.out.println("count replayed: shard=" + server.getShard() + ", replica=" + server.getReplica() + ", count=" + server.getLogManager().getCountReplayed());
 //    }
+
+    for (com.sonicbase.server.DatabaseServer server : dbServers) {
+      server.shutdownRepartitioner();
+    }
+
+    client.beginRebalance("test");
+
+
+    while (true) {
+      if (client.isRepartitioningComplete("test")) {
+        break;
+      }
+      Thread.sleep(1000);
+    }
+
+    for (com.sonicbase.server.DatabaseServer server : dbServers) {
+      server.shutdownRepartitioner();
+    }
+
+    client.beginRebalance("test");
+
+
+    while (true) {
+      if (client.isRepartitioningComplete("test")) {
+        break;
+      }
+      Thread.sleep(1000);
+    }
+
+    for (com.sonicbase.server.DatabaseServer server : dbServers) {
+      server.shutdownRepartitioner();
+    }
+
+
+    client.beginRebalance("test");
+
+
+    while (true) {
+      if (client.isRepartitioningComplete("test")) {
+        break;
+      }
+      Thread.sleep(1000);
+    }
+
+    for (com.sonicbase.server.DatabaseServer server : dbServers) {
+      server.shutdownRepartitioner();
+    }
+
+//    Long key = NativeSkipListMapImpl.added.first();
+//    int currKey = 0;
+//    for (int i = 0; i < 100_000; i++) {
+//      assertEquals((int)(long)key, i);
+//      key = NativeSkipListMapImpl.added.higher(key);
+//    }
+//    assertNull(key);
+//
+//    Map.Entry<Object[], Object> entry = NativeSkipListMapImpl.map.firstEntry();
+//    Object[][] keys = new Object[100_000][];
+//    long[] values = new long[100_000];
+//    int c = NativeSkipListMapImpl.map.tailBlock(entry.getKey(), 100_000, true, keys, values);
+//    assertEquals(c, 50_000);
+//    for (int i = 50_000; i < 100_000; i++) {
+//      assertEquals((int)(long)(Long)keys[i - 50_000][0], i);
+//    }
+
+    Thread.sleep(5_000);
 
     stmt = conn.prepareStatement("select count(*) from persons");
     ret = stmt.executeQuery();
@@ -232,17 +345,37 @@ public class TestLogManager {
     stmt = conn.prepareStatement("select id, id2 from persons where id>=0 order by id asc");
     ret = stmt.executeQuery();
 
-    inError = false;
-    int missing = 0;
     for (int i = 0; i < 100_000; i++) {
-      if(ret.next()) {
-        if (i != ret.getInt("id")) {
-          missing++;
-        }
-      }
-      //assertEquals(ret.getInt("id"), i);
+      assertTrue(ret.next());
+      assertEquals(ret.getInt("id"), i);
     }
     assertFalse(ret.next());
-    assertEquals(missing, 0);
+
+//    inError = false;
+//    int missing = 0;
+//    for (int i = 0; i < 100_000; i++) {
+//      if(ret.next()) {
+//        if (i != ret.getInt("id")) {
+//          missing++;
+//        }
+//      }
+//      //assertEquals(ret.getInt("id"), i);
+//    }
+//    assertFalse(ret.next());
+//
+//    stmt = conn.prepareStatement("select id, id2 from persons where id>=0 order by id asc");
+//    ret = stmt.executeQuery();
+//    missing = 0;
+//    for (int i = 0; i < 100_000; i++) {
+//      if(ret.next()) {
+//        if (i != ret.getInt("id")) {
+//          missing++;
+//        }
+//      }
+//      //assertEquals(ret.getInt("id"), i);
+//    }
+//
+//    assertFalse(ret.next());
+//    assertEquals(missing, 0);
   }
 }

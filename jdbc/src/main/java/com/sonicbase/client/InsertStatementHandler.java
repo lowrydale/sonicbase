@@ -33,7 +33,6 @@ import java.util.concurrent.ExecutionException;
 import java.util.concurrent.Future;
 import java.util.concurrent.ThreadLocalRandom;
 import java.util.concurrent.atomic.AtomicInteger;
-import java.util.concurrent.atomic.AtomicLong;
 
 import static com.sonicbase.client.DatabaseClient.SERIALIZATION_VERSION;
 import static com.sonicbase.client.DatabaseClient.toLower;
@@ -94,9 +93,13 @@ public class InsertStatementHandler implements StatementHandler {
     List<Object> values = getValuesFromParms.getValues();
     List<String> columnNames = getValuesFromParms.getColumnNames();
 
-    for (int i = 0; i < columnNames.size(); i++) {
-      if (values != null && values.size() > i) {
-        insertStatement.addValue(columnNames.get(i), values.get(i));
+    if (values != null) {
+      int size = columnNames.size();
+      int valuesSize = values.size();
+      for (int i = 0; i < size; i++) {
+        if (valuesSize > i) {
+          insertStatement.addValue(columnNames.get(i), values.get(i));
+        }
       }
     }
     insertStatement.setColumns(columnNames);
@@ -172,7 +175,7 @@ public class InsertStatementHandler implements StatementHandler {
   }
 
   public List<PreparedInsert> prepareInsert(InsertRequest request,
-                                            List<PreparedInsert> completed, long nonTransId, AtomicInteger originalOffset) throws UnsupportedEncodingException, SQLException {
+                                            List<PreparedInsert> completed, int[] fieldToColumn, long nonTransId, AtomicInteger originalOffset) throws UnsupportedEncodingException, SQLException {
     List<PreparedInsert> ret = new ArrayList<>();
 
     String dbName = request.dbName;
@@ -197,7 +200,7 @@ public class InsertStatementHandler implements StatementHandler {
     else {
       transId = client.getTransactionId();
     }
-    Record record = prepareRecordForInsert(request.insertStatement, tableSchema, id);
+    Record record = prepareRecordForInsert(request.insertStatement, tableSchema, fieldToColumn, id);
     record.setTransId(transId);
 
     Object[] fields = record.getFields();
@@ -264,7 +267,7 @@ public class InsertStatementHandler implements StatementHandler {
   }
 
   private List<KeyInfo> getKeys(List<String> columnNames, List<Object> values, TableSchema tableSchema, long id, KeyInfo primaryKey) {
-    List<KeyInfo> keys = getKeys(tableSchema, columnNames, values, id);
+    List<KeyInfo> keys = getKeys(client.getShardCount(), tableSchema, columnNames, values, id);
     if (keys.isEmpty()) {
       throw new DatabaseException("key not generated for record to insert");
     }
@@ -282,7 +285,7 @@ public class InsertStatementHandler implements StatementHandler {
     return client.allocateId(dbName);
   }
 
-  public static List<KeyInfo> getKeys(TableSchema tableSchema, List<String> columnNames,
+  public static List<KeyInfo> getKeys(int shardCount, TableSchema tableSchema, List<String> columnNames,
                                       List<Object> values, long id) {
     List<KeyInfo> ret = new ArrayList<>();
     for (Map.Entry<String, IndexSchema> indexSchema : tableSchema.getIndices().entrySet()) {
@@ -302,13 +305,13 @@ public class InsertStatementHandler implements StatementHandler {
         }
       }
       if (shouldIndex) {
-        doGetKeys(tableSchema, columnNames, values, id, ret, indexSchema);
+        doGetKeys(shardCount, tableSchema, columnNames, values, id, ret, indexSchema);
       }
     }
     return ret;
   }
 
-  private static void doGetKeys(TableSchema tableSchema, List<String> columnNames, List<Object> values, long id,
+  private static void doGetKeys(int shardCount, TableSchema tableSchema, List<String> columnNames, List<Object> values, long id,
                                 List<KeyInfo> ret, Map.Entry<String, IndexSchema> indexSchema) {
     String[] indexFields = indexSchema.getValue().getFields();
     TableSchema.Partition[] currPartitions = indexSchema.getValue().getCurrPartitions();
@@ -318,13 +321,15 @@ public class InsertStatementHandler implements StatementHandler {
       key[0] = id;
     }
     else {
+      int[] indexFieldOffsets = indexSchema.getValue().getFieldOffsets();
       for (int i = 0; i < key.length; i++) {
-        for (int j = 0; j < columnNames.size(); j++) {
+        int size = columnNames.size();
+        for (int j = 0; j < size; j++) {
           if (columnNames.get(j).equals(indexFields[i])) {
             key[i] = values.get(j);
 
-            String fieldName = indexSchema.getValue().getFields()[i];
-            FieldSchema fieldSchema = tableSchema.getFields().get(tableSchema.getFieldOffset(fieldName));
+            int fieldOffset = indexFieldOffsets[i];
+            FieldSchema fieldSchema = tableSchema.getFields().get(fieldOffset);
 
             key[i] = fieldSchema.getType().getConverter().convert(key[i]);
           }
@@ -332,10 +337,10 @@ public class InsertStatementHandler implements StatementHandler {
       }
     }
 
-    setShard(tableSchema, ret, indexSchema, currPartitions, key);
+    setShard(shardCount, tableSchema, ret, indexSchema, currPartitions, key);
   }
 
-  private static void setShard(TableSchema tableSchema, List<KeyInfo> ret, Map.Entry<String, IndexSchema> indexSchema, TableSchema.Partition[] currPartitions, Object[] key) {
+  private static void setShard(int shardCount, TableSchema tableSchema, List<KeyInfo> ret, Map.Entry<String, IndexSchema> indexSchema, TableSchema.Partition[] currPartitions, Object[] key) {
     boolean keyIsNull = false;
     for (Object obj : key) {
       if (obj == null) {
@@ -344,44 +349,47 @@ public class InsertStatementHandler implements StatementHandler {
     }
 
     if (!keyIsNull) {
-      List<Integer> selectedShards = PartitionUtils.findOrderedPartitionForRecord(true, false, tableSchema,
-          indexSchema.getKey(), null, com.sonicbase.query.BinaryExpression.Operator.EQUAL, null, key, null);
-      for (int partition : selectedShards) {
-        int shard = currPartitions[partition].getShardOwning();
+      if (shardCount == 1) {
+        int shard = 0;
         ret.add(new KeyInfo(shard, key, indexSchema.getValue()));
+      }
+      else {
+        List<Integer> selectedShards = PartitionUtils.findOrderedPartitionForRecord(true, false, tableSchema,
+            indexSchema.getKey(), null, com.sonicbase.query.BinaryExpression.Operator.EQUAL, null, key, null);
+        for (int partition : selectedShards) {
+          int shard = currPartitions[partition].getShardOwning();
+          ret.add(new KeyInfo(shard, key, indexSchema.getValue()));
+        }
       }
     }
   }
 
 
   private Record prepareRecordForInsert(
-      InsertStatementImpl statement, TableSchema schema, long id) throws UnsupportedEncodingException, SQLException {
-    Record record;
+      InsertStatementImpl statement, TableSchema schema, int[] fieldToColumn, long id) throws UnsupportedEncodingException, SQLException {
     FieldSchema fieldSchema;
     Object[] valuesToStore = new Object[schema.getFields().size()];
-
-    List<String> columnNames = statement.getColumns();
     List<Object> values = statement.getValues();
-    for (int i = 0; i < schema.getFields().size(); i++) {
-      fieldSchema = schema.getFields().get(i);
-      for (int j = 0; j < columnNames.size(); j++) {
-        if (fieldSchema.getName().equals(columnNames.get(j))) {
-          Object value = values.get(j);
+    List<FieldSchema> fields = schema.getFields();
+    int fieldsSize = fields.size();
+    for (int i = 0; i < fieldsSize; i++) {
+      if (i == 0) {
+        valuesToStore[i] = id;
+      }
+      else {
+        int col = fieldToColumn[i];
+        if (col != -1) {
+          fieldSchema = fields.get(i);
+          Object value = values.get(col);
           if (value != null) {
             value = fieldSchema.getType().getConverter().convert(value);
             checkFieldWidth(fieldSchema, value);
           }
           valuesToStore[i] = value;
-          break;
-        }
-        else {
-          if (fieldSchema.getName().equals(SONICBASE_ID_STR)) {
-            valuesToStore[i] = id;
-          }
         }
       }
     }
-    record = new Record(schema);
+    Record record = new Record(schema);
     record.setFields(valuesToStore);
 
     return record;
@@ -467,10 +475,30 @@ public class InsertStatementHandler implements StatementHandler {
       nonTransId = client.allocateId(dbName);
     }
 
+    List<String> columnNames = insertStatement.getColumns();
+    String tableName = insertStatement.getTableName();
+    TableSchema tableSchema = client.getCommon().getTables(dbName).get(tableName);
+    if (tableSchema == null) {
+      throw new DatabaseException("Table does not exist: name=" + tableName);
+    }
+    List<FieldSchema> fields = tableSchema.getFields();
+    int colSize = columnNames.size();
+    int fieldsSize = fields.size();
+    int[] fieldToColumn = new int[fields.size()];
+    for (int i = 0; i < fieldsSize; i++) {
+      FieldSchema fieldSchema = fields.get(i);
+      fieldToColumn[i] = -1;
+      for (int j = 0; j < colSize; j++) {
+        if (fieldSchema.getName().equals(columnNames.get(j))) {
+          fieldToColumn[i] = j;
+          break;
+        }
+      }
+    }
 
     while (true) {
       try {
-        List<PreparedInsert> inserts = prepareInsert(request, completed, nonTransId, new AtomicInteger());
+        List<PreparedInsert> inserts = prepareInsert(request, completed, fieldToColumn, nonTransId, new AtomicInteger());
         List<PreparedInsert> insertsWithRecords = new ArrayList<>();
         List<PreparedInsert> insertsWithKey = new ArrayList<>();
         for (PreparedInsert insert : inserts) {
@@ -1103,8 +1131,35 @@ public class InsertStatementHandler implements StatementHandler {
                               List<PreparedInsert> preparedKeys, long nonTransId, AtomicInteger originalOffset) throws UnsupportedEncodingException, SQLException {
     int insertId = 0;
 
+    List<InsertRequest> batch = getBatch().get();
+    if (batch.isEmpty()) {
+      return;
+    }
+    InsertRequest firstRequest = batch.get(0);
+    InsertStatementImpl statement = firstRequest.insertStatement;
+    List<String> columnNames = statement.getColumns();
+    String tableName = statement.getTableName();
+    TableSchema tableSchema = client.getCommon().getTables(firstRequest.dbName).get(tableName);
+    if (tableSchema == null) {
+      throw new DatabaseException("Table does not exist: name=" + tableName);
+    }
+    List<FieldSchema> fields = tableSchema.getFields();
+    int colSize = columnNames.size();
+    int fieldsSize = fields.size();
+    int[] fieldToColumn = new int[fields.size()];
+    for (int i = 0; i < fieldsSize; i++) {
+      FieldSchema fieldSchema = fields.get(i);
+      fieldToColumn[i] = -1;
+      for (int j = 0; j < colSize; j++) {
+        if (fieldSchema.getName().equals(columnNames.get(j))) {
+          fieldToColumn[i] = j;
+          break;
+        }
+      }
+    }
+
     for (InsertRequest request : getBatch().get()) {
-      List<PreparedInsert> inserts = prepareInsert(request, new ArrayList<>(), nonTransId,
+      List<PreparedInsert> inserts = prepareInsert(request, new ArrayList<>(), fieldToColumn, nonTransId,
           originalOffset);
       for (PreparedInsert insert : inserts) {
         if (client.isExplicitTrans() && insert.ignore) {
@@ -1138,7 +1193,7 @@ public class InsertStatementHandler implements StatementHandler {
 
   private void fixupKeys(List<PreparedInsert> preparedKeys) {
     for (PreparedInsert insert : preparedKeys) {
-      List<KeyInfo> keys = getKeys(client.getCommon().getTables(insert.dbName).get(insert.tableSchema.getName()),
+      List<KeyInfo> keys = getKeys(client.getShardCount(), client.getCommon().getTables(insert.dbName).get(insert.tableSchema.getName()),
           insert.columnNames, insert.values, insert.id);
       for (KeyInfo key : keys) {
         if (key.indexSchema.getName().equals(insert.indexName)) {
@@ -1155,12 +1210,37 @@ public class InsertStatementHandler implements StatementHandler {
 
   private List<ComObject> batchInsertIndexEntryByKey(List<PreparedInsert> preparedKeys, List<List<PreparedInsert>> processed,
                                                      List<ByteArrayOutputStream> bytesOut, List<ComObject> cobjs2) throws ExecutionException, InterruptedException {
-    List<Future<ComObject>> futures = new ArrayList<>();
-    for (int i = 0; i < bytesOut.size(); i++) {
-      final int offset = i;
-      futures.add(client.getExecutor().submit((Callable) () -> {
+    if (bytesOut.size() != 1) {
+      List<Future<ComObject>> futures = new ArrayList<>();
+      for (int i = 0; i < bytesOut.size(); i++) {
+        final int offset = i;
+        futures.add(client.getExecutor().submit((Callable) () -> {
+          if (cobjs2.get(offset).getArray(ComObject.Tag.INSERT_OBJECTS).getArray().isEmpty()) {
+            return new ComObject(2);
+          }
+          ComObject ret = client.send("UpdateManager:batchInsertIndexEntryByKey", offset, 0, cobjs2.get(offset),
+              DatabaseClient.Replica.DEF);
+
+          for (PreparedInsert insert : processed.get(offset)) {
+            preparedKeys.remove(insert);
+          }
+
+          return ret;
+        }));
+      }
+      List<ComObject> responses = new ArrayList<>();
+      for (Future<ComObject> future : futures) {
+        responses.add(future.get());
+      }
+      return responses;
+    }
+    else {
+      List<ComObject> responses = new ArrayList<>();
+      for (int i = 0; i < bytesOut.size(); i++) {
+        final int offset = i;
         if (cobjs2.get(offset).getArray(ComObject.Tag.INSERT_OBJECTS).getArray().isEmpty()) {
-          return new ComObject(2);
+          responses.add(new ComObject(2));
+          continue;
         }
         ComObject ret = client.send("UpdateManager:batchInsertIndexEntryByKey", offset, 0, cobjs2.get(offset),
             DatabaseClient.Replica.DEF);
@@ -1169,25 +1249,49 @@ public class InsertStatementHandler implements StatementHandler {
           preparedKeys.remove(insert);
         }
 
-        return ret;
-      }));
+        responses.add(ret);
+      }
+      return responses;
     }
-    List<ComObject> responses = new ArrayList<>();
-    for (Future<ComObject> future : futures) {
-      responses.add(future.get());
-    }
-    return responses;
   }
 
   private List<ComObject> batchInsertIndexEntryByKeyWithRecord(AtomicInteger totalCount,
                                                                List<ByteArrayOutputStream> bytesOut,
                                                                List<ComObject> cobjs1) throws InterruptedException, java.util.concurrent.ExecutionException {
-    List<Future<ComObject>> futures = new ArrayList<>();
-    for (int i = 0; i < bytesOut.size(); i++) {
-      final int offset = i;
-      futures.add(client.getExecutor().submit(() -> {
+    if (bytesOut.size() != 1) {
+      List<Future<ComObject>> futures = new ArrayList<>();
+      for (int i = 0; i < bytesOut.size(); i++) {
+        final int offset = i;
+        futures.add(client.getExecutor().submit(() -> {
+          if (cobjs1.get(offset).getArray(ComObject.Tag.INSERT_OBJECTS).getArray().isEmpty()) {
+            return new ComObject(2);
+          }
+          ComObject retObj = client.send("UpdateManager:batchInsertIndexEntryByKeyWithRecord", offset, 0,
+              cobjs1.get(offset), DatabaseClient.Replica.DEF);
+          if (retObj == null) {
+            throw new FailedToInsertException("No response for key insert");
+          }
+          if (retObj.getInt(ComObject.Tag.COUNT) == null) {
+            throw new DatabaseException("count not returned: obj=" + retObj.toString());
+          }
+          int retVal = retObj.getInt(ComObject.Tag.COUNT);
+          totalCount.addAndGet(retVal);
+          return retObj;
+        }));
+      }
+      List<ComObject> responses = new ArrayList<>();
+      for (Future<ComObject> future : futures) {
+        responses.add(future.get());
+      }
+      return responses;
+    }
+    else {
+      List<ComObject> responses = new ArrayList<>();
+      for (int i = 0; i < bytesOut.size(); i++) {
+        final int offset = i;
         if (cobjs1.get(offset).getArray(ComObject.Tag.INSERT_OBJECTS).getArray().isEmpty()) {
-          return new ComObject(2);
+          responses.add(new ComObject(2));
+          continue;
         }
         ComObject retObj = client.send("UpdateManager:batchInsertIndexEntryByKeyWithRecord", offset, 0,
             cobjs1.get(offset), DatabaseClient.Replica.DEF);
@@ -1199,14 +1303,10 @@ public class InsertStatementHandler implements StatementHandler {
         }
         int retVal = retObj.getInt(ComObject.Tag.COUNT);
         totalCount.addAndGet(retVal);
-        return retObj;
-      }));
+        responses.add(retObj);
+      }
+      return responses;
     }
-    List<ComObject> responses = new ArrayList<>();
-    for (Future<ComObject> future : futures) {
-      responses.add(future.get());
-    }
-    return responses;
   }
 
   private class GetValuesFromParms {
@@ -1236,7 +1336,8 @@ public class InsertStatementHandler implements StatementHandler {
       ExpressionList items = (ExpressionList) insert.getItemsList();
       List srcExpressions = items == null ? null : items.getExpressions();
       int parmOffset = 1;
-      for (int i = 0; i < srcColumns.size(); i++) {
+      int colSize = srcColumns.size();
+      for (int i = 0; i < colSize; i++) {
         Column column = (Column) srcColumns.get(i);
         columnNames.add(toLower(column.getColumnName()));
         if (srcExpressions != null) {

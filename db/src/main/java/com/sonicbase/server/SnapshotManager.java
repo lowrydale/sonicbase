@@ -261,11 +261,12 @@ public class SnapshotManager {
                                  long indexBegin, AtomicLong lastLogged, String tableName, String indexName,
                                  List<Future> futures, AtomicInteger offset, File[] indexFiles) {
     if (indexFiles != null) {
+      final Index index = server.getIndex(dbName, tableName, indexName);
+      index.clear();
       for (final File indexFile : indexFiles) {
         final int currOffset = offset.get();
         final TableSchema tableSchema = server.getCommon().getTables(dbName).get(tableName);
         final IndexSchema indexSchema = server.getIndexSchema(dbName, tableSchema.getName(), indexName);
-        final Index index = server.getIndex(dbName, tableName, indexName);
 
         recoverIndex(executor, recoveredCount, indexBegin, lastLogged, tableName, indexName, futures, indexFile,
             currOffset, tableSchema, indexSchema, index);

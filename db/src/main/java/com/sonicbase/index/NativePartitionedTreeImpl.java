@@ -27,6 +27,7 @@ import java.util.ArrayList;
 import java.util.List;
 import java.util.Map;
 import java.util.concurrent.ConcurrentLinkedQueue;
+import java.util.concurrent.ConcurrentSkipListSet;
 
 import static java.sql.Types.*;
 
@@ -131,7 +132,6 @@ public class NativePartitionedTreeImpl extends NativePartitionedTree implements 
     logger.error(msg);
   }
 
-
   @Override
   public Object put(Object[] key, Object value) {
     long ret = put(indexId, key, (long)value);
@@ -140,6 +140,10 @@ public class NativePartitionedTreeImpl extends NativePartitionedTree implements 
       return null;
     }
     return ret;
+  }
+
+  public void put(Object[][] keys,  long[] values, long[] retValues) {
+    put(indexId, keys, values, retValues);
   }
 
   @Override
@@ -166,7 +170,7 @@ public class NativePartitionedTreeImpl extends NativePartitionedTree implements 
   }
 
 
-  Object[] deserializeKey(byte[] bytes, int[] offset) {
+  public static Object[] deserializeKey(int[] dataTypes, byte[] bytes, int[] offset) {
 
     Object[] ret = new Object[dataTypes.length];
     for (int i = 0; i < ret.length; i++) {
@@ -316,7 +320,7 @@ public class NativePartitionedTreeImpl extends NativePartitionedTree implements 
       offset[0] += 8;
 //
       for (int i = 0; i < retCount; i++) {
-        keys[i] = deserializeKey(bytes, offset);
+        keys[i] = deserializeKey(dataTypes, bytes, offset);
         values[i] = DataUtils.bytesToLong(bytes, offset[0]);
         offset[0] += 8;
       }
@@ -386,7 +390,7 @@ public class NativePartitionedTreeImpl extends NativePartitionedTree implements 
       offset[0] += 8;
 //
       for (int i = 0; i < retCount; i++) {
-        keys[i] = deserializeKey(bytes, offset);
+        keys[i] = deserializeKey(dataTypes, bytes, offset);
         values[i] = DataUtils.bytesToLong(bytes, offset[0]);
         offset[0] += 8;
       }

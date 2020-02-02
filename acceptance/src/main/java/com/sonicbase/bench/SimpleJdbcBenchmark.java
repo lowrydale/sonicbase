@@ -21,9 +21,10 @@ import java.util.concurrent.atomic.AtomicLong;
 public class SimpleJdbcBenchmark {
 
   private static Connection conn;
-  private static final int recordCount = 10_000_000;
 
   public static void main(String[] args) throws SQLException, ClassNotFoundException, IOException, InterruptedException, ExecutionException {
+    int threadCount = Integer.parseInt(args[0]);
+    long recordCount = Long.parseLong(args[1]);
     String configStr = IOUtils.toString(new BufferedInputStream(SimpleJdbcBenchmark.class.getResourceAsStream("/config/config-1-local.yaml")), "utf-8");
     Config config = new Config(configStr);
 
@@ -60,31 +61,53 @@ public class SimpleJdbcBenchmark {
     DatabaseClient client = new DatabaseClient("localhost", 9010, -1, -1, true);
 
     client.createDatabase("db");
-    conn = DriverManager.getConnection("jdbc:sonicbase:localhost:9010/db", "user", "password");
 
-    PreparedStatement stmt = conn.prepareStatement("create table Persons (id BIGINT, id2 BIGINT, socialSecurityNumber VARCHAR(20), relatives VARCHAR(64000), restricted BOOLEAN, gender VARCHAR(8), PRIMARY KEY (id))");
-    stmt.executeUpdate();
+    Class.forName("org.postgresql.Driver");
+
+    conn = DriverManager.getConnection("jdbc:postgresql://54.144.0.23:5432/test", "postgres", "postgres");
+
+    //conn = DriverManager.getConnection("jdbc:sonicbase:localhost:9010/db", "user", "password");
+
+    try (PreparedStatement stmt = conn.prepareStatement("drop table persons")) {
+      stmt.executeUpdate();
+    }
+    catch (Exception e) {
+      e.printStackTrace();
+    }
+
+    try {
+      PreparedStatement stmt = conn.prepareStatement("create table Persons (id BIGINT, id2 BIGINT, socialSecurityNumber VARCHAR(20), relatives VARCHAR(64000), restricted BOOLEAN, gender VARCHAR(8), PRIMARY KEY (id))");
+      stmt.executeUpdate();
+    }
+    catch (Exception e) {
+      e.printStackTrace();
+    }
 
 
     AtomicLong countInserted = new AtomicLong();
     final long begin = System.currentTimeMillis();
-    Thread[] threads = new Thread[1];
+    Thread[] threads = new Thread[threadCount];
     for (int j = 0; j < threads.length; j++) {
       final int offset = j;
       threads[j] = new Thread(() -> {
-        for (int i = 0; i < recordCount; i += 5000) {
+        for (int i = 0; ; i += 5000) {
           try {
-            PreparedStatement stmt1 = conn.prepareStatement("insert into persons (id) VALUES (?)");
-            for (int k = 0; k < 500; k++) {
-              stmt1.setLong(1, (i + 1) + offset * 10_000_000);
-              if (countInserted.incrementAndGet() % 100_000 == 0) {
-                System.out.println("insert progress: count=" + i + ", rate=" +
-                    ((double) i / (System.currentTimeMillis() - begin) * 1000f));
-              }
+            try (PreparedStatement stmt1 = conn.prepareStatement("insert into persons (id) VALUES (?)")) {
+              for (int k = 0; k < 5000; k++) {
+                stmt1.setLong(1, (i + k) + offset * 10_000_000_000L);
+                if (countInserted.incrementAndGet() % 100_000 == 0) {
+                  System.out.println("insert progress: count=" + countInserted.get() + ", rate=" +
+                      ((double) countInserted.get() / (System.currentTimeMillis() - begin) * 1000f));
+                }
 
-              stmt1.addBatch();
+                stmt1.addBatch();
+              }
+              int[] batchRet = stmt1.executeBatch();
+
+              if (countInserted.get() > recordCount) {
+                return;
+              }
             }
-            int[] batchRet = stmt1.executeBatch();
           }
           catch (Exception e) {
             e.printStackTrace();
@@ -110,7 +133,7 @@ public class SimpleJdbcBenchmark {
 
     AtomicLong countRead = new AtomicLong();
     final long begin2 = System.currentTimeMillis();
-    threads = new Thread[8];
+    threads = new Thread[threadCount];
     for (int j = 0; j < threads.length; j++) {
       threads[j] = new Thread(() -> {
         try {

@@ -52,6 +52,7 @@ public class TestPartitionedIndex {
   NettyServer serverB1;
   NettyServer serverB2;
   private Set<Long> ids;
+  private ConcurrentSkipListSet<Long> idsAdded = new ConcurrentSkipListSet<>();
 
   @AfterClass(alwaysRun = true)
   public void afterClass() throws SQLException {
@@ -228,6 +229,7 @@ public class TestPartitionedIndex {
           break;
         }
       }
+      idsAdded.add(id);
       stmt.setLong(1, id);//9223174091577576305L + i);
       stmt.setLong(2, (i + 100) % 2);
       assertEquals(stmt.executeUpdate(), 1);
@@ -291,13 +293,18 @@ public class TestPartitionedIndex {
     List<Long> kept = new ArrayList<>();
     int countReturned = 0;
     long last = Long.MIN_VALUE;
+    Long currKey = idsAdded.first();
+    int currId = 0;
     while (rs.next()) {
       long curr = rs.getLong("id1");
       kept.add(curr);
       ids.remove(curr);
+      assertEquals(curr, (long)currKey);
+      currKey = idsAdded.higher(currKey);
       assertTrue(last < curr, "currId=" + curr + ", last=" + last);
       countReturned++;
-      if (countReturned % 10 == 0) {
+      last = curr;
+      if (countReturned % 1_000 == 0) {
         System.out.println(countReturned);
       }
     }

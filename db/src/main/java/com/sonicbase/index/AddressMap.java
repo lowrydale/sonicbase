@@ -82,15 +82,9 @@ public class AddressMap {
   }
 
   public void stopCompactor() {
-    try {
-      if (compactionThread != null) {
-        compactionThread.interrupt();
-        compactionThread.join();
-        compactionThread = null;
-      }
-    }
-    catch (InterruptedException e) {
-      Thread.currentThread().interrupt();
+    if (compactionThread != null) {
+      compactionThread.interrupt();
+      compactionThread = null;
     }
   }
 
@@ -140,6 +134,9 @@ public class AddressMap {
               logger.info("Free queue status: size={}", freeRequests.size());
               lastLogged = System.currentTimeMillis();
             }
+          }
+          catch (InterruptedException e) {
+            Thread.currentThread().interrupt();
           }
           catch (Exception e) {
             logger.error("error freeing address", e);

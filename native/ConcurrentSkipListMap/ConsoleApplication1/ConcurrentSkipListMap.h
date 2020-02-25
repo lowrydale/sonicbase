@@ -972,7 +972,7 @@ namespace skiplist
 					if ((c = key->compareTo(k)) > 0)
 					{
 						q = r;
-						r a= r->right;
+						r = r->right;
 						continue;
 					}
 					else if (c == 0)

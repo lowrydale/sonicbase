@@ -41,6 +41,11 @@ public class StringIndexImpl implements IndexImpl {
     return stringSkipIndex.get((byte[]) key[0]);
   }
 
+  @Override
+  public void put(Object[][] key, Object[] value) {
+
+  }
+
   public Object put(Object[] key, Object id) {
     Object ret = stringSkipIndex.put((byte[]) key[0], id);
     if (ret == null) {

@@ -1,66 +1,25 @@
+/* © 2020 by Intellectual Reserve, Inc. All rights reserved. */
 package com.sonicbase.index;
 
 import com.sonicbase.common.DataUtils;
-import com.sonicbase.common.FileUtils;
-import com.sonicbase.jdbcdriver.Parameter;
 import com.sonicbase.query.DatabaseException;
 import com.sonicbase.schema.FieldSchema;
 import com.sonicbase.schema.IndexSchema;
 import com.sonicbase.schema.TableSchema;
-import org.anarres.lzo.LzoDecompressor1x;
-import org.anarres.lzo.lzo_uintp;
-import org.apache.commons.io.IOUtils;
-import org.slf4j.Logger;
-import org.slf4j.LoggerFactory;
 
-import java.io.ByteArrayInputStream;
-import java.io.File;
-import java.io.InputStream;
-import java.lang.management.ManagementFactory;
-import java.math.BigDecimal;
-import java.net.URL;
-import java.nio.file.Files;
-import java.sql.Date;
-import java.sql.Time;
-import java.sql.Timestamp;
 import java.util.ArrayList;
 import java.util.List;
 import java.util.Map;
 import java.util.concurrent.ConcurrentLinkedQueue;
-import java.util.concurrent.ConcurrentSkipListSet;
 
-import static java.sql.Types.*;
-
-public class NativePartitionedTreeImpl extends NativePartitionedTree implements IndexImpl {
-  private static final Logger logger = LoggerFactory.getLogger(NativePartitionedTreeImpl.class);
+public class NativePartitionedConcurrentSkipListMapImpl extends NativePartitionedSkipListMap implements IndexImpl {
 
   private final int port;
+  private final Index index;
+  private final long indexId;
   private final int[] dataTypes;
 
-  public static boolean isWindows() {
-    return !OS.contains("cygwin") && OS.contains("win");
-  }
-
-  public static boolean isCygwin() {
-    return OS.contains("cygwin");
-  }
-
-  public static boolean isMac() {
-    return OS.contains("mac");
-  }
-
-  public static boolean isUnix() {
-    return OS.contains("nux");
-  }
-
-  private static String OS = System.getProperty("os.name").toLowerCase();
-
-  private final long indexId;
-  private final Index index;
-  private static boolean initializedNative = false;
-  private static Object mutex = new Object();
-
-  public NativePartitionedTreeImpl(int port, Index index) {
+  public NativePartitionedConcurrentSkipListMapImpl(int port, Index index) {
 
     init(port);
 
@@ -77,68 +36,33 @@ public class NativePartitionedTreeImpl extends NativePartitionedTree implements 
       dataTypes[i] = field.getType().getValue();
     }
 
-    this.indexId = initIndex(dataTypes);
+    this.indexId = initIndexSkipListMap(dataTypes);
     this.dataTypes = dataTypes;
   }
 
   public static void init(int port) {
-    try {
-      synchronized (mutex) {
-        if (!initializedNative) {
-
-          //System.load("/home/ec2-user/PartitionedAvlTree/linux/SonicBase.so");
-
-          String libName = "";
-          String name = ManagementFactory.getRuntimeMXBean().getName();
-          String pid = name.split("@")[0];
-
-          String libName2 = "";
-          if (isWindows()) {
-            libName = "/win/SonicBase.dll";
-            libName2 = "\\win\\SonicBase.dll";
-          } else if (isCygwin()) {
-            libName = "/win/SonicBase.dll";
-            libName2 = "\\win\\SonicBase.dll";
-          } else if (isMac()) {
-            libName = "/mac/SonicBase.so";
-            libName2 = "/mac/SonicBase.so";
-          } else if (isUnix()) {
-            libName = "/linux/SonicBase.so";
-            libName2 = "/linux/SonicBase.so";
-          }
-          URL url = NativePartitionedTreeImpl.class.getResource(libName);
-          String tmpdir = System.getProperty("java.io.tmpdir");
-          File tmpDir = new File(new File(tmpdir), "SonicBase-Native-" + port);
-          File nativeLibTmpFile = new File(tmpDir, libName2);
-          FileUtils.deleteDirectory(nativeLibTmpFile.getParentFile());
-          nativeLibTmpFile.getParentFile().mkdirs();
-          try (InputStream in = url.openStream()) {
-            Files.copy(in, nativeLibTmpFile.toPath());
-          }
-          System.load(nativeLibTmpFile.getAbsolutePath());
-
-          initializedNative = true;
-        }
-      }
-    }
-    catch (Exception e) {
-      logger.error("Unable to load native library", e);
-      throw new DatabaseException(e);
-    }
+    NativePartitionedTreeImpl.init(port);
   }
 
-  @Override
-  public void logError(String msg) {
-    logger.error(msg);
-  }
+  //public static ConcurrentSkipListSet<Long> added = new ConcurrentSkipListSet<>();;
+
+
+  //public static NativeSkipListMapImpl map;
 
   @Override
   public void put(Object[][] key, Object[] value) {
-
+    long[] retValues = new long[key.length];
+    long[] values = new long[key.length];
+    for (int i = 0; i < values.length; i++) {
+      values[i] = (long)value[i];
+    }
+    put(indexId, key, values, retValues);
   }
 
   @Override
   public Object put(Object[] key, Object value) {
+    //map = this;
+    //added.add((Long) key[0]);
     long ret = put(indexId, key, (long)value);
     if (ret == -1) {
       index.getSizeObj().incrementAndGet();
@@ -171,122 +95,8 @@ public class NativePartitionedTreeImpl extends NativePartitionedTree implements 
   }
 
   public void sortKeys(Object[][] keys, boolean ascend) {
-    sortKeys(indexId, keys, ascend);
+    throw new DatabaseException("not supported");
   }
-
-
-  public static Object[] deserializeKey(int[] dataTypes, byte[] bytes, int[] offset) {
-
-    Object[] ret = new Object[dataTypes.length];
-    for (int i = 0; i < ret.length; i++) {
-      byte hasValue = bytes[offset[0]++];
-      if (hasValue == 0) {
-        continue;
-      }
-      switch (dataTypes[i]) {
-        case ROWID:
-        case BIGINT: {
-          long v = DataUtils.bytesToLong(bytes, offset[0]);
-          offset[0] += 8;
-          ret[i] = v;
-        }
-          break;
-        case INTEGER: {
-          int v = (int) DataUtils.bytesToInt(bytes, offset[0]);
-          offset[0] += 4;
-          ret[i] = v;
-        }
-          break;
-        case SMALLINT: {
-          short v = (short) DataUtils.bytesToShort(bytes, offset[0]);
-          offset[0] += 2;
-          ret[i] = v;
-        }
-          break;
-        case TINYINT: {
-          ret[i] = bytes[offset[0]++];
-        }
-          break;
-        case DATE: {
-          long v = DataUtils.bytesToLong(bytes, offset[0]);
-          offset[0] += 8;
-          Date d = new Date(v);
-          ret[i] = d;
-        }
-          break;
-        case TIME: {
-          long v = DataUtils.bytesToLong(bytes, offset[0]);
-          offset[0] += 8;
-          Time t = new Time(0);
-          t.setTime(v);
-          ret[i] = t;
-        }
-          break;
-        case TIMESTAMP: {
-          long v1 = DataUtils.bytesToLong(bytes, offset[0]);
-          offset[0] += 8;
-          long v2 = (int) DataUtils.bytesToInt(bytes, offset[0]);
-          offset[0] += 4;
-          Timestamp t = new Timestamp(0);
-          t.setTime(v1);
-          t.setNanos((int) v2);
-          ret[i] = t;
-        }
-          break;
-        case DOUBLE:
-        case FLOAT: {
-          long value = DataUtils.bytesToLong(bytes, offset[0]);
-          offset[0] += 8;
-          ret[i] = Double.longBitsToDouble(value);
-        }
-          break;
-        case REAL: {
-          int value = DataUtils.bytesToInt(bytes, offset[0]);
-          offset[0] += 4;
-          ret[i] = Float.intBitsToFloat(value);
-        }
-          break;
-        case NUMERIC:
-        case DECIMAL: {
-          long len = DataUtils.bytesToLong(bytes, offset[0]);
-          offset[0] += 8;
-          char[] chars = new char[(int) len];
-          for (int j = 0; j < len; j++) {
-            byte b1 = bytes[offset[0]++];
-            byte b2 = bytes[offset[0]++];
-            char c = (char) ((b1 & 0xFF) << 8 | (b2 & 0xFF));
-            chars[j] = c;
-          }
-          BigDecimal b = new BigDecimal(new String(chars));
-          ret[i] = b;
-        }
-          break;
-        case VARCHAR:
-        case CHAR:
-        case LONGVARCHAR:
-        case NCHAR:
-        case NVARCHAR:
-        case LONGNVARCHAR:
-        case NCLOB: {
-          long len = DataUtils.bytesToLong(bytes, offset[0]);
-          offset[0] += 8;
-          char[] chars = new char[(int) len];
-          for (int j = 0; j < len; j++) {
-            byte b1 = bytes[offset[0]++];
-            byte b2 = bytes[offset[0]++];
-            char c = (char) ((b1 & 0xFF) << 8 | (b2 & 0xFF));
-            chars[j] = c;
-          }
-          ret[i] = chars;
-        }
-          break;
-        default:
-        throw new DatabaseException("unsupported type: type=" + dataTypes[i]);
-      }
-    }
-    return ret;
-  }
-
 
   private ConcurrentLinkedQueue<byte[]> bytePool = new ConcurrentLinkedQueue<>();
 
@@ -325,7 +135,7 @@ public class NativePartitionedTreeImpl extends NativePartitionedTree implements 
       offset[0] += 8;
 //
       for (int i = 0; i < retCount; i++) {
-        keys[i] = deserializeKey(dataTypes, bytes, offset);
+        keys[i] = NativePartitionedTreeImpl.deserializeKey(dataTypes, bytes, offset);
         values[i] = DataUtils.bytesToLong(bytes, offset[0]);
         offset[0] += 8;
       }
@@ -395,7 +205,7 @@ public class NativePartitionedTreeImpl extends NativePartitionedTree implements 
       offset[0] += 8;
 //
       for (int i = 0; i < retCount; i++) {
-        keys[i] = deserializeKey(dataTypes, bytes, offset);
+        keys[i] = NativePartitionedTreeImpl.deserializeKey(dataTypes, bytes, offset);
         values[i] = DataUtils.bytesToLong(bytes, offset[0]);
         offset[0] += 8;
       }
@@ -518,5 +328,6 @@ public class NativePartitionedTreeImpl extends NativePartitionedTree implements 
   public void delete() {
 
   }
+
 
 }

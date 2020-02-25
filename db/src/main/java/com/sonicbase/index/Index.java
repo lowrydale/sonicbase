@@ -10,6 +10,7 @@ import com.sonicbase.schema.FieldSchema;
 import com.sonicbase.schema.IndexSchema;
 import com.sonicbase.schema.TableSchema;
 import com.sonicbase.server.DatabaseServer;
+import org.apache.commons.lang.StringUtils;
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
 
@@ -58,6 +59,8 @@ public class Index {
       mutexes[i] = new Object();
     }
 
+    String idxImplStr = System.getenv("IDX_IMPL");
+
     this.tableSchema = tableSchema;
     this.indexSchema = tableSchema.getIndices().get(indexName);
     String[] fields = indexSchema.getFields();
@@ -86,7 +89,20 @@ public class Index {
         case DATE:
         case TIME:
         case TIMESTAMP:
-          impl = new NativeSkipListMapImpl(port, this);// new NativePartitionedTreeImpl(port, this); //new LongIndexImpl(this); //
+          if (StringUtils.isEmpty(idxImplStr)) {
+            impl = new NativeSkipListMapImpl(port, this);// new NativePartitionedTreeImpl(port, this); //new LongIndexImpl(this); //
+          }
+          else {
+            if ("skiplist".equalsIgnoreCase(idxImplStr)) {
+              impl = new NativeSkipListMapImpl(port, this);// new NativePartitionedTreeImpl(port, this); //new LongIndexImpl(this); //
+            }
+            else if ("partitionedskiplist".equalsIgnoreCase(idxImplStr)) {
+              impl = new NativePartitionedConcurrentSkipListMapImpl(port, this);// new NativePartitionedTreeImpl(port, this); //new LongIndexImpl(this); //
+            }
+            else if ("partitionedavltree".equalsIgnoreCase(idxImplStr)) {
+              impl = new NativePartitionedTreeImpl(port, this);
+            }
+          }
 //          impl = new NativePartitionedTreeImpl(port, this); //new LongIndexImpl(this); //
 //          impl = new ObjectIndexImpl(this, comparators);
         break;
@@ -96,7 +112,20 @@ public class Index {
       }
     }
     else {
-      impl = new NativeSkipListMapImpl(port, this);// new NativePartitionedTreeImpl(port, this); //new LongIndexImpl(this); //
+      if (StringUtils.isEmpty(idxImplStr)) {
+        impl = new NativeSkipListMapImpl(port, this);// new NativePartitionedTreeImpl(port, this); //new LongIndexImpl(this); //
+      }
+      else {
+        if ("skiplist".equalsIgnoreCase(idxImplStr)) {
+          impl = new NativeSkipListMapImpl(port, this);// new NativePartitionedTreeImpl(port, this); //new LongIndexImpl(this); //
+        }
+        else if ("partitionedskiplist".equalsIgnoreCase(idxImplStr)) {
+          impl = new NativePartitionedConcurrentSkipListMapImpl(port, this);// new NativePartitionedTreeImpl(port, this); //new LongIndexImpl(this); //
+        }
+        else if ("partitionedavltree".equalsIgnoreCase(idxImplStr)) {
+          impl = new NativePartitionedTreeImpl(port, this);
+        }
+      }
 //      impl = new NativePartitionedTreeImpl(port, this); //new LongIndexImpl(this); //
 //      impl = new ObjectIndexImpl(this, comparators);
     }
@@ -177,6 +206,11 @@ public class Index {
       }
     }
     return ret;
+  }
+
+  public void put(Object[][] key, Object[] id) {
+
+    impl.put(key, id);
   }
 
   public Object remove(Object[] key) {

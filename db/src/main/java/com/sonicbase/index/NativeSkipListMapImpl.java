@@ -51,6 +51,11 @@ public class NativeSkipListMapImpl extends NativeSkipListMap implements IndexImp
   //public static NativeSkipListMapImpl map;
 
   @Override
+  public void put(Object[][] key, Object[] value) {
+
+  }
+
+  @Override
   public Object put(Object[] key, Object value) {
     //map = this;
     //added.add((Long) key[0]);

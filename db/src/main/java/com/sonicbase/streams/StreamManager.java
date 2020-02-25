@@ -1372,6 +1372,10 @@ public class StreamManager {
     }
   }
 
+  public boolean haveProducers() {
+    return !producers.isEmpty();
+  }
+
   public void publishInsertOrUpdate(ComObject cobj, String dbName, String tableName, byte[] recordBytes, byte[] existingBytes,
                                     UpdateManager.UpdateType updateType) {
     if (dbName.equals("_sonicbase_sys")) {

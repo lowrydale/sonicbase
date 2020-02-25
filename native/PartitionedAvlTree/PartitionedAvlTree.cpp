@@ -4,7 +4,10 @@
  * and open the template in the editor.
  */
 
-//#include "stdafx.h"
+#ifdef _WIN32
+#include "stdafx.h"
+#endif
+
 #include <stdio.h>
 #include <string>
 #include <stdlib.h>
@@ -40,8 +43,8 @@
 //#include <pthread.h>
 
 #ifdef _WIN32
-#include <WinSock2.h>
-#include <Windows.h>
+//#include <WinSock2.h>
+//#include <Windows.h>
 #else
 #include <sys/time.h>
 #include<pthread.h>
@@ -471,8 +474,8 @@ public:
     std::mutex *locks = new std::mutex[PARTITION_COUNT];
     spinlock_t *slocks = new spinlock_t[PARTITION_COUNT];
     KAVLComparator *comparator = 0;
-    PooledObjectPool *keyPool;
-    PooledObjectPool *keyImplPool;
+    PooledObjectPool<Key*> *keyPool;
+    PooledObjectPool<KeyImpl*> *keyImplPool;
 	int *dataTypes = 0;
 	int fieldCount = 0;
 
@@ -495,8 +498,8 @@ public:
 		memcpy( (void*)this->dataTypes, (void*)types, fieldCount * sizeof(int));
 		comparator = new KeyComparator(env, indexId, fieldCount, this->dataTypes);
 
-        keyImplPool = createKeyPool(env, types, fieldCount);
-		keyPool = new PooledObjectPool(new Key());
+        keyImplPool = createKeyPool(env, (int*)types, fieldCount);
+		keyPool = new PooledObjectPool<Key*>(new Key());
 
 		env->ReleaseIntArrayElements(dataTypes, types, 0);
     }
@@ -516,21 +519,15 @@ public:
 
 
 
-void deleteKey(JNIEnv *env, int *dataTypes, Key *key) {
+void deleteKey(JNIEnv *env, int *dataTypes, Key *key, PooledObjectPool<Key*> *keyPool, PooledObjectPool<KeyImpl*> *keyImplPool) {
 
-	//key->free(dataTypes);
-	//delete key;
+	key->key->free(dataTypes);
+	keyImplPool->free(key->key);
+	keyPool->free(key);
 }
 
 
-class DeleteQueueEntry {
-public:
-	PartitionedMap * map = 0;
-	Key *key = 0;
-	uint64_t time = 0;
-	DeleteQueueEntry *next = 0;
-	DeleteQueueEntry *prev = 0;
-};
+
 
 uint64_t getCurrMillis() {
 #ifdef _WIN32
@@ -544,49 +541,6 @@ uint64_t getCurrMillis() {
 #endif
 }
 
-class DeleteQueue {
-	std::mutex queueLock;
-	DeleteQueueEntry *head = 0;
-	DeleteQueueEntry *tail = 0;
-
-public:
-	void push(DeleteQueueEntry *entry) {
-		{
-
-			entry->time = getCurrMillis();
-			std::lock_guard<std::mutex> lock(queueLock);
-			if (tail == 0) {
-				head = tail = entry;
-			}
-			else {
-				tail->next = entry;
-				entry->prev = tail;
-				tail = entry;
-			}
-		}
-	}
-
-	DeleteQueueEntry *pop() {
-		{
-			std::lock_guard<std::mutex> lock(queueLock);
-			if (head == 0) {
-				return 0;
-			}
-
-			if (getCurrMillis() - head->time > 10000) {
-				return 0;
-			}
-
-			DeleteQueueEntry *ret = 0;
-			ret = head;
-			head = ret->next;
-			if (head == 0) {
-				tail = 0;
-			}
-			return ret;
-		}
-	}
-};
 
 DeleteQueue *deleteQueue = new DeleteQueue();
 
@@ -606,7 +560,8 @@ void deleteRunner() {
 		}
 		//		printf("############# deleting");
 		//		fflush(stdout);
-		deleteKey(0, entry->map->dataTypes, entry->key);
+		//deleteKey(0, ((PartitionedMap*)entry->map)->dataTypes, entry->value,
+		//	((PartitionedMap*)entry->map)->keyPool, ((PartitionedMap*)entry->map)->keyImplPool);
 		delete entry;
 	}
 }
@@ -622,7 +577,7 @@ void pushDelete(PartitionedMap *map, Key *key) {
 	}
 	DeleteQueueEntry *entry = new DeleteQueueEntry();
 	entry->map = map;
-	entry->key = key;
+	entry->value = key;
 	deleteQueue->push(entry);
 }
 
@@ -637,63 +592,10 @@ public:
 
 FreeNode *freeNode = new MyFreeNode();
 
-class SortedListNode {
-public:
-	SortedListNode * next = 0;
-	SortedListNode *prev = 0;
-	head_t *head = 0;
-	Key *key = 0;
-	uint64_t value = 0;
-	int partition;
-};
-
-
-class PartitionResults {
-  public:
-    Key **keys;
-	uint64_t* values;
-    int count = -1;
-    int posWithinPartition = 0;
-    Key *key = 0;
-    uint64_t value = 0;
-    int partition = 0;
-	SortedListNode sortedListNode;
-
-	PartitionResults() {
-	}
-	
-	~PartitionResults() {
-		delete[] values;
-		delete[] keys;
-	}
-
-    void init(int numRecordsPerPartition) {
-    	values = new uint64_t[numRecordsPerPartition];
-    	keys = new Key*[numRecordsPerPartition];
-
-  //      key = new void*[2];
-        for (int i = 0; i < numRecordsPerPartition; i++) {
-            keys[i] = 0;
-            values[i] = 0;
-        }
-    }
-    Key* getKey() {
-      return  key;
-    }
-
-	uint64_t getValue() {
-      return value;
-    }
-
-    int getPartition() {
-      return partition;
-    }
-  };
-
-float timedifference_msec(struct timeval t0, struct timeval t1)
-{
-    return (t1.tv_sec - t0.tv_sec) * 1000.0f + (t1.tv_usec - t0.tv_usec) / 1000.0f;
-}
+//float timedifference_msec(struct timeval t0, struct timeval t1)
+//{
+//    return (t1.tv_sec - t0.tv_sec) * 1000.0f + (t1.tv_usec - t0.tv_usec) / 1000.0f;
+//}
 
 
 static uint64_t EXP_BIT_MASK = 9218868437227405312L;
@@ -752,12 +654,12 @@ std::string byte_seq_to_string_orig( const unsigned char bytes[], std::size_t n 
 */
 
 
-Key *javaKeyToNativeKey(JNIEnv *env, PooledObjectPool *keyPool, PooledObjectPool *keyImplPool,
-	int *dataTypes, jobjectArray jKey, KeyComparator *comparator) {
+Key *javaKeyToNativeKey(JNIEnv *env, PooledObjectPool<Key*> *keyPool, PooledObjectPool<KeyImpl*> *keyImplPool,
+	int *dataTypes, jobjectArray jKey, KeyComparator *comparator, int fieldCount) {
 
 	int len = env->GetArrayLength(jKey);
 
-	if (comparator->fieldCount == 1) {
+	if (fieldCount == 1) {
 		int type = dataTypes[0];
 		jobject obj = env->GetObjectArrayElement(jKey, 0);
 		switch (type) {
@@ -765,9 +667,10 @@ Key *javaKeyToNativeKey(JNIEnv *env, PooledObjectPool *keyPool, PooledObjectPool
 			case BIGINT:
 			{
 				jlong l = env->CallLongMethod(obj, gLong_longValue_mid);
-				LongKey *key = (LongKey*)keyImplPool->allocate();//new Key(0, 1, comparator);;
+				LongKey *key = (LongKey*)keyImplPool->allocate();
 				key->longKey = l;
-				Key* ret = (Key*)keyPool->allocate();
+				void *obj = keyPool->allocate();
+				Key* ret = static_cast<Key*>(obj);
 				ret->key = key;
 				return ret;
 			}
@@ -1131,7 +1034,7 @@ JNIEXPORT jlong JNICALL Java_com_sonicbase_index_NativePartitionedTree_initIndex
 		  }
 
 		  uint64_t currMapId = highestMapId;
-		  PartitionedMap *newMap = new PartitionedMap(env, currMapId, dataTypes);
+		  PartitionedMap *newMap = new PartitionedMap(env, (long)currMapId, dataTypes);
 		  allMaps[highestMapId] = newMap;
 		  highestMapId++;
 		  return currMapId;
@@ -1177,7 +1080,7 @@ JNIEXPORT void JNICALL Java_com_sonicbase_index_NativePartitionedTree_put__J_3_3
 		for (int i = 0; i < len; i++) {
 			jobjectArray jKey = (jobjectArray)env->GetObjectArrayElement(jKeys, i);
 
-			Key *startKey = javaKeyToNativeKey(env, map->keyPool, map->keyImplPool, map->dataTypes, jKey, 0);
+			Key *startKey = javaKeyToNativeKey(env, map->keyPool, map->keyImplPool, map->dataTypes, jKey, 0, map->fieldCount);
 
         	my_node *q, *p = new my_node;
 
@@ -1252,7 +1155,7 @@ JNIEXPORT jlong JNICALL Java_com_sonicbase_index_NativePartitionedTree_put__J_3L
 		}
 
 
-		Key *startKey = javaKeyToNativeKey(env, map->keyPool, map->keyImplPool, map->dataTypes, jstartKey, 0);
+		Key *startKey = javaKeyToNativeKey(env, map->keyPool, map->keyImplPool, map->dataTypes, jstartKey, 0, map->fieldCount);
 
 		if (startKey == 0) {
 			printf("put, null key");
@@ -1298,6 +1201,59 @@ JNIEXPORT jlong JNICALL Java_com_sonicbase_index_NativePartitionedTree_put__J_3L
 	}
 }
 
+
+class SortedListNode {
+public:
+	SortedListNode * next = 0;
+	SortedListNode *prev = 0;
+	head_t *head = 0;
+	Key *key = 0;
+	uint64_t value = 0;
+	int partition;
+};
+
+
+class PartitionResults {
+  public:
+    Key **keys;
+	uint64_t* values;
+    int count = -1;
+    int posWithinPartition = 0;
+    Key *key = 0;
+    uint64_t value = 0;
+    int partition = 0;
+	SortedListNode sortedListNode;
+
+	PartitionResults() {
+	}
+
+	~PartitionResults() {
+		delete[] values;
+		delete[] keys;
+	}
+
+    void init(int numRecordsPerPartition) {
+    	values = new uint64_t[numRecordsPerPartition];
+    	keys = new Key*[numRecordsPerPartition];
+
+  //      key = new void*[2];
+        for (int i = 0; i < numRecordsPerPartition; i++) {
+            keys[i] = 0;
+            values[i] = 0;
+        }
+    }
+    Key* getKey() {
+      return  key;
+    }
+
+	uint64_t getValue() {
+      return value;
+    }
+
+    int getPartition() {
+      return partition;
+    }
+  };
 
 class SortedList {
  	SortedListNode *head = 0;
@@ -1697,7 +1653,7 @@ jboolean JNICALL tailHeadlockArray
 
 	int posInTopLevelArray = 0;
 
-	Key *startKey = javaKeyToNativeKey(env, map->keyPool, map->keyImplPool, map->dataTypes, jstartKey, 0);
+	Key *startKey = javaKeyToNativeKey(env, map->keyPool, map->keyImplPool, map->dataTypes, jstartKey, 0, map->fieldCount);
 
 	SortedList sortedList(map, tail, count);
 
@@ -1805,7 +1761,7 @@ jboolean JNICALL tailHeadlockArray
 
 		delete[] keys;
 		delete[] values;
-		deleteKey(env, map->dataTypes, startKey);
+		deleteKey(env, map->dataTypes, startKey, map->keyPool, map->keyImplPool);
 		delete[] currResults;
 
 		if (SB_DEBUG) {
@@ -1885,7 +1841,7 @@ JNIEXPORT jlong JNICALL Java_com_sonicbase_index_NativePartitionedTree_remove
 		return 0;
 	}
 
-	Key *key = javaKeyToNativeKey(env, map->keyPool, map->keyImplPool, map->dataTypes, jKey, 0);
+	Key *key = javaKeyToNativeKey(env, map->keyPool, map->keyImplPool, map->dataTypes, jKey, 0, map->fieldCount);
 
 	if (key == 0) {
 		printf("remove, null key");
@@ -1916,7 +1872,7 @@ JNIEXPORT jlong JNICALL Java_com_sonicbase_index_NativePartitionedTree_remove
 			}
 		}
     }
-    deleteKey(env, map->dataTypes, key);
+    deleteKey(env, map->dataTypes, key, map->keyPool, map->keyImplPool);
 	
 	if (SB_DEBUG) {
 		printf("remove end\n");
@@ -1977,7 +1933,7 @@ JNIEXPORT jlong JNICALL Java_com_sonicbase_index_NativePartitionedTree_get
 		return 0;
 	}
 
-    Key *startKey = javaKeyToNativeKey(env, map->keyPool, map->keyImplPool, map->dataTypes, jKey, 0);
+    Key *startKey = javaKeyToNativeKey(env, map->keyPool, map->keyImplPool, map->dataTypes, jKey, 0, map->fieldCount);
 
     int partition = hashKey(env, map->dataTypes, startKey) % PARTITION_COUNT;
 
@@ -1996,7 +1952,7 @@ JNIEXPORT jlong JNICALL Java_com_sonicbase_index_NativePartitionedTree_get
             }
         }
     }
-    deleteKey(env, map->dataTypes, startKey);
+    deleteKey(env, map->dataTypes, startKey, map->keyPool, map->keyImplPool);
 
 	if (SB_DEBUG) {
 		printf("get end\n");
@@ -2017,7 +1973,7 @@ JNIEXPORT jboolean JNICALL Java_com_sonicbase_index_NativePartitionedTree_higher
 		return 0;
 	}
 
-    Key *key = javaKeyToNativeKey(env, map->keyPool, map->keyImplPool, map->dataTypes, jKey, 0);
+    Key *key = javaKeyToNativeKey(env, map->keyPool, map->keyImplPool, map->dataTypes, jKey, 0, map->fieldCount);
 
     my_node keyNode;
     keyNode.key = key;
@@ -2056,7 +2012,7 @@ JNIEXPORT jboolean JNICALL Java_com_sonicbase_index_NativePartitionedTree_higher
 		}
 	}
 
-    deleteKey(env, map->dataTypes, key);
+    deleteKey(env, map->dataTypes, key, map->keyPool, map->keyImplPool);
 
 	if (lowest.key != 0) {
 		jlong *valuesArray = env->GetLongArrayElements(jValues, 0);
@@ -2087,7 +2043,7 @@ JNIEXPORT jboolean JNICALL Java_com_sonicbase_index_NativePartitionedTree_lowerE
 		return 0;
 	}
 
-	Key *key = javaKeyToNativeKey(env, map->keyPool, map->keyImplPool, map->dataTypes, jKey, 0);
+	Key *key = javaKeyToNativeKey(env, map->keyPool, map->keyImplPool, map->dataTypes, jKey, 0, map->fieldCount);
 
     my_node keyNode;
     keyNode.key = key;
@@ -2123,7 +2079,7 @@ JNIEXPORT jboolean JNICALL Java_com_sonicbase_index_NativePartitionedTree_lowerE
             }
         }
     }
-    deleteKey(env, map->dataTypes, key);
+    deleteKey(env, map->dataTypes, key, map->keyPool, map->keyImplPool);
 
     if (highest.key != 0) {
 		jlong *valuesArray = env->GetLongArrayElements(jValues, 0);
@@ -2159,7 +2115,7 @@ JNIEXPORT jboolean JNICALL Java_com_sonicbase_index_NativePartitionedTree_floorE
 		return 0;
 	}
 
-    Key *key = javaKeyToNativeKey(env, map->keyPool, map->keyImplPool, map->dataTypes, jKey, 0);
+    Key *key = javaKeyToNativeKey(env, map->keyPool, map->keyImplPool, map->dataTypes, jKey, 0, map->fieldCount);
 
 	my_node keyNode;
     keyNode.key = key;
@@ -2193,7 +2149,7 @@ JNIEXPORT jboolean JNICALL Java_com_sonicbase_index_NativePartitionedTree_floorE
             }
         }
     }
-    deleteKey(env, map->dataTypes, key);
+    deleteKey(env, map->dataTypes, key, map->keyPool, map->keyImplPool);
 
     if (lowest.key != 0) {
 		jlong *valuesArray = env->GetLongArrayElements(jValues, 0);
@@ -2231,7 +2187,7 @@ JNIEXPORT jboolean JNICALL Java_com_sonicbase_index_NativePartitionedTree_ceilin
 		return 0;
 	}
 
-	Key *key = javaKeyToNativeKey(env, map->keyPool, map->keyImplPool, map->dataTypes, jKey, 0);
+	Key *key = javaKeyToNativeKey(env, map->keyPool, map->keyImplPool, map->dataTypes, jKey, 0, map->fieldCount);
 
 	my_node keyNode;
     keyNode.key = key;
@@ -2263,7 +2219,7 @@ JNIEXPORT jboolean JNICALL Java_com_sonicbase_index_NativePartitionedTree_ceilin
             }
         }
     }
-    deleteKey(env, map->dataTypes, key);
+    deleteKey(env, map->dataTypes, key, map->keyPool, map->keyImplPool);
 
     if (lowest.key != 0) {
 		jlong *valuesArray = env->GetLongArrayElements(jValues, 0);
@@ -2453,7 +2409,7 @@ JNIEXPORT void JNICALL Java_com_sonicbase_index_NativePartitionedTree_sortKeys
 	Key ** nativeKeys = new Key*[keyCount];
 	for (int i = 0; i < keyCount; i++) {
 		jobjectArray jKey = (jobjectArray)env->GetObjectArrayElement(keysObj, i);
-		nativeKeys[i] = javaKeyToNativeKey(env, map->keyPool, map->keyImplPool, map->dataTypes, jKey, 0);
+		nativeKeys[i] = javaKeyToNativeKey(env, map->keyPool, map->keyImplPool, map->dataTypes, jKey, 0, map->fieldCount);
 	}
 
 	binarySort(map, nativeKeys, 0, keyCount, 0, ascend);
@@ -2673,7 +2629,7 @@ void allocator() {
 	}
 	*/
 }
-int main() {
+int main2() {
 
 	begin = std::chrono::duration_cast<std::chrono::milliseconds>(std::chrono::system_clock::now().time_since_epoch()).count();
 
@@ -2689,7 +2645,7 @@ int main() {
 
 
 
-
+	return 0;
 }
 /*
 class spinlock_t {

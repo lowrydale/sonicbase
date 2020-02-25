@@ -42,6 +42,11 @@ public class ObjectIndexImpl implements IndexImpl {
     return objectSkipIndex.get(key);
   }
 
+  @Override
+  public void put(Object[][] key, Object[] value) {
+
+  }
+
   public Object put(Object[] key, Object id) {
     Object ret = objectSkipIndex.put(key, id);
     if (ret == null) {

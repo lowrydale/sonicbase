@@ -23,7 +23,7 @@
 #include <random>
 #include <iostream>
 #include "ObjectPool.h"
-#include "SonicBase.h"
+#include "sonicbase.h"
 
 #ifndef INT_MAX
 #define INT_MAX  ((1 << (sizeof(int)*8 - 2)) - 1 + (1 << (sizeof(int)*8 - 2)))
@@ -373,9 +373,11 @@ namespace skiplist
 		 * (Note that comparatorField must be separately initialized.)
 		 */
 	public:
-		PooledObjectPool *keyPool;
-		PooledObjectPool *keyImplPool;
-		PooledObjectPool *valuePool;
+		void *map;
+		PooledObjectPool<Key*> *keyPool;
+		PooledObjectPool<KeyImpl*> *keyImplPool;
+		PooledObjectPool<MyValue*> *valuePool;
+		int *dataTypes;
 
 		virtual void initialize()
 		{
@@ -393,8 +395,9 @@ namespace skiplist
 
 			randomSeed = r | 0x0100; // ensure nonzero
 
-			head = new HeadIndex<K, V>(new Node<K, V>(NULL, BASE_HEADER, NULL), NULL, NULL, 1);
-			atomicHead.set(head);
+			Node<K, V> *node = new Node<K, V>(NULL, BASE_HEADER, NULL);
+			node->addRef();
+			atomicHead.set(new HeadIndex<K, V>(node, NULL, NULL, 1));
 		}
 
 		~ConcurrentSkipListMap() {
@@ -427,54 +430,83 @@ namespace skiplist
 		 */
 	public:
 		template<typename K1, typename V1>
-		class Node : public PoolableObject
+		class Node : public PoolableObject<Node<K1, V1>*>
 		{
 		public:
 			K1 key;
 //JAVA TO C++ CONVERTER TODO TASK: 'volatile' has a different meaning in C++:
 //ORIGINAL LINE: volatile AtomicJava<Object> value;
-			void* value;
 			AtomicJava<void*> atomicValue;
 //JAVA TO C++ CONVERTER TODO TASK: 'volatile' has a different meaning in C++:
 //ORIGINAL LINE: volatile AtomicJava<Node<K,V>> next;
-			Node<K1, V1>* next;
 			AtomicJava<Node<K1, V1>*> atomicNext;
+			std::atomic<unsigned long> refCount;
 
 			Node() {
+				incrementNodeCount();
+			}
+
+
+			void addRef() {
+				unsigned long c = refCount++;
 
 			}
 
-			PoolableObject *allocate(int count) {
+			void deleteRef(void *map, PooledObjectPool<Node<K1, V1>*> *nodePool) {
+				unsigned long count = --refCount;
+				if (count == 0) {
+					pushNodeDelete(map, this);
+					//if (this->atomicNext.get() != 0) {
+						//this->atomicNext.get()->deleteRef(map, nodePool);
+					//}
+					//refCount.store(-99999999);
+					//nodePool->free(this);
+				}
+			}
+
+			Node<K1, V1> *allocate(int count) {
 				return new Node[count];
 			}
 
-			virtual PoolableObject *getObjectAtOffset(PoolableObject *array, int offset) {
+			Node<K1, V1> *allocate() {
+				return new Node();
+			}
+
+			virtual Node<K1, V1> *getObjectAtOffset(Node<K1, V1> *array, int offset) {
 				return &((Node*)array)[offset];
 			}
 
-				virtual char *className() {
+				virtual const char *className() {
             		return "Node";
             	};
 
 
+			~Node() {
+				decrementNodeCount();
+			}
+
 			/**
 			 * Creates a new regular node.
 			 */
-			Node(K1 key, const void *value, const Node<K1, V1> *next) : key(key)
+			Node(K1 key, const void *value, Node<K1, V1> *next)
 			{
-				this->value = (void*)value;
+				incrementNodeCount();
+				this->key = key;
 				this->atomicValue.set((void*)value);
-				this->next = (Node<K1, V1>*)next;
 				this->atomicNext.set((Node<K1, V1>*)next);
+				if (next != 0) {
+					next->addRef();
+				}
 			}
 
-			void init(K1 key, const void *value, const Node<K1, V1> *next)
+			void init(K1 key, const void *value, Node<K1, V1> *next)
 			{
 				this->key = key;
-				this->value = (void*)value;
 				this->atomicValue.set((void*)value);
-				this->next = (Node<K1, V1>*)next;
 				this->atomicNext.set((Node<K1, V1>*)next);
+				if (next != 0) {
+					next->addRef();
+				}
 			}
 
 			/**
@@ -484,20 +516,23 @@ namespace skiplist
 			 * but this doesn't distinguish markers from the base-level
 			 * header node (head.node), which also has a null key.
 			 */
-			Node(const Node<K1, V1> *next) : key(0)
+			Node(Node<K1, V1> *next) : key(0)
 			{
-				this->value = this;
+				incrementNodeCount();
 				this->atomicValue.set(this);
-				this->next = (Node<K1, V1>*)next;
 				this->atomicNext.set((Node<K1, V1>*)next);
+				if (next != 0) {
+					next->addRef();
+				}
 			}
 
-			void init(const Node<K1, V1> *next) {
+			void init(Node<K1, V1> *next) {
 				key = 0;
-				this->value = this;
 				this->atomicValue.set(this);
-				this->next = (Node<K1, V1>*)next;
 				this->atomicNext.set((Node<K1, V1>*)next);
+				if (next != 0) {
+					next->addRef();
+				}
 			}
 			/**
 			 * compareAndSet value field
@@ -505,9 +540,6 @@ namespace skiplist
 			bool casValue(void *cmp, void *val)
 			{
 				bool ret = atomicValue.compareAndSet(cmp, val);
-				if (ret) {
-					value = atomicValue.get();
-				}
 				return ret;
 			}
 
@@ -517,9 +549,6 @@ namespace skiplist
 			bool casNext(Node<K1, V1> *cmp, Node<K1, V1> *val)
 			{
 				bool ret = atomicNext.compareAndSet(cmp, val);
-				if (ret) {
-					next = atomicNext.get();
-				}
 				return ret;
 			}
 
@@ -534,7 +563,7 @@ namespace skiplist
 			 */
 			bool isMarker()
 			{
-				return value == this;
+				return atomicValue.get() == this;
 			}
 
 			/**
@@ -543,7 +572,7 @@ namespace skiplist
 			 */
 			bool isBaseHeader()
 			{
-				return value == BASE_HEADER;
+				return atomicValue.get() == BASE_HEADER;
 			}
 
 			/**
@@ -551,11 +580,23 @@ namespace skiplist
 			 * @param f the assumed current successor of this node
 			 * @return true if successful
 			 */
-			bool appendMarker(Node<K1, V1> *f, Node<K1, V1> *z)
+			bool appendMarker(void *map, PooledObjectPool<Node<K1, V1>*> *nodePool, Node<K1, V1> *f)
 			{
-				bool ret = casNext(f, z);
-				if (ret) {
-					next = z;
+				return true;
+
+				Node<K1, V1> *next = NULL;// f == NULL ? NULL : f->atomicNext.get();
+				Node<K1, V1> *z = (Node<K1, V1>*)nodePool->allocate();
+				z->init(f);
+				next = z;
+				next->addRef();
+				bool ret = casNext(f, next);
+				if (!ret) {
+					next->deleteRef(map, nodePool);
+				}
+				else {
+					if (f != 0) {
+						f->deleteRef(map, nodePool);
+					}
 				}
 				return ret;
 			}
@@ -568,7 +609,8 @@ namespace skiplist
 			 * @param f successor
 			 */
 
-			void helpDelete(Node<K1, V1> *b, Node<K1, V1> *f, PooledObjectPool *nodePool)
+
+			void helpDelete(void *map, Node<K1, V1> *b, Node<K1, V1> *f, PooledObjectPool<Node<K1, V1>*> *nodePool)
 			{
 				/*
 				 * Rechecking links and then doing only one of the
@@ -577,16 +619,40 @@ namespace skiplist
 				 */
 				if (f == atomicNext.get()/*next*/ && this == b->atomicNext.get()/*next*/)
 				{
-					if (f == NULL || f->value != f) // not already marked
+					if (f == NULL)// || f->atomicValue.get() != f) // not already marked
 					{
-						Node<K1, V1> *z = (Node<K1, V1>*)nodePool->allocate();
-						z->init(f);
-						appendMarker(f, z);
+						//Node<K1, V1> *z = (Node<K1, V1>*)nodePool->allocate();
+						//z->init(f);
+						if (!appendMarker(map, nodePool, f)) {
+							//pushNodeDelete(map, z);
+						}
 					}
 					else
 					{
-						if (b->casNext(this, f->atomicNext.get()/*next*/)) {
-							next = f->atomicNext.get();
+						Node<K1, V1> *next = f->atomicNext.get();
+
+						if (next != 0) {
+							next->addRef();
+						}
+						if (b->casNext(this, next)) {
+							//f->deleteRef(map, nodePool);
+							this->key = 0;
+							Node<K, V> *toDel = atomicNext.get();
+							atomicNext.set(0);
+							if (toDel != 0) {
+								//toDel->deleteRef(map, nodePool);
+							}
+
+							this->deleteRef(map, nodePool);
+							
+							//this->key = 0;
+							//pushNodeDelete(map, this);
+							//next = f->atomicNext.get();
+						}
+						else {
+							if (next != 0) {
+								next->deleteRef(map, nodePool);
+							}
 						}
 					}
 				}
@@ -600,7 +666,7 @@ namespace skiplist
 			 */
 			V1 getValidValue()
 			{
-				auto v = value;
+				auto v = atomicValue.get();
 				if (v == this || v == BASE_HEADER)
 				{
 					return NULL;
@@ -624,7 +690,19 @@ namespace skiplist
 			}
 		};
 
-		PooledObjectPool *nodePool = new PooledObjectPool(new Node<K, V>());
+		void deleteNode(Node<K, V> *n) {
+			//((Key*)n->key)->key->free(dataTypes);
+			//keyImplPool->free(((Key*)n->key)->key);
+			//keyPool->free((PoolableObject*)n->key);
+			//valuePool->free((PoolableObject*)n->value);
+			//
+			//nodePool->free(n);
+
+			//n->key = 0;
+			//pushNodeDelete(map, n);
+		}
+
+		PooledObjectPool<Node<K,V>*> *nodePool = new PooledObjectPool<Node<K,V>*>(new Node<K, V>());
 
 		//static NonSafeObjectPool<Node<K, V>> &nodePool = getNodePool();
 
@@ -640,24 +718,57 @@ namespace skiplist
 		 */
 	public:
 		template<typename K1, typename V1>
-		class Index
+		class Index : public PoolableObject<Index<K1, V1>*>
 		{
 		public:
-			Node<K1, V1> *const node;
-			Index<K1, V1> *const down;
+			Node<K1, V1> * node;
+			Index<K1, V1> * down;
 //JAVA TO C++ CONVERTER TODO TASK: 'volatile' has a different meaning in C++:
 //ORIGINAL LINE: volatile AtomicJava<Index<K,V>> right;
-			Index<K1, V1>* right;
 			AtomicJava<Index<K1, V1>*> atomicRight;
+
+			Index() {
+				incrementIndexCount();
+			}
+
+			~Index() {
+				decrementIndexCount();
+			}
 
 			/**
 			 * Creates index node with given values.
 			 */
 			Index(Node<K1, V1> *node, Index<K1, V1> *down, Index<K1, V1> *right) : node(node), down(down)
 			{
-				this->right = right;
+				this->atomicRight.set(right);
+				incrementIndexCount();
+			}
+
+			void init(Node<K1, V1> *node, Index<K1, V1> *down, Index<K1, V1> *right)
+			{
+				//node->addRef();
+				this->node = node;
+				this->down = down;
 				this->atomicRight.set(right);
 			}
+
+			virtual Index<K1, V1> * allocate(int count) {
+				return new Index<K1, V1>[count];
+			}
+
+			virtual Index<K1, V1> * allocate() {
+				return new Index<K1, V1>();
+			}
+
+			virtual Index<K1, V1> * getObjectAtOffset(Index<K1, V1> *array, int offset) {
+				return &((Index<K1, V1> *)array)[offset];
+
+			}
+
+			virtual const char *className() {
+				return "Index";
+			}
+
 
 			virtual int hashCode() {
 				return (int)(size_t)this;
@@ -673,9 +784,6 @@ namespace skiplist
 			virtual bool casRight(Index<K1, V1> *cmp, Index<K1, V1> *val)
 			{
 				bool ret = atomicRight.compareAndSet(cmp, val);
-				if (ret) {
-					right = atomicRight.get();
-				}
 				return ret;
 			}
 
@@ -685,7 +793,7 @@ namespace skiplist
 			 */
 			virtual bool indexesDeletedNode()
 			{
-				return node->value == NULL;
+				return node->atomicValue.get() == NULL;
 			}
 
 			/**
@@ -696,14 +804,14 @@ namespace skiplist
 			 * @param newSucc the new successor
 			 * @return true if successful
 			 */
-			virtual bool link(Index<K1, V1> *succ, Index<K1, V1> *newSucc)
+			virtual bool link(void *map, Index<K1, V1> *succ, Index<K1, V1> *newSucc)
 			{
 				Node<K1, V1> *n = node;
 				newSucc->atomicRight.set(succ);
-				newSucc->right = newSucc->atomicRight.get();
-				if (n->atomicValue.get()/*value*/ != NULL) {
+				if (n->atomicValue.get() != NULL) {
 				 if (casRight(succ, newSucc)) {
 				 	//right = newSucc;
+					 //pushIndexDelete(map, succ);
 				 	return true;
 				 }
 
@@ -718,15 +826,24 @@ namespace skiplist
 			 * @param succ the expected current successor
 			 * @return true if successful
 			 */
-			virtual bool unlink(Index<K1, V1> *succ)
+			virtual bool unlink(void *map, PooledObjectPool<Node<K1, V1>*> *nodePool, Index<K1, V1> *succ)
 			{
-				bool ret = !indexesDeletedNode() && casRight(succ, succ->right);
+				bool ret = !indexesDeletedNode() && casRight(succ, succ->atomicRight.get());
 				if (ret) {
+					//pushNodeDelete(map, succ->node);
+					
+					//succ->node->deleteRef(map, nodePool);
+					pushIndexDelete(map, succ);
+					
+					//delete succ;
 					//right = succ->right;
 				}
 				return ret;
 			}
 		};
+
+		PooledObjectPool<Index<K, V>*> *indexPool = new PooledObjectPool<Index<K, V>*>(new Index<K, V>());
+
 
 		/* ---------------- Head nodes -------------- */
 
@@ -748,9 +865,6 @@ namespace skiplist
 		bool casHead(HeadIndex<K, V> *cmp, HeadIndex<K, V> *val)
 		{
 			bool ret = atomicHead.compareAndSet(cmp, val);
-			if (ret) {
-				head = atomicHead.get();
-			}
 			return ret;
 		}
 
@@ -880,22 +994,29 @@ namespace skiplist
 					if (r != NULL)
 					{
 						Node<K, V> *n = r->node;
+						//n->addRef();
 						K k = n->key;
-						if (n->atomicValue.get()/*value*/ == NULL)
+						if (n->atomicValue.get() == NULL)
 						{
-							if (!q->unlink(r))
+							if (!q->unlink(map, nodePool, r))
 							{
 								//delete r->node->key;
 								//delete (V)r->node->value.get();
 								//delete r->node;
 								//delete r;
+							
+								//n->deleteRef(map, nodePool);
 								break; // restart
 							}
 							//delete r->node->key;
 							//delete (V)r->node->value.get();
 							//delete r->node;
+							//r->node->key = 0;
+							//pushNodeDelete(map, r->node);
 							//delete r;
+
 							r = q->atomicRight.get();//right; // reread r
+							//n->deleteRef(map, nodePool);
 							continue;
 						}
 						//printf("findPred - compare begin\n");
@@ -906,10 +1027,13 @@ namespace skiplist
 						//fflush(stdout);
 							q = r;
 							r = r->atomicRight.get();//right;
+							//n->deleteRef(map, nodePool);
 							continue;
 						}
 						//printf("findPred - compare end\n");
 						//fflush(stdout);
+						
+						//n->deleteRef(map, nodePool);
 
 					}
 					Index<K, V> *d = q->down;
@@ -920,7 +1044,9 @@ namespace skiplist
 					}
 					else
 					{
-						return q->node;
+						Node<K, V> *n = q->node;
+						//n->addRef();
+						return n;
 					}
 				}
 			}
@@ -976,40 +1102,93 @@ namespace skiplist
 			{
 				Node<K, V> *b = findPredecessor(key);
 				Node<K, V> *n = b->atomicNext.get();//next;
+				if (n != 0) {
+					//n->addRef();
+				}
 				for (;;)
 				{
 					if (n == NULL)
 					{
+						if (n != 0) {
+							//n->deleteRef(map, nodePool);
+						}
+						//b->deleteRef(map, nodePool);
 						return NULL;
 					}
 					Node<K, V> *f = n->atomicNext.get();//next;
-					if (n != b->atomicNext.get()/*next*/) // inconsistent read
+					if (f != 0) {
+						//f->addRef();
+					}
+					if (n != b->atomicNext.get()) // inconsistent read
 					{
+						if (f != 0) {
+							//f->deleteRef(map, nodePool);
+						}
+						if (n != 0) {
+							//n->deleteRef(map, nodePool);
+						}
+						//b->deleteRef(map, nodePool);
 						break;
 					}
 					void *v = /*&*/n->atomicValue.get();//value;
 					if (v == NULL)
 					{ // n is deleted
-						n->helpDelete(b, f, nodePool);
-						//delete n->key;
-						//delete (V)n->value.get();
-						//delete n;
+						n->helpDelete(map, b, f, nodePool);
+						deleteNode(n);
+						if (f != 0) {
+							//f->deleteRef(map, nodePool);;
+						}
+						if (n != 0) {
+							//n->deleteRef(map, nodePool);
+						}
+						//b->deleteRef(map, nodePool);
 						break;
 					}
-					if (v == n || b->atomicValue.get()/*value*/ == NULL) // b is deleted
+					if (v == n || b->atomicValue.get() == NULL) // b is deleted
 					{
+						if (f != 0) {
+							//f->deleteRef(map, nodePool);
+						}
+						if (n != 0) {
+							//n->deleteRef(map, nodePool);
+						}
+						//b->deleteRef(map, nodePool);
 						break;
 					}
 					int c = key->compareTo(n->key);
 					if (c == 0)
 					{
+						if (f != 0) {
+							//f->deleteRef(map, nodePool);
+						}
+						if (n != 0) {
+							//n->deleteRef(map, nodePool);
+						}
+						//b->deleteRef(map, nodePool);
 						return n;
 					}
 					if (c < 0)
 					{
+						if (f != 0) {
+							//f->deleteRef(map, nodePool);
+						}
+						if (n != 0) {
+							//n->deleteRef(map, nodePool);
+						}
+						//b->deleteRef(map, nodePool);
 						return NULL;
 					}
+					//b->deleteRef(map, nodePool);
+					if (n != 0) {
+						//n->addRef();
+					}
 					b = n;
+					if (n != 0) {
+						//n->deleteRef(map, nodePool);
+					}
+					if (f != 0) {
+						//f->addRef();
+					}
 					n = f;
 				}
 			}
@@ -1031,8 +1210,8 @@ namespace skiplist
 		{
 			Comparable<K> *key = comparable(okey);
 			Node<K, V> *bound = NULL;
-			Index<K, V> *q = head;
-			Index<K, V> *r = q->right;
+			Index<K, V> *q = atomicHead.get();
+			Index<K, V> *r = q->atomicRight.get();
 			Node<K, V> *n;
 			K k;
 			int c;
@@ -1045,12 +1224,12 @@ namespace skiplist
 					if ((c = key->compareTo(k)) > 0)
 					{
 						q = r;
-						r = r->right;
+						r = r->atomicRight.get();
 						continue;
 					}
 					else if (c == 0)
 					{
-						void *v = n->value;
+						void *v = n->atomicValue.get();
 						return (v != NULL)? static_cast<V>(v): getUsingFindNode(key);
 					}
 					else
@@ -1063,7 +1242,7 @@ namespace skiplist
 				if ((d = q->down) != NULL)
 				{
 					q = d;
-					r = d->right;
+					r = d->atomicRight.get();
 				}
 				else
 				{
@@ -1072,13 +1251,13 @@ namespace skiplist
 			}
 
 			// Traverse nexts
-			for (n = q->node->next; n != NULL; n = n->next)
+			for (n = q->node->atomicNext.get(); n != NULL; n = n->atomicNext.get())
 			{
 				if ((k = n->key) != NULL)
 				{
 					if ((c = key->compareTo(k)) == 0)
 					{
-						void *v = n->value;
+						void *v = n->atomicValue.get();
 						return (v != NULL)? static_cast<V>(v): getUsingFindNode(key);
 					}
 					else if (c < 0)
@@ -1110,7 +1289,7 @@ namespace skiplist
 				{
 					return NULL;
 				}
-				void *v = &n->value;
+				void *v = n->atomicValue.get();
 				if (v != NULL)
 				{
 					return static_cast<V>(v);
@@ -1124,7 +1303,7 @@ namespace skiplist
 		 * Main insertion method.  Adds element if not present, or
 		 * replaces value if present and onlyIfAbsent is false.
 		 * @param kkey the key
-		 * @param value  the value that must be associated with key
+		 * @param vadlue  the value that must be associated with key
 		 * @param onlyIfAbsent if should not insert if already present
 		 * @return the old value, or null if newly inserted
 		 */
@@ -1136,27 +1315,40 @@ namespace skiplist
 			Comparable<K> *key = comparable(kkey);
 			for (;;)
 			{
-			if (callCount++ > 1000) {
-				printf("findPred\n");
+			//if (callCount++ > 1000) {
+			//	printf("findPred\n");
 				//fflush(stdout);
-				}
+			//	}
 				Node<K, V> *b = findPredecessor(key);
 				//printf("findPred - end\n");
 				//fflush(stdout);
 				Node<K, V> *n = b->atomicNext.get();//next;
+				if (n != 0) {
+					//n->addRef();
+				}
 				for (;;)
 				{
-			if (callCount++ > 1000) {
-				printf("inner\n");
+			//if (callCount++ > 1000) {
+			//	printf("inner\n");
 				//fflush(stdout);
-				}
+			//	}
 					if (n != NULL)
 					{
 						Node<K, V> *f = n->atomicNext.get();//next;
-						if (n != b->atomicNext.get()/*next*/) // inconsistent read
+						if (f != 0) {
+							//f->addRef();
+						}
+						if (n != b->atomicNext.get()) // inconsistent read
 						{
 							//printf("n != b->next\n");
 							//fflush(stdout);
+							if (f != 0) {
+							//	f->deleteRef(map, nodePool);
+							}
+							if (n != 0) {
+								//n->deleteRef(map, nodePool);
+							}
+							//b->deleteRef(map, nodePool);
 							break;
 						}
 						void *v = n->atomicValue.get();//value;
@@ -1165,16 +1357,28 @@ namespace skiplist
 							//printf("helpDelete\n");
 							//fflush(stdout);
 
-							n->helpDelete(b, f, nodePool);
-							//delete n->key;
-							//delete (V)n->value.get();
-							//delete n;
+							n->helpDelete(map, b, f, nodePool);
+							deleteNode(n);
+							if (f != 0) {
+							//	f->deleteRef(map, nodePool);
+							}
+							if (n != 0) {
+								//n->deleteRef(map, nodePool);
+							}
+							//b->deleteRef(map, nodePool);
 							break;
 						}
-						if (v == n || b->atomicValue.get()/*value*/ == NULL) // b is deleted
+						if (v == n || b->atomicValue.get() == NULL) // b is deleted
 						{
 							//printf("v == n || b->value == NULL\n");
 							//fflush(stdout);
+							if (f != 0) {
+							//	f->deleteRef(map, nodePool);
+							}
+							if (n != 0) {
+								//n->deleteRef(map, nodePool);
+							}
+							//b->deleteRef(map, nodePool);
 							break;
 						}
 
@@ -1186,7 +1390,17 @@ namespace skiplist
 						{
 						//printf("compareTo - c > 0\n");
 						//fflush(stdout);
+							if (n != 0) {
+							//	n->addRef();
+							}
+							//b->deleteRef(map, nodePool);
 							b = n;
+							if (f != 0) {
+								//f->addRef();
+							}
+							if (n != 0) {
+							//	n->deleteRef(map, nodePool);
+							}
 							n = f;
 							continue;
 						}
@@ -1198,16 +1412,34 @@ namespace skiplist
 								if (!onlyIfAbsent) {
 					//				n->value = value;
 								}
-								keyImplPool->free(((Key*)key)->key);
-								keyPool->free((PoolableObject*)kkey);
+								//((Key*)key)->key->free(dataTypes);
+								//keyImplPool->free(((Key*)key)->key);
+								//keyPool->free(kkey);
+								if (f != 0) {
+							//		f->deleteRef(map, nodePool);
+								}
+								if (n != 0) {
+									//n->deleteRef(map, nodePool);
+								}
+							//	b->deleteRef(map, nodePool);
 								return static_cast<V>(prev);
 							}
 							else
 							{
 						//printf("compareTo - c == 0, break\n");
 						//fflush(stdout);
+								if (f != 0) {
+							//		f->deleteRef(map, nodePool);
+								}
+								if (n != 0) {
+									//n->deleteRef(map, nodePool);
+								}
+							//	b->deleteRef(map, nodePool);
 								break; // restart if lost race to replace value
 							}
+						}
+						if (f != 0) {
+							//f->deleteRef(map, nodePool);
 						}
 						// else c < 0; fall through
 					}
@@ -1229,12 +1461,25 @@ namespace skiplist
 						//printf("newNode - end\n");
 						//fflush(stdout);
 
+					z->addRef();
 					if (!b->casNext(n, z))
 					{
+						//z->key = 0;
+						//z->atomicValue.set(0);
+						//z->deleteRef(map, nodePool);
+
 						//printf("!b->casNext(n, z)\n");
 						//fflush(stdout);
 
+						//f->deleteRef(nodePool);
+						if (n != 0) {
+							//n->deleteRef(map, nodePool);
+						}
+						//b->deleteRef(map, nodePool);
 						break; // restart if lost race to append to b
+					}
+					if (n != 0) {
+						n->deleteRef(map, nodePool);
 					}
 					//b->next = z;
 
@@ -1242,12 +1487,19 @@ namespace skiplist
 					//rng.seed(std::random_device()());
 					//std::uniform_int_distribution<std::mt19937::result_type> dist(0, INT_MAX);
 
-					int r = rand() % INT_MAX;//dist(rng);
-					r ^= r << 13;   // xorshift
-					r ^= r >> 17;
-					r ^= r << 5;
+					int x = randomSeed;
+					x ^= x << 13;
+					x ^= static_cast<int>(static_cast<unsigned int>(x) >> 17);
+					randomSeed = x ^= x << 5;
 
-			        if ((r & 0x80000001) == 0)  // test highest and lowest bits
+					int r = x;//rand() % INT_MAX;//dist(rng);
+//					r ^= r << 13;   // xorshift
+//					r ^= r >> 17;
+//					r ^= r << 5;
+
+					//if enabled, puts eventually hang
+			        //if ((r & 0x80000001) == 0)  // test highest and lowest bits
+					if ((r & 0x00000001) == 0)  // test highest and lowest bits
 					{
 						int level = 1, max;
 						while (((r >>= 1) & 1) != 0)
@@ -1262,6 +1514,11 @@ namespace skiplist
 							insertIndex(key, z, level);
 						//}
 					}
+					//f->deleteRef(map, nodePool);
+					if (n != 0) {
+						//n->deleteRef(map, nodePool);
+					}
+					//b->deleteRef(map, nodePool);
 					return NULL;
 				}
 			}
@@ -1318,7 +1575,9 @@ namespace skiplist
 				Index<K, V> *idx = NULL;
 				for (int i = 1; i <= level; ++i)
 				{
-					idx = new Index<K, V>(z, idx, NULL);
+					Index<K, V> *prev = idx;
+					idx = indexPool->allocate();
+					idx->init(z, prev, NULL);// new Index<K, V>(z, idx, NULL);
 				}
 				addIndex(key, idx, h, level);
 
@@ -1340,7 +1599,9 @@ namespace skiplist
 				Index<K, V> *idx = NULL;
 				for (int i = 1; i <= level; ++i)
 				{
-					idxs[i] = idx = new Index<K, V>(z, idx, NULL);
+					Index<K, V> *prev = idx;
+					idxs[i] = idx = indexPool->allocate();
+					idxs[i]->init(z, prev, NULL);// new Index<K, V>(z, idx, NULL);
 				}
 
 				HeadIndex<K, V> *oldh;
@@ -1399,7 +1660,7 @@ namespace skiplist
 				//printf("addIndex\n");
 				int j = h->level;
 				Index<K, V> *q = h;
-				Index<K, V> *r = q->atomicRight.get();//right;
+				Index<K, V> *r = q->right;//q->atomicRight.get();//right;
 				Index<K, V> *t = idx;
 				for (;;)
 				{
@@ -1415,24 +1676,24 @@ namespace skiplist
 						int c = key->compareTo(n->key);
 						if (n->value == NULL)
 						{
-							if (!q->unlink(r))
+							if (!q->unlink(map, nodePool, r))
 							{
 								break;
 							}
-							r = q->atomicRight.get();//right;
+							r = q->right;//q->atomicRight.get();//right;
 							continue;
 						}
 						if (c > 0)
 						{
 							q = r;
-							r = r->atomicRight.get();//right;
+							r = r->right;//r->atomicRight.get();//right;
 							continue;
 						}
 					}
 
 					if (j == insertionLevel)
 					{
-						if (!q->link(r, t))
+						if (!q->link(map, r, t))
 						{
 							break; // restart
 						}
@@ -1458,7 +1719,7 @@ namespace skiplist
 						t = t->down;
 					}
 					q = q->down;
-					r = q->atomicRight.get();//right;
+					r = q->right;//q->atomicRight.get();//right;
 				}
 			}
 		}
@@ -1490,9 +1751,9 @@ namespace skiplist
 						Node<K, V> *n = r->node;
 						// compare before deletion check avoids needing recheck
 						int c = key->compareTo(n->key);
-						if (n->value == NULL)
+						if (n->atomicValue.get() == NULL)
 						{
-							if (!q->unlink(r))
+							if (!q->unlink(map, nodePool, r))
 							{
 								break;
 							}
@@ -1509,7 +1770,7 @@ namespace skiplist
 
 					if (j == insertionLevel)
 					{
-						if (!q->link(r, t))
+						if (!q->link(map, r, t))
 						{
 							break; // restart
 						}
@@ -1541,7 +1802,6 @@ namespace skiplist
 		}
 
 		/* ---------------- Deletion -------------- */
-/
 		/**
 		 * Main deletion method. Locates node, nulls value, appends a
 		 * deletion marker, unlinks predecessor, removes associated index
@@ -1568,47 +1828,68 @@ namespace skiplist
 			Comparable<K> *key = comparable(okey);
 			for (;;)
 			{
-						if (callCount++ > 1000) {
+						//if (callCount++ > 1000) {
 
-				 printf("outer\n");
-				 fflush(stdout);
-}
+				 //printf("outer\n");
+				 //fflush(stdout);
+//}
 
 				Node<K, V> *b = findPredecessor(key);
 				Node<K, V> *n = b->atomicNext.get();//next;
+				if (n != 0) {
+					//n->addRef();
+				}
 				for (;;)
 				{
 					if (n == NULL)
 					{
+						//b->deleteRef(map, nodePool);
 						return NULL;
 					}
 					Node<K, V> *f = n->atomicNext.get();//next;
+			 		if (f != 0) {
+						//f->addRef();
+					}
 					if (n != b->atomicNext.get()/*next*/) // inconsistent read
 					{
-						printf("n != b->next\n");
-						fflush(stdout);
+						//printf("n != b->next\n");
+						//fflush(stdout);
+						if (f != 0) {
+							//f->deleteRef(map, nodePool);
+						}
 						break;
 					}
 					void *v = n->atomicValue.get();//value;
 					if (v == NULL)
 					{ // n is deleted
-						n->helpDelete(b, f, nodePool);
-						//delete n->key;
-						//delete (V)n->value.get();
-						//delete n;
-						printf("v == NULL\n");
-						fflush(stdout);
+						n->helpDelete(map, b, f, nodePool);
+						deleteNode(n);
+						//printf("v == NULL\n");
+						//fflush(stdout);
+						if (f != 0) {
+							//f->deleteRef(map, nodePool);
+						}
 						break;
 					}
 					if (v == n || b->atomicValue.get()/*value*/ == NULL) // b is deleted
 					{
-						printf("v == n || b->value == NULL\n");
-						fflush(stdout);
+						//printf("v == n || b->value == NULL\n");
+						//fflush(stdout);
+						if (f != 0) {
+							//f->deleteRef(map, nodePool);
+						}
 						break;
 					}
 					int c = key->compareTo(n->key);
 					if (c < 0)
 					{
+						if (f != 0) {
+							//f->deleteRef(map, nodePool);
+						}
+						if (n != 0) {
+							//n->deleteRef(map, nodePool);
+						}
+				//		b->deleteRef(map, nodePool);
 						return NULL;
 					}
 					if (c > 0)
@@ -1616,46 +1897,100 @@ namespace skiplist
 						//printf("c > 0\n");
 						//fflush(stdout);
 
+						//b->deleteRef(map, nodePool);
+						if (n != 0) {
+							n->addRef();
+						}
 						b = n;
+						if (f != 0) {
+							//f->addRef();
+						}
+						if (n != 0) {
+							n->deleteRef(map, nodePool);
+						}
 						n = f;
 						continue;
 					}
 					if (value != NULL && !((V)value)->equals(v))
 					{
+						if (f != 0) {
+							//f->deleteRef(map, nodePool);
+						}
+						if (n != 0) {
+							//n->deleteRef(map, nodePool);
+						}
+						//b->deleteRef(map, nodePool);
 						return NULL;
 					}
 					void *prev = v;
 					if (!n->casValue(prev, NULL))
 					{
-						printf("!n->casValue(prev, NULL)\n");
-						fflush(stdout);
+						//printf("!n->casValue(prev, NULL)\n");
+						//fflush(stdout);
 
+						if (f != 0) {
+							//f->deleteRef(map, nodePool);
+						}
 						break;
 					}
-					n->value = NULL;
+					//n->value = NULL;
 					//delete (V)prev;
-					Node<K, V> *z = (Node<K, V>*)nodePool->allocate();
-					z->init(f);
-					if (!n->appendMarker(f, z) || !b->casNext(n, f))
+
+					//Node<K, V> *z = (Node<K, V>*)nodePool->allocate();
+					//z->init(f);
+
+					//bool appended = n->appendMarker(f, z);
+					bool appended = n->appendMarker(map, nodePool, f);
+
+					//f->addRef();
+					if (!appended)
+					{
+						//if (!appended) {
+						//	pushNodeDelete(map, z);
+						//}
+						findNode(key); // Retry via findNode
+						//f->deleteRef(map, nodePool);
+					}
+					else if (!b->casNext(n, f)) 
 					{
 						findNode(key); // Retry via findNode
+						//f->deleteRef(map, nodePool);
 					}
 					else
 					{
-						b->next = f;
-						findPredecessor(key); // Clean index
-						if (head->atomicRight.get()/*right*/ == NULL)
+						//n->atomicNext.set(0);
+						n->deleteRef(map, nodePool);
+						//pushNodeDelete(map, n);
+
+//						b->next = f;
+						Node<K, V> * x = findPredecessor(key); // Clean index
+						if (atomicHead.get()->atomicRight.get()/*right*/ == NULL)
 						{
 							tryReduceLevel();
 						}
-
-						keyImplPool->free(((Key*)n->key)->key);
-						keyPool->free((PoolableObject*)n->key);
-						//valuePool->free((PoolableObject*)n->value);
-						nodePool->free(n);
+						if (x != 0) {
+							//x->deleteRef(map, nodePool);
+						}
 					}
+					//((Key*)n->key)->key->free(dataTypes);
+					//keyImplPool->free(((Key*)n->key)->key);
+					//keyPool->free(n->key);
+					//nodePool->free(n);
+
+
+					if (f != 0) {
+						//f->deleteRef(map, nodePool);
+					}
+					if (n != 0) {
+						//n->deleteRef(map, nodePool);
+					}
+					//b->deleteRef(map, nodePool);
 					return static_cast<V>(prev);
 				}
+				if (n != 0) {
+					//n->deleteRef(map, nodePool);
+				}
+				//b->deleteRef(map, nodePool);
 			}
 		}
 
@@ -1682,14 +2017,16 @@ namespace skiplist
 	private:
 		void tryReduceLevel()
 		{
-			HeadIndex<K, V> *h = head;
+			HeadIndex<K, V> *h = atomicHead.get();
 			HeadIndex<K, V> *d;
 			HeadIndex<K, V> *e;
 			if (h->level > 3 && (d = static_cast<ConcurrentSkipListMap::HeadIndex<K, V>*>(h->down)) != NULL && 
-				(e = static_cast<ConcurrentSkipListMap::HeadIndex<K, V>*>(d->down)) != NULL && e->right == NULL &&
-				d->right == NULL && h->right == NULL && casHead(h, d) && h->right != NULL) // recheck
+				(e = static_cast<ConcurrentSkipListMap::HeadIndex<K, V>*>(d->down)) != NULL && e->atomicRight.get() == NULL &&
+				d->atomicRight.get() == NULL && h->atomicRight.get() == NULL && casHead(h, d) && h->atomicRight.get() != NULL) // recheck
 			{
-				casHead(d, h); // try to backout
+				if (casHead(d, h)) { // try to backout
+					//pushIndexDelete(map, d);
+				}
 			}
 		}
 
@@ -1704,22 +2041,18 @@ namespace skiplist
 		{
 			for (;;)
 			{
-				Node<K, V> *b = head->node;
-				Node<K, V> *n = b->next;
+				Node<K, V> *b = atomicHead.get()->node;
+				Node<K, V> *n = b->atomicNext.get();
 				if (n == NULL)
 				{
 					return NULL;
 				}
-				if (n->value != NULL)
+				if (n->atomicValue.get() != NULL)
 				{
 					return n;
 				}
-				n->helpDelete(b, n->next, nodePool);
-
-				keyImplPool->free(((Key*)n->key)->key);
-				keyPool->free((PoolableObject*)n->key);
-				valuePool->free((PoolableObject*)n->value);
-				nodePool->free(n);
+				n->helpDelete(map, b, n->atomicNext.get(), nodePool);
+				deleteNode(n);
 			}
 		}
 
@@ -1731,24 +2064,22 @@ namespace skiplist
 		{
 			for (;;)
 			{
-				Node<K, V> *b = head->node;
-				Node<K, V> *n = b->next;
+				Node<K, V> *b = atomicHead.get()->node;
+				Node<K, V> *n = b->atomicNext.get();
 				if (n == NULL)
 				{
 					return NULL;
 				}
-				Node<K, V> *f = n->next;
-				if (n != b->next)
+				Node<K, V> *f = n->atomicNext.get();
+				if (n != b->atomicNext.get())
 				{
 					continue;
 				}
-				void *v = n->value;
+				void *v = n->atomicValue.get();
 				if (v == NULL)
 				{
-					n->helpDelete(b, f, nodePool);
-					//delete n->key;
-					//delete (V)n->value.get();
-					//delete n;
+					n->helpDelete(map, b, f, nodePool);
+					deleteNode(n);
 					continue;
 				}
 				void *prev = v;
@@ -1756,13 +2087,24 @@ namespace skiplist
 				{
 					continue;
 				}
-				valuePool->free((PoolableObject*)prev);
+				valuePool->free((V)prev);
 
-				Node<K, V> *z = (Node<K, V>*)nodePool->allocate();
-				z->init(f);
-				if (!n->appendMarker(f, z) || !b->casNext(n, f))
-				{
+				//Node<K, V> *z = (Node<K, V>*)nodePool->allocate();
+				//z->init(f);
+
+				f->addRef();
+				if (!n->appendMarker(map, nodePool, f)) {
+					//pushNodeDelete(map, z);
 					findFirst(); // retry
+					f->deleteRef(map, nodePool);
+				}
+				else if (!b->casNext(n, f)) {
+					findFirst(); // retry
+					f->deleteRef(map, nodePool);
+				}
+				else {
+					n->deleteRef(map, nodePool);
+					//pushNodeDelete(map, n);
 				}
 				clearIndexToFirst();
 				return new typename AbstractMap<K,V>::template SimpleImmutableEntry<K, V>(n->key, static_cast<V>(v));
@@ -1777,17 +2119,17 @@ namespace skiplist
 		{
 			for (;;)
 			{
-				Index<K, V> *q = head;
+				Index<K, V> *q = atomicHead.get();
 				for (;;)
 				{
-					Index<K, V> *r = q->right;
-					if (r != NULL && r->indexesDeletedNode() && !q->unlink(r))
+					Index<K, V> *r = q->atomicRight.get();
+					if (r != NULL && r->indexesDeletedNode() && !q->unlink(map, nodePool, r))
 					{
 						break;
 					}
 					if ((q = q->down) == NULL)
 					{
-						if (head->right == NULL)
+						if (atomicHead.get()->atomicRight.get() == NULL)
 						{
 							tryReduceLevel();
 						}
@@ -1812,16 +2154,16 @@ namespace skiplist
 			 * because this doesn't use comparisons.  So traversals of
 			 * both levels are folded together.
 			 */
-			Index<K, V> *q = head;
+			Index<K, V> *q = atomicHead.get();
 			for (;;)
 			{
 				Index<K, V> *d, *r;
-				if ((r = q->right) != NULL)
+				if ((r = q->atomicRight.get()) != NULL)
 				{
 					if (r->indexesDeletedNode())
 					{
-						q->unlink(r);
-						q = head; // restart
+						q->unlink(map, nodePool, r);
+						q = atomicHead.get(); // restart
 					}
 					else
 					{
@@ -1835,35 +2177,33 @@ namespace skiplist
 				else
 				{
 					Node<K, V> *b = q->node;
-					Node<K, V> *n = b->next;
+					Node<K, V> *n = b->atomicNext.get();
 					for (;;)
 					{
 						if (n == NULL)
 						{
 							return (b->isBaseHeader())? NULL : b;
 						}
-						Node<K, V> *f = n->next; // inconsistent read
-						if (n != b->next)
+						Node<K, V> *f = n->atomicNext.get(); // inconsistent read
+						if (n != b->atomicNext.get())
 						{
 							break;
 						}
-						void *v = n->value;
+						void *v = n->atomicValue.get();
 						if (v == NULL)
 						{ // n is deleted
-							n->helpDelete(b, f, nodePool);
-							//delete n->key;
-							//delete (V)n->value.get();
-							//delete n;
+							n->helpDelete(map, b, f, nodePool);
+							deleteNode(n);
 							break;
 						}
-						if (v == n || b->value == NULL) // b is deleted
+						if (v == n || b->atomicValue.get() == NULL) // b is deleted
 						{
 							break;
 						}
 						b = n;
 						n = f;
 					}
-					q = head; // restart
+					q = atomicHead.get(); // restart
 				}
 			}
 		}
@@ -1880,19 +2220,19 @@ namespace skiplist
 		{
 			for (;;)
 			{
-				Index<K, V> *q = head;
+				Index<K, V> *q = atomicHead.get();
 				for (;;)
 				{
 					Index<K, V> *d, *r;
-					if ((r = q->right) != NULL)
+					if ((r = q->atomicRight.get()) != NULL)
 					{
 						if (r->indexesDeletedNode())
 						{
-							q->unlink(r);
+							q->unlink(map, nodePool, r);
 							break; // must restart
 						}
 						// proceed as far across as possible without overshooting
-						if (r->node->next != NULL)
+						if (r->node->atomicNext.get() != NULL)
 						{
 							q = r;
 							continue;
@@ -1921,7 +2261,7 @@ namespace skiplist
 			for (;;)
 			{
 				Node<K, V> *b = findPredecessorOfLast();
-				Node<K, V> *n = b->next;
+				Node<K, V> *n = b->atomicNext.get();
 				if (n == NULL)
 				{
 					if (b->isBaseHeader()) // empty
@@ -1935,21 +2275,19 @@ namespace skiplist
 				}
 				for (;;)
 				{
-					Node<K, V> *f = n->next;
-					if (n != b->next) // inconsistent read
+					Node<K, V> *f = n->atomicNext.get();
+					if (n != b->atomicNext.get()) // inconsistent read
 					{
 						break;
 					}
-					void *v = n->value;
+					void *v = n->atomicValue.get();
 					if (v == NULL)
 					{ // n is deleted
-						n->helpDelete(b, f, nodePool);
-						//delete n->key;
-						//delete (V)n->value.get();
-						//delete n;
+						n->helpDelete(map, b, f, nodePool);
+						deleteNode(n);
 						break;
 					}
-					if (v == n || b->value == NULL) // b is deleted
+					if (v == n || b->atomicValue.get() == NULL) // b is deleted
 					{
 						break;
 					}
@@ -1964,20 +2302,29 @@ namespace skiplist
 					{
 						break;
 					}
-					valuePool->free((PoolableObject*)prev);
+					valuePool->free((V)prev);
 					K key = n->key;
 					Comparable<K> *ck = comparable(key);
 
-					Node<K, V> *z = (Node<K, V>*)nodePool->allocate();
-					z->init(f);
-					if (!n->appendMarker(f, z) || !b->casNext(n, f))
+					//Node<K, V> *z = (Node<K, V>*)nodePool->allocate();
+					//z->init(f);
+
+					bool appended = n->appendMarker(map, nodePool, f);
+					f->addRef();
+					if (!appended || !b->casNext(n, f))
 					{
+						//if (!appended) {
+						//	pushNodeDelete(map, z);
+						//}
 						findNode(ck); // Retry via findNode
+						f->deleteRef(map, nodePool);
 					}
 					else
 					{
+						n->deleteRef(map, nodePool);
+						//pushNodeDelete(map, n);
 						findPredecessor(ck); // Clean index
-						if (head->right == NULL)
+						if (atomicHead.get()->atomicRight.get() == NULL)
 						{
 							tryReduceLevel();
 						}
@@ -2024,10 +2371,8 @@ namespace skiplist
 					void *v = n->atomicValue.get();//value;
 					if (v == NULL)
 					{ // n is deleted
-						n->helpDelete(b, f, nodePool);
-						//delete n->key;
-						//delete (V)n->value.get();
-						//delete n;
+						n->helpDelete(map, b, f, nodePool);
+						deleteNode(n);
 						break;
 					}
 					if (v == n || b->atomicValue.get()/*value*/ == NULL) // b is deleted
@@ -2079,12 +2424,14 @@ namespace skiplist
 		 * Constructs a new, empty map, sorted according to the
 		 * {@linkplain Comparable natural ordering} of the keys.
 		 */
-		ConcurrentSkipListMap(PooledObjectPool *keyPool, PooledObjectPool *keyImplPool,
-			PooledObjectPool *valuePool) : comparatorField(NULL)
+		ConcurrentSkipListMap(void *map, PooledObjectPool<Key*> *keyPool, PooledObjectPool<KeyImpl*> *keyImplPool,
+			PooledObjectPool<MyValue*> *valuePool, int *dataTypes) : comparatorField(NULL)
 		{
+			this->map = map;
 			this->keyPool = keyPool;
 			this->keyImplPool = keyImplPool;
 			this->valuePool = valuePool;
+			this->dataTypes = dataTypes;
 			initialize();
 		}
 
@@ -2146,7 +2493,7 @@ namespace skiplist
 				throw NullPointerException();
 			}
 
-			HeadIndex<K, V> *h = head;
+			HeadIndex<K, V> *h = atomicHead.get();
 			Node<K, V> *basepred = h->node;
 
 			// Track the current rightmost node at each level. Uses an
@@ -2182,6 +2529,7 @@ namespace skiplist
 				}
 				Node<K, V> *z = new Node<K, V>(k, v, NULL);
 				basepred->next = z;
+				z->addRef();
 				basepred->atomicNext.set(z);
 				basepred = z;
 				if (j > 0)
@@ -2189,7 +2537,9 @@ namespace skiplist
 					Index<K, V> *idx = NULL;
 					for (int i = 1; i <= j; ++i)
 					{
-						idx = new Index<K, V>(z, idx, NULL);
+						Index<K, V> *prev = idx;
+						idx = indexPool->allocate();
+						idx->init(z, prev, NULL);// new Index<K, V>(z, idx, NULL);
 						if (i > h->level)
 						{
 							h = new HeadIndex<K, V>(h->node, h, idx, i);
@@ -2208,7 +2558,6 @@ namespace skiplist
 				}
 				it++;
 			}
-			head = h;
 			atomicHead.set(h);
 		}
 
@@ -2302,7 +2651,7 @@ namespace skiplist
 			{
 				throw NullPointerException();
 			}
-			for (Node<K, V> *n = findFirst(); n != NULL; n = n->next)
+			for (Node<K, V> *n = findFirst(); n != NULL; n = n->atomicNext.get())
 			{
 				V v = n->getValidValue();
 				if (v != NULL && ((V)value)->equals(v))
@@ -2332,14 +2681,14 @@ namespace skiplist
 		virtual int size()
 		{
 			long long count = 0;
-			for (Node<K, V> *n = findFirst(); n != NULL; n = n->next)
+			for (Node<K, V> *n = findFirst(); n != NULL; n = n->atomicNext.get())
 			{
 				if (n->getValidValue() != NULL)
 				{
 					++count;
 				}
 			}
-			return (count >= std::numeric_limits<int>::max())? std::numeric_limits<int>::max() : static_cast<int>(count);
+			return static_cast<int>(count);
 		}
 
 		/**
@@ -2536,7 +2885,7 @@ namespace skiplist
 				{
 					return false;
 				}
-				void *v = n->value;
+				void *v = n->atomicValue.get();
 				if (v != NULL)
 				{
 					if (!oldValue->equals(v))
@@ -2548,7 +2897,7 @@ namespace skiplist
 					{
 						return true;
 					}
-					valuePool->free((PoolableObject*)prev);
+					valuePool->free((V)prev);
 				}
 			}
 		}
@@ -2576,7 +2925,7 @@ namespace skiplist
 				{
 					return NULL;
 				}
-				void *v = n->value;
+				void *v = n->atomicValue.get();
 				if (v != NULL && n->casValue(v, value))
 				{
 					return (V)v;
@@ -2888,7 +3237,7 @@ namespace skiplist
 					{
 						break;
 					}
-					void *x = next->value;
+					void *x = next->atomicValue.get();
 					if (x != NULL && x != next)
 					{
 						nextValue = static_cast<V>(x);
@@ -2914,12 +3263,12 @@ namespace skiplist
 				lastReturned = next;
 				for (;;)
 				{
-					next = next->next;
+					next = next->atomicNext.get();
 					if (next == NULL)
 					{
 						break;
 					}
-					void *x = next->value;
+					void *x = next->atomicValue.get();
 					if (x != NULL && x != next)
 					{
 						nextValue = static_cast<V>(x);
@@ -3707,14 +4056,14 @@ namespace skiplist
 			virtual int size()
 			{
 				long long count = 0;
-				for (ConcurrentSkipListMap::Node<K, V> *n = loNode(); isBeforeEnd(n); n = n->next)
+				for (ConcurrentSkipListMap::Node<K, V> *n = loNode(); isBeforeEnd(n); n = n->atomicNext.get())
 				{
 					if (n->getValidValue() != NULL)
 					{
 						++count;
 					}
 				}
-				return count >= std::numeric_limits<int>::max()? std::numeric_limits<int>::max() : static_cast<int>(count);
+				return static_cast<int>(count);
 			}
 
 			virtual bool isEmpty()
@@ -3728,7 +4077,7 @@ namespace skiplist
 				{
 					throw NullPointerException();
 				}
-				for (ConcurrentSkipListMap::Node<K, V> *n = loNode(); isBeforeEnd(n); n = n->next)
+				for (ConcurrentSkipListMap::Node<K, V> *n = loNode(); isBeforeEnd(n); n = n->atomicNext.get())
 				{
 					V v = n->getValidValue();
 					if (v != NULL && ((V)value)->equals(v))
@@ -3741,7 +4090,7 @@ namespace skiplist
 
 			virtual void clear()
 			{
-				for (ConcurrentSkipListMap::Node<K, V> *n = loNode(); isBeforeEnd(n); n = n->next)
+				for (ConcurrentSkipListMap::Node<K, V> *n = loNode(); isBeforeEnd(n); n = n->atomicNext.get())
 				{
 					if (n->getValidValue() != NULL)
 					{
@@ -4101,7 +4450,7 @@ namespace skiplist
 						{
 							break;
 						}
-						void *x = next->value;
+						void *x = next->atomicValue.get();
 						if (x != NULL && x != next)
 						{
 							if (!outerInstance->inBounds(next->key))
@@ -4146,12 +4495,12 @@ namespace skiplist
 				{
 					for (;;)
 					{
-						next = next->next;
+						next = next->atomicNext.get();
 						if (next == NULL)
 						{
 							break;
 						}
-						void *x = next->value;
+						void *x = next->atomicValue.get();
 						if (x != NULL && x != next)
 						{
 							if (outerInstance->tooHigh(next->key))
@@ -4176,7 +4525,7 @@ namespace skiplist
 						{
 							break;
 						}
-						void *x = next->value;
+						void *x = next->atomicValue.get();
 						if (x != NULL && x != next)
 						{
 							if (outerInstance->tooLow(next->key))
@@ -4289,7 +4638,7 @@ namespace skiplist
 		*/
 		//JAVA TO C++ CONVERTER TODO TASK: 'volatile' has a different meaning in C++:
 		//ORIGINAL LINE: private transient volatile AtomicJava<HeadIndex<K,V>> head;
-		HeadIndex<K, V>* head;
+
 		AtomicJava<HeadIndex<K, V>*> atomicHead;
 
 		/**

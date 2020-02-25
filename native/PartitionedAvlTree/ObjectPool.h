@@ -5,57 +5,68 @@
 //#include <bits/stdc++.h>
 #include <thread>
 #include <random>
+#include <cstring>
 #include <typeinfo>
 
-#define OBJECT_POOL_SIZE 250000
+#define OBJECT_POOL_SIZE 50000
 
 #define CORE_COUNT std::thread::hardware_concurrency()
 
+template<typename V>
 class PoolableObject {
 public:
 
-	virtual PoolableObject *allocate(int count) = 0;
+	virtual V allocate(int count) = 0;
 
-	virtual PoolableObject *getObjectAtOffset(PoolableObject *array, int offset) = 0;;
+	virtual V allocate() = 0;
 
-	virtual char *className() = 0;
+	virtual V getObjectAtOffset(V array, int offset) = 0;;
 
+	virtual const char *className() = 0;
 };
 
-#define FREE_POOL_SIZE 100000
+#define FREE_POOL_SIZE 1000000
 
+template<typename V>
 class FreePool {
 public:
-	PoolableObject **freePool = new PoolableObject*[FREE_POOL_SIZE];
+	V *freePool = new V[FREE_POOL_SIZE];
 	int freeFreedOffset = 0;
 	int freeAllocOffset = 0;
 
 	FreePool() {
-		memset(freePool, 0, FREE_POOL_SIZE * sizeof(PoolableObject*));
+		memset(freePool, 0, FREE_POOL_SIZE * sizeof(V));
 	 	freeFreedOffset = 0;
 		freeAllocOffset = 0;
 	}
 };
 
+template<typename V>
 class NonSafeObjectPool {
 public:
-	PoolableObject *obj;
+	V obj;
 	long currInnerPool;
 	long innerPoolOffset;
-	PoolableObject **innerPools = 0;
-	std::vector<FreePool*> freePools;
-	FreePool *currLastFreePool = 0;
+	V *innerPools = 0;
+	std::vector<FreePool<V>*> freePools;
+	FreePool<V> *currLastFreePool = 0;
 	int freePoolsSize = 0;
 public:
 
 NonSafeObjectPool() {
-	currLastFreePool = new FreePool();
+	currLastFreePool = new FreePool<V>();
 	freePools.push_back(currLastFreePool);
 	freePoolsSize++;
 }
 
+//~NonSafeObjectPool() {
+//	for (int i = 0; i < innerPoolOffset; i++) {
+//		delete innerPools[i];
+//	}
+//}
+
 void init() {
-	innerPools = new PoolableObject*[100000];
+	innerPools = new V[10000000];
 	innerPools[0] = obj->allocate(OBJECT_POOL_SIZE);
 	currInnerPool = 0;
 	innerPoolOffset = 0;
@@ -63,21 +74,29 @@ void init() {
 	//fflush(stdout);
 }
 
-PoolableObject *allocFromFree() {
-	return 0;
+V allocFromFree() {
 
-	FreePool *freePool = freePools[0];
+	FreePool<V> *freePool = freePools[0];
 	if (freePool->freeAllocOffset >= freePool->freeFreedOffset) {
-		if (freePool->freeAllocOffset >= FREE_POOL_SIZE) {
+		if (freePool->freeAllocOffset >= FREE_POOL_SIZE) 
+		{
+			//printf("freeAlloc > SIZE\n");
+			//fflush(stdout);
 			freePools.erase(freePools.begin());
 			freePoolsSize--;
 			if (freePools.size() == 0) {
-				currLastFreePool = new FreePool();
+				currLastFreePool = new FreePool<V>();
 				freePools.push_back(currLastFreePool);
 				freePoolsSize++;
+						//printf("allocating free pool\n");
+                		//fflush(stdout);
+
 			}
 			freePool = freePools[0];
 			if (freePool->freeAllocOffset >= freePool->freeFreedOffset) {
+					//printf("freeAlloc > freedOffset 2\n");
+            		//fflush(stdout);
+
 				return 0;
 			}
 		}
@@ -86,7 +105,7 @@ PoolableObject *allocFromFree() {
 		}
 	}
 
-	PoolableObject *ret = freePool->freePool[freePool->freeAllocOffset++];
+	V ret = freePool->freePool[freePool->freeAllocOffset++];
 	if (ret == 0) {
 		printf("returning null object\n");
 		fflush(stdout);
@@ -94,8 +113,7 @@ PoolableObject *allocFromFree() {
 	return ret;
 }
 
-PoolableObject *allocate() {
-
+V allocate() {
 	if (innerPools == 0) {
 		init();
 	}
@@ -106,7 +124,7 @@ PoolableObject *allocate() {
 		long currPool = currInnerPool;
 		long innerOffset = innerPoolOffset++;
 		if (innerOffset < OBJECT_POOL_SIZE && currPool == currInnerPool) {
-			PoolableObject *ret = obj->getObjectAtOffset(innerPools[currPool], innerOffset);
+			V ret = obj->getObjectAtOffset((V)innerPools[currPool], innerOffset);
 			//printf("returning pointer: %ld\n", (long)ret);
 			//fflush(stdout);
 			return ret;
@@ -115,7 +133,7 @@ PoolableObject *allocate() {
 			//printf("allocating new pool\n");
 			//fflush(stdout);
 			if (currPool == currInnerPool) {
-				PoolableObject *inner = obj->allocate(OBJECT_POOL_SIZE);
+				V inner = obj->allocate(OBJECT_POOL_SIZE);
 				innerPools[currInnerPool + 1]  = inner;//innerPools.push_back(inner);
 				currInnerPool++;
 				innerPoolOffset = 0;
@@ -123,10 +141,11 @@ PoolableObject *allocate() {
 		}
 	}
 }
-	void free(PoolableObject *obj) {
-		FreePool *freePool = currLastFreePool;
+	void free(V obj) {
+
+		FreePool<V> *freePool = currLastFreePool;
 		if (freePool->freeFreedOffset >= FREE_POOL_SIZE) {
-			freePool = new FreePool();
+			freePool = new FreePool<V>();
 			currLastFreePool = freePool;
 			//printf("past end\n");
 			//fflush(stdout);
@@ -144,10 +163,11 @@ PoolableObject *allocate() {
 
 extern void print_trace(void);
 
+template<typename V>
 class PooledObjectPool {
-	PoolableObject *obj;
-	int poolCount = CORE_COUNT / 4;
-	NonSafeObjectPool *pools = new NonSafeObjectPool[poolCount];
+	V obj;
+	int poolCount = CORE_COUNT;
+	NonSafeObjectPool<V> *pools = new NonSafeObjectPool<V>[poolCount];
 	std::atomic<int> *l = new std::atomic<int>[poolCount];
 	std::atomic<int> *fl = new std::atomic<int>[poolCount];
 	std::atomic<int> offset;
@@ -156,7 +176,7 @@ class PooledObjectPool {
 
 public:
 
-	PooledObjectPool(PoolableObject *obj) {
+	PooledObjectPool(V obj) {
 		this->obj = obj;
 		for (int i = 0; i < poolCount; i++) {
 			pools[i].obj = obj;
@@ -164,19 +184,29 @@ public:
 		offset.store(0);
 		for (int i = 0; i < poolCount; i++) {
 			l[i].store(0);
+			fl[i].store(0);
 		}
 	}
 
-	PoolableObject *allocate() {
-		while (false) {
+//	~PooledObjectPool() {
+//		delete pools;
+//	}
+
+	V allocate() {
+		return obj->allocate();
+
+		while (true) {
 			int o = abs(freeAllocOffset++) % poolCount;
 			int lval = 0;
 			if (fl[o].compare_exchange_strong(lval, 1)) {
-				PoolableObject *ret = pools[o].allocFromFree();
+				V ret = pools[o].allocFromFree();
 				if (ret == 0) {
 					fl[o].store(0);
 					break;
 				}
+				//printf("alloc from free %lu\n", (unsigned long)ret);
+				//fflush(stdout);
+
 				fl[o].store(0);
 				return ret;
 			}
@@ -186,7 +216,7 @@ public:
 			int o = abs(offset++) % poolCount;
 			int lval = 0;
 			if (l[o].compare_exchange_strong(lval, 1)) {
-				PoolableObject *ret = pools[o].allocate();
+				V ret = pools[o].allocate();
 				l[o].store(0);
 				return ret;
 			}
@@ -194,8 +224,8 @@ public:
 	}
 
 
-	void free(PoolableObject *obj) {
-
+	void free(V obj) {
+		delete obj;
 		return;
 		if (obj == 0) {
 			//printf("freeing null object\n");
@@ -210,6 +240,9 @@ public:
 		//	return;
 		//}
 			//printf("freeing actual object: class=%s\n", obj->className());
+			//fflush(stdout);
+
+			//printf("free %lu\n", (unsigned long)obj);
 			//fflush(stdout);
 		while (true) {
 			int o = abs(freeFreeOffset++) % poolCount;

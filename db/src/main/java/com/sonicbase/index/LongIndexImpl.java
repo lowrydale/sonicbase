@@ -32,6 +32,11 @@ public class LongIndexImpl implements IndexImpl {
     return longSkipIndex.get((long) key[0]);
   }
 
+  @Override
+  public void put(Object[][] key, Object[] value) {
+
+  }
+
   public Object put(Object[] key, Object id) {
     Object ret = longSkipIndex.put((Long) key[0], id);
     if (ret == null) {

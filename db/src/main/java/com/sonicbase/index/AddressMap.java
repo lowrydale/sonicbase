@@ -38,7 +38,7 @@ public class AddressMap {
   private final AtomicLong currOuterAddress = new AtomicLong();
   private final AtomicLong currPageId = new AtomicLong();
   private final Object[] mutexes = new Object[10_000];
-  private final Unsafe unsafe = getUnsafe();
+  public static final Unsafe unsafe = getUnsafe();
   private final boolean useUnsafe;
   private Thread compactionThread;
   private final DatabaseServer server;

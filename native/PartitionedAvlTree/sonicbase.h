@@ -117,6 +117,16 @@ struct sb_utf8str {
     int len;
 };
 
+extern void incrementNodeCount();
+extern void decrementNodeCount();
+extern void incrementIndexCount();
+extern void decrementIndexCount();
+extern void incrementNodeQCount();
+extern void decrementNodeQCount();
+extern void incrementIndexQCount();
+extern void decrementIndexQCount();
+
+
 long readLong(std::vector<jbyte> &vector, int offset);
 
 jboolean writeLong(long long int value, jbyte *bytes, int *offset, int len);
@@ -150,7 +160,7 @@ class KeyComparator : public KAVLComparator {
 	int compare(void *o1, void *o2);
 };
 
-class KeyImpl : public PoolableObject {
+class KeyImpl : public PoolableObject<KeyImpl*> {
 public:
 
 	KeyImpl() {
@@ -170,9 +180,11 @@ public:
 
 	virtual bool serializeKey(int* dataTypes, jbyte *bytes, int *offset, int len) = 0;
 
-	virtual PoolableObject *allocate(int count) = 0;
+	virtual KeyImpl *allocate(int count) = 0;
 
-	virtual PoolableObject *getObjectAtOffset(PoolableObject *array, int offset) = 0;
+	virtual KeyImpl *allocate() = 0;
+
+	virtual KeyImpl *getObjectAtOffset(KeyImpl *array, int offset) = 0;
 
 	virtual void free(int *dataTypes) = 0;
 
@@ -181,23 +193,27 @@ public:
 };
 
 
-class Key : public Comparable<Key*>, public PoolableObject {
+class Key : public Comparable<Key*>, public PoolableObject<Key*> {
 public:
 	KeyImpl *key;
 
 	Key() {
 	}
 
-	PoolableObject *allocate(int count) {
+	Key *allocate(int count) {
 		return new Key[count];
 	}
 
-	virtual PoolableObject *getObjectAtOffset(PoolableObject *array, int offset) {
+	Key *allocate() {
+		return new Key();
+	}
+
+	virtual Key *getObjectAtOffset(Key *array, int offset) {
 		return &((Key*)array)[offset];
 	}
 
 
-	virtual char *className() {
+	virtual const char *className() {
 		return "Key";
 	};
 
@@ -251,15 +267,19 @@ public:
 		this->comparator = comparator;
 	}
 
-	virtual PoolableObject *allocate(int count) {
+	virtual KeyImpl *allocate(int count) {
 		return new CompoundKey[count];
 	}
 
-	virtual PoolableObject *getObjectAtOffset(PoolableObject *array, int offset) {
+	virtual KeyImpl *allocate() {
+		return new CompoundKey();
+	}
+
+	virtual KeyImpl *getObjectAtOffset(KeyImpl *array, int offset) {
 		return &((CompoundKey*)array)[offset];
 	}
 
-	virtual char *className() {
+	virtual const char *className() {
 		return "CompoundKey";
 	};
 
@@ -983,17 +1003,21 @@ public:
 		this->longKey = key;
 	}
 
-	virtual PoolableObject *allocate(int count) {
+	virtual KeyImpl *allocate(int count) {
 		//printf("allocate - class=%s, count=%d\n", className(), count);
 		//fflush(stdout);
 		return new DateKey[count];
 	}
 
-	virtual PoolableObject *getObjectAtOffset(PoolableObject *array, int offset) {
+	virtual KeyImpl *allocate() {
+		return new DateKey();
+	}
+
+	virtual KeyImpl *getObjectAtOffset(KeyImpl *array, int offset) {
 		return &((DateKey*)array)[offset];
 	}
 
-	virtual char *className() {
+	virtual const char *className() {
 		return "DateKey";
 	};
 
@@ -1046,17 +1070,21 @@ public:
 		this->longKey = key;
 	}
 
-	virtual PoolableObject *allocate(int count) {
+	virtual KeyImpl *allocate(int count) {
 		//printf("allocate - class=%s, count=%d\n", className(), count);
 		//fflush(stdout);
 		return new TimeKey[count];
 	}
 
-	virtual PoolableObject *getObjectAtOffset(PoolableObject *array, int offset) {
+	virtual KeyImpl *allocate() {
+		return new TimeKey();
+	}
+
+	virtual KeyImpl *getObjectAtOffset(KeyImpl *array, int offset) {
 		return &((TimeKey*)array)[offset];
 	}
 
-	virtual char *className() {
+	virtual const char *className() {
 		return "TimeKey";
 	};
 
@@ -1109,17 +1137,23 @@ public:
 		this->longKey = key;
 	}
 
-	virtual PoolableObject *allocate(int count) {
+	virtual KeyImpl *allocate(int count) {
 		//printf("allocate - class=%s, count=%d\n", className(), count);
 		//fflush(stdout);
 		return new LongKey[count];
 	}
 
-	virtual PoolableObject *getObjectAtOffset(PoolableObject *array, int offset) {
+	virtual KeyImpl *allocate() {
+		//printf("allocate - class=%s, count=%d\n", className(), count);
+		//fflush(stdout);
+		return new LongKey();
+	}
+
+	virtual KeyImpl *getObjectAtOffset(KeyImpl *array, int offset) {
 		return &((LongKey*)array)[offset];
 	}
 
-	virtual char *className() {
+	virtual const char *className() {
 		return "LongKey";
 	};
 
@@ -1172,17 +1206,23 @@ public:
 		this->intKey = key;
 	}
 
-	virtual PoolableObject *allocate(int count) {
+	virtual KeyImpl *allocate(int count) {
 		//printf("allocate - class=%s, count=%d\n", className(), count);
 		//fflush(stdout);
 		return new IntKey[count];
 	}
 
-	virtual PoolableObject *getObjectAtOffset(PoolableObject *array, int offset) {
+	virtual KeyImpl *allocate() {
+		//printf("allocate - class=%s, count=%d\n", className(), count);
+		//fflush(stdout);
+		return new IntKey();
+	}
+
+	virtual KeyImpl *getObjectAtOffset(KeyImpl *array, int offset) {
 		return &((IntKey*)array)[offset];
 	}
 
-	virtual char *className() {
+	virtual const char *className() {
 		return "IntKey";
 	};
 
@@ -1235,17 +1275,23 @@ public:
 		this->shortKey = key;
 	}
 
-	virtual PoolableObject *allocate(int count) {
+	virtual KeyImpl *allocate(int count) {
 		//printf("allocate - class=%s, count=%d\n", className(), count);
 		//fflush(stdout);
 		return new ShortKey[count];
 	}
 
-	virtual PoolableObject *getObjectAtOffset(PoolableObject *array, int offset) {
+	virtual KeyImpl *allocate() {
+		//printf("allocate - class=%s, count=%d\n", className(), count);
+		//fflush(stdout);
+		return new ShortKey();
+	}
+
+	virtual KeyImpl *getObjectAtOffset(KeyImpl *array, int offset) {
 		return &((ShortKey*)array)[offset];
 	}
 
-	virtual char *className() {
+	virtual const char *className() {
 		return "ShortKey";
 	};
 
@@ -1298,17 +1344,23 @@ public:
 		this->byteKey = key;
 	}
 
-	virtual PoolableObject *allocate(int count) {
+	virtual KeyImpl *allocate(int count) {
 		//printf("allocate - class=%s, count=%d\n", className(), count);
 		//fflush(stdout);
 		return new ByteKey[count];
 	}
 
-	virtual PoolableObject *getObjectAtOffset(PoolableObject *array, int offset) {
+	virtual KeyImpl *allocate() {
+		//printf("allocate - class=%s, count=%d\n", className(), count);
+		//fflush(stdout);
+		return new ByteKey();
+	}
+
+	virtual KeyImpl *getObjectAtOffset(KeyImpl *array, int offset) {
 		return &((ByteKey*)array)[offset];
 	}
 
-	virtual char *className() {
+	virtual const char *className() {
 		return "ByteKey";
 	};
 
@@ -1360,17 +1412,23 @@ public:
 		this->bigDecimalKey = key;
 	}
 
-	virtual PoolableObject *allocate(int count) {
+	virtual KeyImpl *allocate(int count) {
 		//printf("allocate - class=%s, count=%d\n", className(), count);
 		//fflush(stdout);
 		return new BigDecimalKey[count];
 	}
 
-	virtual PoolableObject *getObjectAtOffset(PoolableObject *array, int offset) {
+	virtual KeyImpl *allocate() {
+		//printf("allocate - class=%s, count=%d\n", className(), count);
+		//fflush(stdout);
+		return new BigDecimalKey();
+	}
+
+	virtual KeyImpl *getObjectAtOffset(KeyImpl *array, int offset) {
 		return &((BigDecimalKey*)array)[offset];
 	}
 
-	virtual char *className() {
+	virtual const char *className() {
 		return "BigDecimalKey";
 	};
 
@@ -1444,17 +1502,23 @@ public:
 //		this->stringKey = key;
 //	}
 
-	virtual PoolableObject *allocate(int count) {
+	virtual KeyImpl *allocate(int count) {
 		//printf("allocate - class=%s, count=%d\n", className(), count);
 		//fflush(stdout);
 		return new StringKey[count];
 	}
 
-	virtual PoolableObject *getObjectAtOffset(PoolableObject *array, int offset) {
+	virtual KeyImpl *allocate() {
+		//printf("allocate - class=%s, count=%d\n", className(), count);
+		//fflush(stdout);
+		return new StringKey();
+	}
+
+	virtual KeyImpl *getObjectAtOffset(KeyImpl *array, int offset) {
 		return &((StringKey*)array)[offset];
 	}
 
-	virtual char *className() {
+	virtual const char *className() {
 		return "StringKey";
 	};
 
@@ -1528,17 +1592,23 @@ public:
 		this->timestampKey = key;
 	}
 
-	virtual PoolableObject *allocate(int count) {
+	virtual KeyImpl *allocate(int count) {
 		//printf("allocate - class=%s, count=%d\n", className(), count);
 		//fflush(stdout);
 		return new TimestampKey[count];
 	}
 
-	virtual PoolableObject *getObjectAtOffset(PoolableObject *array, int offset) {
+	virtual KeyImpl *allocate() {
+		//printf("allocate - class=%s, count=%d\n", className(), count);
+		//fflush(stdout);
+		return new TimestampKey();
+	}
+
+	virtual KeyImpl *getObjectAtOffset(KeyImpl *array, int offset) {
 		return &((TimestampKey*)array)[offset];
 	}
 
-	virtual char *className() {
+	virtual const char *className() {
 		return "TimestampKey";
 	};
 
@@ -1598,17 +1668,23 @@ public:
 		this->doubleKey = key;
 	}
 
-	virtual PoolableObject *allocate(int count) {
+	virtual KeyImpl *allocate(int count) {
 		//printf("allocate - class=%s, count=%d\n", className(), count);
 		//fflush(stdout);
 		return new DoubleKey[count];
 	}
 
-	virtual PoolableObject *getObjectAtOffset(PoolableObject *array, int offset) {
+	virtual KeyImpl *allocate() {
+		//printf("allocate - class=%s, count=%d\n", className(), count);
+		//fflush(stdout);
+		return new DoubleKey();
+	}
+
+	virtual KeyImpl *getObjectAtOffset(KeyImpl *array, int offset) {
 		return &((DoubleKey*)array)[offset];
 	}
 
-	virtual char *className() {
+	virtual const char *className() {
 		return "DoubleKey";
 	};
 
@@ -1665,17 +1741,23 @@ public:
 		this->floatKey = key;
 	}
 
-	virtual PoolableObject *allocate(int count) {
+	virtual KeyImpl *allocate(int count) {
 		//printf("allocate - class=%s, count=%d\n", className(), count);
 		//fflush(stdout);
 		return new FloatKey[count];
 	}
 
-	virtual PoolableObject *getObjectAtOffset(PoolableObject *array, int offset) {
+	virtual KeyImpl *allocate() {
+		//printf("allocate - class=%s, count=%d\n", className(), count);
+		//fflush(stdout);
+		return new FloatKey();
+	}
+
+	virtual KeyImpl *getObjectAtOffset(KeyImpl *array, int offset) {
 		return &((FloatKey*)array)[offset];
 	}
 
-	virtual char *className() {
+	virtual const char *className() {
 		return "FloatKey";
 	};
 
@@ -1721,7 +1803,7 @@ public:
 };
 
 
-class MyValue : public Comparable<MyValue*>, public PoolableObject {
+class MyValue : public Comparable<MyValue*>, public PoolableObject<MyValue*> {
 public:
 	long value;
 	MyValue();
@@ -1736,34 +1818,113 @@ public:
 
 	virtual int hashCode();
 
-	PoolableObject *allocate(int count) {
+	MyValue *allocate(int count) {
 		return new MyValue[count];
 	}
 
-	virtual PoolableObject *getObjectAtOffset(PoolableObject *array, int offset) {
+	MyValue *allocate() {
+		return new MyValue();
+	}
+
+	virtual MyValue *getObjectAtOffset(MyValue *array, int offset) {
 		return &((MyValue*)array)[offset];
 	}
 
-	virtual char *className() {
+	virtual const char *className() {
 		return "MyValue";
 	};
 
 };
 
+extern uint64_t getCurrMillis();
 
-extern Key *javaKeyToNativeKey(JNIEnv *env, PooledObjectPool *keyPool, PooledObjectPool *keyImplPool, int *dataTypes, jobjectArray jKey, KeyComparator *comparator);
+#define TYPE_NODE 1
+#define TYPE_INDEX 2
+
+class DeleteQueueEntry {
+public:
+	DeleteQueueEntry() {
+		incrementNodeQCount();
+	}
+	~DeleteQueueEntry() {
+		decrementNodeQCount();
+	}
+	void *map = 0;
+	void *value = 0;
+	jbyte type = 0;
+	uint64_t time = 0;
+	DeleteQueueEntry *next = 0;
+	DeleteQueueEntry *prev = 0;
+};
+
+class DeleteQueue {
+	std::mutex queueLock;
+	DeleteQueueEntry *head = 0;
+	DeleteQueueEntry *tail = 0;
+
+public:
+	void push(DeleteQueueEntry *entry) {
+		{
+
+			entry->time = getCurrMillis();
+			std::lock_guard<std::mutex> lock(queueLock);
+			if (tail == 0) {
+				head = tail = entry;
+			}
+			else {
+				tail->next = entry;
+				entry->prev = tail;
+				tail = entry;
+			}
+		}
+	}
+
+	DeleteQueueEntry *pop() {
+		{
+			std::lock_guard<std::mutex> lock(queueLock);
+			if (head == 0) {
+				return 0;
+			}
+
+			//printf("times: curr=%lu, head=%lu\n", getCurrMillis(), head->time);
+			//fflush(stdout);
+			if (getCurrMillis() - head->time < 10000) {
+				return 0;
+			}
+
+			DeleteQueueEntry *ret = 0;
+			ret = head;
+			head = ret->next;
+			if (head == 0) {
+				tail = 0;
+			}
+			return ret;
+		}
+	}
+};
+
+
+extern void pushNodeDelete(void *map, void *value);
+
+extern void pushIndexDelete(void *map, void *value);
+
+
+extern Key *javaKeyToNativeKey(JNIEnv *env, PooledObjectPool<Key*> *keyPool, PooledObjectPool<KeyImpl*> *keyImplPool,
+       	int *dataTypes, jobjectArray jKey, KeyComparator *comparator, int fieldCount);
 
 extern uint32_t hashKey(JNIEnv* env, int* dataTypes, Key *key);
 
-extern void deleteKey(JNIEnv *env, int *dataTypes, Key *key);
+extern void deleteKey(JNIEnv *env, int *dataTypes, Key *key, PooledObjectPool<Key*> *keyPool, PooledObjectPool<KeyImpl*> *keyImplPool);
 
 extern jboolean serializeKeyValue(JNIEnv *env, int* dataTypes, jbyte *bytes, int len, int *offset, Key *key, uint64_t value);
 
 extern jobjectArray nativeKeyToJavaKey(JNIEnv *env, int *dataTypes, Key *key);
 
-extern PooledObjectPool *createKeyPool(JNIEnv * env, int *dataTypes, int fieldCount);
+extern PooledObjectPool<KeyImpl*> *createKeyPool(JNIEnv * env, int *dataTypes, int fieldCount);
 
 
 jint throwException(JNIEnv *env, const char *message);
+
+
 
 #endif

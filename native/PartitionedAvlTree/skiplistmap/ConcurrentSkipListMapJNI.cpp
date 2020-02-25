@@ -29,6 +29,9 @@
 
 #include <jni.h>
 
+#include "sonicbase.h"
+#include "ObjectPool.h"
+
 #include "Comparator.h"
 #include "Comparable.h"
 using namespace skiplist;
@@ -48,12 +51,11 @@ using namespace skiplist;
 #include "ConcurrentNavigableMap.h"
 #include "AtomicJava.h"
 #include "ConcurrentSkipListMap.h"
-#include "../sonicbase.h"
-#include "ObjectPool.h"
 
 #include "com_sonicbase_index_NativeSkipListMap.h"
 
 #define SB_DEBUG 0
+#define concurentThreadsSupported std::thread::hardware_concurrency()
 
 //template <class K, class V>
 //thread_local NonSafeObjectPool<typename ConcurrentSkipListMap<K,V>::template Node<K, V>>
@@ -95,49 +97,89 @@ int MyValue::hashCode() {
 	return value;
 }
 
-PooledObjectPool *createKeyPool(JNIEnv * env, int *dataTypes, int fieldCount) {
+std::atomic<unsigned long> nodeQCount;
+
+void incrementNodeQCount() {
+	nodeQCount++;
+}
+
+void decrementNodeQCount() {
+	nodeQCount--;
+}
+
+std::atomic<unsigned long> nodeCount;
+
+void incrementNodeCount() {
+	nodeCount++;
+}
+
+void decrementNodeCount() {
+	nodeCount--;
+}
+
+std::atomic<unsigned long> indexCount;
+
+void incrementIndexCount() {
+	indexCount++;
+}
+
+void decrementIndexCount() {
+	indexCount--;
+}
+
+std::atomic<unsigned long> indexQCount;
+
+void incrementIndexQCount() {
+	indexQCount++;
+}
+
+void decrementIndexQCount() {
+	indexQCount--;
+}
+
+PooledObjectPool<KeyImpl*> *createKeyPool(JNIEnv * env, int *dataTypes, int fieldCount) {
 
 	if (fieldCount > 1) {
-		return new PooledObjectPool(new CompoundKey());
+		return new PooledObjectPool<KeyImpl*>(new CompoundKey());
 	}
 
-	jint *types = dataTypes;
+	jint *types = (jint*)dataTypes;
 
 	int type = types[0];
 
 	switch (type) {
 	case ROWID:
 	case BIGINT:
-		return new PooledObjectPool(new LongKey());
+		return new PooledObjectPool<KeyImpl*>(new LongKey());
 	break;
 	case TIME:
-		return new PooledObjectPool(new TimeKey());
+		return new PooledObjectPool<KeyImpl*>(new TimeKey());
 	break;
 	case DATE:
-		return new PooledObjectPool(new DateKey());
+		return new PooledObjectPool<KeyImpl*>(new DateKey());
 	break;
 	case SMALLINT:
-		return new PooledObjectPool(new ShortKey());
+		return new PooledObjectPool<KeyImpl*>(new ShortKey());
 	break;
 	case INTEGER:
-		return new PooledObjectPool(new IntKey());
+		return new PooledObjectPool<KeyImpl*>(new IntKey());
 	break;
 	case TINYINT:
-		return new PooledObjectPool(new ByteKey());
+		return new PooledObjectPool<KeyImpl*>(new ByteKey());
 	break;
 	case TIMESTAMP:
-		return new PooledObjectPool(new TimestampKey());
+		return new PooledObjectPool<KeyImpl*>(new TimestampKey());
 	break;
 	case DOUBLE:
 	case FLOAT:
-		return new PooledObjectPool(new DoubleKey());
+		return new PooledObjectPool<KeyImpl*>(new DoubleKey());
 	break;
 	case REAL:
-		return new PooledObjectPool(new FloatKey());
+		return new PooledObjectPool<KeyImpl*>(new FloatKey());
 	break;
 	case NUMERIC:
 	case DECIMAL:
-		return new PooledObjectPool(new BigDecimalKey());
+		return new PooledObjectPool<KeyImpl*>(new BigDecimalKey());
 	break;
 	case VARCHAR:
 	case CHAR:
@@ -146,7 +188,7 @@ PooledObjectPool *createKeyPool(JNIEnv * env, int *dataTypes, int fieldCount) {
 	case NVARCHAR:
 	case LONGNVARCHAR:
 	case NCLOB:
-		return new PooledObjectPool(new StringKey());
+		return new PooledObjectPool<KeyImpl*>(new StringKey());
 	break;
 
 	default:
@@ -168,9 +210,9 @@ public:
 	int *dataTypes = 0;
 	int fieldCount = 0;
 	ConcurrentSkipListMap<Key*, MyValue*> *map;
-	PooledObjectPool *keyPool;
-	PooledObjectPool *keyImplPool;
-	PooledObjectPool *valuePool;
+	PooledObjectPool<Key*> *keyPool;
+	PooledObjectPool<KeyImpl*> *keyImplPool;
+	PooledObjectPool<MyValue*> *valuePool;
 
 	~SkipListMap() {
 		delete comparator;
@@ -185,12 +227,12 @@ public:
 		memcpy( (void*)this->dataTypes, (void*)types, fieldCount * sizeof(int));
 		comparator = new KeyComparator(env, indexId, fieldCount, this->dataTypes);
 
-		valuePool = new PooledObjectPool(new MyValue());
+		valuePool = new PooledObjectPool<MyValue*>(new MyValue());
 
 		env->ReleaseIntArrayElements(dataTypes, types, 0);
 
-		keyImplPool = createKeyPool(env, types, fieldCount);
-		keyPool = new PooledObjectPool(new Key());
+		keyImplPool = createKeyPool(env, this->dataTypes, fieldCount);
+		keyPool = new PooledObjectPool<Key*>(new Key());
 
 /*
 		for (int i = 0; i < 100; i++) {
@@ -208,7 +250,7 @@ public:
 
 		//printf("creating map\n");
 		//fflush(stdout);
-		map = new ConcurrentSkipListMap <Key*, MyValue *>(keyPool, keyImplPool, valuePool);
+		map = new ConcurrentSkipListMap <Key*, MyValue *>(this, keyPool, keyImplPool, valuePool, this->dataTypes);
 		//printf("created map\n");
 		//fflush(stdout);
     }
@@ -218,10 +260,10 @@ public:
 		this->dataTypes = dataTypes;
 		comparator = new KeyComparator(env, indexId, fieldCount, this->dataTypes);
 
-		valuePool = new PooledObjectPool(new MyValue());
+		valuePool = new PooledObjectPool<MyValue*>(new MyValue());
 
 		keyImplPool = createKeyPool(env, dataTypes, fieldCount);
-		keyPool = new PooledObjectPool(new Key());
+		keyPool = new PooledObjectPool<Key*>(new Key());
 
 /*
 		for (int i = 0; i < 100; i++) {
@@ -239,7 +281,7 @@ public:
 
 		//printf("creating map\n");
 		//fflush(stdout);
-		map = new ConcurrentSkipListMap <Key*, MyValue *>(keyPool, keyImplPool, valuePool);
+		map = new ConcurrentSkipListMap <Key*, MyValue *>(this, keyPool, keyImplPool, valuePool, this->dataTypes);
 		//printf("created map\n");
 		//fflush(stdout);
     }
@@ -263,18 +305,165 @@ SkipListMap *getSkipListMap(JNIEnv *env, jlong indexId) {
 }
 
 
-#include <execinfo.h>
-void print_trace(void) {
-    char **strings;
-    size_t i, size;
-    enum Constexpr { MAX_SIZE = 1024 };
-    void *array[MAX_SIZE];
-    size = backtrace(array, MAX_SIZE);
-    strings = backtrace_symbols(array, size);
-    for (i = 0; i < size; i++)
-        printf("%s\n", strings[i]);
-    puts("");
-    free(strings);
+
+DeleteQueue *nodeDeleteQueue = new DeleteQueue();
+
+std::thread **deleteThreads;
+
+
+void nodeDeleteRunner() {
+	printf("started nodeDelete runner");
+	fflush(stdout);
+	while (true) {
+		try {
+			DeleteQueueEntry *entry = nodeDeleteQueue->pop();
+			if (entry == 0) {
+				//			printf("popped nothing");
+				//			fflush(stdout);
+				std::this_thread::sleep_for(std::chrono::milliseconds(100));
+				//printf("############ continue\n");
+				//fflush(stdout);
+				continue;
+			}
+			//		printf("############# deleting");
+			//		fflush(stdout);
+				 //printf("deleting node\n	");
+				 //fflush(stdout);
+			if (entry->type == TYPE_INDEX) {
+				((SkipListMap*)entry->map)->map->indexPool->free((ConcurrentSkipListMap<Key*, MyValue*>::Index<Key*, MyValue*>*)entry->value);
+			}
+			else {
+				ConcurrentSkipListMap<Key*, MyValue*>::Node<Key*, MyValue*>* node = (ConcurrentSkipListMap<Key*, MyValue*>::Node<Key*, MyValue*>*)entry->value;
+				if (node->key != 0) {
+					//((SkipListMap*)entry->map)->keyImplPool->free(node->key->key);
+					//((SkipListMap*)entry->map)->keyPool->free(node->key);
+				}
+				ConcurrentSkipListMap<Key*, MyValue*>::Node<Key*, MyValue*>* next = node->atomicNext.get();
+				if (next != 0) {
+					//delete marker
+					//if (next->atomicValue.get() == next) {
+						//printf("deleting marker\n	");
+						//fflush(stdout);
+						   //
+						//if (next->key == 0) {
+			//				pushNodeDelete(entry->map, next);
+						//}
+						//((SkipListMap*)entry->map)->map->nodePool->free(next);
+					//}
+				}
+				if (node->refCount.load() == 0) {
+					if (node->atomicNext.get() != 0) {
+						//node->atomicNext.get()->deleteRef(entry->map, ((SkipListMap*)entry->map)->map->nodePool);
+					}
+					if (node->key != 0) {
+						((SkipListMap*)entry->map)->keyImplPool->free(node->key->key);
+						((SkipListMap*)entry->map)->keyPool->free(node->key);
+					}
+					node->refCount = 99999999;
+					((SkipListMap*)entry->map)->map->nodePool->free(node);
+				}
+			}
+			if (entry->type == TYPE_NODE) {
+				delete (DeleteQueueEntry*)entry;
+			}
+			else {
+				delete (DeleteQueueEntry*)entry;
+			}
+		}
+		catch (const std::exception& e) {
+			printf("exp");
+			fflush(stdout);
+		}
+	}
+}
+
+std::mutex nodeDeleteThreadMutex;
+
+#define DELETE_THREAD_COUNT concurentThreadsSupported * 4
+
+void initDeleteThreads() {
+	if (deleteThreads == 0) {
+		std::lock_guard<std::mutex> lock(nodeDeleteThreadMutex);
+		if (deleteThreads == 0) {
+			deleteThreads = (std::thread**)malloc(DELETE_THREAD_COUNT * sizeof(std::thread*));
+			for (int i = 0; i < DELETE_THREAD_COUNT; i++) {
+				deleteThreads[i] = new std::thread(nodeDeleteRunner);
+			}
+		}
+	}
+}
+
+void pushNodeDelete(void *map, void *value) {
+	initDeleteThreads();
+
+	DeleteQueueEntry *entry = new DeleteQueueEntry();
+	entry->map = map;
+	entry->type = TYPE_NODE;
+	entry->value = value;
+	nodeDeleteQueue->push(entry);
+}
+
+
+
+DeleteQueue *indexDeleteQueue = new DeleteQueue();
+
+std::thread *indexDeleteThread;
+
+
+void indexDeleteRunner() {
+	printf("started indexDelete runner");
+	fflush(stdout);
+	while (true) {
+		DeleteQueueEntry *entry = indexDeleteQueue->pop();
+		if (entry == 0) {
+			//			printf("popped nothing");
+			//			fflush(stdout);
+			std::this_thread::sleep_for(std::chrono::milliseconds(10000));
+			//printf("############ continue\n");
+			//fflush(stdout);
+			continue;
+		}
+		//		printf("############# deleting");
+		//		fflush(stdout);
+		//printf("deleting node\n	");
+		//fflush(stdout);
+		
+		//delete entry->value;
+		//((SkipListMap*)entry->map)->map->indexPool->free(entry->value);
+
+		/*
+		if (entry->value->key != 0) {
+			((SkipListMap*)entry->map)->keyImplPool->free(entry->value->key->key);
+			((SkipListMap*)entry->map)->keyPool->free(entry->value->key);
+		}
+		ConcurrentSkipListMap<Key*, MyValue*>::Node<Key*, MyValue*>* next = entry->value->atomicNext.get();
+		if (next != 0) {
+			//delete marker
+			if (next->key == 0) {
+				//printf("deleting marker\n	");
+				//fflush(stdout);
+				//
+				pushNodeDelete(entry->map, next);
+
+				//((SkipListMap*)entry->map)->map->nodePool->free(next);
+			}
+		}
+		((SkipListMap*)entry->map)->map->nodePool->free(entry->value);
+		*/
+		delete entry;
+	}
+}
+
+std::mutex indexDeleteThreadMutex;
+
+void pushIndexDelete(void *map, void *value) {
+	initDeleteThreads();
+
+	DeleteQueueEntry *entry = new DeleteQueueEntry();
+	entry->map = map;
+	entry->type = TYPE_INDEX;
+	entry->value = value;
+	nodeDeleteQueue->push((DeleteQueueEntry*)entry);
 }
 
 
@@ -292,7 +481,7 @@ JNIEXPORT jlong JNICALL Java_com_sonicbase_index_NativeSkipListMap_put__J_3Ljava
 
 		//printf("before key\n");
 		//fflush(stdout);
-		Key * key = javaKeyToNativeKey(env, map->keyPool, map->keyImplPool, map->dataTypes, jKey, map->comparator);
+		Key * key = javaKeyToNativeKey(env, map->keyPool, map->keyImplPool, map->dataTypes, jKey, map->comparator, map->comparator->fieldCount);
 		//printf("after key\n");
 		//fflush(stdout);
 		//printf("before value\n");
@@ -318,9 +507,9 @@ JNIEXPORT jlong JNICALL Java_com_sonicbase_index_NativeSkipListMap_put__J_3Ljava
 	if (SB_DEBUG) {
 		printf("put end\n");
 		fflush(stdout);
-	}
-		return -1;
   }
+		return -1;
+}
 
 JNIEXPORT void JNICALL Java_com_sonicbase_index_NativeSkipListMap_put__J_3_3Ljava_lang_Object_2_3J_3J
   (JNIEnv *env, jobject obj, jlong indexId, jobjectArray jKeys, jlongArray jValues, jlongArray jRetValues) {
@@ -342,12 +531,11 @@ JNIEXPORT void JNICALL Java_com_sonicbase_index_NativeSkipListMap_put__J_3_3Ljav
 		for (int i = 0; i < len; i++) {
 			jobjectArray jKey = (jobjectArray)env->GetObjectArrayElement(jKeys, i);
 
-			Key * key = javaKeyToNativeKey(env, map->keyPool, map->keyImplPool, map->dataTypes, jKey, map->comparator);
+			Key * key = javaKeyToNativeKey(env, map->keyPool, map->keyImplPool, map->dataTypes, jKey, map->comparator, map->comparator->fieldCount);
 			MyValue *v = map->map->put(key, new MyValue(values[i]));
 			if (v != NULL) {
-				delete v;
+				map->valuePool->free(v);
 			}
-			deleteKey(env, map->dataTypes, key);
 		}
 
 		env->ReleaseLongArrayElements(jValues, values, 0);
@@ -378,10 +566,19 @@ JNIEXPORT jlong JNICALL Java_com_sonicbase_index_NativeSkipListMap_get
   		return 0;
   	}
 
-	Key *startKey = javaKeyToNativeKey(env, map->keyPool, map->keyImplPool, map->dataTypes, jKey, map->comparator);
+		//printf("javakey begin\n");
+		//fflush(stdout);
+	Key *startKey = javaKeyToNativeKey(env, map->keyPool, map->keyImplPool, map->dataTypes, jKey, map->comparator, map->comparator->fieldCount);
+		//printf("get\n");
+		//fflush(stdout);
 	MyValue *ret = map->map->get(startKey);
+		//printf("deletetkey begin\n");
+		//fflush(stdout);
 
-	deleteKey(env, map->dataTypes, startKey);
+	deleteKey(env, map->dataTypes, startKey, map->keyPool, map->keyImplPool);
+		//printf("finish\n");
+		//fflush(stdout);
+
 
 	if (SB_DEBUG) {
 		printf("get end\n");
@@ -412,27 +609,34 @@ JNIEXPORT jlong JNICALL Java_com_sonicbase_index_NativeSkipListMap_remove
 		return 0;
 	}
 
-	Key *key = javaKeyToNativeKey(env, map->keyPool, map->keyImplPool, map->dataTypes, jKey, map->comparator);
+	Key *key = javaKeyToNativeKey(env, map->keyPool, map->keyImplPool, map->dataTypes, jKey, map->comparator, map->comparator->fieldCount);
 
 	if (key == 0) {
 		printf("remove, null key");
 		fflush(stdout);
 	}
+	//printf("delete %ld\n", ((LongKey*)key->key)->longKey);
+	//fflush(stdout);
 	MyValue *ret = map->map->remove(key);
+	//printf("deleted\n");
+	//fflush(stdout);
 	long retValue = -1;
 	if (ret != 0) {
 		retValue = ret->value;
 		map->valuePool->free(ret);
 	}
-	deleteKey(env, map->dataTypes, key);
+	//printf("deleting key\n");
+	//fflush(stdout);
+	deleteKey(env, map->dataTypes, key, map->keyPool, map->keyImplPool);
 
 	if (SB_DEBUG) {
 		printf("remove end\n");
 		fflush(stdout);
 	}
+	//printf("deleted key\n");
+	//fflush(stdout);
 
     return retValue;
-
   }
 
 /*
@@ -527,7 +731,7 @@ JNIEXPORT jboolean JNICALL Java_com_sonicbase_index_NativeSkipListMap_tailBlockA
 		return 0;
 	}
 
-	Key *key = javaKeyToNativeKey(env, map->keyPool, map->keyImplPool, map->dataTypes, jKey, map->comparator);
+	Key *key = javaKeyToNativeKey(env, map->keyPool, map->keyImplPool, map->dataTypes, jKey, map->comparator, map->comparator->fieldCount);
 
 	if (key == 0) {
 		printf("tailBlockArray null key\n");
@@ -601,7 +805,7 @@ JNIEXPORT jboolean JNICALL Java_com_sonicbase_index_NativeSkipListMap_tailBlockA
 	delete[] keys;
 	delete[] values;
 
-	deleteKey(env, map->dataTypes, key);
+	deleteKey(env, map->dataTypes, key, map->keyPool, map->keyImplPool);
 
 	//printf("after delete key\n");
 	//fflush(stdout);
@@ -632,7 +836,7 @@ JNIEXPORT jboolean JNICALL Java_com_sonicbase_index_NativeSkipListMap_headBlockA
 		return 0;
 	}
 
-	Key *key = javaKeyToNativeKey(env, map->keyPool, map->keyImplPool, map->dataTypes, jKey, map->comparator);
+	Key *key = javaKeyToNativeKey(env, map->keyPool, map->keyImplPool, map->dataTypes, jKey, map->comparator, map->comparator->fieldCount);
 
 	if (key == 0) {
 		printf("tailBlockArray null key");
@@ -681,7 +885,7 @@ JNIEXPORT jboolean JNICALL Java_com_sonicbase_index_NativeSkipListMap_headBlockA
 
 	delete[] keys;
 	delete[] values;
-	deleteKey(env, map->dataTypes, key);
+	deleteKey(env, map->dataTypes, key, map->keyPool, map->keyImplPool);
 
 	if (SB_DEBUG) {
 		printf("head block end\n");
@@ -709,7 +913,7 @@ JNIEXPORT jboolean JNICALL Java_com_sonicbase_index_NativeSkipListMap_higherEntr
 		return 0;
 	}
 
-    Key *key = javaKeyToNativeKey(env, map->keyPool, map->keyImplPool, map->dataTypes, jKey, map->comparator);
+    Key *key = javaKeyToNativeKey(env, map->keyPool, map->keyImplPool, map->dataTypes, jKey, map->comparator, map->comparator->fieldCount);
 
 	Map<Key*,MyValue*>::Entry<Key*,MyValue*> *entry = map->map->higherEntry(key);
 	if (entry != 0) {
@@ -725,7 +929,7 @@ JNIEXPORT jboolean JNICALL Java_com_sonicbase_index_NativeSkipListMap_higherEntr
 	   	return true;
 	}
 
-    deleteKey(env, map->dataTypes, key);
+    deleteKey(env, map->dataTypes, key, map->keyPool, map->keyImplPool);
 
 	if (SB_DEBUG) {
 		printf("higherEntry end\n");
@@ -753,7 +957,7 @@ JNIEXPORT jboolean JNICALL Java_com_sonicbase_index_NativeSkipListMap_lowerEntry
 		return 0;
 	}
 
-    Key *key = javaKeyToNativeKey(env, map->keyPool, map->keyImplPool, map->dataTypes, jKey, map->comparator);
+    Key *key = javaKeyToNativeKey(env, map->keyPool, map->keyImplPool, map->dataTypes, jKey, map->comparator, map->comparator->fieldCount);
 
 	Map<Key*,MyValue*>::Entry<Key*,MyValue*> *entry = map->map->lowerEntry(key);
 	if (entry != 0) {
@@ -769,7 +973,7 @@ JNIEXPORT jboolean JNICALL Java_com_sonicbase_index_NativeSkipListMap_lowerEntry
 	   	return true;
 	}
 
-    deleteKey(env, map->dataTypes, key);
+    deleteKey(env, map->dataTypes, key, map->keyPool, map->keyImplPool);
 
 	if (SB_DEBUG) {
 		printf("lowerEntry end\n");
@@ -797,7 +1001,7 @@ JNIEXPORT jboolean JNICALL Java_com_sonicbase_index_NativeSkipListMap_floorEntry
 		return 0;
 	}
 
-    Key *key = javaKeyToNativeKey(env, map->keyPool, map->keyImplPool, map->dataTypes, jKey, map->comparator);
+    Key *key = javaKeyToNativeKey(env, map->keyPool, map->keyImplPool, map->dataTypes, jKey, map->comparator, map->comparator->fieldCount);
 
 	Map<Key*,MyValue*>::Entry<Key*,MyValue*> *entry = map->map->floorEntry(key);
 	if (entry != 0) {
@@ -809,7 +1013,7 @@ JNIEXPORT jboolean JNICALL Java_com_sonicbase_index_NativeSkipListMap_floorEntry
     	env->ReleaseLongArrayElements(jValues, valuesArray, 0);
 
 		delete entry;
-	    deleteKey(env, map->dataTypes, key);
+	    deleteKey(env, map->dataTypes, key, map->keyPool, map->keyImplPool);
 
 		if (SB_DEBUG) {
 			printf("floorEntry end\n");
@@ -819,7 +1023,7 @@ JNIEXPORT jboolean JNICALL Java_com_sonicbase_index_NativeSkipListMap_floorEntry
 	   	return true;
 	}
 
-    deleteKey(env, map->dataTypes, key);
+    deleteKey(env, map->dataTypes, key, map->keyPool, map->keyImplPool);
 
 	if (SB_DEBUG) {
 		printf("floorEntry end\n");
@@ -847,7 +1051,7 @@ JNIEXPORT jboolean JNICALL Java_com_sonicbase_index_NativeSkipListMap_ceilingEnt
 		return 0;
 	}
 
-    Key *key = javaKeyToNativeKey(env, map->keyPool, map->keyImplPool, map->dataTypes, jKey, map->comparator);
+    Key *key = javaKeyToNativeKey(env, map->keyPool, map->keyImplPool, map->dataTypes, jKey, map->comparator, map->comparator->fieldCount);
 
 	Map<Key*,MyValue*>::Entry<Key*,MyValue*> *entry = map->map->ceilingEntry(key);
 	if (entry != 0) {
@@ -859,7 +1063,7 @@ JNIEXPORT jboolean JNICALL Java_com_sonicbase_index_NativeSkipListMap_ceilingEnt
     	env->ReleaseLongArrayElements(jValues, valuesArray, 0);
 
 		delete entry;
-	    deleteKey(env, map->dataTypes, key);
+	    deleteKey(env, map->dataTypes, key, map->keyPool, map->keyImplPool);
 
 		if (SB_DEBUG) {
 			printf("ceilingEntry end\n");
@@ -869,7 +1073,7 @@ JNIEXPORT jboolean JNICALL Java_com_sonicbase_index_NativeSkipListMap_ceilingEnt
 	   	return true;
 	}
 
-    deleteKey(env, map->dataTypes, key);
+    deleteKey(env, map->dataTypes, key, map->keyPool, map->keyImplPool);
 
 	if (SB_DEBUG) {
 		printf("ceilingEntry end\n");
@@ -990,6 +1194,11 @@ JNIEXPORT void JNICALL Java_com_sonicbase_index_NativeSkipListMap_delete
 	Java_com_sonicbase_index_NativeSkipListMap_clear(env, obj, indexId);
 	allMapsSkipListMap[(int)indexId] = 0;
 
+//    delete map->map;
+  //  delete map->keyPool;
+    //delete map->keyImplPool;
+	//delete map->valuePool;
+
 	if (SB_DEBUG) {
 		printf("delete end\n");
 		fflush(stdout);
@@ -1039,3 +1248,231 @@ JNIEXPORT jlong JNICALL Java_com_sonicbase_index_NativeSkipListMap_initIndexSkip
 	}
 
 }
+
+
+
+
+SkipListMap *map;
+
+long currMillis() {
+	unsigned long now = std::chrono::duration_cast<std::chrono::milliseconds>(std::chrono::system_clock::now().time_since_epoch()).count();
+	return now;
+}
+
+void readThread() {
+	/*
+	while (true) {
+	ConcurrentNavigableMap<Key*, MyValue*> *headMap = map->headMap(map->lastKey())->descendingMap();
+	Set<Map<Key*, MyValue*>::Entry<Key*, MyValue*>*> *set = ((AbstractMap<Key*, MyValue*>*)headMap)->entrySet();
+	Iterator<Map<Key*, MyValue*>::Entry<Key*, MyValue*>*> *i = set->beginIterator();
+	typename Map<Key*,MyValue*>::template Entry<Key*,MyValue*> *entry = map->allocateEntry();
+	while (i->hasNext()) {
+	i->nextEntry(entry);
+	long value = entry->getValue()->value;
+	//		printf("%u\n", entry->getValue()->value);
+	//delete entry;
+	if (count++ % 1000000 == 0) {
+	printf("read progress count=%lu, rate=%f\n", count.load(), (float)((float)count.load() / (float)((currMillis() - beginTime)) * (float)1000));
+	}
+
+	}
+	//delete set;
+	//delete iterator;
+	//delete headMap;
+	}
+	*/
+}
+
+
+std::atomic<unsigned long> pcount;
+long recCount = 0;
+long beginTime = 0;
+
+void insertForever(int offset) {
+
+	int partCount = 0;
+	for (long i = offset * 100000000; ; i += 2001) {
+		//Key *keys = new Key[2000];
+		//MyValue *values = new MyValue[2000];
+		for (long j = 0; j < 2001; j++) {
+			//keys[j].value = i + j;
+			//values[j].value = i + j;
+			//	MyValue *v = map->put(&keys[j], &values[j]);
+
+			partCount++;
+			int count = pcount++;
+
+			Key *key = (Key*)map->keyPool->allocate();//new Key();
+			key->key = (KeyImpl*)map->keyImplPool->allocate();
+			((LongKey*)key->key)->longKey = i + j;
+			MyValue *value = (MyValue*)map->valuePool->allocate();
+			value->value = i + j;
+			//printf("%ld\n", i);
+			//fflush(stdout);
+			MyValue *v = map->map->put(key, value);
+			if (v != NULL) {
+				//delete v;
+			}
+			if (count % 100000 == 0) {
+				printf("put progress count=%lu, rate=%f, nodeCount=%lu, indexCount=%lu, queue=%lu\n", pcount.load(),
+				(float)((float)pcount.load() / (float)((currMillis() - beginTime)) * (float)1000),
+				nodeCount.load(), indexCount.load(), nodeQCount.load());
+			}
+		}
+		if (pcount.load() > recCount) {
+			break;
+		}
+	}
+}
+
+void deleteForever(int offset) {
+
+	int partCount = 0;
+	for (long i = offset * 100000000; ; i += 2001) {
+		//Key *keys = new Key[2000];
+		//MyValue *values = new MyValue[2000];
+		for (long j = 0; j < 2001; j++) {
+			//keys[j].value = i + j;
+			//values[j].value = i + j;
+			//	MyValue *v = map->put(&keys[j], &values[j]);
+
+			partCount++;
+			int count = pcount++;
+
+			Key *key = (Key*)map->keyPool->allocate();//new Key();
+			key->key = (KeyImpl*)map->keyImplPool->allocate();
+			((LongKey*)key->key)->longKey = i + j;
+			//printf("%ld\n", i);
+			//fflush(stdout);
+			MyValue *v = map->map->remove(key);
+			if (v != NULL) {
+				map->valuePool->free(v);
+			}
+			map->keyImplPool->free(key->key);
+			map->keyPool->free(key);
+			if (count % 100000 == 0) {
+				printf("delete progress count=%lu, rate=%f, nodeCount=%lu, indexCount==%lu, queue=%lu\n", pcount.load(),
+				(float)((float)pcount.load() / (float)((currMillis() - beginTime)) * (float)1000),
+				nodeCount.load(), indexCount.load(), nodeQCount.load());
+			}
+		}
+		if (pcount.load() > recCount) {
+			break;
+		}
+	}
+}
+
+void doInsert(int threadCount) {
+	beginTime = currMillis();
+	pcount = 0;
+
+	std::thread **pthrd = new std::thread*[threadCount];
+	for (int i = 0; i < threadCount; i++) {
+		pthrd[i] = new std::thread(insertForever, i);
+	}
+
+	for (int i = 0; i < threadCount; i++) {
+		pthrd[i]->join();
+	}
+}
+
+void doDelete(int threadCount) {
+	beginTime = currMillis();
+	pcount = 0;
+
+	std::thread **pthrd = new std::thread*[threadCount];
+	for (int i = 0; i < threadCount; i++) {
+		pthrd[i] = new std::thread(deleteForever, i);
+	}
+
+	for (int i = 0; i < threadCount; i++) {
+		pthrd[i]->join();
+	}
+}
+
+class Test : public std::enable_shared_from_this<Test> {
+public:
+	void run(int argc, char *argv[]) {
+		//ConcurrentSkipListMap<long, long> *lmap = new ConcurrentSkipListMap <long, long>();
+		if (argc < 2) {
+			printf("missing parms: threadCount, recCount");
+			return;
+		}
+
+		int threadCount = atoi(argv[1]);
+		recCount = atol(argv[2]);
+
+		int *dataTypes = new int[1]{ BIGINT };
+
+		map = new SkipListMap(0, 0, new int[1]{ BIGINT }, 1);
+
+
+		doInsert(threadCount);
+
+		for (int i = 0; i < 20; i++) {
+			//recCount = 20000000;;
+			doDelete(threadCount);
+
+
+			//recCount = 20000000;;
+			doInsert(threadCount);
+		}
+
+		//delete map;
+		//printf("done");
+		/*
+		std::thread th1(foo1);
+		std::thread th2(foo2);
+
+		th1.join();
+		th2.join();
+		*/
+		//for (int i = 0; i < 1000; i++) {
+		//	printf("out: %u", map->get(new Key(i))->value);
+		//}
+		/*
+		Iterator<MyValue*> *iterator = map->valueIterator();
+		while (iterator->hasNext()) {
+		printf("%u\n", iterator->nextEntry()->value);
+		}
+
+		Iterator<Key*> *kiterator = map->keyIterator();
+		while (iterator->hasNext()) {
+		Key *entry = kiterator->nextEntry();
+		printf("%u\n", entry->value);
+		}
+		Iterator<Key*> *kkiterator = map->tailMap(map->firstKey())->keySet()->beginIterator();
+		while (kkiterator->hasNext()) {
+		printf("%u\n", entry->value);
+		}
+		*/
+
+		/*
+		printf("finished load\n");
+		printf("starting read\n");
+		fflush(stdout);
+
+		beginTime = currMillis();
+
+		std::thread **thrd = new std::thread*[threadCount];
+		for (int i = 0; i < threadCount; i++) {
+		thrd[i] = new std::thread(readThread);
+		}
+
+		for (int i = 0; i < threadCount; i++) {
+		thrd[i]->join();
+		}
+
+		delete map;
+		*/
+	}
+};
+int main(int argc, char *argv[])
+{
+
+	Test t;
+	t.run(argc, argv);
+
+	return 0;
+}
+

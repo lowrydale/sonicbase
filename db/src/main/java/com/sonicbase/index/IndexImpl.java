@@ -6,6 +6,8 @@ import java.util.Map;
 
 public interface IndexImpl {
 
+  void put(Object[][] key, Object[] value);
+
   Object put(Object[] key, Object value);
 
   Object get(Object[] startKey);

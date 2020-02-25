@@ -198,23 +198,27 @@ public class TransactionManager {
   }
 
   private ConcurrentSkipListMap<Object[], RecordLock> createTableLocks(String dbName, String tableName) {
-    locks.get(dbName).computeIfAbsent(tableName, (k)->{
-      IndexSchema primaryKeySchema = null;
-      for (Map.Entry<String, IndexSchema> entry :
-          server.getCommon().getTables(dbName).get(tableName).getIndices().entrySet()) {
-        if (entry.getValue().isPrimaryKey()) {
-          primaryKeySchema = entry.getValue();
-          break;
+    ConcurrentSkipListMap<Object[], RecordLock> ret = locks.get(dbName).get(tableName);
+    if (ret == null) {
+      locks.get(dbName).computeIfAbsent(tableName, (k) -> {
+        IndexSchema primaryKeySchema = null;
+        for (Map.Entry<String, IndexSchema> entry :
+            server.getCommon().getTables(dbName).get(tableName).getIndices().entrySet()) {
+          if (entry.getValue().isPrimaryKey()) {
+            primaryKeySchema = entry.getValue();
+            break;
+          }
         }
-      }
-      if (primaryKeySchema == null) {
-        throw new DatabaseException("primaryKeySchema is null: dbName=" + dbName + ", table=" + tableName);
-      }
-      final Comparator[] comparators = primaryKeySchema.getComparators();
-      ConcurrentSkipListMap<Object[], RecordLock> locks = new ConcurrentSkipListMap<>((o1, o2) -> getComparatorForTableLocks(comparators, o1, o2));
-      return locks;
-    });
-    return locks.get(dbName).get(tableName);
+        if (primaryKeySchema == null) {
+          throw new DatabaseException("primaryKeySchema is null: dbName=" + dbName + ", table=" + tableName);
+        }
+        final Comparator[] comparators = primaryKeySchema.getComparators();
+        ConcurrentSkipListMap<Object[], RecordLock> locks = new ConcurrentSkipListMap<>((o1, o2) -> getComparatorForTableLocks(comparators, o1, o2));
+        return locks;
+      });
+      ret = locks.get(dbName).get(tableName);
+    }
+    return ret;
   }
 
   private int getComparatorForTableLocks(Comparator[] comparators, Object[] o1, Object[] o2) {

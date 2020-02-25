@@ -1335,7 +1335,7 @@ public class SelectStatementImpl extends StatementImpl implements SelectStatemen
 
     ExpressionImpl.CachedRecord cachedRecord = tables[0].get(new ExpressionImpl.RecordCache.Key(actualIds[0][0]));
 
-    if (cachedRecord.getRecord().getFields()[0] == null) {
+    if (cachedRecord == null || cachedRecord.getRecord().getFields()[0] == null) {
       //keyRecord, has no recordId
 
       DedupComparator comparator = new DedupComparator(comparators);

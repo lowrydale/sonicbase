@@ -443,6 +443,7 @@ namespace skiplist
 			std::atomic<unsigned long> refCount;
 
 			Node() {
+				refCount.store(0);
 				incrementNodeCount();
 			}
 
@@ -490,6 +491,7 @@ namespace skiplist
 			 */
 			Node(K1 key, const void *value, Node<K1, V1> *next)
 			{
+				refCount.store(0);
 				incrementNodeCount();
 				this->key = key;
 				this->atomicValue.set((void*)value);
@@ -501,6 +503,7 @@ namespace skiplist
 
 			void init(K1 key, const void *value, Node<K1, V1> *next)
 			{
+				refCount.store(0);
 				this->key = key;
 				this->atomicValue.set((void*)value);
 				this->atomicNext.set((Node<K1, V1>*)next);
@@ -518,6 +521,7 @@ namespace skiplist
 			 */
 			Node(Node<K1, V1> *next) : key(0)
 			{
+				refCount.store(0);
 				incrementNodeCount();
 				this->atomicValue.set(this);
 				this->atomicNext.set((Node<K1, V1>*)next);
@@ -527,6 +531,7 @@ namespace skiplist
 			}
 
 			void init(Node<K1, V1> *next) {
+				refCount.store(0);
 				key = 0;
 				this->atomicValue.set(this);
 				this->atomicNext.set((Node<K1, V1>*)next);
@@ -582,7 +587,7 @@ namespace skiplist
 			 */
 			bool appendMarker(void *map, PooledObjectPool<Node<K1, V1>*> *nodePool, Node<K1, V1> *f)
 			{
-				return true;
+				//return true;
 
 				Node<K1, V1> *next = NULL;// f == NULL ? NULL : f->atomicNext.get();
 				Node<K1, V1> *z = (Node<K1, V1>*)nodePool->allocate();
@@ -991,6 +996,7 @@ namespace skiplist
 				Index<K, V> *r = q->atomicRight.get();//right;
 				for (;;)
 				{
+
 					if (r != NULL)
 					{
 						Node<K, V> *n = r->node;
@@ -1464,9 +1470,9 @@ namespace skiplist
 					z->addRef();
 					if (!b->casNext(n, z))
 					{
-						//z->key = 0;
-						//z->atomicValue.set(0);
-						//z->deleteRef(map, nodePool);
+						z->key = 0;
+						z->atomicValue.set(0);
+						z->deleteRef(map, nodePool);
 
 						//printf("!b->casNext(n, z)\n");
 						//fflush(stdout);
@@ -1899,14 +1905,14 @@ namespace skiplist
 
 						//b->deleteRef(map, nodePool);
 						if (n != 0) {
-							n->addRef();
+							//n->addRef();
 						}
 						b = n;
 						if (f != 0) {
 							//f->addRef();
 						}
 						if (n != 0) {
-							n->deleteRef(map, nodePool);
+							//n->deleteRef(map, nodePool);
 						}
 						n = f;
 						continue;
@@ -1942,24 +1948,34 @@ namespace skiplist
 					//bool appended = n->appendMarker(f, z);
 					bool appended = n->appendMarker(map, nodePool, f);
 
-					//f->addRef();
+					if (f != 0) {
+						f->addRef();
+					}
 					if (!appended)
 					{
 						//if (!appended) {
 						//	pushNodeDelete(map, z);
 						//}
 						findNode(key); // Retry via findNode
-						//f->deleteRef(map, nodePool);
+						if (f != 0) {
+							f->deleteRef(map, nodePool);
+						}
 					}
 					else if (!b->casNext(n, f)) 
 					{
 						findNode(key); // Retry via findNode
-						//f->deleteRef(map, nodePool);
+						if (f != 0) {
+							f->deleteRef(map, nodePool);
+						}
 					}
 					else
 					{
+						pushRefDelete(map, n);
+						//n->atomicNext.get()->deleteRef(map, nodePool);
 						//n->atomicNext.set(0);
-						n->deleteRef(map, nodePool);
+
+						//n->atomicNext.set(0);
+						//n->deleteRef(map, nodePool);
 						//pushNodeDelete(map, n);
 
 //						b->next = f;
@@ -2092,15 +2108,24 @@ namespace skiplist
 				//Node<K, V> *z = (Node<K, V>*)nodePool->allocate();
 				//z->init(f);
 
-				f->addRef();
+				if (f != 0) {
+					f->addRef();
+				}
+				if (b == f) {
+					printf("bogus\n");
+				}
 				if (!n->appendMarker(map, nodePool, f)) {
 					//pushNodeDelete(map, z);
 					findFirst(); // retry
-					f->deleteRef(map, nodePool);
+					if (f != 0) {
+						f->deleteRef(map, nodePool);
+					}
 				}
 				else if (!b->casNext(n, f)) {
 					findFirst(); // retry
-					f->deleteRef(map, nodePool);
+					if (f != 0) {
+						f->deleteRef(map, nodePool);
+					}
 				}
 				else {
 					n->deleteRef(map, nodePool);
@@ -2310,14 +2335,21 @@ namespace skiplist
 					//z->init(f);
 
 					bool appended = n->appendMarker(map, nodePool, f);
-					f->addRef();
+					if (b == f) {
+						printf("bogus\n");
+					}
+					if (f != 0) {
+						f->addRef();
+					}
 					if (!appended || !b->casNext(n, f))
 					{
 						//if (!appended) {
 						//	pushNodeDelete(map, z);
 						//}
 						findNode(ck); // Retry via findNode
-						f->deleteRef(map, nodePool);
+						if (f != 0) {
+							f->deleteRef(map, nodePool);
+						}
 					}
 					else
 					{

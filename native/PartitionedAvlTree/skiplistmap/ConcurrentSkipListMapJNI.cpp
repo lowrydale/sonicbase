@@ -332,6 +332,15 @@ void nodeDeleteRunner() {
 			if (entry->type == TYPE_INDEX) {
 				((SkipListMap*)entry->map)->map->indexPool->free((ConcurrentSkipListMap<Key*, MyValue*>::Index<Key*, MyValue*>*)entry->value);
 			}
+			else if (entry->type == TYPE_REF) {
+				ConcurrentSkipListMap<Key*, MyValue*>::Node<Key*, MyValue*>* node = (ConcurrentSkipListMap<Key*, MyValue*>::Node<Key*, MyValue*>*)entry->value;
+				ConcurrentSkipListMap<Key*, MyValue*>::Node<Key*, MyValue*>* next = node->atomicNext.get();
+				
+				if (node->atomicNext.compareAndSet(next, 0) && next != 0) {
+					next->deleteRef(entry->map, ((SkipListMap*)entry->map)->map->nodePool);
+				}
+				node->deleteRef(entry->map, ((SkipListMap*)entry->map)->map->nodePool);
+			}
 			else {
 				ConcurrentSkipListMap<Key*, MyValue*>::Node<Key*, MyValue*>* node = (ConcurrentSkipListMap<Key*, MyValue*>::Node<Key*, MyValue*>*)entry->value;
 				if (node->key != 0) {
@@ -351,9 +360,17 @@ void nodeDeleteRunner() {
 						//((SkipListMap*)entry->map)->map->nodePool->free(next);
 					//}
 				}
-				if (node->refCount.load() == 0) {
-					if (node->atomicNext.get() != 0) {
-						//node->atomicNext.get()->deleteRef(entry->map, ((SkipListMap*)entry->map)->map->nodePool);
+				if (node->refCount.load() == 0)
+				{
+					ConcurrentSkipListMap<Key*, MyValue*>::Node<Key*, MyValue*>* next = node->atomicNext.get();
+					if (node->atomicNext.compareAndSet(next, 0) &&
+							next != 0) {
+						//printf("delete ref 2\n");
+//						if (next->refCount.load() > 1) {
+//							printf("greater\n");
+//						}
+					//printf("delref %lu, value=%lu, next=%lu\n", next->refCount.load(), (unsigned long)next->atomicValue.get(), (unsigned long)next->atomicNext.get());
+						next->deleteRef(entry->map, ((SkipListMap*)entry->map)->map->nodePool);
 					}
 					if (node->key != 0) {
 						((SkipListMap*)entry->map)->keyImplPool->free(node->key->key);
@@ -403,6 +420,15 @@ void pushNodeDelete(void *map, void *value) {
 	nodeDeleteQueue->push(entry);
 }
 
+void pushRefDelete(void *map, void *value) {
+	initDeleteThreads();
+
+	DeleteQueueEntry *entry = new DeleteQueueEntry();
+	entry->map = map;
+	entry->type = TYPE_REF;
+	entry->value = value;
+	nodeDeleteQueue->push(entry);
+}
 
 
 DeleteQueue *indexDeleteQueue = new DeleteQueue();
@@ -1409,7 +1435,7 @@ public:
 
 		doInsert(threadCount);
 
-		for (int i = 0; i < 20; i++) {
+		for (int i = 0; i < 100; i++) {
 			//recCount = 20000000;;
 			doDelete(threadCount);
 

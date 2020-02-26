@@ -1840,6 +1840,7 @@ extern uint64_t getCurrMillis();
 
 #define TYPE_NODE 1
 #define TYPE_INDEX 2
+#define TYPE_REF 3
 
 class DeleteQueueEntry {
 public:
@@ -1888,7 +1889,7 @@ public:
 
 			//printf("times: curr=%lu, head=%lu\n", getCurrMillis(), head->time);
 			//fflush(stdout);
-			if (getCurrMillis() - head->time < 10000) {
+			if (getCurrMillis() - head->time < 2000) {
 				return 0;
 			}
 
@@ -1903,6 +1904,8 @@ public:
 	}
 };
 
+
+extern void pushRefDelete(void *map, void *value);
 
 extern void pushNodeDelete(void *map, void *value);
 

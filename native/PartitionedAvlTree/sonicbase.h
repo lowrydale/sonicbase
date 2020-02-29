@@ -4,9 +4,10 @@
 #include "Comparable.h"
 #include "ObjectPool.h"
 #include "BigDecimal.h"
-
+#include "blockingconcurrentqueue.h"
 
 using namespace skiplist;
+using namespace moodycamel;
 
 extern jmethodID gNativePartitionedTree_logError_mid;
 extern jclass gNativePartitioned_class;
@@ -1842,7 +1843,7 @@ extern uint64_t getCurrMillis();
 #define TYPE_INDEX 2
 #define TYPE_REF 3
 
-class DeleteQueueEntry {
+class DeleteQueueEntry : public PoolableObject<DeleteQueueEntry*> {
 public:
 	DeleteQueueEntry() {
 		incrementNodeQCount();
@@ -1850,6 +1851,23 @@ public:
 	~DeleteQueueEntry() {
 		decrementNodeQCount();
 	}
+
+	virtual DeleteQueueEntry *allocate(int count) {
+		return new DeleteQueueEntry[count];
+	};
+
+	virtual DeleteQueueEntry *allocate() {
+		return new DeleteQueueEntry();
+	}
+
+	virtual DeleteQueueEntry *getObjectAtOffset(DeleteQueueEntry* array, int offset) {
+		return &((DeleteQueueEntry*)array)[offset];
+	}
+
+	virtual const char *className() {
+		return "DeleteQueueEntry";
+	};
+
 	void *map = 0;
 	void *value = 0;
 	jbyte type = 0;
@@ -1859,51 +1877,98 @@ public:
 };
 
 class DeleteQueue {
-	std::mutex queueLock;
-	DeleteQueueEntry *head = 0;
-	DeleteQueueEntry *tail = 0;
+	std::mutex **queueLock = new std::mutex*[32];
+	DeleteQueueEntry **head = new DeleteQueueEntry*[32];
+	DeleteQueueEntry **tail = new DeleteQueueEntry*[32];
+	std::atomic<unsigned long> offset;
+	std::atomic<unsigned long> popOffset;
 
 public:
+	DeleteQueue() {
+		for (int i = 0; i < 32; i++) {
+			queueLock[i] = new std::mutex();
+			head[i] = 0;
+			tail[i] = 0;;
+		}
+		offset = 0;
+		popOffset = 0;
+	}
 	void push(DeleteQueueEntry *entry) {
 		{
 
+			unsigned int currOffset = offset++ % 32;
+
 			entry->time = getCurrMillis();
-			std::lock_guard<std::mutex> lock(queueLock);
-			if (tail == 0) {
-				head = tail = entry;
+			std::lock_guard<std::mutex> lock(*queueLock[currOffset]);
+			if (tail[currOffset] == 0) {
+				head[currOffset] = tail[currOffset] = entry;
 			}
 			else {
-				tail->next = entry;
-				entry->prev = tail;
-				tail = entry;
+				tail[currOffset]->next = entry;
+				entry->prev = tail[currOffset];
+				tail[currOffset] = entry;
 			}
 		}
 	}
 
 	DeleteQueueEntry *pop() {
 		{
-			std::lock_guard<std::mutex> lock(queueLock);
-			if (head == 0) {
+			unsigned int currOffset = popOffset++ % 32;
+
+			std::lock_guard<std::mutex> lock(*queueLock[currOffset]);
+			if (head[currOffset] == 0) {
 				return 0;
 			}
 
 			//printf("times: curr=%lu, head=%lu\n", getCurrMillis(), head->time);
 			//fflush(stdout);
-			if (getCurrMillis() - head->time < 2000) {
+			if (getCurrMillis() - head[currOffset]->time < 2000) {
 				return 0;
 			}
 
 			DeleteQueueEntry *ret = 0;
-			ret = head;
-			head = ret->next;
-			if (head == 0) {
-				tail = 0;
+			ret = head[currOffset];
+			head[currOffset] = ret->next;
+			if (head[currOffset] == 0) {
+				tail[currOffset] = 0;
 			}
 			return ret;
 		}
 	}
 };
 
+
+/*
+class DeleteQueue {
+	BlockingConcurrentQueue<DeleteQueueEntry*> *queue;
+
+public:
+	DeleteQueue() {
+		queue = new BlockingConcurrentQueue<DeleteQueueEntry*>(5000000);
+	}
+	void push(DeleteQueueEntry *entry) {
+		{
+			entry->time = getCurrMillis();
+
+			while (!queue->enqueue(entry)) {
+				//int size = queue->size_approx();
+				//std::this_thread::sleep_for(std::chrono::milliseconds(1));
+			}
+		}
+	}
+
+	DeleteQueueEntry *pop() {
+		DeleteQueueEntry *entry = 0;
+		if (queue->try_dequeue(entry)) {
+			long diff = getCurrMillis() - entry->time;
+			if (diff < 2000) {
+				std::this_thread::sleep_for(std::chrono::milliseconds(diff));
+			}
+		}
+		return entry;
+	}
+};
+*/
 
 extern void pushRefDelete(void *map, void *value);
 

@@ -553,6 +553,9 @@ namespace skiplist
 			 */
 			bool casNext(Node<K1, V1> *cmp, Node<K1, V1> *val)
 			{
+				if (this == val) {
+					printf("this === val\n");
+				}
 				bool ret = atomicNext.compareAndSet(cmp, val);
 				return ret;
 			}
@@ -642,13 +645,19 @@ namespace skiplist
 						if (b->casNext(this, next)) {
 							//f->deleteRef(map, nodePool);
 							this->key = 0;
+							
+							
 							Node<K, V> *toDel = atomicNext.get();
 							atomicNext.set(0);
-							if (toDel != 0) {
-								//toDel->deleteRef(map, nodePool);
-							}
+							//if (atomicNext.compareAndSet(toDel, 0)) {
+							//	if (toDel != 0) {
+							//		toDel->deleteRef(map, nodePool);
+							//	}
+							//}
 
 							this->deleteRef(map, nodePool);
+							
+							//pushRefDelete(map, this);
 							
 							//this->key = 0;
 							//pushNodeDelete(map, this);
@@ -1000,9 +1009,18 @@ namespace skiplist
 					if (r != NULL)
 					{
 						Node<K, V> *n = r->node;
+						if (n == 0) {
+							printf("n == 0\n");
+							//q->unlink(map, nodePool, r);
+							//break;
+						}
 						//n->addRef();
 						K k = n->key;
-						if (n->atomicValue.get() == NULL)
+						//if (k == 0) {
+							//printf("k == 0\n");
+							//break;
+						//}
+						if (k == 0 || n->atomicValue.get() == NULL)
 						{
 							if (!q->unlink(map, nodePool, r))
 							{
@@ -1051,6 +1069,9 @@ namespace skiplist
 					else
 					{
 						Node<K, V> *n = q->node;
+						if (n == 0) {
+							printf("n == 0\n");
+						}
 						//n->addRef();
 						return n;
 					}
@@ -1326,6 +1347,9 @@ namespace skiplist
 				//fflush(stdout);
 			//	}
 				Node<K, V> *b = findPredecessor(key);
+				//if (b == 0) {
+				//	continue;
+				//}
 				//printf("findPred - end\n");
 				//fflush(stdout);
 				Node<K, V> *n = b->atomicNext.get();//next;
@@ -1394,7 +1418,20 @@ namespace skiplist
 						int c = key->compareTo(n->key);
 						if (c > 0)
 						{
-						//printf("compareTo - c > 0\n");
+							if (b == n) {
+								printf("doPut b == n\n");
+								break;
+							}
+							if (n == f) {
+								printf("doPut n == f\n");
+								//n->atomicNext.set(0);
+								break;
+							}
+							if (b == f) {
+								printf("doPut b == f\n");
+								break;
+							}
+							//printf("compareTo - c > 0\n");
 						//fflush(stdout);
 							if (n != 0) {
 							//	n->addRef();
@@ -1470,8 +1507,8 @@ namespace skiplist
 					z->addRef();
 					if (!b->casNext(n, z))
 					{
-						z->key = 0;
 						z->atomicValue.set(0);
+						z->key = 0;
 						z->deleteRef(map, nodePool);
 
 						//printf("!b->casNext(n, z)\n");
@@ -1498,7 +1535,7 @@ namespace skiplist
 					x ^= static_cast<int>(static_cast<unsigned int>(x) >> 17);
 					randomSeed = x ^= x << 5;
 
-					int r = x;//rand() % INT_MAX;//dist(rng);
+					int r = abs(x);//rand() % INT_MAX;//dist(rng);
 //					r ^= r << 13;   // xorshift
 //					r ^= r >> 17;
 //					r ^= r << 5;
@@ -1666,7 +1703,7 @@ namespace skiplist
 				//printf("addIndex\n");
 				int j = h->level;
 				Index<K, V> *q = h;
-				Index<K, V> *r = q->right;//q->atomicRight.get();//right;
+				Index<K, V> *r = q->atomicRight.get();//right;
 				Index<K, V> *t = idx;
 				for (;;)
 				{
@@ -1686,13 +1723,13 @@ namespace skiplist
 							{
 								break;
 							}
-							r = q->right;//q->atomicRight.get();//right;
+							r = q->atomicRight.get();//right;
 							continue;
 						}
 						if (c > 0)
 						{
 							q = r;
-							r = r->right;//r->atomicRight.get();//right;
+							r = r->atomicRight.get();//right;
 							continue;
 						}
 					}
@@ -1725,7 +1762,7 @@ namespace skiplist
 						t = t->down;
 					}
 					q = q->down;
-					r = q->right;//q->atomicRight.get();//right;
+					r = q->atomicRight.get();//right;
 				}
 			}
 		}
@@ -1961,7 +1998,7 @@ namespace skiplist
 							f->deleteRef(map, nodePool);
 						}
 					}
-					else if (!b->casNext(n, f)) 
+					else if (!b->casNext(n, f))
 					{
 						findNode(key); // Retry via findNode
 						if (f != 0) {
@@ -1988,6 +2025,7 @@ namespace skiplist
 							//x->deleteRef(map, nodePool);
 						}
 					}
+					
 					//((Key*)n->key)->key->free(dataTypes);
 					//keyImplPool->free(((Key*)n->key)->key);
 					//keyPool->free(n->key);

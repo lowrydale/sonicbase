@@ -13,11 +13,15 @@ import java.sql.SQLException;
 import java.util.ArrayList;
 import java.util.Date;
 import java.util.List;
+import java.util.concurrent.ConcurrentSkipListMap;
 import java.util.concurrent.atomic.AtomicLong;
 
 import static com.sonicbase.index.AddressMap.unsafe;
 
 public class BenchEmbedded {
+
+  private static boolean skip = true;
+  private static ConcurrentSkipListMap<Long, Long> map = new ConcurrentSkipListMap<>();
 
   public static void main(String[] args) throws SQLException, InterruptedException {
     int threadCount = Integer.parseInt(args[0]);
@@ -90,7 +94,7 @@ public class BenchEmbedded {
 
     //doSimpleGets(tableCount, deleteCount, insertThreadCount, embeddedConn, tables);
 
-    for (int i = 0; i < 20; i++){
+    for (int i = 0; i < 1000; i++){
       doDeletes(tableCount, deleteCount, insertThreadCount, embeddedConn, tables);
 
       System.gc();
@@ -205,33 +209,53 @@ public class BenchEmbedded {
       identityThreads[i] = new Thread(() -> {
         try {
           while (true) {
-            int currTableOffset = (int) (tableOffset.incrementAndGet() % tableCount);
-            StringBuilder builder = new StringBuilder("delete from " + tables[currTableOffset] + " where id in (");
-            for (int k = 0; k < 1000; k++) {
-              if (k != 0) {
-                builder.append(",");
-              }
-              builder.append("?");
-            }
-            builder.append(")");;
-
-            try (PreparedStatement stmt = embeddedConn.prepareStatement(builder.toString())) {
+            if (skip) {
               for (int k = 0; k < 1000; k++) {
                 long id = identityCount.getAndIncrement();
-                stmt.setLong(k + 1, id);
+                map.remove(id);;
                 if (id % 100_000 == 0) {
                   System.out.println("delete progress: count=" + identityCount.get() +
                       ", rate=" + ((double) identityCount.get() / (double) (System.currentTimeMillis() - identityBegin) * 1000f) +
-                      ", avgDuration=" + ((double)totalDuration.get() / (double)identityCount.get()));
+                      ", avgDuration=" + ((double) totalDuration.get() / (double) identityCount.get()));
                 }
               }
               long currBegin = System.nanoTime();
-              stmt.executeUpdate();
               if (identityCount.get() > count) {
                 return;
               }
 
               totalDuration.addAndGet(System.nanoTime() - currBegin);
+            }
+            else {
+              int currTableOffset = (int) (tableOffset.incrementAndGet() % tableCount);
+              StringBuilder builder = new StringBuilder("delete from " + tables[currTableOffset] + " where id in (");
+              for (int k = 0; k < 1000; k++) {
+                if (k != 0) {
+                  builder.append(",");
+                }
+                builder.append("?");
+              }
+              builder.append(")");
+              ;
+
+              try (PreparedStatement stmt = embeddedConn.prepareStatement(builder.toString())) {
+                for (int k = 0; k < 1000; k++) {
+                  long id = identityCount.getAndIncrement();
+                  stmt.setLong(k + 1, id);
+                  if (id % 100_000 == 0) {
+                    System.out.println("delete progress: count=" + identityCount.get() +
+                        ", rate=" + ((double) identityCount.get() / (double) (System.currentTimeMillis() - identityBegin) * 1000f) +
+                        ", avgDuration=" + ((double) totalDuration.get() / (double) identityCount.get()));
+                  }
+                }
+                long currBegin = System.nanoTime();
+                stmt.executeUpdate();
+                if (identityCount.get() > count) {
+                  return;
+                }
+
+                totalDuration.addAndGet(System.nanoTime() - currBegin);
+              }
             }
           }
         }
@@ -357,19 +381,34 @@ public class BenchEmbedded {
           for (long j = startOffset; j < (offset + 1) * count / threads.length; j += 500) {
             long currBegin = System.nanoTime();
             long currOffset = insertedCurr.getAndIncrement();
-            int tableOffset = (int) (currOffset % tableCount);
-            try (PreparedStatement stmt1 = embeddedConn.prepareStatement("insert into " + tables[tableOffset] + " (id) values(?)")) {
+            if (skip) {
+              int tableOffset = (int) (currOffset % tableCount);
               for (int k = 0; k < 500; k++) {
-                stmt1.setLong(1, startOffset + tableOffsets[tableOffset].getAndIncrement());
-                stmt1.addBatch();
+                long key = startOffset + tableOffsets[tableOffset].getAndIncrement();
+                map.put(key, key);
 
                 if (insertedCount.incrementAndGet() % 100_000 == 0) {
                   System.out.println("insert progress: count=" + insertedCount.get() +
-                      ", rate=" + ((double)insertedCount.get() / (double)(System.currentTimeMillis() - insertBegin) * 1000f) +
-                      ", avgDuration=" + ((double)totalDuration.get() / (double)insertedCount.get()));
+                      ", rate=" + ((double) insertedCount.get() / (double) (System.currentTimeMillis() - insertBegin) * 1000f) +
+                      ", avgDuration=" + ((double) totalDuration.get() / (double) insertedCount.get()));
                 }
               }
-              stmt1.executeBatch();
+            }
+            else {
+              int tableOffset = (int) (currOffset % tableCount);
+              try (PreparedStatement stmt1 = embeddedConn.prepareStatement("insert into " + tables[tableOffset] + " (id) values(?)")) {
+                for (int k = 0; k < 500; k++) {
+                  stmt1.setLong(1, startOffset + tableOffsets[tableOffset].getAndIncrement());
+                  stmt1.addBatch();
+
+                  if (insertedCount.incrementAndGet() % 100_000 == 0) {
+                    System.out.println("insert progress: count=" + insertedCount.get() +
+                        ", rate=" + ((double) insertedCount.get() / (double) (System.currentTimeMillis() - insertBegin) * 1000f) +
+                        ", avgDuration=" + ((double) totalDuration.get() / (double) insertedCount.get()));
+                  }
+                }
+                stmt1.executeBatch();
+              }
               totalDuration.addAndGet(System.nanoTime() - currBegin);
             }
           }

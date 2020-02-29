@@ -213,6 +213,7 @@ public:
 	PooledObjectPool<Key*> *keyPool;
 	PooledObjectPool<KeyImpl*> *keyImplPool;
 	PooledObjectPool<MyValue*> *valuePool;
+	PooledObjectPool<DeleteQueueEntry*> *deleteQueueEntryPool;
 
 	~SkipListMap() {
 		delete comparator;
@@ -227,6 +228,7 @@ public:
 		memcpy( (void*)this->dataTypes, (void*)types, fieldCount * sizeof(int));
 		comparator = new KeyComparator(env, indexId, fieldCount, this->dataTypes);
 
+		deleteQueueEntryPool = new PooledObjectPool<DeleteQueueEntry*>(new DeleteQueueEntry());
 		valuePool = new PooledObjectPool<MyValue*>(new MyValue());
 
 		env->ReleaseIntArrayElements(dataTypes, types, 0);
@@ -260,6 +262,7 @@ public:
 		this->dataTypes = dataTypes;
 		comparator = new KeyComparator(env, indexId, fieldCount, this->dataTypes);
 
+		deleteQueueEntryPool = new PooledObjectPool<DeleteQueueEntry*>(new DeleteQueueEntry());
 		valuePool = new PooledObjectPool<MyValue*>(new MyValue());
 
 		keyImplPool = createKeyPool(env, dataTypes, fieldCount);
@@ -311,9 +314,35 @@ DeleteQueue *nodeDeleteQueue = new DeleteQueue();
 std::thread **deleteThreads;
 
 
+void freeNode(DeleteQueueEntry *entry, ConcurrentSkipListMap<Key*, MyValue*>::Node<Key*, MyValue*>* node) {
+	ConcurrentSkipListMap<Key*, MyValue*>::Node<Key*, MyValue*>* next = node->atomicNext.get();
+	if (node->atomicNext.compareAndSet(next, 0) &&
+		next != 0) {
+		//if (--next->refCount == 0) {
+			//freeNode(entry, next);
+		//}
+		//else 
+		{
+		//	next->refCount++;
+			next->deleteRef(entry->map, ((SkipListMap*)entry->map)->map->nodePool);
+		}
+
+		//printf("delete ref 2\n");
+		//						if (next->refCount.load() > 1) {
+		//							printf("greater\n");
+		//						}
+		//printf("delref %lu, value=%lu, next=%lu\n", next->refCount.load(), (unsigned long)next->atomicValue.get(), (unsigned long)next->atomicNext.get());
+		//next->deleteRef(entry->map, ((SkipListMap*)entry->map)->map->nodePool);
+	}
+	if (node->key != 0) {
+		((SkipListMap*)entry->map)->keyImplPool->free(node->key->key);
+		((SkipListMap*)entry->map)->keyPool->free(node->key);
+	}
+	node->refCount = 99999999;
+	((SkipListMap*)entry->map)->map->nodePool->free(node);
+}
+
 void nodeDeleteRunner() {
-	printf("started nodeDelete runner");
-	fflush(stdout);
 	while (true) {
 		try {
 			DeleteQueueEntry *entry = nodeDeleteQueue->pop();
@@ -337,55 +366,40 @@ void nodeDeleteRunner() {
 				ConcurrentSkipListMap<Key*, MyValue*>::Node<Key*, MyValue*>* next = node->atomicNext.get();
 				
 				if (node->atomicNext.compareAndSet(next, 0) && next != 0) {
-					next->deleteRef(entry->map, ((SkipListMap*)entry->map)->map->nodePool);
+					//if (next->refCount == 1) {
+						//next->refCount = 99999999;
+						//((SkipListMap*)entry->map)->map->nodePool->free(next);
+					//}
+					//else {
+//						next->deleteRef(entry->map, ((SkipListMap*)entry->map)->map->nodePool);
+					//}
+
+					if (--next->refCount == 0) {
+						freeNode(entry, next);
+					}
+					else {
+						next->refCount++;
+						next->deleteRef(entry->map, ((SkipListMap*)entry->map)->map->nodePool);
+					}
+
+					//next->deleteRef(entry->map, ((SkipListMap*)entry->map)->map->nodePool);
 				}
-				node->deleteRef(entry->map, ((SkipListMap*)entry->map)->map->nodePool);
+				//if (--node->refCount == 0) {
+					//freeNode(entry, node);
+				//}
+				//else {
+					//node->refCount++;
+					node->deleteRef(entry->map, ((SkipListMap*)entry->map)->map->nodePool);
+				//}
 			}
 			else {
 				ConcurrentSkipListMap<Key*, MyValue*>::Node<Key*, MyValue*>* node = (ConcurrentSkipListMap<Key*, MyValue*>::Node<Key*, MyValue*>*)entry->value;
-				if (node->key != 0) {
-					//((SkipListMap*)entry->map)->keyImplPool->free(node->key->key);
-					//((SkipListMap*)entry->map)->keyPool->free(node->key);
-				}
-				ConcurrentSkipListMap<Key*, MyValue*>::Node<Key*, MyValue*>* next = node->atomicNext.get();
-				if (next != 0) {
-					//delete marker
-					//if (next->atomicValue.get() == next) {
-						//printf("deleting marker\n	");
-						//fflush(stdout);
-						   //
-						//if (next->key == 0) {
-			//				pushNodeDelete(entry->map, next);
-						//}
-						//((SkipListMap*)entry->map)->map->nodePool->free(next);
-					//}
-				}
-				if (node->refCount.load() == 0)
+				if (node->refCount-- == 0)
 				{
-					ConcurrentSkipListMap<Key*, MyValue*>::Node<Key*, MyValue*>* next = node->atomicNext.get();
-					if (node->atomicNext.compareAndSet(next, 0) &&
-							next != 0) {
-						//printf("delete ref 2\n");
-//						if (next->refCount.load() > 1) {
-//							printf("greater\n");
-//						}
-					//printf("delref %lu, value=%lu, next=%lu\n", next->refCount.load(), (unsigned long)next->atomicValue.get(), (unsigned long)next->atomicNext.get());
-						next->deleteRef(entry->map, ((SkipListMap*)entry->map)->map->nodePool);
-					}
-					if (node->key != 0) {
-						((SkipListMap*)entry->map)->keyImplPool->free(node->key->key);
-						((SkipListMap*)entry->map)->keyPool->free(node->key);
-					}
-					node->refCount = 99999999;
-					((SkipListMap*)entry->map)->map->nodePool->free(node);
+					freeNode(entry, node);
 				}
 			}
-			if (entry->type == TYPE_NODE) {
-				delete (DeleteQueueEntry*)entry;
-			}
-			else {
-				delete (DeleteQueueEntry*)entry;
-			}
+			((SkipListMap*)entry->map)->deleteQueueEntryPool->free(entry);
 		}
 		catch (const std::exception& e) {
 			printf("exp");
@@ -396,7 +410,7 @@ void nodeDeleteRunner() {
 
 std::mutex nodeDeleteThreadMutex;
 
-#define DELETE_THREAD_COUNT concurentThreadsSupported * 4
+#define DELETE_THREAD_COUNT concurentThreadsSupported * 2
 
 void initDeleteThreads() {
 	if (deleteThreads == 0) {
@@ -413,7 +427,7 @@ void initDeleteThreads() {
 void pushNodeDelete(void *map, void *value) {
 	initDeleteThreads();
 
-	DeleteQueueEntry *entry = new DeleteQueueEntry();
+	DeleteQueueEntry *entry = ((SkipListMap*)map)->deleteQueueEntryPool->allocate();
 	entry->map = map;
 	entry->type = TYPE_NODE;
 	entry->value = value;
@@ -423,7 +437,7 @@ void pushNodeDelete(void *map, void *value) {
 void pushRefDelete(void *map, void *value) {
 	initDeleteThreads();
 
-	DeleteQueueEntry *entry = new DeleteQueueEntry();
+	DeleteQueueEntry *entry = ((SkipListMap*)map)->deleteQueueEntryPool->allocate();
 	entry->map = map;
 	entry->type = TYPE_REF;
 	entry->value = value;
@@ -485,7 +499,7 @@ std::mutex indexDeleteThreadMutex;
 void pushIndexDelete(void *map, void *value) {
 	initDeleteThreads();
 
-	DeleteQueueEntry *entry = new DeleteQueueEntry();
+	DeleteQueueEntry *entry = ((SkipListMap*)map)->deleteQueueEntryPool->allocate();
 	entry->map = map;
 	entry->type = TYPE_INDEX;
 	entry->value = value;
@@ -1309,12 +1323,13 @@ void readThread() {
 	*/
 }
 
+std::atomic<unsigned long> dupCount;
 
 std::atomic<unsigned long> pcount;
 long recCount = 0;
 long beginTime = 0;
 
-void insertForever(int offset) {
+void insertForever(int offset, int pass) {
 
 	int partCount = 0;
 	for (long i = offset * 100000000; ; i += 2001) {
@@ -1337,12 +1352,15 @@ void insertForever(int offset) {
 			//fflush(stdout);
 			MyValue *v = map->map->put(key, value);
 			if (v != NULL) {
-				//delete v;
+				dupCount++;
+				map->valuePool->free(v);
+				map->keyImplPool->free(key->key);
+				map->keyPool->free(key);
 			}
 			if (count % 100000 == 0) {
-				printf("put progress count=%lu, rate=%f, nodeCount=%lu, indexCount=%lu, queue=%lu\n", pcount.load(),
+				printf("put progress pass=%d, count=%lu, rate=%f, nodeCount=%lu, indexCount=%lu, queue=%lu, dups=%lu\n", pass, pcount.load(),
 				(float)((float)pcount.load() / (float)((currMillis() - beginTime)) * (float)1000),
-				nodeCount.load(), indexCount.load(), nodeQCount.load());
+				nodeCount.load(), indexCount.load(), nodeQCount.load(), dupCount.load());
 			}
 		}
 		if (pcount.load() > recCount) {
@@ -1351,7 +1369,7 @@ void insertForever(int offset) {
 	}
 }
 
-void deleteForever(int offset) {
+void deleteForever(int offset, int pass) {
 
 	int partCount = 0;
 	for (long i = offset * 100000000; ; i += 2001) {
@@ -1377,7 +1395,7 @@ void deleteForever(int offset) {
 			map->keyImplPool->free(key->key);
 			map->keyPool->free(key);
 			if (count % 100000 == 0) {
-				printf("delete progress count=%lu, rate=%f, nodeCount=%lu, indexCount==%lu, queue=%lu\n", pcount.load(),
+				printf("delete progress pass=%d, count=%lu, rate=%f, nodeCount=%lu, indexCount==%lu, queue=%lu\n", pass, pcount.load(),
 				(float)((float)pcount.load() / (float)((currMillis() - beginTime)) * (float)1000),
 				nodeCount.load(), indexCount.load(), nodeQCount.load());
 			}
@@ -1388,31 +1406,38 @@ void deleteForever(int offset) {
 	}
 }
 
-void doInsert(int threadCount) {
+void doInsert(int threadCount, int pass) {
 	beginTime = currMillis();
 	pcount = 0;
+	dupCount = 0;
 
 	std::thread **pthrd = new std::thread*[threadCount];
 	for (int i = 0; i < threadCount; i++) {
-		pthrd[i] = new std::thread(insertForever, i);
+		pthrd[i] = new std::thread(insertForever, i, pass);
 	}
 
 	for (int i = 0; i < threadCount; i++) {
 		pthrd[i]->join();
+	}
+	for (int i = 0; i < threadCount; i++) {
+		delete pthrd[i];
 	}
 }
 
-void doDelete(int threadCount) {
+void doDelete(int threadCount, int pass) {
 	beginTime = currMillis();
 	pcount = 0;
 
 	std::thread **pthrd = new std::thread*[threadCount];
 	for (int i = 0; i < threadCount; i++) {
-		pthrd[i] = new std::thread(deleteForever, i);
+		pthrd[i] = new std::thread(deleteForever, i, pass);
 	}
 
 	for (int i = 0; i < threadCount; i++) {
 		pthrd[i]->join();
+	}
+	for (int i = 0; i < threadCount; i++) {
+		delete pthrd[i];
 	}
 }
 
@@ -1433,15 +1458,15 @@ public:
 		map = new SkipListMap(0, 0, new int[1]{ BIGINT }, 1);
 
 
-		doInsert(threadCount);
+		doInsert(threadCount, 0);
 
-		for (int i = 0; i < 100; i++) {
+		for (int i = 0; i < 1000; i++) {
 			//recCount = 20000000;;
-			doDelete(threadCount);
+			doDelete(threadCount, i);
 
 
 			//recCount = 20000000;;
-			doInsert(threadCount);
+			doInsert(threadCount, i);
 		}
 
 		//delete map;

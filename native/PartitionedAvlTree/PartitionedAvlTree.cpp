@@ -533,7 +533,7 @@ uint64_t getCurrMillis() {
 #ifdef _WIN32
 	SYSTEMTIME time;
 	GetSystemTime(&time);
-	return (time.wSecond * 1000) + time.wMilliseconds;
+	return (time.wHour * 60 * 60 * 1000) + (time.wMinute * 60 * 1000) + (time.wSecond * 1000) + time.wMilliseconds;
 #else
 	struct timeval tp;
 	gettimeofday(&tp, NULL);

@@ -173,6 +173,7 @@ class PooledObjectPool {
 	std::atomic<int> offset;
 	std::atomic<int> freeFreeOffset;
 	std::atomic<int> freeAllocOffset;
+	std::mutex **freeMutexes = new std::mutex*[poolCount];
 
 public:
 
@@ -180,6 +181,7 @@ public:
 		this->obj = obj;
 		for (int i = 0; i < poolCount; i++) {
 			pools[i].obj = obj;
+			freeMutexes[i] = new std::mutex();
 		}
 		offset.store(0);
 		for (int i = 0; i < poolCount; i++) {
@@ -247,11 +249,13 @@ public:
 		while (true) {
 			int o = abs(freeFreeOffset++) % poolCount;
 			int lval = 0;
+			
 			if (fl[o].compare_exchange_strong(lval, 1)) {
 				pools[o].free(obj);
 				fl[o].store(0);
 				return;
 			}
+			
 		}
 
 	}

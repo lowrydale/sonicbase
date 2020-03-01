@@ -1569,12 +1569,13 @@ public class BackupManagerImpl {
         else {
           file = new File(file, "delta/" + server.getShard() + "/0/schema.bin");
         }
-        BufferedInputStream in = new BufferedInputStream(new FileInputStream(file));
-        byte[] bytes = IOUtils.toByteArray(in);
+        try (BufferedInputStream in = new BufferedInputStream(new FileInputStream(file))) {
+          byte[] bytes = IOUtils.toByteArray(in);
 
-        synchronized (server.getCommon()) {
-          server.getCommon().deserializeSchema(bytes);
-          server.getCommon().saveSchema(server.getDataDir());
+          synchronized (server.getCommon()) {
+            server.getCommon().deserializeSchema(bytes);
+            server.getCommon().saveSchema(server.getDataDir());
+          }
         }
       }
       //pushSchema();

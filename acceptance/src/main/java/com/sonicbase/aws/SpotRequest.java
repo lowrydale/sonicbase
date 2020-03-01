@@ -38,12 +38,12 @@ public class SpotRequest {
         .build();
 
     //servers
-    requestInstances(ec2, "sonicbase-server", "4-dale", "0.30", 2, "ami-09c35f79935d5105f", //"ami-2cd41851", //ami-a12c15da (2k iops)
-        "r5n.large", "us-east-1b", true);
+    requestInstances(ec2, "sonicbase-server", "4-dale", "0.30", 4, "ami-06231c03d383d87bb", //"ami-2cd41851", //ami-a12c15da (2k iops)
+        "r5.2xlarge", "us-east-1b", true);
 
     //clients
-    requestInstances(ec2, "sonicbase-client", "4-dale", "0.8", 2, "ami-09c35f79935d5105f", //"ami-9ed519e3",
-        "m5a.large", "us-east-1b", false);
+    requestInstances(ec2, "sonicbase-client", "4-dale", "0.2", 8, "ami-06231c03d383d87bb", //"ami-9ed519e3",
+        "m5a.xlarge", "us-east-1b", false);
   }
 
   private static void requestInstances(AmazonEC2 ec2, String tag, String cluster, String price, int count,

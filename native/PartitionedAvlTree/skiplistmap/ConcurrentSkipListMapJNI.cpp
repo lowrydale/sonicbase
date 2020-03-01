@@ -964,7 +964,8 @@ JNIEXPORT jboolean JNICALL Java_com_sonicbase_index_NativeSkipListMap_higherEntr
 
     	env->ReleaseLongArrayElements(jValues, valuesArray, 0);
 
-		//delete entry;
+		delete entry;
+	    deleteKey(env, map->dataTypes, key, map->keyPool, map->keyImplPool);
 
 	   	return true;
 	}
@@ -1009,6 +1010,7 @@ JNIEXPORT jboolean JNICALL Java_com_sonicbase_index_NativeSkipListMap_lowerEntry
     	env->ReleaseLongArrayElements(jValues, valuesArray, 0);
 
 		delete entry;
+	    deleteKey(env, map->dataTypes, key, map->keyPool, map->keyImplPool);
 
 	   	return true;
 	}
@@ -1195,7 +1197,7 @@ JNIEXPORT jboolean JNICALL Java_com_sonicbase_index_NativeSkipListMap_firstEntry
 
     	env->ReleaseLongArrayElements(jValues, valuesArray, 0);
 
-		//delete entry;
+		delete entry;
 
 		if (SB_DEBUG) {
 			printf("firstEntry end\n");
@@ -1460,7 +1462,7 @@ public:
 
 		doInsert(threadCount, 0);
 
-		for (int i = 0; i < 1000; i++) {
+		for (int i = 0; i < 10000; i++) {
 			//recCount = 20000000;;
 			doDelete(threadCount, i);
 
@@ -1518,7 +1520,7 @@ public:
 		*/
 	}
 };
-int main(int argc, char *argv[])
+int main2(int argc, char *argv[])
 {
 
 	Test t;

@@ -1688,7 +1688,7 @@ public class UpdateManager {
       byte[][] bytes = doDeleteRecordRemoveFromIndex(key, index);
 
       if (bytes != null) {
-        //checkOutOfOrderForDelete(cobj, sequence0, sequence1, dbName, key, bytes);
+        checkOutOfOrderForDelete(cobj, sequence0, sequence1, dbName, key, bytes);
 
         if (tableSchema.getIndices().get(indexName).isPrimaryKey()) {
           for (byte[] innerBytes : bytes) {

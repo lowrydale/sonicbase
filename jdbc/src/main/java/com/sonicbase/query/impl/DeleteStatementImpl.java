@@ -216,9 +216,9 @@ public class DeleteStatementImpl extends StatementImpl implements DeleteStatemen
 
         doDeleteRecord(indexSchema, DatabaseCommon.serializeKey(tableSchema, indexSchema.getName(), entry[0]), selectedShards);
 
-        if (!indexSchema.isPrimaryKey()) {
+        //if (!indexSchema.isPrimaryKey()) {
           doDeleteIndexEntry(DatabaseCommon.serializeKey(tableSchema, indexSchema.getName(), entry[0]), record);
-        }
+        //}
 
         countDeleted++;
       }

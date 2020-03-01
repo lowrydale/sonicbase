@@ -4950,9 +4950,6 @@ public class TestDatabase {
     ret = stmt.executeQuery();
     assertTrue(ret.next());
     assertFalse(ret.next());
-//    assertTrue(ret.next());
-//    assertTrue(ret.next());
-//    assertFalse(ret.next());
 
     stmt = conn.prepareStatement("select * from persons where socialSecurityNumber='ssn'");
     ret = stmt.executeQuery();

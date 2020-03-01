@@ -57,17 +57,20 @@
         </layout>
     </appender>
 
+<!--
     <appender name="logstash" class="com.sonicbase.logger.Logger">
         <param name="threshold" value="info"/>
         <layout class="org.apache.log4j.PatternLayout">
             <param name="ConversionPattern" value="%d{yyyy-MM-dd HH:mm:ss,SSS} %-5p - %C{1}: %m%n" />
         </layout>
     </appender>
-
+-->
     <logger name="com.sonicbase" additivity="false">
         <level value="info"/>
         <appender-ref ref="roll"/>
+<!--
         <appender-ref ref="logstash"/>
+-->
     </logger>
 
     <logger name="com.sonicbase.logger.Logger" additivity="false">
@@ -83,7 +86,9 @@
     <root>
         <priority value="info" />
         <appender-ref ref="roll" />
+<!--
         <appender-ref ref="logstash" />
+-->
         <!--<appender-ref ref="roll-errors" />-->
       <!--<appender-ref ref="console" />-->
     </root>

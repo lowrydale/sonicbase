@@ -340,8 +340,12 @@ public class DatabaseCommon {
   }
 
   public void deserializeSchema(byte[] bytes) {
-    DataInputStream in = new DataInputStream(new ByteArrayInputStream(bytes));
-    deserializeSchema(in);
+    try (DataInputStream in = new DataInputStream(new ByteArrayInputStream(bytes))) {
+      deserializeSchema(in);
+    }
+    catch (IOException e) {
+      throw new DatabaseException(e);
+    }
   }
 
   public void deserializeSchema(DataInputStream in) {

@@ -25,7 +25,7 @@ public:
 	virtual const char *className() = 0;
 };
 
-#define FREE_POOL_SIZE 1000000
+#define FREE_POOL_SIZE 100000
 
 template<typename V>
 class FreePool {
@@ -167,22 +167,17 @@ template<typename V>
 class PooledObjectPool {
 	V obj;
 	int poolCount = CORE_COUNT;
-	NonSafeObjectPool<V> *pools = new NonSafeObjectPool<V>[poolCount];
+	NonSafeObjectPool<V> *pools = 0;//new NonSafeObjectPool<V>[poolCount];
 	std::atomic<int> *l = new std::atomic<int>[poolCount];
 	std::atomic<int> *fl = new std::atomic<int>[poolCount];
 	std::atomic<int> offset;
 	std::atomic<int> freeFreeOffset;
 	std::atomic<int> freeAllocOffset;
-	std::mutex **freeMutexes = new std::mutex*[poolCount];
 
 public:
 
 	PooledObjectPool(V obj) {
 		this->obj = obj;
-		for (int i = 0; i < poolCount; i++) {
-			pools[i].obj = obj;
-			freeMutexes[i] = new std::mutex();
-		}
 		offset.store(0);
 		for (int i = 0; i < poolCount; i++) {
 			l[i].store(0);

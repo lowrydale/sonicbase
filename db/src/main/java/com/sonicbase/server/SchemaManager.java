@@ -11,10 +11,7 @@ import org.apache.commons.io.IOUtils;
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
 
-import java.io.File;
-import java.io.FileInputStream;
-import java.io.FileOutputStream;
-import java.io.IOException;
+import java.io.*;
 import java.nio.file.Files;
 import java.util.*;
 import java.util.concurrent.*;
@@ -1204,8 +1201,10 @@ public class SchemaManager {
       if (indexSchemas != null && indexSchemas.length > 0) {
         sortSchemaFiles(indexSchemas);
         File indexSchemaFile = indexSchemas[indexSchemas.length - 1];
-        byte[] bytes = IOUtils.toByteArray(new FileInputStream(indexSchemaFile));
-        retObj.put(ComObject.Tag.INDEX_SCHEMA, bytes);
+        try (InputStream in = new FileInputStream(indexSchemaFile)) {
+          byte[] bytes = IOUtils.toByteArray(in);
+          retObj.put(ComObject.Tag.INDEX_SCHEMA, bytes);
+        }
       }
       return retObj;
     }
@@ -1226,8 +1225,10 @@ public class SchemaManager {
       if (tableSchemas != null && tableSchemas.length > 0) {
         sortSchemaFiles(tableSchemas);
         File tableSchemaFile = tableSchemas[tableSchemas.length - 1];
-        byte[] bytes = IOUtils.toByteArray(new FileInputStream(tableSchemaFile));
-        retObj.put(ComObject.Tag.TABLE_SCHEMA, bytes);
+        try (InputStream in = new FileInputStream(tableSchemaFile)) {
+          byte[] bytes = IOUtils.toByteArray(in);
+          retObj.put(ComObject.Tag.TABLE_SCHEMA, bytes);
+        }
       }
       return retObj;
     }

@@ -20,7 +20,7 @@ import static com.sonicbase.index.AddressMap.unsafe;
 
 public class BenchEmbedded {
 
-  private static boolean skip = true;
+  private static boolean skip = false;
   private static ConcurrentSkipListMap<Long, Long> map = new ConcurrentSkipListMap<>();
 
   public static void main(String[] args) throws SQLException, InterruptedException {
@@ -94,7 +94,7 @@ public class BenchEmbedded {
 
     //doSimpleGets(tableCount, deleteCount, insertThreadCount, embeddedConn, tables);
 
-    for (int i = 0; i < 1000; i++){
+    for (int i = 0; i < 1; i++){
       doDeletes(tableCount, deleteCount, insertThreadCount, embeddedConn, tables);
 
       System.gc();

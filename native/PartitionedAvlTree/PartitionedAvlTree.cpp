@@ -473,7 +473,7 @@ public:
     my_node * maps[PARTITION_COUNT];
     std::mutex *locks = new std::mutex[PARTITION_COUNT];
     spinlock_t *slocks = new spinlock_t[PARTITION_COUNT];
-    KAVLComparator *comparator = 0;
+    KeyComparator *comparator = 0;
     PooledObjectPool<Key*> *keyPool;
     PooledObjectPool<KeyImpl*> *keyImplPool;
 	int *dataTypes = 0;
@@ -1080,7 +1080,7 @@ JNIEXPORT void JNICALL Java_com_sonicbase_index_NativePartitionedTree_put__J_3_3
 		for (int i = 0; i < len; i++) {
 			jobjectArray jKey = (jobjectArray)env->GetObjectArrayElement(jKeys, i);
 
-			Key *startKey = javaKeyToNativeKey(env, map->keyPool, map->keyImplPool, map->dataTypes, jKey, 0, map->fieldCount);
+			Key *startKey = javaKeyToNativeKey(env, map->keyPool, map->keyImplPool, map->dataTypes, jKey, map->comparator, map->fieldCount);
 
         	my_node *q, *p = new my_node;
 
@@ -1155,7 +1155,7 @@ JNIEXPORT jlong JNICALL Java_com_sonicbase_index_NativePartitionedTree_put__J_3L
 		}
 
 
-		Key *startKey = javaKeyToNativeKey(env, map->keyPool, map->keyImplPool, map->dataTypes, jstartKey, 0, map->fieldCount);
+		Key *startKey = javaKeyToNativeKey(env, map->keyPool, map->keyImplPool, map->dataTypes, jstartKey, map->comparator, map->fieldCount);
 
 		if (startKey == 0) {
 			printf("put, null key");
@@ -1653,7 +1653,7 @@ jboolean JNICALL tailHeadlockArray
 
 	int posInTopLevelArray = 0;
 
-	Key *startKey = javaKeyToNativeKey(env, map->keyPool, map->keyImplPool, map->dataTypes, jstartKey, 0, map->fieldCount);
+	Key *startKey = javaKeyToNativeKey(env, map->keyPool, map->keyImplPool, map->dataTypes, jstartKey, map->comparator, map->fieldCount);
 
 	SortedList sortedList(map, tail, count);
 
@@ -1841,7 +1841,7 @@ JNIEXPORT jlong JNICALL Java_com_sonicbase_index_NativePartitionedTree_remove
 		return 0;
 	}
 
-	Key *key = javaKeyToNativeKey(env, map->keyPool, map->keyImplPool, map->dataTypes, jKey, 0, map->fieldCount);
+	Key *key = javaKeyToNativeKey(env, map->keyPool, map->keyImplPool, map->dataTypes, jKey, map->comparator, map->fieldCount);
 
 	if (key == 0) {
 		printf("remove, null key");
@@ -1933,7 +1933,7 @@ JNIEXPORT jlong JNICALL Java_com_sonicbase_index_NativePartitionedTree_get
 		return 0;
 	}
 
-    Key *startKey = javaKeyToNativeKey(env, map->keyPool, map->keyImplPool, map->dataTypes, jKey, 0, map->fieldCount);
+    Key *startKey = javaKeyToNativeKey(env, map->keyPool, map->keyImplPool, map->dataTypes, jKey, map->comparator, map->fieldCount);
 
     int partition = hashKey(env, map->dataTypes, startKey) % PARTITION_COUNT;
 
@@ -1973,7 +1973,7 @@ JNIEXPORT jboolean JNICALL Java_com_sonicbase_index_NativePartitionedTree_higher
 		return 0;
 	}
 
-    Key *key = javaKeyToNativeKey(env, map->keyPool, map->keyImplPool, map->dataTypes, jKey, 0, map->fieldCount);
+    Key *key = javaKeyToNativeKey(env, map->keyPool, map->keyImplPool, map->dataTypes, jKey, map->comparator, map->fieldCount);
 
     my_node keyNode;
     keyNode.key = key;
@@ -2043,7 +2043,7 @@ JNIEXPORT jboolean JNICALL Java_com_sonicbase_index_NativePartitionedTree_lowerE
 		return 0;
 	}
 
-	Key *key = javaKeyToNativeKey(env, map->keyPool, map->keyImplPool, map->dataTypes, jKey, 0, map->fieldCount);
+	Key *key = javaKeyToNativeKey(env, map->keyPool, map->keyImplPool, map->dataTypes, jKey, map->comparator, map->fieldCount);
 
     my_node keyNode;
     keyNode.key = key;
@@ -2115,7 +2115,7 @@ JNIEXPORT jboolean JNICALL Java_com_sonicbase_index_NativePartitionedTree_floorE
 		return 0;
 	}
 
-    Key *key = javaKeyToNativeKey(env, map->keyPool, map->keyImplPool, map->dataTypes, jKey, 0, map->fieldCount);
+    Key *key = javaKeyToNativeKey(env, map->keyPool, map->keyImplPool, map->dataTypes, jKey, map->comparator, map->fieldCount);
 
 	my_node keyNode;
     keyNode.key = key;
@@ -2187,7 +2187,7 @@ JNIEXPORT jboolean JNICALL Java_com_sonicbase_index_NativePartitionedTree_ceilin
 		return 0;
 	}
 
-	Key *key = javaKeyToNativeKey(env, map->keyPool, map->keyImplPool, map->dataTypes, jKey, 0, map->fieldCount);
+	Key *key = javaKeyToNativeKey(env, map->keyPool, map->keyImplPool, map->dataTypes, jKey, map->comparator, map->fieldCount);
 
 	my_node keyNode;
     keyNode.key = key;
@@ -2409,7 +2409,7 @@ JNIEXPORT void JNICALL Java_com_sonicbase_index_NativePartitionedTree_sortKeys
 	Key ** nativeKeys = new Key*[keyCount];
 	for (int i = 0; i < keyCount; i++) {
 		jobjectArray jKey = (jobjectArray)env->GetObjectArrayElement(keysObj, i);
-		nativeKeys[i] = javaKeyToNativeKey(env, map->keyPool, map->keyImplPool, map->dataTypes, jKey, 0, map->fieldCount);
+		nativeKeys[i] = javaKeyToNativeKey(env, map->keyPool, map->keyImplPool, map->dataTypes, jKey, map->comparator, map->fieldCount);
 	}
 
 	binarySort(map, nativeKeys, 0, keyCount, 0, ascend);
@@ -2629,7 +2629,31 @@ void allocator() {
 	}
 	*/
 }
-int main2() {
+int main() {
+
+	KeyComparator *comparator = new KeyComparator(0, 0, 1, new int[1, 1] {BIGINT});
+	my_node * map = 0;
+
+	Key *startKey = new Key();
+	startKey->key = new CompoundKey();
+	((LongKey*)startKey->key)->longKey = 100;
+	my_node *q, *p = new my_node;
+
+	p->key = startKey;
+	p->value = (uint64_t)10;
+
+	q = kavl_insert(&map, p, comparator, 0);
+
+	p = new my_node;
+
+	startKey = new Key();
+	startKey->key = new LongKey();
+	((LongKey*)startKey->key)->longKey = 101;
+	p->key = startKey;
+	p->value = (uint64_t)11;
+
+	q = kavl_insert(&map, p, comparator, 0);
+
 
 	begin = std::chrono::duration_cast<std::chrono::milliseconds>(std::chrono::system_clock::now().time_since_epoch()).count();
 

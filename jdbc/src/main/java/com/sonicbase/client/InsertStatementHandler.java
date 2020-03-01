@@ -321,15 +321,13 @@ public class InsertStatementHandler implements StatementHandler {
       key[0] = id;
     }
     else {
-      int[] indexFieldOffsets = indexSchema.getValue().getFieldOffsets();
       for (int i = 0; i < key.length; i++) {
-        int size = columnNames.size();
-        for (int j = 0; j < size; j++) {
+        for (int j = 0; j < columnNames.size(); j++) {
           if (columnNames.get(j).equals(indexFields[i])) {
             key[i] = values.get(j);
 
-            int fieldOffset = indexFieldOffsets[i];
-            FieldSchema fieldSchema = tableSchema.getFields().get(fieldOffset);
+            String fieldName = indexSchema.getValue().getFields()[i];
+            FieldSchema fieldSchema = tableSchema.getFields().get(tableSchema.getFieldOffset(fieldName));
 
             key[i] = fieldSchema.getType().getConverter().convert(key[i]);
           }

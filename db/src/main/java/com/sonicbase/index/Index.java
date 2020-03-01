@@ -90,7 +90,8 @@ public class Index {
         case TIME:
         case TIMESTAMP:
           if (StringUtils.isEmpty(idxImplStr)) {
-            impl = new NativeSkipListMapImpl(port, this);// new NativePartitionedTreeImpl(port, this); //new LongIndexImpl(this); //
+            impl = new NativePartitionedTreeImpl(port, this);
+//            impl = new NativeSkipListMapImpl(port, this);// new NativePartitionedTreeImpl(port, this); //new LongIndexImpl(this); //
           }
           else {
             if ("skiplist".equalsIgnoreCase(idxImplStr)) {
@@ -113,7 +114,8 @@ public class Index {
     }
     else {
       if (StringUtils.isEmpty(idxImplStr)) {
-        impl = new NativeSkipListMapImpl(port, this);// new NativePartitionedTreeImpl(port, this); //new LongIndexImpl(this); //
+        impl = new NativePartitionedTreeImpl(port, this);
+//        impl = new NativeSkipListMapImpl(port, this);// new NativePartitionedTreeImpl(port, this); //new LongIndexImpl(this); //
       }
       else {
         if ("skiplist".equalsIgnoreCase(idxImplStr)) {

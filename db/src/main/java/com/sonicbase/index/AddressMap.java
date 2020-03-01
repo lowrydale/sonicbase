@@ -137,6 +137,7 @@ public class AddressMap {
           }
           catch (InterruptedException e) {
             Thread.currentThread().interrupt();
+            break;
           }
           catch (Exception e) {
             logger.error("error freeing address", e);

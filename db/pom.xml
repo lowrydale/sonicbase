@@ -79,7 +79,7 @@
         <testng.version>6.8</testng.version>
         <gson.version>2.2.3</gson.version>
         <jsqlparser.version>0.9.5</jsqlparser.version>
-        <quartz.version>2.2.1</quartz.version>
+        <quartz.version>2.3.2</quartz.version>
         <quartz-jobs.version>2.2.1</quartz-jobs.version>
         <aws-java-sdk.version>1.11.400</aws-java-sdk.version>
         <fastutil.version>7.0.2</fastutil.version>
